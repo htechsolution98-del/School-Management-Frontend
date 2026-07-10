@@ -363,3 +363,59 @@ export function getDashboardRoute(roles: string[]): string {
   if (role === "parents") return "/parent";
   return "/";
 }
+
+// ─── Face Verification / Enrollment ──────────────────────────────────────────
+
+export class FaceApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+    this.name = "FaceApiError";
+  }
+}
+
+export async function enrollFace(imageBlob: Blob): Promise<any> {
+  const url = `${API_BASE_URL}/face-enroll/`;
+  const formData = new FormData();
+  formData.append("face_image", imageBlob, "face.png");
+
+  const response = await fetchWithAuth(url, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = "Face enrollment failed.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.message || message;
+    } catch { /* ignore */ }
+    throw new FaceApiError(message, response.status);
+  }
+
+  return response.json();
+}
+
+export async function verifyFace(imageBlob: Blob): Promise<any> {
+  const url = `${API_BASE_URL}/face-verify/`;
+  const formData = new FormData();
+  formData.append("image", imageBlob, "face.png");
+
+  const response = await fetchWithAuth(url, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = "Face verification failed.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.message || message;
+    } catch { /* ignore */ }
+    throw new FaceApiError(message, response.status);
+  }
+
+  return response.json();
+}
+

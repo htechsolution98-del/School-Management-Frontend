@@ -39,8 +39,10 @@ export async function saveLocationSettings(payload: LocationSettings): Promise<v
   }
 }
 
-export async function deleteLocationSettings(id?: number | string): Promise<void> {
-  const url = id ? `${LOCATION_URL}${id}/` : LOCATION_URL;
+const DELETE_LOCATION_URL = `${API_BASE_URL}${API_ENDPOINTS.DELETE_LOCATION}`;
+
+export async function deleteLocationSettings(id: number | string): Promise<void> {
+  const url = `${DELETE_LOCATION_URL}${id}/`;
   const response = await fetchWithAuth(url, { method: "DELETE" });
 
   if (!response.ok && response.status !== 204) {

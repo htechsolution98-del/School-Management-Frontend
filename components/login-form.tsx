@@ -9,6 +9,13 @@ import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { loginUser, getDashboardRoute } from "@/lib/auth";
 import { useRouter, useSearchParams } from "next/navigation";
+import { FaceScan } from "@/components/face-scan";
+
+const STAFF_ROLES = ["teacher"];
+
+function isStaff(roles: string[]): boolean {
+  return roles.some((role) => STAFF_ROLES.includes(role.toLowerCase()));
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -33,6 +40,11 @@ function LoginFormInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+
+  // Face scanning states
+  const [showFaceScan, setShowFaceScan] = useState(false);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [pendingRoute, setPendingRoute] = useState("");
 
   useEffect(() => {
     const identifier = searchParams.get("identifier");
@@ -84,16 +96,49 @@ function LoginFormInner() {
       console.log("response : ",response,"response.user?.roles : ",response.roles, response.user?.roles);
       const roles = response.roles || response.user?.roles || [];
       const route = getDashboardRoute(roles);
-      router.push(route);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("username", username);
+      }
+
+      if (isStaff(roles)) {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const lastVerified = localStorage.getItem(`face_verified_date_${username}`);
+        if (lastVerified === todayStr) {
+          router.push(route);
+        } else {
+          setUserRoles(roles);
+          setPendingRoute(route);
+          setShowFaceScan(true);
+        }
+      } else {
+        router.push(route);
+      }
     } catch (err: any) {
       setError(
         err.message || "Failed to login. Please verify your credentials.",
       );
-      console.error("Login failed:", err);
+      console.warn("Login failed:", err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (showFaceScan) {
+    return (
+      <FaceScan
+        username={username}
+        roles={userRoles}
+        onSuccess={() => {
+          router.push(pendingRoute);
+        }}
+        onCancel={() => {
+          setShowFaceScan(false);
+          setIsLoading(false);
+        }}
+      />
+    );
+  }
 
   return (
     <motion.div

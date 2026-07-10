@@ -119,11 +119,11 @@ export const admissionFormSchema: AdmissionFormSchema = {
           type: "textarea",
           required: true,
           gridColumn: "full",
-        },
+        },        { id: "pincode", label: "Pincode", type: "text", required: true },
+
         { id: "cityVillage", label: "City/Village", type: "text", required: true },
         { id: "district", label: "District", type: "text", required: true },
         { id: "state", label: "State", type: "text", required: true },
-        { id: "pincode", label: "Pincode", type: "text", required: true },
         {
           id: "applyingForClass",
           label: "Applying For Class",

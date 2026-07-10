@@ -30,7 +30,12 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   fallback = "Request failed."
 ): Promise<T> {
-  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  let url = path;
+  if (!path.startsWith("http")) {
+    const cleanBase = API_BASE_URL.replace(/\/$/, "");
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    url = `${cleanBase}${cleanPath}`;
+  }
   const response = await fetchWithAuth(url, {
     headers: {
       "Content-Type": "application/json",

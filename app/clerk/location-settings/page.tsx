@@ -393,7 +393,7 @@ function InteractiveMap({
     if (circleRef.current) {
       try {
         circleRef.current.remove();
-      } catch {}
+      } catch { }
       circleRef.current = null;
     }
 
@@ -477,7 +477,7 @@ function InteractiveMap({
       );
       const data = await res.json();
       if (data?.display_name) setAddress(data.display_name);
-    } catch {}
+    } catch { }
   };
 
   const doGetLocation = () => {
@@ -837,13 +837,13 @@ function DataView({ data, onDelete }: { data: any; onDelete: () => void }) {
 
               {/* Map — only render if valid coords */}
               {data.latitude &&
-              data.longitude &&
-              !isNaN(parseFloat(data.latitude)) ? (
+                data.longitude &&
+                !isNaN(parseFloat(data.latitude)) ? (
                 <InteractiveMap
                   lat={data.latitude}
                   lng={data.longitude}
                   radius={data.radius || "100"}
-                  onLocationSelect={() => {}}
+                  onLocationSelect={() => { }}
                   readOnly
                 />
               ) : (
@@ -979,25 +979,11 @@ function DataView({ data, onDelete }: { data: any; onDelete: () => void }) {
                 value={data.half_day_time?.slice(0, 5)}
                 icon={AlarmClock}
               />
-              {data.id && (
-                <InfoRow
-                  label="Record ID"
-                  value={`#${data.id}`}
-                  icon={CheckCircle2}
-                />
-              )}
             </div>
           </Section>
 
           {/* Action buttons */}
           <div className="flex justify-end">
-            {/* <button
-              type="button"
-              onClick={onEdit}
-              className="flex-1 h-14 text-base rounded-2xl font-semibold border-2 border-teal-500 text-teal-600 hover:bg-teal-50 transition-all flex items-center justify-center gap-3"
-            >
-              <Pencil className="h-5 w-5" />Edit Zone
-            </button> */}
             <button
               type="button"
               onClick={() => setShowDeleteDialog(true)}
