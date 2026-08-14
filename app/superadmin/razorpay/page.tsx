@@ -175,34 +175,31 @@ function CredentialForm({
       setSaving(false);
     }
   };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6"
-    >
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-[#4F46E5]/10 flex items-center justify-center">
-            <CreditCard className="h-4.5 w-4.5 text-[#4F46E5]" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-gray-900">
-              {isEdit ? "Edit Razorpay Credentials" : "Add Razorpay Credentials"}
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {isEdit ? `Updating for ${existing?.school_name}` : "Link a school to its payment gateway"}
-            </p>
-          </div>
-        </div>
-        <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
-          <X className="h-4 w-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        className="bg-white rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-6 md:p-8 w-full max-w-2xl overflow-hidden flex flex-col relative max-h-[90vh]"
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors z-10"
+        >
+          <X className="h-5 w-5" />
         </button>
-      </div>
+        
+        <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">
+          {isEdit ? "Edit Razorpay Credentials" : "Add Razorpay Credentials"}
+        </h3>
+        <p className="text-sm text-slate-500 mb-6">
+          {isEdit ? `Updating for ${existing?.school_name}` : "Link a school to its payment gateway"}
+        </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="overflow-y-auto custom-scrollbar pr-2 flex-1">
+          <form onSubmit={handleSubmit} className="space-y-5 pb-4">
         {/* School selector */}
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">School</Label>
@@ -279,8 +276,10 @@ function CredentialForm({
             {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</> : <><Save className="h-4 w-4 mr-2" />{isEdit ? "Update" : "Save Credentials"}</>}
           </Button>
         </div>
-      </form>
-    </motion.div>
+          </form>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

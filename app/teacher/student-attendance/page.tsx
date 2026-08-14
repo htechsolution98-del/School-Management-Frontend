@@ -24,6 +24,7 @@ import {
 import {
   getStudentsForAttendance,
   submitStudentAttendance,
+  getStudentAttendanceRecords,
 } from "@/lib/teacher";
 import type { StudentAttendanceListResponse } from "@/types/teacher";
 
@@ -73,6 +74,19 @@ function formatDate(date: Date): string {
     month: "long",
     year: "numeric",
   });
+}
+
+function normalizeDate(dStr: string): string {
+  if (!dStr) return "";
+  const parts = dStr.split("T")[0].split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+    } else if (parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    }
+  }
+  return dStr;
 }
 
 // ─── Shared style tokens ──────────────────────────────────────────────────────
@@ -841,10 +855,20 @@ function StudentListView({
   students,
   divisionName,
   onMarkAttendance,
+  isAlreadyMarkedToday,
+  assignedDivisions,
+  selectedDivisionId,
+  onSelectDivision,
+  onViewStudent,
 }: {
   students: Student[];
   divisionName: string;
   onMarkAttendance: () => void;
+  isAlreadyMarkedToday: boolean;
+  assignedDivisions?: { division_id: number; division_name: string }[];
+  selectedDivisionId?: number | null;
+  onSelectDivision?: (divId: number) => void;
+  onViewStudent?: (student: Student) => void;
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage]     = useState(1);
@@ -870,6 +894,9 @@ function StudentListView({
   const pct          = students.length > 0
     ? Math.round((presentCount / students.length) * 100)
     : 0;
+  const absentPct    = students.length > 0
+    ? Math.round((absentCount / students.length) * 100)
+    : 0;
 
   return (
     <div
@@ -880,6 +907,26 @@ function StudentListView({
         fontFamily: "'Sora', sans-serif",
       }}
     >
+      {isAlreadyMarkedToday && (
+        <div
+          style={{
+            background: "#d1fae5",
+            border: "1px solid #10b981",
+            borderRadius: 12,
+            padding: "12px 18px",
+            marginBottom: 20,
+            color: "#059669",
+            fontSize: 13,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <CheckCircle2 size={16} color="#10b981" />
+          <span>Attendance for today has already been submitted successfully.</span>
+        </div>
+      )}
       {/* Page header */}
       <div
         style={{
@@ -892,17 +939,43 @@ function StudentListView({
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: "#1e1b4b",
-              margin: 0,
-              fontFamily: "inherit",
-            }}
-          >
-            Student Attendance
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#1e1b4b",
+                margin: 0,
+                fontFamily: "inherit",
+              }}
+            >
+              Student Attendance
+            </h1>
+            {assignedDivisions && assignedDivisions.length > 1 && (
+              <select
+                value={selectedDivisionId ?? ""}
+                onChange={(e) => onSelectDivision?.(Number(e.target.value))}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ede9fe",
+                  background: "#fff",
+                  color: "#7c3aed",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  outline: "none",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                }}
+              >
+                {assignedDivisions.map((ad) => (
+                  <option key={ad.division_id} value={ad.division_id}>
+                    {ad.division_name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 3 }}>
             {divisionName} · {today}
           </p>
@@ -928,7 +1001,8 @@ function StudentListView({
             {today}
           </button>
           <button
-            onClick={onMarkAttendance}
+            onClick={isAlreadyMarkedToday ? undefined : onMarkAttendance}
+            disabled={isAlreadyMarkedToday}
             style={{
               display: "flex",
               alignItems: "center",
@@ -936,17 +1010,22 @@ function StudentListView({
               padding: "8px 18px",
               borderRadius: 10,
               border: "none",
-              background: "linear-gradient(135deg,#7c3aed,#4f46e5)",
+              background: isAlreadyMarkedToday
+                ? "#9ca3af"
+                : "linear-gradient(135deg,#7c3aed,#4f46e5)",
               color: "#fff",
               fontSize: 13,
-              cursor: "pointer",
+              cursor: isAlreadyMarkedToday ? "not-allowed" : "pointer",
               fontWeight: 700,
               fontFamily: "inherit",
-              boxShadow: "0 4px 14px rgba(124,58,237,0.32)",
+              boxShadow: isAlreadyMarkedToday
+                ? "none"
+                : "0 4px 14px rgba(124,58,237,0.32)",
+              opacity: isAlreadyMarkedToday ? 0.7 : 1,
             }}
           >
             <CheckCircle2 size={14} />
-            Mark Attendance
+            {isAlreadyMarkedToday ? "Attendance Submitted" : "Mark Attendance"}
           </button>
         </div>
       </div>
@@ -973,7 +1052,7 @@ function StudentListView({
         <StatCard
           label="Absent Today"
           value={String(absentCount)}
-          sub={students.length > 0 ? `(${100 - pct}%)` : ""}
+          sub={students.length > 0 ? `(${absentPct}%)` : ""}
           icon={XCircle}
           iconBg="#fee2e2"
           iconColor="#ef4444"
@@ -1104,6 +1183,7 @@ function StudentListView({
                   </td>
                   <td style={S.tdBase}>
                     <button
+                      onClick={() => onViewStudent?.(s)}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -1198,10 +1278,14 @@ function MarkAttendanceView({
   students,
   divisionName,
   onBack,
+  localStorageKey,
+  onMarkedSuccess,
 }: {
   students: Student[];
   divisionName: string;
   onBack: () => void;
+  localStorageKey: string;
+  onMarkedSuccess: () => void;
 }) {
   const [attendance, setAttendance] = useState<
     Record<string, AttendanceStatus>
@@ -1267,6 +1351,11 @@ function MarkAttendanceView({
 
       await submitStudentAttendance(records);
 
+      if (typeof window !== "undefined" && localStorageKey) {
+        localStorage.setItem(localStorageKey, "true");
+      }
+      onMarkedSuccess();
+
       setSaving(false);
       setShowConfirm(false);
       setSaved(true);
@@ -1279,9 +1368,20 @@ function MarkAttendanceView({
     } catch (err: any) {
       setSaving(false);
       setShowConfirm(false);
-      setApiError(err?.message || "Failed to save attendance. Please try again.");
+      const isAlreadyMarked = err?.message?.toLowerCase().includes("already") || 
+                              err?.message?.toLowerCase().includes("unique") ||
+                              err?.message?.toLowerCase().includes("exist");
+      if (isAlreadyMarked) {
+        if (typeof window !== "undefined" && localStorageKey) {
+          localStorage.setItem(localStorageKey, "true");
+        }
+        onMarkedSuccess();
+        setApiError("Attendance for this class has already been marked today.");
+      } else {
+        setApiError(err?.message || "Failed to save attendance. Please try again.");
+      }
     }
-  }, [students, attendance, onBack]);
+  }, [students, attendance, onBack, localStorageKey, onMarkedSuccess]);
 
   return (
     <div
@@ -1848,6 +1948,193 @@ function MarkAttendanceView({
   );
 }
 
+// ─── StudentViewModal ─────────────────────────────────────────────────────────
+
+function StudentViewModal({
+  student,
+  attendanceRecords,
+  divisionName,
+  onClose,
+}: {
+  student: Student;
+  attendanceRecords: any[];
+  divisionName: string;
+  onClose: () => void;
+}) {
+  const studentHistory = useMemo(() => {
+    return attendanceRecords.filter(
+      (r) => String(r.student) === String(student.id)
+    );
+  }, [attendanceRecords, student.id]);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.45)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+          width: "100%",
+          maxWidth: 520,
+          overflow: "hidden",
+          border: "1px solid #ede9fe",
+          fontFamily: "'Sora', sans-serif",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "18px 24px",
+            background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Avatar initials={student.initials} color="#7c3aed" size={42} />
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#fff" }}>
+                {student.name}
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: 12, opacity: 0.9 }}>
+                GR No: {student.grNo} · {divisionName}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.2)",
+              border: "none",
+              color: "#fff",
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "20px 24px" }}>
+          {/* Today's Status */}
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 12,
+              background: "#faf9ff",
+              border: "1px solid #ede9fe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 18,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#4b5563" }}>
+              Today's Status
+            </span>
+            <StatusBadge status={student.todayStatus} />
+          </div>
+
+          {/* Attendance History */}
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#1e1b4b" }}>
+            Attendance History ({studentHistory.length})
+          </h4>
+
+          <div
+            style={{
+              maxHeight: 200,
+              overflowY: "auto",
+              border: "1px solid #ede9fe",
+              borderRadius: 12,
+            }}
+          >
+            {studentHistory.length === 0 ? (
+              <div style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                No past attendance records found.
+              </div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>Date</th>
+                    <th style={S.th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentHistory.map((rec, i) => (
+                    <tr key={rec.id || i} style={{ borderBottom: "1px solid #f5f3ff" }}>
+                      <td style={{ ...S.tdBase, fontSize: 12, color: "#4b5563" }}>
+                        {rec.attendance_date}
+                      </td>
+                      <td style={S.tdBase}>
+                        <StatusBadge
+                          status={
+                            rec.is_present ? "present" : rec.is_absent ? "absent" : "unmarked"
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "12px 24px",
+            borderTop: "1px solid #f5f3ff",
+            display: "flex",
+            justifyContent: "flex-end",
+            background: "#faf9ff",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 9,
+              border: "1px solid #ede9fe",
+              background: "#fff",
+              color: "#6b7280",
+              fontSize: 13,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontFamily: "inherit",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page Entry Point ─────────────────────────────────────────────────────────
 
 export default function StudentAttendancePage() {
@@ -1857,28 +2144,81 @@ export default function StudentAttendancePage() {
   const [apiData, setApiData]       = useState<StudentAttendanceListResponse | null>(null);
   const [students, setStudents]     = useState<Student[]>([]);
   const [divisionName, setDivisionName] = useState("—");
+  const [selectedDivId, setSelectedDivId] = useState<number | null>(null);
+  const [rawAttendanceRecords, setRawAttendanceRecords] = useState<any[]>([]);
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
 
-  // ── Fetch students on mount ─────────────────────────────────────────────────
-  const fetchStudents = useCallback(async () => {
+  const [isAlreadyMarkedToday, setIsAlreadyMarkedToday] = useState(false);
+  const todayDateStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const localStorageKey = useMemo(() => {
+    const divId = apiData?.division_id || "";
+    return divId ? `attendance_marked_${divId}_${todayDateStr}` : "";
+  }, [apiData, todayDateStr]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorageKey) {
+      const marked = localStorage.getItem(localStorageKey);
+      if (marked === "true") {
+        setIsAlreadyMarkedToday(true);
+      } else {
+        setIsAlreadyMarkedToday(false);
+      }
+    }
+  }, [localStorageKey]);
+
+  // ── Fetch students ──────────────────────────────────────────────────────────
+  const fetchStudents = useCallback(async (targetDivId?: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await getStudentsForAttendance();
+      const [data, attendanceRecords] = await Promise.all([
+        getStudentsForAttendance(targetDivId),
+        getStudentAttendanceRecords(),
+      ]);
       setApiData(data);
+      setRawAttendanceRecords(attendanceRecords);
       setDivisionName(data.division_name);
+      if (data.division_id) {
+        setSelectedDivId(data.division_id);
+      }
+
+      const todayNorm = normalizeDate(new Date().toISOString().split("T")[0]);
+      let hasMarkedToday = false;
 
       // Map API shape → internal Student shape
-      const mapped: Student[] = data.students.map((s, idx) => ({
-        id:          String(s.id),
-        grNo:        s.gr_no,
-        name:        [s.name, s.surname].filter(Boolean).join(" "),
-        initials:    getInitials(s.name, s.surname),
-        color:       AVATAR_COLORS[idx % AVATAR_COLORS.length],
-        todayStatus: "unmarked",
-      }));
+      const mapped: Student[] = data.students.map((s, idx) => {
+        const match = attendanceRecords.find(
+          (r) => String(r.student) === String(s.id) && normalizeDate(r.attendance_date) === todayNorm
+        );
+
+        let todayStatus: "present" | "absent" | "unmarked" = "unmarked";
+        if (match) {
+          hasMarkedToday = true;
+          if (match.is_present) {
+            todayStatus = "present";
+          } else if (match.is_absent) {
+            todayStatus = "absent";
+          }
+        }
+
+        return {
+          id:          String(s.id),
+          grNo:        s.gr_no,
+          name:        [s.name, s.surname].filter(Boolean).join(" "),
+          initials:    getInitials(s.name, s.surname),
+          color:       AVATAR_COLORS[idx % AVATAR_COLORS.length],
+          todayStatus,
+        };
+      });
 
       setStudents(mapped);
+
+      if (hasMarkedToday) {
+        setIsAlreadyMarkedToday(true);
+      } else {
+        setIsAlreadyMarkedToday(false);
+      }
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");
     } finally {
@@ -1889,6 +2229,11 @@ export default function StudentAttendancePage() {
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  const handleSelectDivision = (divId: number) => {
+    setSelectedDivId(divId);
+    fetchStudents(divId);
+  };
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -1902,18 +2247,35 @@ export default function StudentAttendancePage() {
       {loading ? (
         <LoadingSkeleton />
       ) : error ? (
-        <ErrorState message={error} onRetry={fetchStudents} />
+        <ErrorState message={error} onRetry={() => fetchStudents(selectedDivId ?? undefined)} />
       ) : view === "list" ? (
-        <StudentListView
-          students={students}
-          divisionName={divisionName}
-          onMarkAttendance={() => setView("mark")}
-        />
+        <>
+          <StudentListView
+            students={students}
+            divisionName={divisionName}
+            onMarkAttendance={() => setView("mark")}
+            isAlreadyMarkedToday={isAlreadyMarkedToday}
+            assignedDivisions={apiData?.assigned_divisions}
+            selectedDivisionId={selectedDivId}
+            onSelectDivision={handleSelectDivision}
+            onViewStudent={(st) => setViewingStudent(st)}
+          />
+          {viewingStudent && (
+            <StudentViewModal
+              student={viewingStudent}
+              attendanceRecords={rawAttendanceRecords}
+              divisionName={divisionName}
+              onClose={() => setViewingStudent(null)}
+            />
+          )}
+        </>
       ) : (
         <MarkAttendanceView
           students={students}
           divisionName={divisionName}
           onBack={() => setView("list")}
+          localStorageKey={localStorageKey}
+          onMarkedSuccess={() => setIsAlreadyMarkedToday(true)}
         />
       )}
     </>

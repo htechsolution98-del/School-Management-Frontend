@@ -25,6 +25,7 @@ import {
   CalendarDays,
   BookOpen,
   GraduationCap,
+  UserX,
 } from "lucide-react";
 import {
   fetchStudents,
@@ -37,6 +38,7 @@ import {
   deleteStudentFee,
   formatCurrency,
   formatBillingPeriod,
+  formatDisplayDate,
   getUniqueClasses,
   validateMonthlyFeeForm,
   validateSingleFeeForm,
@@ -46,6 +48,8 @@ import {
   type AcademicYear,
   type FeeWiseClass,
 } from "@/lib/fees";
+import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
+import ReceiptModal from "../student-ledger/ReceiptModal";
 
 // Status Badge Component
 const StatusBadge = ({ status }: { status: StudentFee["status"] }) => {
@@ -64,6 +68,16 @@ const StatusBadge = ({ status }: { status: StudentFee["status"] }) => {
       label: "Partial",
       className: "bg-yellow-100 text-yellow-700 border-yellow-200",
       icon: Clock,
+    },
+    partial: {
+      label: "Partial",
+      className: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      icon: Clock,
+    },
+    pending: {
+      label: "Unpaid",
+      className: "bg-red-100 text-red-700 border-red-200",
+      icon: XCircle,
     },
     overdue: {
       label: "Overdue",
@@ -245,8 +259,7 @@ const CreateFeeModal = ({
     fee_wise_class: "",
     feetype: "",
     billing_period: new Date().toISOString().slice(0, 7),
-    due_date: "",
-    selected_class: "", // ADD THIS ONLY
+    selected_class: "",
   });
 
   useEffect(() => {
@@ -261,7 +274,6 @@ const CreateFeeModal = ({
         fee_wise_class: "",
         feetype: "",
         billing_period: new Date().toISOString().slice(0, 7),
-        due_date: "",
         selected_class: "",
       });
       setErrors({});
@@ -274,15 +286,19 @@ const CreateFeeModal = ({
       feeWiseClasses.map((fc) => [fc.school_class, fc.school_class_name]),
     ).entries(),
   ).map(([id, name]) => ({ id, name }));
-
-  const filteredFeeClasses = feeWiseClasses;
-
+  const filteredFeeClasses = form.selected_class 
+    ? feeWiseClasses.filter((fc) => String(fc.school_class) === form.selected_class)
+    : feeWiseClasses;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errs =
-      feeType === "monthly"
-        ? validateMonthlyFeeForm(form)
-        : validateSingleFeeForm(form);
+    
+    // Basic validation
+    const errs: Record<string, string> = {};
+    if (!form.student) errs.student = "Student is required";
+    if (!form.academic_year) errs.academic_year = "Academic year is required";
+    if (!form.fee_wise_class) errs.fee_wise_class = "Fee structure is required";
+    if (!form.billing_period) errs.billing_period = "Billing period is required";
+
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
@@ -293,14 +309,10 @@ const CreateFeeModal = ({
         academic_year: parseInt(form.academic_year),
         fee_wise_class: parseInt(form.fee_wise_class),
         feetype: parseInt(form.feetype),
-        billing_period: feeType === "monthly" ? form.billing_period : "",
-        due_date: form.due_date,
+        billing_period: form.billing_period,
       };
 
-      const result =
-        feeType === "monthly"
-          ? await createMonthlyStudentFee(payload)
-          : await createSingleStudentFee(payload);
+      const result = await createMonthlyStudentFee(payload); // Using this as it passes all fields including billing_period
 
       if (result.success) {
         setToast({ type: "success", message: "Fee created successfully!" });
@@ -326,24 +338,6 @@ const CreateFeeModal = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create Student Fee">
-      {/* Fee Type Toggle */}
-      <div className="flex bg-gray-100 rounded-xl p-1 mb-5">
-        {(["monthly", "single"] as const).map((type) => (
-          <button
-            key={type}
-            onClick={() => {
-              setFeeType(type);
-              setErrors({});
-            }}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${feeType === type
-              ? "bg-white text-blue-600 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-              }`}
-          >
-            {type === "monthly" ? "Monthly Fee" : "Single Fee"}
-          </button>
-        ))}
-      </div>
 
       {toast && (
         <div
@@ -367,9 +361,7 @@ const CreateFeeModal = ({
           <CustomDropdown
             value={form.selected_class}
             onChange={(v) => { update("selected_class", v); update("student", ""); }}
-            options={[...new Set(students.map((s) => s.class_name).filter(Boolean))]
-              .sort()
-              .map((cls) => ({ value: cls!, label: cls! }))}
+            options={uniqueClassOptions.map((cls) => ({ value: String(cls.id), label: cls.name }))}
             placeholder="Select class..."
           />
         </FormField>
@@ -381,9 +373,19 @@ const CreateFeeModal = ({
             disabled={!form.selected_class}
             placeholder={form.selected_class ? "Select student..." : "Select class first"}
             options={students
-              .filter((s) => s.class_name === form.selected_class)
-              .map((s) => ({ value: String(s.id), label: `${s.name} ${s.surname || ""}`.trim() }))}
+              .filter((s) => String(s.school_class) === form.selected_class)
+              .map((s) => {
+                const fName = s.name === "null" ? "" : s.name;
+                const lName = s.surname === "null" ? "" : s.surname;
+                const fthName = s.father_name === "null" ? "" : s.father_name;
+                const fullName = [fName, lName].filter(Boolean).join(" ");
+                return { 
+                  value: String(s.id), 
+                  label: `${fullName || "No Name"} - Father: ${fthName || "N/A"}` 
+                };
+              })}
             error={!!errors.student}
+            searchable={true}
           />
         </FormField>
 
@@ -417,27 +419,16 @@ const CreateFeeModal = ({
           />
         </FormField>
 
-        {feeType === "monthly" && (
-          <FormField
-            label="Billing Period"
-            error={errors.billing_period}
-            required
-          >
-            <input
-              type="month"
-              className={inputClass}
-              value={form.billing_period}
-              onChange={(e) => update("billing_period", e.target.value)}
-            />
-          </FormField>
-        )}
-
-        <FormField label="Due Date" error={errors.due_date} required>
+        <FormField
+          label="Billing Period"
+          error={errors.billing_period}
+          required
+        >
           <input
-            type="date"
+            type="month"
             className={inputClass}
-            value={form.due_date}
-            onChange={(e) => update("due_date", e.target.value)}
+            value={form.billing_period}
+            onChange={(e) => update("billing_period", e.target.value)}
           />
         </FormField>
 
@@ -476,6 +467,7 @@ function CustomDropdown({
   placeholder = "Select...",
   disabled = false,
   error = false,
+  searchable = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -483,8 +475,10 @@ function CustomDropdown({
   placeholder?: string;
   disabled?: boolean;
   error?: boolean;
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = React.useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
 
@@ -495,6 +489,14 @@ function CustomDropdown({
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+
+  useEffect(() => {
+    if (!open) setSearchQuery("");
+  }, [open]);
+
+  const filteredOptions = searchable 
+    ? options.filter((o) => o.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : options;
 
   return (
     <div ref={ref} className="relative">
@@ -516,20 +518,41 @@ function CustomDropdown({
         />
       </button>
       {open && (
-        <div className="absolute z-[500] top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                ${value === opt.value
-                  ? "bg-blue-50 text-blue-700 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"}`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="absolute z-[500] top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden flex flex-col">
+          {searchable && (
+            <div className="p-2 border-b border-gray-100 bg-gray-50">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+          )}
+          <div className="max-h-52 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { onChange(opt.value); setOpen(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors
+                    ${value === opt.value
+                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      : "text-gray-700 hover:bg-gray-50"}`}
+                >
+                  {opt.label}
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-sm text-gray-500 text-center">No options found</div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -744,16 +767,179 @@ const DiscountModal = ({
   );
 };
 
+// Collect Fee Modal
+const CollectFeeModal = ({
+  isOpen,
+  onClose,
+  fee,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  fee: StudentFee | null;
+  onSuccess: () => void;
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  
+  const [form, setForm] = useState({
+    amount: "",
+    payment_mode: "cash",
+    payment_date: new Date().toISOString().split('T')[0],
+    transaction_id: "",
+    receipt_number: "",
+    note: "",
+  });
+
+  useEffect(() => {
+    if (fee) {
+      setForm({
+        amount: fee.balance_amount || "0.00",
+        payment_mode: "cash",
+        payment_date: new Date().toISOString().split('T')[0],
+        transaction_id: "",
+        receipt_number: "",
+        note: "",
+      });
+    }
+  }, [fee]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fee) return;
+    const errs: Record<string, string> = {};
+    if (!form.amount || parseFloat(form.amount) <= 0) errs.amount = "Invalid amount";
+    if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
+    if (!form.payment_date) errs.payment_date = "Payment date is required";
+    
+    if (["cheque", "upi", "card"].includes(form.payment_mode) && !form.transaction_id) {
+       errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
+    }
+
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLoading(true);
+    try {
+      const { collectStudentFeePayment } = await import("@/lib/fees/fee-generation");
+      const result = await collectStudentFeePayment({
+        student_fee: fee.id,
+        ...form
+      });
+      if (result.success) {
+        setToast({ type: "success", message: "Fee collected successfully!" });
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1500);
+      } else {
+        setToast({ type: "error", message: result.error || "Failed to collect fee" });
+      }
+    } catch (error: any) {
+       setToast({ type: "error", message: error.message || "Failed to collect fee" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const update = (key: string, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Collect Fee">
+      {fee && (
+        <div className="bg-blue-50 rounded-xl p-4 mb-5 border border-blue-100 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900">{fee.student_name}</p>
+              <p className="text-sm text-gray-500">{fee.class_name} • {formatBillingPeriod(fee.billing_period)}</p>
+            </div>
+            <div className="text-right">
+              <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
+                <span className="text-[10px] font-semibold uppercase tracking-wider">
+                  {formatCurrency(fee.amount)} BASE 
+                  {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
+                  {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
+                  =
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Total Balance</p>
+              <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+            </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${toast.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {toast.type === "success" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+          {toast.message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Amount to Collect (₹)" error={errors.amount} required>
+            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" max={fee?.balance_amount} />
+          </FormField>
+          
+          <FormField label="Payment Mode" error={errors.payment_mode} required>
+             <select className={inputClass} value={form.payment_mode} onChange={(e) => update("payment_mode", e.target.value)}>
+                <option value="cash">Cash</option>
+                <option value="cheque">Cheque</option>
+                <option value="upi">UPI</option>
+                <option value="card">Card</option>
+             </select>
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Payment Date" error={errors.payment_date} required>
+             <input type="date" className={inputClass} value={form.payment_date} onChange={(e) => update("payment_date", e.target.value)} />
+          </FormField>
+          <FormField label="Receipt No. (Optional)" error={errors.receipt_number}>
+             <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
+          </FormField>
+        </div>
+
+        {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card") && (
+          <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : "Reference No. *"} error={errors.transaction_id}>
+             <input type="text" className={inputClass} value={form.transaction_id} onChange={(e) => update("transaction_id", e.target.value)} />
+          </FormField>
+        )}
+
+        <FormField label="Note (Optional)" error={errors.note}>
+          <textarea className={`${inputClass} resize-none`} rows={2} value={form.note} onChange={(e) => update("note", e.target.value)} />
+        </FormField>
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+          <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Collecting...</> : "Collect Payment"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
 // View Fee Modal
 const ViewFeeModal = ({
   isOpen,
   onClose,
   fee,
+  onSuccess,
+  onViewReceipt,
 }: {
   isOpen: boolean;
   onClose: () => void;
   fee: StudentFee | null;
+  onSuccess?: () => void;
+  onViewReceipt?: (receiptNo: string) => void;
 }) => {
+  const [processingPayment, setProcessingPayment] = useState<number | null>(null);
+  
   if (!fee) return null;
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Fee Details">
@@ -773,12 +959,12 @@ const ViewFeeModal = ({
           {[
             {
               label: "Academic Year",
-              value: fee.academic_year_name,
+              value: fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A",
               icon: CalendarDays,
             },
             {
               label: "Fee Structure",
-              value: fee.fee_wise_class_name,
+              value: fee.feetype_name || "N/A",
               icon: BookOpen,
             },
             {
@@ -788,7 +974,7 @@ const ViewFeeModal = ({
             },
             {
               label: "Due Date",
-              value: new Date(fee.due_date).toLocaleDateString("en-IN"),
+              value: formatDisplayDate(fee.due_date),
               icon: Clock,
             },
           ].map(({ label, value, icon: Icon }) => (
@@ -815,6 +1001,14 @@ const ViewFeeModal = ({
               - {formatCurrency(fee.discount_amount ?? "0")}
             </span>
           </div>
+          {parseFloat(fee.fine_amount || "0") >= 0 && (
+            <div className="flex justify-between text-sm text-red-600">
+              <span>Penalty</span>
+              <span className="font-medium">
+                + {formatCurrency(fee.fine_amount)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-sm font-bold text-gray-900 pt-2 border-t border-blue-200">
             <span>Payable Amount</span>
             <span className="text-blue-600">
@@ -834,11 +1028,96 @@ const ViewFeeModal = ({
             )}
           </div>
         )}
+
+        {/* Payments History */}
+        {fee.payments && fee.payments.length > 0 && (
+          <div className="border-t border-gray-100 pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Payments History</h3>
+            <div className="space-y-3">
+              {fee.payments.map((payment) => (
+                <div key={payment.id} className={`p-3 rounded-xl border ${payment.is_bounced ? 'bg-red-50 border-red-100' : (!payment.is_verified && payment.payment_mode === 'cheque' ? 'bg-orange-50 border-orange-100' : 'bg-gray-50 border-gray-100')}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{formatCurrency(payment.amount)}</p>
+                      <p className="text-xs text-gray-500 capitalize">{payment.payment_mode} • {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString("en-IN") : "—"}</p>
+                    </div>
+                    <div className="text-right">
+                       {payment.is_bounced ? (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">Bounced</span>
+                       ) : (!payment.is_verified && payment.payment_mode.toLowerCase() === 'cheque' ? (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">Pending Clearance</span>
+                       ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">Cleared</span>
+                       ))}
+                    </div>
+                  </div>
+                  {(payment.transaction_id || payment.receipt_number) && (
+                    <div className="text-xs text-gray-600 bg-white bg-opacity-50 p-2 rounded mt-2 flex justify-between items-center gap-2 border border-gray-100">
+                      <div className="flex flex-col gap-1">
+                        {payment.transaction_id && <span>Ref: {payment.transaction_id}</span>}
+                        {payment.receipt_number && <span>Receipt: <span className="font-mono text-gray-800">{payment.receipt_number}</span></span>}
+                      </div>
+                      {payment.receipt_number && onViewReceipt && (
+                        <button
+                          onClick={() => onViewReceipt(payment.receipt_number!)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition-colors font-medium shadow-sm"
+                        >
+                          <Download size={14} /> Download
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {payment.note && <p className="text-xs text-gray-500 mt-1 italic">{payment.note}</p>}
+                  
+                  {/* Action Buttons for Pending Cheques */}
+                  {!payment.is_verified && !payment.is_bounced && payment.payment_mode.toLowerCase() === 'cheque' && onSuccess && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-orange-200/50">
+                      <button
+                        onClick={async () => {
+                          if (processingPayment) return;
+                          setProcessingPayment(payment.id);
+                          const { clearStudentFeePayment } = await import("@/lib/fees/fee-generation");
+                          const res = await clearStudentFeePayment(payment.id);
+                          setProcessingPayment(null);
+                          if (res.success) {
+                             onSuccess();
+                             onClose();
+                          } else alert(res.error || "Failed to clear cheque.");
+                        }}
+                        disabled={!!processingPayment}
+                        className="flex-1 bg-white border border-green-200 text-green-700 text-xs font-medium py-1.5 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50"
+                      >
+                        {processingPayment === payment.id ? "Processing..." : "Clear Cheque"}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (processingPayment) return;
+                          if (!confirm("Are you sure you want to mark this cheque as bounced? The fee balance will be restored.")) return;
+                          setProcessingPayment(payment.id);
+                          const { bounceStudentFeePayment } = await import("@/lib/fees/fee-generation");
+                          const res = await bounceStudentFeePayment(payment.id);
+                          setProcessingPayment(null);
+                          if (res.success) {
+                             onSuccess();
+                             onClose();
+                          } else alert(res.error || "Failed to bounce cheque.");
+                        }}
+                        disabled={!!processingPayment}
+                        className="flex-1 bg-white border border-red-200 text-red-700 text-xs font-medium py-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {processingPayment === payment.id ? "Processing..." : "Bounce Cheque"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );
 };
-
 // Main Page Component
 export default function GenerateFeesPage() {
   const [activeTab, setActiveTab] = useState<"monthly" | "single">("monthly");
@@ -846,6 +1125,7 @@ export default function GenerateFeesPage() {
   const [fees, setFees] = useState<StudentFee[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [feeWiseClasses, setFeeWiseClasses] = useState<FeeWiseClass[]>([]);
+
 
   // Filters
   const [filterClass, setFilterClass] = useState("");
@@ -859,10 +1139,13 @@ export default function GenerateFeesPage() {
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
+  const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedFee, setSelectedFee] = useState<StudentFee | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false); // ✅ ADD THIS
+  const [loading, setLoading] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [searchedReceiptNumber, setSearchedReceiptNumber] = useState<string | null>(null);
 
   const uniqueClasses = getUniqueClasses(students);
 
@@ -878,8 +1161,8 @@ export default function GenerateFeesPage() {
             search: searchQuery,
             page: currentPage,
           }),
-          fetchAcademicYearsForFee(), // ✅ updated
-          fetchFeeWiseClassesForFee(), // ✅ updated
+          fetchAcademicYearsForFee(),
+          fetchFeeWiseClassesForFee(),
         ],
       );
 
@@ -902,6 +1185,7 @@ export default function GenerateFeesPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
 
   // Client-side filtering for mock data
   const filteredFees = fees.filter((fee) => {
@@ -927,7 +1211,7 @@ export default function GenerateFeesPage() {
   const totalCollected = fees
     .filter((f) => f.status === "paid")
     .reduce((a, f) => a + parseFloat(f.payable_amount), 0);
-  const overdueFees = fees // ✅ ADD THIS
+  const overdueFees = fees
     .filter((f) => f.status === "overdue")
     .reduce((a, f) => a + parseFloat(f.payable_amount), 0);
   const totalDiscount = fees.reduce(
@@ -947,11 +1231,17 @@ export default function GenerateFeesPage() {
     setDiscountModalOpen(true);
     setOpenMenuId(null);
   };
+  const handleCollect = (fee: StudentFee) => {
+    setSelectedFee(fee);
+    setIsCollectFeeModalOpen(true);
+    setOpenMenuId(null);
+  };
   const handleView = (fee: StudentFee) => {
     setSelectedFee(fee);
     setViewModalOpen(true);
     setOpenMenuId(null);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1116,7 +1406,7 @@ export default function GenerateFeesPage() {
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto pb-32">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 size={32} className="animate-spin text-blue-500" />
@@ -1139,6 +1429,8 @@ export default function GenerateFeesPage() {
                       "Amount (₹)",
                       "Discount (₹)",
                       "Payable (₹)",
+                      "Paid (₹)",
+                      "Balance (₹)",
                       "Status",
                       "Action",
                     ].map((h) => (
@@ -1186,11 +1478,7 @@ export default function GenerateFeesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(fee.due_date).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {formatDisplayDate(fee.due_date)}
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold text-gray-900">
                         ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
@@ -1208,6 +1496,12 @@ export default function GenerateFeesPage() {
                         ₹
                         {parseFloat(fee.payable_amount).toLocaleString("en-IN")}
                       </td>
+                      <td className="px-4 py-3 text-sm font-medium text-green-600">
+                        ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-red-600">
+                        ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
+                      </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={fee.status} />
                       </td>
@@ -1220,11 +1514,19 @@ export default function GenerateFeesPage() {
                             <Eye size={15} />
                           </button>
                           <button
-                            onClick={() => handleDiscount(fee)}
-                            className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                            onClick={() => handleCollect(fee)}
+                            className="p-1.5 hover:bg-green-50 rounded-lg transition-colors text-gray-400 hover:text-green-600"
                           >
-                            <Percent size={15} />
+                            <IndianRupee size={15} />
                           </button>
+                          {fee.status !== "paid" && (
+                            <button
+                              onClick={() => handleDiscount(fee)}
+                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                            >
+                              <Percent size={15} />
+                            </button>
+                          )}
                           <div className="relative">
                             <button
                               onClick={() =>
@@ -1245,11 +1547,19 @@ export default function GenerateFeesPage() {
                                   <Eye size={14} /> View
                                 </button>
                                 <button
-                                  onClick={() => handleDiscount(fee)}
+                                  onClick={() => handleCollect(fee)}
                                   className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                 >
-                                  <Percent size={14} /> Discount
+                                  <IndianRupee size={14} /> Collect
                                 </button>
+                                {fee.status !== "paid" && (
+                                  <button
+                                    onClick={() => handleDiscount(fee)}
+                                    className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Percent size={14} /> Discount
+                                  </button>
+                                )}
                                 <hr className="my-1 border-gray-100" />
                                 <button
                                   onClick={async () => {
@@ -1312,26 +1622,29 @@ export default function GenerateFeesPage() {
                     <StatusBadge status={fee.status} />
                   </div>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="mt-3 grid grid-cols-4 gap-2">
                     <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <p className="text-xs text-gray-400">Amount</p>
-                      <p className="text-sm font-bold text-gray-900">
-                        ₹{(parseFloat(fee.amount) / 1000).toFixed(0)}K
-                      </p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <p className="text-xs text-gray-400">Discount</p>
-                      <p className="text-sm font-bold text-green-600">
-                        ₹
-                        {parseFloat(
-                          fee.discount_amount ?? "0",
-                        ).toLocaleString()}
+                      <p className="text-[10px] uppercase text-gray-400">Amount</p>
+                      <p className="text-xs font-bold text-gray-900">
+                        ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
                       </p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-2 text-center">
-                      <p className="text-xs text-gray-400">Payable</p>
-                      <p className="text-sm font-bold text-blue-600">
-                        ₹{(parseFloat(fee.payable_amount) / 1000).toFixed(0)}K
+                      <p className="text-[10px] uppercase text-gray-400">Payable</p>
+                      <p className="text-xs font-bold text-blue-600">
+                        ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-2 text-center">
+                      <p className="text-[10px] uppercase text-gray-400">Paid</p>
+                      <p className="text-xs font-bold text-green-600">
+                        ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-2 text-center">
+                      <p className="text-[10px] uppercase text-gray-400">Balance</p>
+                      <p className="text-xs font-bold text-red-600">
+                        ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
                       </p>
                     </div>
                   </div>
@@ -1343,12 +1656,14 @@ export default function GenerateFeesPage() {
                     >
                       <Eye size={12} /> View
                     </button>
-                    <button
-                      onClick={() => handleDiscount(fee)}
-                      className="flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Percent size={12} /> Discount
-                    </button>
+                    {fee.status !== "paid" && (
+                      <button
+                        onClick={() => handleDiscount(fee)}
+                        className="flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <Percent size={12} /> Discount
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -1475,7 +1790,7 @@ export default function GenerateFeesPage() {
         students={students}
         academicYears={academicYears}
         feeWiseClasses={feeWiseClasses}
-        onSuccess={loadData}
+        onSuccess={() => { loadData(); }}
         activeTab={activeTab}
       />
 
@@ -1483,13 +1798,36 @@ export default function GenerateFeesPage() {
         isOpen={discountModalOpen}
         onClose={() => setDiscountModalOpen(false)}
         fee={selectedFee}
-        onSuccess={loadData}
+        onSuccess={() => { loadData(); }}
       />
 
       <ViewFeeModal
         isOpen={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         fee={selectedFee}
+        onSuccess={() => { loadData(); }}
+        onViewReceipt={(receiptNo) => {
+          setSearchedReceiptNumber(receiptNo);
+          setIsReceiptModalOpen(true);
+        }}
+      />
+
+      <CollectFeeModal
+        isOpen={isCollectFeeModalOpen}
+        onClose={() => {
+          setIsCollectFeeModalOpen(false);
+          setSelectedFee(null);
+        }}
+        fee={selectedFee}
+        onSuccess={() => { loadData(); }}
+      />
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setSearchedReceiptNumber(null);
+        }}
+        receiptNumber={searchedReceiptNumber}
       />
     </div>
   );

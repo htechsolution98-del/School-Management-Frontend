@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { motion, Variants } from "framer-motion";
 import {
   BookOpen,
@@ -63,6 +64,7 @@ interface StatCard {
   iconBg: string;
   valueColor: string;
   linkColor: string;
+  href?: string;
 }
 
 interface TimetableEntry {
@@ -95,6 +97,7 @@ const statCards: StatCard[] = [
     iconBg: "bg-indigo-100",
     valueColor: "text-indigo-600",
     linkColor: "text-indigo-500",
+    href: "/student/homework",
   },
   {
     title: "Syllabus",
@@ -105,6 +108,7 @@ const statCards: StatCard[] = [
     iconBg: "bg-emerald-100",
     valueColor: "text-emerald-500",
     linkColor: "text-emerald-500",
+    href: "/student/syllabus",
   },
   {
     title: "Tests",
@@ -285,9 +289,9 @@ function GreetingHeader() {
 // Stat Card
 // ─────────────────────────────────────────────
 function StatCard({ card, index }: { card: StatCard; index: number }) {
-  return (
+  const content = (
     <motion.div
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col gap-3 cursor-pointer group"
+      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col gap-3 cursor-pointer group h-full"
       variants={scaleIn}
       initial="hidden"
       animate="visible"
@@ -323,13 +327,23 @@ function StatCard({ card, index }: { card: StatCard; index: number }) {
       <p className="text-sm text-gray-400">{card.subtitle}</p>
 
       {/* CTA link */}
-      <button
-        className={`text-sm font-semibold ${card.linkColor} hover:underline text-left group-hover:tracking-wide transition-all duration-200`}
+      <span
+        className={`text-sm font-semibold ${card.linkColor} group-hover:underline text-left group-hover:tracking-wide transition-all duration-200`}
       >
         {card.linkText}
-      </button>
+      </span>
     </motion.div>
   );
+
+  if (card.href) {
+    return (
+      <Link href={card.href} className="block h-full">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
 // ─────────────────────────────────────────────

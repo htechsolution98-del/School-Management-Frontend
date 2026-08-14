@@ -15,6 +15,7 @@ export interface LoginResponse {
   };
   roles?: string[]; 
   school_id?: number;
+  school_name?: string;
   school_slug?: string;
   modules?: string[];
 
@@ -32,12 +33,21 @@ export type StaffCategory =
   | "TRANSOPORTATION"
   | "INVENTORY";
 
+export interface Department {
+  id: number;
+  name: string;
+  school: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Staff {
   id: number;
   name: string | null;
   email: string | null;
-  phone_number: string | null;
+  mobile: string | null;
   category: StaffCategory;
+  department: number | null;
   address: string | null;
   date_of_birth: string | null;
   joining_date: string | null;
@@ -51,8 +61,9 @@ export interface Staff {
 export interface CreateStaffPayload {
   name: string;
   email: string;
-  phone_number: string;
-  category: StaffCategory;
+  mobile: string;
+  category: StaffCategory | string;
+  department?: number;
   address: string;
   date_of_birth: string;
   salary: string;

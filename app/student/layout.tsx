@@ -1,8 +1,6 @@
-// app/student/layout.tsx
 "use client";
 
-import React from "react";
-import { LayoutDashboard, History, Users, CreditCard , BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, BookOpen, BookMarked, CalendarRange, Trophy } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
@@ -11,26 +9,36 @@ const sidebarLinks = [
     href: "/student",
     icon: LayoutDashboard,
   },
-  // {
-  //   title: "Attendance History",
-  //   href: "/student/attendance-history",
-  //   icon: History,
-  // },
-  // {
-  //   title: "Student Attendance",
-  //   href: "/student/attendance",
-  //   icon: Users,
-  // },
+  {
+    title: "Attendance",
+    href: "/student/attendance",
+    icon: Users,
+  },
+  {
+    title: "Syllabus",
+    href: "/student/syllabus",
+    icon: BookMarked,
+  },
   {
     title: "Homework",
     href: "/student/homework",
     icon: BookOpen,
   },
   {
-  title: "Pay Fees",
-  href: "/student/pay-fees",
-  icon: CreditCard,
-},
+    title: "Exam Timetable",
+    href: "/student/exams",
+    icon: CalendarRange,
+  },
+  {
+    title: "My Results",
+    href: "/student/results",
+    icon: Trophy,
+  },
+  {
+    title: "Pay Fees",
+    href: "/student/pay-fees",
+    icon: CreditCard,
+  },
 ];
 
 export default function StudentLayout({

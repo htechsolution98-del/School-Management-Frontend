@@ -67,3 +67,77 @@ export async function updateTimetable(
 
   return response.json();
 }
+
+export interface AutoGeneratePreviewResponse {
+  status: string;
+  message: string;
+  draft_timetables: Array<{
+    class_division: number;
+    class_name: string;
+    division_name: string;
+    day: string;
+    total_lecture: number;
+    start_time: string;
+    end_time: string;
+    slots: Array<{
+      slot_number: number;
+      is_lecture: boolean;
+      is_break: boolean;
+      slot_start_time: string;
+      slot_end_time: string;
+      teacher: number | null;
+      teacher_name: string;
+      subject: number | null;
+      subject_name: string;
+    }>;
+  }>;
+  missing_divisions?: string[];
+  error?: string;
+}
+
+export async function autoGenerateTimetablePreview(options?: {
+  days?: string[];
+  total_lecture?: number;
+  start_time?: string;
+  end_time?: string;
+  include_break?: boolean;
+  break_duration?: number;
+  break_after_lecture?: number;
+}): Promise<AutoGeneratePreviewResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/timetable/auto-generate-preview/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options || {}),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorObj = new Error(data?.error || data?.detail || "Failed to auto generate timetable draft.") as Error & {
+      missing_divisions?: string[];
+    };
+    if (data?.missing_divisions) {
+      errorObj.missing_divisions = data.missing_divisions;
+    }
+    throw errorObj;
+  }
+
+  return data;
+}
+
+export async function publishBulkTimetables(timetables: any[]): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/timetable/bulk-publish/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ timetables }),
+  });
+
+  if (!response.ok) {
+    let message = "Failed to publish timetables.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.error || err?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+}

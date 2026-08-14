@@ -285,7 +285,18 @@ function validateCurrentStep() {
         });
     }
     
-    if (!isValid) alert("Please complete all required fields.");
+    if (!isValid) {
+        Toastify({
+            text: "Please complete all required fields.",
+            duration: 3000,
+            close: true,
+            gravity: "top",
+            position: "right",
+            style: {
+                background: "#ef4444",
+            }
+        }).showToast();
+    }
     return isValid;
 }
 

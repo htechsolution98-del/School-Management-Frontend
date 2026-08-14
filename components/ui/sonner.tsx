@@ -40,6 +40,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          error: "bg-red-500 text-white border-red-600 [&_[data-icon]]:text-white [&_[data-description]]:text-red-50",
         },
       }}
       {...props}

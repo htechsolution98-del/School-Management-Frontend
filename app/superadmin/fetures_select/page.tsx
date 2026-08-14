@@ -16,6 +16,7 @@ import {
   Bus,
   Wallet,
   Boxes,
+  Power,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -23,7 +24,9 @@ import { Badge } from "@/components/ui/badge"
 import {
   getFeatures,
   createFeature,
+  deleteFeature,
 } from "@/lib/superadmin"
+import { useConfirm } from "@/components/providers/confirm-provider"
 import type { FeatureType } from "@/types"
 
 const SCHOOL_FEATURES = [
@@ -66,7 +69,8 @@ const SCHOOL_FEATURES = [
 
 // ================= PAGE =================
 
-export default function FeaturesPage() {
+export default function FeaturesManagerPage() {
+  const confirm = useConfirm()
   const [features, setFeatures] = useState<FeatureType[]>([])
   const [selectedFeature, setSelectedFeature] = useState("")
   const [loading, setLoading] = useState(true)
@@ -162,6 +166,24 @@ export default function FeaturesPage() {
       )
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDeactivate = async (id: number) => {
+    if (!(await confirm("Are you sure you want to deactivate and remove this feature? This might affect schools currently using it."))) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      await deleteFeature(id)
+      setSuccess("Feature deactivated successfully.")
+      setTimeout(() => setSuccess(""), 2000)
+      await fetchFeatures()
+    } catch (err: any) {
+      setError(err.message || "Failed to deactivate feature.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -366,9 +388,18 @@ export default function FeaturesPage() {
                   </p>
                 </div>
 
-                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                  Active
-                </Badge>
+                <div className="flex items-center gap-4">
+                  <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                    Active
+                  </Badge>
+                  <button
+                    onClick={() => handleDeactivate(feature.id)}
+                    className="inline-flex items-center justify-center rounded-full p-2 hover:bg-red-50 text-red-500 transition-colors"
+                    title="Deactivate Feature"
+                  >
+                    <Power className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
 

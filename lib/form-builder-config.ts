@@ -292,16 +292,11 @@ export const PERSONAL_FIELD_TEMPLATES: FieldTemplate[] = [
 ];
 
 export const DOCUMENT_FIELD_TEMPLATES: FieldTemplate[] = [
-  // { key: "aadhaar_card_number", label: "Aadhaar Card Number", type: "file", required: true },
   { key: "aadhaar_card_file", label: "Aadhaar Card File", type: "file", required: true },
-  { key: "birth_certificate", label: "Birth Certificate", type: "file", required: true },
   { key: "birth_certificate_file", label: "Birth Certificate File", type: "file", required: true },
-  { key: "school_leaving_certificate", label: "School Leaving Certificate", type: "file" },
   { key: "school_leaving_certificate_file", label: "School Leaving Certificate File", type: "file" },
   { key: "student_photo", label: "Student Photo", type: "file", required: true },
-  { key: "caste_certificate", label: "Caste Certificate", type: "file" },
   { key: "caste_certificate_file", label: "Caste Certificate File", type: "file" },
-  { key: "income_certificate", label: "Income Certificate Number", type: "file" },
   { key: "income_certificate_file", label: "Income Certificate File", type: "file" },
   {
     key: "address_proof_type",
@@ -316,7 +311,7 @@ export const DOCUMENT_FIELD_TEMPLATES: FieldTemplate[] = [
     ],
   },
   { key: "address_proof_file", label: "Address Proof File", type: "file" },
-]
+];
 
 export function createConfiguredField(
   template: FieldTemplate,

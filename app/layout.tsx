@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "@/components/ui/sonner";
+import { ConfirmProvider } from "@/components/providers/confirm-provider";
 
 export default function RootLayout({
   children,
@@ -35,7 +36,9 @@ export default function RootLayout({
       <body
   className={`${geistSans.variable} ${geistMono.variable} antialiased w-full max-w-full overflow-x-clip`}
 >
+        <ConfirmProvider>
           {children}
+        </ConfirmProvider>
         <Toaster />
       </body>
     </html>

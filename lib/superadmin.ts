@@ -45,10 +45,19 @@ export async function getSchools(): Promise<School[]> {
 export async function createSchool(
   payload: CreateSchoolPayload
 ): Promise<CreateSchoolResponse> {
+  const formData = new FormData();
+  for (const key in payload) {
+    const value = payload[key as keyof CreateSchoolPayload];
+    if (key === "feature_ids") {
+      (value as number[]).forEach(id => formData.append("feature_ids", id.toString()));
+    } else if (value !== null && value !== undefined) {
+      formData.append(key, value as string | Blob);
+    }
+  }
+
   const response = await fetchWithAuth(SCHOOL_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: formData,
   });
 
   if (!response.ok) {
@@ -64,6 +73,58 @@ export async function createSchool(
   }
 
   return response.json();
+}
+
+/**
+ * PATCH /SchoolView/{id}/ — update an existing school entry.
+ */
+export async function updateSchool(
+  id: number,
+  payload: Partial<CreateSchoolPayload>
+): Promise<School> {
+  const formData = new FormData();
+  for (const key in payload) {
+    const value = payload[key as keyof CreateSchoolPayload];
+    if (key === "feature_ids") {
+      (value as number[]).forEach(id => formData.append("feature_ids", id.toString()));
+    } else if (value !== null && value !== undefined) {
+      if (!(typeof value === 'string' && value.startsWith('http'))) {
+        formData.append(key, value as string | Blob);
+      }
+    }
+  }
+
+  const response = await fetchWithAuth(`${SCHOOL_URL}${id}/`, {
+    method: "PATCH",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = "Failed to update school.";
+    try {
+      const err = await response.json();
+      const fieldErrors = Object.values(err || {})
+        .flat()
+        .filter((value): value is string => typeof value === "string");
+      message = err?.detail || err?.message || fieldErrors[0] || message;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/**
+ * DELETE /SchoolView/{id}/ — delete a school entry.
+ */
+export async function deleteSchool(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${SCHOOL_URL}${id}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete school.");
+  }
 }
 
 // ================= FEATURE APIS =================
@@ -86,6 +147,19 @@ export async function getFeatures(): Promise<FeatureType[]> {
 
   const data = await response.json();
   return Array.isArray(data) ? data : data.results ?? [];
+}
+
+/**
+ * DELETE /feature/{id}/ — delete a feature.
+ */
+export async function deleteFeature(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${FEATURE_URL}${id}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete feature.");
+  }
 }
 
 /**

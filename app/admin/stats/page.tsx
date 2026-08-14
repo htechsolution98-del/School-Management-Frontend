@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 // Predefined available icons for the user to select
 const AVAILABLE_ICONS = [
@@ -46,6 +47,7 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
 }
 
 export default function StatsManager() {
+  const confirm = useConfirm();
   const [statsList, setStatsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -104,8 +106,8 @@ export default function StatsManager() {
     setIsOpen(true);
   };
 
-  const handleDelete = (index: number) => {
-    if (!confirm("Are you sure you want to remove this statistics counter?")) return;
+  const handleDelete = async (index: number) => {
+    if (!(await confirm("Are you sure you want to remove this statistics counter?"))) return;
     const updatedList = [...statsList];
     updatedList.splice(index, 1);
     setStatsList(updatedList);

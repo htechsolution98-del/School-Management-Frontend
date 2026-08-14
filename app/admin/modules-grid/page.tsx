@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 // ── Icon registry ─────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -80,6 +81,7 @@ const EMPTY_CARD: Omit<Card, "order"> = {
 };
 
 export default function ModulesGridPage() {
+  const confirm = useConfirm();
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -150,8 +152,8 @@ export default function ModulesGridPage() {
     setCards(u);
   };
 
-  const deleteCard = (idx: number) => {
-    if (!confirm("Delete this card?")) return;
+  const deleteCard = async (idx: number) => {
+    if (!(await confirm("Delete this card?"))) return;
     setCards(cards.filter((_, i) => i !== idx));
   };
 

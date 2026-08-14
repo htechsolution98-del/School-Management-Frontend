@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 interface InfrastructureCard {
   title: string;
@@ -128,6 +129,7 @@ const DEFAULT_SEEDS: InfrastructureCard[] = [
 ];
 
 export default function MobileInfrastructureManager() {
+  const confirm = useConfirm();
   const [settings, setSettings] = useState<any>(null);
   const [infrastructureCards, setInfrastructureCards] = useState<InfrastructureCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -188,8 +190,8 @@ export default function MobileInfrastructureManager() {
     setIsOpen(true);
   };
 
-  const handleDelete = (index: number) => {
-    if (!confirm("Are you sure you want to delete this infrastructure feature card?")) return;
+  const handleDelete = async (index: number) => {
+    if (!(await confirm("Are you sure you want to delete this infrastructure feature card?"))) return;
     const updated = infrastructureCards.filter((_, i) => i !== index);
     setInfrastructureCards(updated);
     toast.success("Card removed locally! Click 'Save Synchronization' to make changes permanent.");
@@ -239,8 +241,8 @@ export default function MobileInfrastructureManager() {
     setIsOpen(false);
   };
 
-  const handleResetToDefaults = () => {
-    if (!confirm("Are you sure you want to reset all cards to default seeded configuration? This will discard custom modifications.")) return;
+  const handleResetToDefaults = async () => {
+    if (!(await confirm("Are you sure you want to reset all cards to default seeded configuration? This will discard custom modifications."))) return;
     setInfrastructureCards(DEFAULT_SEEDS);
     toast.success("Reset to default seeds! Save changes to synchronize.");
   };

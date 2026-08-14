@@ -93,7 +93,55 @@ export interface StudentFee {
   paid_amount: string;
   actual_payable_amount: string;
   balance_amount: string;
+  is_virtual?: boolean;
   payments?: Payment[];
+}
+
+export type PaymentMode = "cash" | "online" | "cheque" | "bank_transfer" | "upi";
+
+export interface Payment {
+  id: number;
+  school?: number;
+  school_name?: string | null;
+  student_fee?: number;
+  student?: number;
+  student_name?: string;
+  student_gr_no?: string | null;
+  student_class?: string | null;
+  student_division?: string | null;
+  feetype?: number;
+  feetype_name?: string;
+  academic_year?: number;
+  academic_year_name?: string;
+  fee_billing_cycle?: BillingCycle | string;
+  fee_billing_period?: string | null;
+  fee_due_date?: string | null;
+  fee_amount?: string;
+  fee_penalty?: string;
+  fee_discount?: string;
+  fee_payable_amount?: string;
+  fee_paid_amount?: string;
+  fee_balance_amount?: string;
+  fee_status?: StudentFeeStatusValue | string;
+  amount: string;
+  payment_mode: PaymentMode | string;
+  transaction_id?: string | null;
+  razorpay_order_id?: string | null;
+  razorpay_payment_id?: string | null;
+  razorpay_signature?: string | null;
+  receipt_number?: string | null;
+  payment_date?: string;
+  date?: string;
+  created_at?: string;
+  note?: string;
+  collected_by?: number | null;
+  collected_by_username?: string | null;
+  is_verified?: boolean;
+  is_bounced?: boolean;
+  verified_by?: number | null;
+  verified_by_username?: string | null;
+  verified_at?: string | null;
+  balance_after_payment?: string;
 }
 
 export interface StudentFeePayload {
@@ -137,6 +185,7 @@ export interface Student {
   mother_name: string;
   school_class: number | null;
   class_name?: string;
+  gr_no?: string | null;
 }
 
 export interface CreateSingleFeePayload {
@@ -152,13 +201,23 @@ export interface CreateMonthlyFeePayload {
   academic_year: number;
   fee_wise_class: number;
   billing_period: string;
-  due_date: string;
+  due_date?: string;
 }
 
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
   success: boolean;
+}
+
+export interface CollectFeePayload {
+  student_fee: number;
+  amount: string;
+  payment_mode: string;
+  transaction_id?: string;
+  receipt_number?: string;
+  note?: string;
+  payment_date?: string;
 }
 
 export interface FeeVerifyRecord {
@@ -273,28 +332,6 @@ export interface GenerateSalaryPayload {
   note?: string;
 }
 
-export type FeeStatus = "pending" | "partial" | "paid" | "cancelled";
-export type PaymentMode = "cash" | "online" | "cheque" | "bank_transfer" | "upi";
-
-export interface Payment {
-  id: number;
-  student_fee: number;
-  amount: string;
-  payment_mode: PaymentMode;
-  receipt_number: string;
-  note?: string;
-  is_verified: boolean;
-  date: string;
-  created_at?: string;
-}
-
-export interface FeeSummary {
-  totalFees: number;
-  paidAmount: number;
-  pendingAmount: number;
-  remainingBalance: number;
-}
-
 export interface RazorpayOrderResponse {
   order_id: string;
   amount: number;
@@ -314,8 +351,8 @@ export interface OfflinePaymentPayload {
   payment_mode: PaymentMode;
   receipt_number: string;
   note?: string;
-  is_verified?: boolean;
 }
+export type FeeStatus = "pending" | "partial" | "paid" | "cancelled";
 
 export interface FeeFilters {
   student?: number;
@@ -348,4 +385,11 @@ export interface PaymentFilters {
   payment_mode?: PaymentMode;
   date_from?: string;
   date_to?: string;
+}
+
+export interface FeeSummary {
+  totalFees: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingBalance: number;
 }

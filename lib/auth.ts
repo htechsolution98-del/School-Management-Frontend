@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
 import { LoginRequest, LoginResponse } from "../types";
+import { toast } from "sonner";
 
 // ─── Token Management ─────────────────────────────────────────────────────────
 
@@ -12,11 +13,11 @@ const REFRESH_TOKEN_COOKIE = "refresh_token";
 const COOKIE_PATH = "path=/";
 const COOKIE_SAME_SITE = "SameSite=Lax";
 
-function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const { headers, body, ...rest } = init;
   const isFormData = body instanceof FormData;
 
-  return fetch(input, {
+  const response = await fetch(input, {
     ...COOKIE_FETCH_OPTIONS,
     ...rest,
     body,
@@ -27,6 +28,40 @@ function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
           ...(headers as Record<string, string>),
         },
   });
+
+  if (!response.ok && response.status !== 401) {
+    try {
+      if (response.status >= 500) {
+        toast.error(`Server Error (${response.status})`, {
+          description: "An unexpected error occurred on the server.",
+        });
+      } else {
+        const errData = await response.clone().json();
+        let errorDesc = "Request failed";
+        
+        if (errData.message) {
+          errorDesc = String(errData.message);
+        } else if (errData.detail) {
+          errorDesc = String(errData.detail);
+        } else if (errData.error) {
+          errorDesc = String(errData.error);
+        } else if (typeof errData === "object" && errData !== null) {
+           // It might be a DRF field-level error object e.g. {"email": ["already exists"]}
+           const firstKey = Object.keys(errData)[0];
+           if (firstKey) {
+             const firstVal = errData[firstKey];
+             errorDesc = Array.isArray(firstVal) ? String(firstVal[0]) : String(firstVal);
+           }
+        }
+        
+        toast.error("Error", { description: errorDesc });
+      }
+    } catch (e) {
+      toast.error(`Request Failed (${response.status})`);
+    }
+  }
+
+  return response;
 }
 
 function getCookie(name: string): string | null {
@@ -158,13 +193,17 @@ export async function loginUser(credentials: LoginRequest): Promise<LoginRespons
   }
 
   const data = await response.json() as LoginResponse;
-  // Tokens now arrive as HttpOnly-style cookies set by the server.
-  // No need to manually call setTokens() — the browser stores them automatically.
-  // Clear any stale legacy tokens from localStorage just in case.
-  clearLegacyLocalTokens();
+  if (data.access) {
+    setTokens(data.access, data.refresh);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("access_token", data.access);
+      if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
+    }
+  }
 
-   if (typeof window !== "undefined") {
+  if (typeof window !== "undefined") {
     if (data.school_id)   localStorage.setItem("school_id",   String(data.school_id));
+    if (data.school_name) localStorage.setItem("school_name", data.school_name);
     if (data.school_slug) localStorage.setItem("school_slug", data.school_slug);
     if (data.roles)       localStorage.setItem("roles",       JSON.stringify(data.roles));
   }
@@ -280,17 +319,40 @@ export async function fetchWithAuth(
 ): Promise<Response> {
 
   const url = String(input);
+  const token = getAccessToken() || (typeof window !== "undefined" ? localStorage.getItem("access_token") : null);
+  const authHeaders: Record<string, string> = {};
+  if (token) {
+    authHeaders["Authorization"] = `Bearer ${token}`;
+  }
 
-  // COOKIE BASED REQUEST
+  // COOKIE & HEADER BASED REQUEST
   let response = await apiFetch(url, {
     ...init,
+    headers: {
+      ...authHeaders,
+      ...(init.headers as Record<string, string>),
+    },
     credentials: "include",
+    cache: "no-store",
   });
 
   // SUCCESS
   if (response.status !== 401) {
     return response;
   }
+
+  // SCHOOL DEACTIVATED / ACCOUNT DISABLED → force logout
+  try {
+    const errBody = await response.clone().json();
+    const msg = errBody?.detail || errBody?.message || "";
+    if (/deactivated|disabled/i.test(msg)) {
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return response;
+    }
+  } catch { /* ignore */ }
 
   // WAIT IF TOKEN REFRESH RUNNING
   if (isRefreshing) {
@@ -329,6 +391,15 @@ export async function fetchWithAuth(
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
+/** Immediately clears tokens and redirects to login (no API call). */
+export function forceLogout(): void {
+  clearTokens();
+
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 export async function logoutUser(): Promise<void> {
 
   try {
@@ -350,18 +421,18 @@ export async function logoutUser(): Promise<void> {
 // ─── Role → Route ─────────────────────────────────────────────────────────────
 
 export function getDashboardRoute(roles: string[]): string {
-  const role = roles?.[0]?.toLowerCase() ?? "";
-  if (role === "super_admin") return "/superadmin";
-  if (role === "admin(trustee)") return "/trustee";
-  if (role === "principal") return "/principal";
-  if (role === "librarian") return "/librarian";
-  if (role === "clerk" || role === "fees_clerk") return "/clerk";
-  if (role === "temp_user") return "/user";
-  if (role === "fees management") return "/fees";
-  if (role === "teacher") return "/teacher";
-  if (role === "student") return "/student";
-  if (role === "parents") return "/parent";
-  return "/";
+  const normalizedRoles = (roles || []).map((r) => (r || "").toLowerCase());
+  if (normalizedRoles.includes("super_admin")) return "/superadmin";
+  if (normalizedRoles.includes("admin(trustee)") || normalizedRoles.includes("trustee")) return "/trustee";
+  if (normalizedRoles.includes("principal")) return "/principal";
+  if (normalizedRoles.includes("librarian")) return "/librarian";
+  if (normalizedRoles.includes("clerk") || normalizedRoles.includes("fees_clerk")) return "/clerk";
+  if (normalizedRoles.includes("temp_user")) return "/user";
+  if (normalizedRoles.includes("fees management") || normalizedRoles.includes("fees")) return "/fees";
+  if (normalizedRoles.includes("teacher")) return "/teacher";
+  if (normalizedRoles.includes("student")) return "/student";
+  if (normalizedRoles.includes("parents") || normalizedRoles.includes("parent")) return "/parent";
+  return "/user";
 }
 
 // ─── Face Verification / Enrollment ──────────────────────────────────────────

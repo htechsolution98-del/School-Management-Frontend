@@ -43,6 +43,25 @@ export async function patchFieldValues(
   return response.json();
 }
 
+export async function patchStudentDivision(admissionNumber: string, division: string) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/updatesubmition/${admissionNumber}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ division: division }),
+  });
+
+  if (!response.ok) {
+    let message = "Failed to update student division.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
 export async function patchDocuments(
   admissionNumber: string,
   documents: {

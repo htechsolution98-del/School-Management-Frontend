@@ -12,8 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 export default function TestimonialsManager() {
+  const confirm = useConfirm();
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -89,7 +91,7 @@ export default function TestimonialsManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this testimonial?")) return;
+    if (!(await confirm("Delete this testimonial?"))) return;
     try {
       const res = await fetch(`/api/landing/testimonials?id=${id}`, { method: "DELETE" });
       const data = await res.json();

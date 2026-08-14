@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 interface CapabilityItem {
   _id?: string;
@@ -79,6 +80,7 @@ const defaultCapabilities: CapabilityItem[] = [
 ];
 
 export default function CapabilitiesManagerPage() {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -134,8 +136,8 @@ export default function CapabilitiesManagerPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (index: number) => {
-    if (!confirm("Are you sure you want to delete this dynamic capabilities card?")) return;
+  const handleDelete = async (index: number) => {
+    if (!(await confirm("Are you sure you want to delete this dynamic capabilities card?"))) return;
     const updated = mobileCapabilities.filter((_, i) => i !== index);
     setMobileCapabilities(updated);
     toast.success("Capability card deleted locally. Click Save Settings below to apply permanently.");
@@ -166,8 +168,8 @@ export default function CapabilitiesManagerPage() {
     toast.success("Card configuration added locally! Click Save Settings below to persist.");
   };
 
-  const handleRestoreDefaults = () => {
-    if (confirm("This will replace all currently listed capability cards with the 4 default system capabilities. Do you want to proceed?")) {
+  const handleRestoreDefaults = async () => {
+    if (await confirm("This will replace all currently listed capability cards with the 4 default system capabilities. Do you want to proceed?")) {
       setMobileCapabilities(defaultCapabilities);
       toast.success("Loaded default 4 capabilities. Click Save Settings below to apply permanently.");
     }

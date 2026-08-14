@@ -17,12 +17,14 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Trash2,
   X,
 } from "lucide-react";
 
 import {
   getAdmissionForms,
   toggleFormStatus,
+  deleteAdmissionForm,
   getPublishedFormLink,
 } from "@/lib/principal";
 import type { AdmissionFormResponse } from "@/types/principal";
@@ -40,7 +42,7 @@ function ModalBackdrop({ onClick }: { onClick: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClick}
-      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-40 bg-black/50"
     />
   );
 }
@@ -116,8 +118,9 @@ function FormDetailsModal({
             </div>
           </div>
 
-          {/* Sections & Fields */}
+          {/* Sections, Fields, Documents & Fees */}
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            {/* 1. Form Sections & Fields */}
             {(form.sections || []).map((section, index) => (
               <div
                 key={section.id || `${section.title}-${index}`}
@@ -133,9 +136,9 @@ function FormDetailsModal({
                   </span>
                 </div>
                 <div className="divide-y">
-                  {(section.fields || []).map((field, index) => (
+                  {(section.fields || []).map((field, fIdx) => (
                     <div
-                      key={`field-${index}`}
+                      key={(field as any).id || `field-${fIdx}`}
                       className="flex items-center gap-3 px-4 py-3 group hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shrink-0">
@@ -146,10 +149,11 @@ function FormDetailsModal({
                         <p className="text-sm font-medium text-slate-800 truncate">
                           {field.label}
                         </p>
-
-                        <p className="text-xs text-slate-400 font-mono truncate">
-                          Order: {field.order}
-                        </p>
+                        {field.options && Array.isArray(field.options) && field.options.length > 0 ? (
+                          <p className="text-xs text-slate-400 truncate mt-0.5">
+                            Options: {field.options.map((opt: any) => typeof opt === "string" ? opt : opt.label || opt.value).join(", ")}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
@@ -172,6 +176,75 @@ function FormDetailsModal({
                 </div>
               </div>
             ))}
+
+            {/* 2. Document Fields */}
+            {form.document_fields && form.document_fields.length > 0 ? (
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="flex items-center gap-2 border-b bg-purple-50/70 px-4 py-3">
+                  <ClipboardList className="h-4 w-4 text-purple-600" />
+                  <p className="font-semibold text-slate-800 text-sm">
+                    Required Documents
+                  </p>
+                  <span className="ml-auto text-xs text-slate-400">
+                    {form.document_fields.length} items
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {form.document_fields.map((doc: any, docIdx: number) => {
+                    const label = typeof doc === "string" ? doc : doc.label;
+                    const isReq = typeof doc === "object" ? doc.is_required : true;
+                    return (
+                      <div
+                        key={doc.id || `doc-${docIdx}`}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-purple-50/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shrink-0">
+                            <FileText className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-sm font-medium text-slate-800">
+                            {label}
+                          </span>
+                        </div>
+                        <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2.5 py-0.5 font-medium">
+                          Document Upload
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 3. Fee Structures */}
+            {(form as any).fee_structures && (form as any).fee_structures.length > 0 ? (
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="flex items-center gap-2 border-b bg-emerald-50/70 px-4 py-3">
+                  <IndianRupee className="h-4 w-4 text-emerald-600" />
+                  <p className="font-semibold text-slate-800 text-sm">
+                    Class-wise Fee Structure
+                  </p>
+                </div>
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50/30">
+                  {(form as any).fee_structures.map((fee: any, fIdx: number) => (
+                    <div
+                      key={`fee-${fIdx}`}
+                      className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs"
+                    >
+                      <span className="font-semibold text-slate-800">{fee.class_label || fee.class_code || `Class #${fee.class_name}`}</span>
+                      <span className="font-bold text-emerald-700">₹{fee.fee_amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {(!form.sections || form.sections.length === 0) &&
+            (!form.document_fields || form.document_fields.length === 0) ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                No fields or document requirements defined for this form.
+              </div>
+            ) : null}
           </div>
         </div>
       </motion.div>
@@ -255,14 +328,18 @@ function FormTableRow({
   form,
   index,
   onView,
+  onDelete,
   onPublishToggle,
   isToggling = false,
+  isDeleting = false,
 }: {
   form: AdmissionFormResponse;
   index: number;
   onView: () => void;
+  onDelete: () => void;
   onPublishToggle: (formId: number, currentStatus: boolean) => void;
   isToggling?: boolean;
+  isDeleting?: boolean;
 }) {
   const totalFields = (form.sections || []).reduce(
     (sum, s) => sum + (s.fields?.length || 0),
@@ -341,18 +418,33 @@ function FormTableRow({
           </span>
         </div>
       </td>
-      {/* This is the currently not used but after some time use  */}
-      {/* <td className="px-6 py-4 text-right">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onView}
-          className="gap-2 h-8"
-        >
-          <Eye className="h-3.5 w-3.5" />
-          View
-        </Button>
-      </td> */}
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onView}
+            className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+            title="View Details"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40"
+            title="Delete Form"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </td>
     </motion.tr>
   );
 }
@@ -448,8 +540,10 @@ export default function AdmissionFormPage() {
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [viewForm, setViewForm] = useState<AdmissionFormResponse | null>(null);
+  const [confirmDeleteForm, setConfirmDeleteForm] = useState<AdmissionFormResponse | null>(null);
   const [successBanner, setSuccessBanner] = useState("");
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchForms = useCallback(async () => {
     setLoading(true);
@@ -517,6 +611,20 @@ export default function AdmissionFormPage() {
       );
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleDeleteForm = async (form: AdmissionFormResponse) => {
+    setDeletingId(form.id);
+    try {
+      await deleteAdmissionForm(form.id);
+      toast.success(`Form "${form.title}" deleted successfully`);
+      await fetchForms();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete form");
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteForm(null);
     }
   };
 
@@ -659,8 +767,7 @@ export default function AdmissionFormPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  {/* this is the temparary change for the action column -- S */}
-                  {/* <tr className="border-b border-slate-100 bg-slate-50/70">
+                  <tr className="border-b border-slate-100 bg-slate-50/70">
                     {[
                       "Form",
                       "Description",
@@ -671,23 +778,7 @@ export default function AdmissionFormPage() {
                     ].map((h) => (
                       <th
                         key={h}
-                        className={`px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-400 ${h === "Actions" ? "text-right" : ""}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr> */}
-                  <tr className="border-b border-slate-100 bg-slate-50/70">
-                    {[
-                      "Form",
-                      "Description",
-                      "Fees",
-                      "Sections",
-                      "Publish",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className={`px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-400 ${h === "Actions" ? "text-right" : ""}`}
+                        className={`px-6 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-400 ${h === "Actions" ? "text-right" : ""}`}
                       >
                         {h}
                       </th>
@@ -701,8 +792,10 @@ export default function AdmissionFormPage() {
                       form={form}
                       index={idx}
                       onView={() => setViewForm(form)}
+                      onDelete={() => setConfirmDeleteForm(form)}
                       onPublishToggle={handlePublishToggle}
                       isToggling={togglingId === form.id}
+                      isDeleting={deletingId === form.id}
                     />
                   ))}
                 </tbody>
@@ -723,6 +816,51 @@ export default function AdmissionFormPage() {
       {/* View Form Details Modal */}
       {viewForm ? (
         <FormDetailsModal form={viewForm} onClose={() => setViewForm(null)} />
+      ) : null}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteForm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <ModalBackdrop onClick={() => setConfirmDeleteForm(null)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative z-50 w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200"
+          >
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="p-2.5 bg-red-50 rounded-xl shrink-0">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 leading-tight">Delete Admission Form</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              Are you sure you want to delete <strong className="text-slate-900 font-semibold">{confirmDeleteForm.title}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmDeleteForm(null)}
+                disabled={deletingId === confirmDeleteForm.id}
+                className="h-10 px-4 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDeleteForm(confirmDeleteForm)}
+                disabled={deletingId === confirmDeleteForm.id}
+                className="h-10 px-5 rounded-xl gap-2 bg-red-600 hover:bg-red-700 text-white font-medium shadow-md shadow-red-200"
+              >
+                {deletingId === confirmDeleteForm.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete Form
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       ) : null}
     </>
   );

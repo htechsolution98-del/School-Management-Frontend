@@ -101,19 +101,7 @@ function LoginFormInner() {
         localStorage.setItem("username", username);
       }
 
-      if (isStaff(roles)) {
-        const todayStr = new Date().toISOString().split("T")[0];
-        const lastVerified = localStorage.getItem(`face_verified_date_${username}`);
-        if (lastVerified === todayStr) {
-          router.push(route);
-        } else {
-          setUserRoles(roles);
-          setPendingRoute(route);
-          setShowFaceScan(true);
-        }
-      } else {
-        router.push(route);
-      }
+      router.push(route);
     } catch (err: any) {
       setError(
         err.message || "Failed to login. Please verify your credentials.",

@@ -53,6 +53,7 @@ export interface AssignClassPayload {
 }
 
 export interface AssignedTeacher {
+  id?: number;
   teacher: number | string;
   subject: number | string;
   subject_name?: string;
@@ -68,6 +69,7 @@ export interface Admission {
   admission_number: string;
   status: "pending" | "approved" | "rejected";
   gr_no?: string | null;
+  division?: string | null;
   field_values: {
     id: number;
     field: number;
@@ -89,6 +91,7 @@ export interface LocationSettings {
   start_time: string;
   end_time: string;
   half_day_time: string;
+  school_name?: string;
 }
 
 export interface LocationSettingsRecord extends LocationSettings {

@@ -52,21 +52,52 @@ export async function toggleFormStatus(
   }
 }
 
-export async function getPublishedFormLink(): Promise<{ form_link: string }> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.FORM_LINK}`);
+export async function deleteAdmissionForm(formId: number): Promise<void> {
+  const response = await fetchWithAuth(`${FORMS_URL}${formId}/`, {
+    method: "DELETE",
+  });
 
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, "Failed to fetch form link."));
+    throw new Error(await getErrorMessage(response, "Failed to delete form."));
+  }
+}
+
+export async function updateAdmissionForm(
+  formId: number,
+  payload: Partial<AdmissionFormCreatePayload>
+): Promise<AdmissionFormResponse> {
+  const response = await fetchWithAuth(`${FORMS_URL}${formId}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Failed to update form."));
   }
 
-  const data = await response.json();
+  return response.json();
+}
 
-  if (data.form_link && data.form_link.startsWith("/")) {
-    const baseUrl = API_BASE_URL.endsWith("/")
-      ? API_BASE_URL.slice(0, -1)
-      : API_BASE_URL;
-    data.form_link = `${baseUrl}${data.form_link}`;
+export async function getPublishedFormLink(): Promise<{ form_link: string }> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.FORM_LINK}`);
+
+    if (!response.ok) {
+      return { form_link: "" };
+    }
+
+    const data = await response.json();
+
+    if (data.form_link && data.form_link.startsWith("/")) {
+      const baseUrl = API_BASE_URL.endsWith("/")
+        ? API_BASE_URL.slice(0, -1)
+        : API_BASE_URL;
+      data.form_link = `${baseUrl}${data.form_link}`;
+    }
+
+    return data;
+  } catch (error) {
+    return { form_link: "" };
   }
-
-  return data;
 }

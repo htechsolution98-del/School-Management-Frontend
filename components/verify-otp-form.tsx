@@ -60,6 +60,13 @@ function VerifyOtpInner() {
         payload.mobile = identifier;
       }
 
+      if (typeof window !== "undefined") {
+        const schoolId = localStorage.getItem("school_id");
+        const schoolSlug = localStorage.getItem("school_slug");
+        if (schoolId) payload.school_id = schoolId;
+        if (schoolSlug) payload.school_slug = schoolSlug;
+      }
+
       await verifyOtp(payload);
       
       router.push(`/login?identifier=${encodeURIComponent(identifier)}`);

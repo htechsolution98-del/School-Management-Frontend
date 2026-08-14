@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 interface MobileTab {
   tabId: string;
@@ -121,6 +122,7 @@ const DEFAULT_SEEDS: MobileTab[] = [
 ];
 
 export default function MobileAppRolesManager() {
+  const confirm = useConfirm();
   const [settings, setSettings] = useState<any>(null);
   const [mobileTabs, setMobileTabs] = useState<MobileTab[]>([]);
   const [activePreviewTab, setActivePreviewTab] = useState<string>("");
@@ -242,8 +244,8 @@ export default function MobileAppRolesManager() {
     setPoints(updated);
   };
 
-  const handleDeleteTab = (index: number) => {
-    if (!confirm("Are you sure you want to delete this mobile app role?")) return;
+  const handleDeleteTab = async (index: number) => {
+    if (!(await confirm("Are you sure you want to delete this mobile app role?"))) return;
     const updated = mobileTabs.filter((_, i) => i !== index);
     setMobileTabs(updated);
     toast.success("Role removed from list. Click 'Save Synchronization' to make changes permanent.");
@@ -315,8 +317,8 @@ export default function MobileAppRolesManager() {
     }
   };
 
-  const handleResetToDefaults = () => {
-    if (!confirm("Are you sure you want to reset all roles to the default seeds (Student, Parent, Teacher)? This will overwrite your custom changes.")) return;
+  const handleResetToDefaults = async () => {
+    if (!(await confirm("Are you sure you want to reset all roles to the default seeds (Student, Parent, Teacher)? This will overwrite your custom changes."))) return;
     setMobileTabs(DEFAULT_SEEDS);
     setActivePreviewTab(DEFAULT_SEEDS[0].tabId);
     toast.success("Reset to default seeds! Don't forget to click 'Save Synchronization' to submit.");

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
     Users,
     UserCheck,
@@ -316,7 +317,7 @@ export default function TempUsersPage() {
                 setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: "deactivated" } : u));
             }
         } catch (e: any) {
-            alert(e.message ?? "Action failed");
+            toast.error(e.message ?? "Action failed");
         } finally {
             setToggling(null);
         }
@@ -328,7 +329,7 @@ export default function TempUsersPage() {
             await deactivateAllTempUsers();
             setUsers((prev) => prev.map((u) => ({ ...u, status: "deactivated" })));
         } catch (e: any) {
-            alert(e.message ?? "Failed to deactivate all users");
+            toast.error(e.message ?? "Failed to deactivate all users");
         } finally {
             setDeactivatingAll(false);
         }

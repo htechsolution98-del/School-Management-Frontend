@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { GraduationCap, Menu, X, LogOut, Bell, ChevronRight, Search, Sparkles, Loader2, Megaphone, Trash2 } from "lucide-react";
+import { GraduationCap, Menu, X, LogOut, Bell, ChevronRight, ChevronDown, Search, Sparkles, Loader2, Megaphone, Trash2, School } from "lucide-react";
 import { logoutUser } from "@/lib/auth";
 import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
 import { type AnnouncementResponse } from "@/lib/principal";
@@ -13,6 +13,7 @@ export interface SidebarLink {
   title: string;
   href: string;
   icon: React.ElementType;
+  subLinks?: SidebarLink[];
 }
 
 interface DashboardLayoutProps {
@@ -66,19 +67,149 @@ const roleConfig: Record<string, { gradient: string; badge: string; badgeText: s
   },
 };
 
+function SidebarItem({
+  link,
+  pathname,
+  config,
+  isOpen,
+  onToggle,
+  onLinkClick,
+}: {
+  link: SidebarLink;
+  pathname: string;
+  config: any;
+  isOpen: boolean;
+  onToggle: () => void;
+  onLinkClick?: () => void;
+}) {
+  const hasSubLinks = !!link.subLinks?.length;
+  
+  // Calculate if the current link or any of its sublinks are active
+  const isActive =
+    pathname === link.href ||
+    (pathname.startsWith(`${link.href}/`) &&
+      link.href !== "/" &&
+      (!hasSubLinks)) ||
+    (hasSubLinks && link.subLinks?.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`)));
+
+  if (hasSubLinks) {
+    return (
+      <div className="flex flex-col space-y-1">
+        <button
+          onClick={onToggle}
+          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group overflow-hidden w-full ${
+            isActive ? "text-white" : "text-white/50 hover:text-white/90 hover:bg-white/5"
+          }`}
+        >
+          {isActive && (
+            <motion.div
+              layoutId="activeNavBg"
+              className={`absolute inset-0 bg-gradient-to-r ${config.gradient} rounded-xl opacity-90`}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-3 w-full">
+            <span className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors shrink-0 ${isActive ? "bg-white/20" : "bg-white/5 group-hover:bg-white/10"}`}>
+              <link.icon className="h-3.5 w-3.5" />
+            </span>
+            <span className="flex-1 text-left">{link.title}</span>
+            <span className="shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <ChevronDown className="h-4 w-4 text-white/40" />
+            </span>
+          </span>
+        </button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden flex flex-col space-y-1 pl-10 pr-2 pt-1"
+            >
+              {link.subLinks?.map((subLink) => {
+                const isSubActive = pathname === subLink.href || pathname.startsWith(`${subLink.href}/`);
+                return (
+                  <Link
+                    key={subLink.href}
+                    href={subLink.href}
+                    onClick={onLinkClick}
+                    className={`flex items-center py-2 px-3 rounded-lg text-sm transition-all duration-200 ${
+                      isSubActive
+                        ? "text-white font-semibold bg-white/10"
+                        : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="flex-1">{subLink.title}</span>
+                  </Link>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={link.href}
+      onClick={onLinkClick}
+      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group overflow-hidden ${
+        isActive
+          ? "text-white"
+          : "text-white/50 hover:text-white/90 hover:bg-white/5"
+      }`}
+    >
+      {isActive && (
+        <motion.div
+          layoutId="activeNavBg"
+          className={`absolute inset-0 bg-gradient-to-r ${config.gradient} rounded-xl opacity-90`}
+          transition={{ type: "spring", stiffness: 400, damping: 35 }}
+        />
+      )}
+      <span className="relative z-10 flex items-center gap-3 w-full">
+        <span className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors shrink-0 ${isActive ? "bg-white/20" : "bg-white/5 group-hover:bg-white/10"}`}>
+          <link.icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="flex-1">{link.title}</span>
+        {isActive && (
+          <ChevronRight className="h-3.5 w-3.5 text-white/60 shrink-0" />
+        )}
+      </span>
+    </Link>
+  );
+}
+
 function SidebarContent({
   roleTitle,
   sidebarLinks,
   pathname,
+  schoolName,
   onLinkClick,
 }: {
   roleTitle: string;
   sidebarLinks: SidebarLink[];
   pathname: string;
+  schoolName?: string | null;
   onLinkClick?: () => void;
 }) {
   const config = roleConfig[roleTitle] ?? roleConfig["Super Admin"];
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [openMenuTitle, setOpenMenuTitle] = useState<string | null>(null);
+
+  // Open the active menu initially and on path change
+  useEffect(() => {
+    const activeLink = sidebarLinks.find(link => 
+      pathname === link.href ||
+      (pathname.startsWith(`${link.href}/`) && link.href !== "/" && !link.subLinks?.length) ||
+      (link.subLinks && link.subLinks.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`)))
+    );
+    if (activeLink) {
+      setOpenMenuTitle(activeLink.title);
+    }
+  }, [pathname, sidebarLinks]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -113,11 +244,17 @@ function SidebarContent({
             <div className={`h-8 w-8 rounded-lg ${config.badge} flex items-center justify-center text-white font-bold text-xs shadow-md shrink-0`}>
               {config.badgeText}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Current Role</p>
-              <p className="text-sm font-bold text-white leading-tight">{roleTitle}</p>
+              <p className="text-sm font-bold text-white leading-tight truncate">{roleTitle}</p>
+              {schoolName && (
+                <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[#FFA600] truncate" title={schoolName}>
+                  <School className="h-3 w-3 shrink-0 text-[#FFA600]" />
+                  <span className="truncate">{schoolName}</span>
+                </div>
+              )}
             </div>
-            <Sparkles className="h-3.5 w-3.5 text-white/20 ml-auto" />
+            <Sparkles className="h-3.5 w-3.5 text-white/20 ml-auto shrink-0" />
           </div>
         </div>
       </div>
@@ -126,55 +263,24 @@ function SidebarContent({
         <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/25 px-2">Navigation</p>
       </div>
 
-      {/* Nav Links */}
-      <nav className="flex-1 px-4 space-y-1 overflow-y-auto pb-4">
-        {sidebarLinks.map((link, i) => {
-          const isActive =
-            pathname === link.href ||
-            (pathname.startsWith(`${link.href}/`) &&
-              link.href !== "/" &&
-              !sidebarLinks.some(
-                (other) =>
-                  other.href !== link.href &&
-                  pathname.startsWith(other.href) &&
-                  other.href.length > link.href.length
-              ));
-          return (
-            <motion.div
-              key={link.href}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.06, duration: 0.3 }}
-            >
-              <Link
-                href={link.href}
-                onClick={onLinkClick}
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group overflow-hidden ${
-                  isActive
-                    ? "text-white"
-                    : "text-white/50 hover:text-white/90 hover:bg-white/5"
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNavBg"
-                    className={`absolute inset-0 bg-gradient-to-r ${config.gradient} rounded-xl opacity-90`}
-                    transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-3 w-full">
-                  <span className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors shrink-0 ${isActive ? "bg-white/20" : "bg-white/5 group-hover:bg-white/10"}`}>
-                    <link.icon className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="flex-1">{link.title}</span>
-                  {isActive && (
-                    <ChevronRight className="h-3.5 w-3.5 text-white/60 shrink-0" />
-                  )}
-                </span>
-              </Link>
-            </motion.div>
-          );
-        })}
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto pb-4 no-scrollbar">
+        {sidebarLinks.map((link, i) => (
+          <motion.div
+            key={link.title}
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.06, duration: 0.3 }}
+          >
+            <SidebarItem 
+              link={link} 
+              pathname={pathname} 
+              config={config} 
+              isOpen={openMenuTitle === link.title}
+              onToggle={() => setOpenMenuTitle(openMenuTitle === link.title ? null : link.title)}
+              onLinkClick={onLinkClick} 
+            />
+          </motion.div>
+        ))}
       </nav>
 
       {/* Sign Out */}
@@ -207,7 +313,17 @@ export function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [schoolName, setSchoolName] = useState<string | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sn = localStorage.getItem("school_name");
+      if (sn) {
+        setSchoolName(sn);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -259,6 +375,7 @@ export function DashboardLayout({
             roleTitle={roleTitle}
             sidebarLinks={sidebarLinks}
             pathname={pathname}
+            schoolName={schoolName}
           />
         </div>
       </aside>
@@ -283,6 +400,14 @@ export function DashboardLayout({
               <ChevronRight className="h-4 w-4 text-slate-300" />
               <span className="font-semibold text-slate-800">{activeTitle}</span>
             </div>
+
+            {/* School Name Badge */}
+            {schoolName && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 via-blue-50 to-sky-50 border border-indigo-200/70 text-indigo-900 font-bold text-xs sm:text-sm shadow-xs transition-all hover:shadow-sm">
+                <School className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span className="truncate max-w-[160px] sm:max-w-[260px] md:max-w-[360px] tracking-tight">{schoolName}</span>
+              </div>
+            )}
           </div>
 
           {/* Right */}
@@ -481,6 +606,7 @@ export function DashboardLayout({
                   roleTitle={roleTitle}
                   sidebarLinks={sidebarLinks}
                   pathname={pathname}
+                  schoolName={schoolName}
                   onLinkClick={() => setSidebarOpen(false)}
                 />
               </div>

@@ -44,6 +44,7 @@ import { getSchoolClasses } from "@/lib/clerk";
 
 const feeFormSchema = z
   .object({
+    school_classes: z.array(z.number()).min(1, "Select at least one class"),
     feetype: z.number().min(1, "Select a fee type"),
     amount: z
       .string()
@@ -288,17 +289,19 @@ function LateFeePanel({ fee }: { fee: FeeWiseClass }) {
 
 // ─── Add / Edit Fee Modal ─────────────────────────────────────────────────────
 function FeeModal({
-  feeTypes, classId, editing, onClose, onSave,
+  feeTypes, classes, selectedClassIds, editing, onClose, onSave,
 }: {
   feeTypes: FeeType[];
-  classId: number;
+  classes: { id: number; school_class: string }[];
+  selectedClassIds: number[];
   editing: FeeWiseClass | null;
   onClose: () => void;
-  onSave: (data: FeeWiseClassPayload) => Promise<void>;
+  onSave: (classIds: number[], data: any) => Promise<void>;
 }) {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FeeFormValues>({
     resolver: zodResolver(feeFormSchema),
     defaultValues: {
+      school_classes: editing ? (editing.school_class ? [editing.school_class] : selectedClassIds) : selectedClassIds,
       feetype: editing ? feeTypes.find(ft => ft.name === editing.feetype_name)?.id ?? 0 : 0,
       amount: editing?.amount ?? "",
       late_fee_enabled: editing?.late_fee_enabled ?? false,
@@ -315,9 +318,8 @@ function FeeModal({
   const onSubmit = async (vals: FeeFormValues) => {
     setSaving(true);
     try {
-      const payload: FeeWiseClassPayload = {
+      const payloadBase = {
         feetype: vals.feetype,
-        school_class: classId,
         amount: vals.amount,
         late_fee_enabled: vals.late_fee_enabled,
         ...(vals.late_fee_enabled && {
@@ -327,13 +329,13 @@ function FeeModal({
           max_late_fee: vals.max_late_fee,
         }),
         ...(!vals.late_fee_enabled && {
-          grace_days: null,
+          grace_days: 0,
           late_fee_type: null,
-          late_fee_amount: null,
+          late_fee_amount: "0",
           max_late_fee: null,
         }),
       };
-      await onSave(payload);
+      await onSave(vals.school_classes, payloadBase);
       onClose();
     } finally {
       setSaving(false);
@@ -347,6 +349,36 @@ function FeeModal({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {/* Classes Multi-Select */}
+        {!editing ? (
+          <div>
+            <Label required>Apply to Classes</Label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 150, overflowY: "auto", border: `1.5px solid ${!!errors.school_classes ? C.danger : C.border}`, padding: 10, borderRadius: 8 }}>
+              {classes.map(cls => {
+                const isSelected = watch("school_classes")?.includes(cls.id) ?? false;
+                return (
+                  <label key={cls.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", background: isSelected ? C.accentSoft : "#fff", padding: "6px 10px", borderRadius: 6, border: `1px solid ${isSelected ? C.accent : C.border}`, color: isSelected ? C.accent : C.text, fontWeight: isSelected ? 600 : 400, whiteSpace: "nowrap" }}>
+                    <input type="checkbox" style={{ display: "none" }} checked={isSelected} onChange={(e) => {
+                      const current = watch("school_classes") || [];
+                      if (e.target.checked) setValue("school_classes", [...current, cls.id], { shouldValidate: true });
+                      else setValue("school_classes", current.filter(id => id !== cls.id), { shouldValidate: true });
+                    }} />
+                    {cls.school_class}
+                  </label>
+                );
+              })}
+            </div>
+            <ErrMsg msg={errors.school_classes?.message} />
+          </div>
+        ) : (
+          <div>
+            <Label>Class</Label>
+            <div style={{ ...inp(), background: C.subtle, color: C.muted }}>
+              {classes.find(c => c.id === watch("school_classes")?.[0])?.school_class || "Unknown"}
+            </div>
+          </div>
+        )}
+
         {/* Fee Type */}
         <div>
           <Label required>Fee Type</Label>
@@ -599,7 +631,6 @@ export default function FeeStructurePage() {
   const [classes, setClasses] = useState<{ id: number; school_class: string }[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [fees, setFees] = useState<FeeWiseClass[]>([]);
-  const [selectedClass, setSelectedClass] = useState<{ id: number; school_class: string } | null>(null);
   const [expandedLateFee, setExpandedLateFee] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -620,18 +651,17 @@ export default function FeeStructurePage() {
       .then(([ft, cls]) => {
         setFeeTypes(ft);
         setClasses(cls);
-        if (cls.length > 0) setSelectedClass(cls[0]);
       })
       .catch(() => setError("Failed to load data. Please refresh."))
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Load fees when class changes ───────────────────────────────────────────
-  const loadFees = useCallback(async (classId: number) => {
+  // ── Load all fees ───────────────────────────────────────────────────────────
+  const loadFees = useCallback(async () => {
     setFeesLoading(true);
     setError("");
     try {
-      const data = await getFeeWiseClasses({ school_class: classId });
+      const data = await getFeeWiseClasses({});
       setFees(data);
     } catch {
       setError("Failed to load fee structure.");
@@ -641,20 +671,22 @@ export default function FeeStructurePage() {
   }, []);
 
   useEffect(() => {
-    if (selectedClass) loadFees(selectedClass.id);
-  }, [selectedClass, loadFees]);
+    loadFees();
+  }, [loadFees]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleSave = async (payload: FeeWiseClassPayload) => {
+  const handleSave = async (classIds: number[], basePayload: any) => {
     try {
       if (editingFee) {
+        const payload = { ...basePayload, school_class: classIds[0] };
         const updated = await updateFeeWiseClass(editingFee.id, payload);
         setFees(prev => prev.map(f => f.id === editingFee.id ? updated : f));
         showToast("Fee updated successfully!", "success");
       } else {
-        const created = await createFeeWiseClass(payload);
-        setFees(prev => [...prev, created]);
-        showToast("Fee added successfully!", "success");
+        const promises = classIds.map(cid => createFeeWiseClass({ ...basePayload, school_class: cid }));
+        await Promise.all(promises);
+        loadFees(); // Refresh all fees
+        showToast(`Fee added to ${classIds.length} class(es) successfully!`, "success");
       }
     } catch (e: any) {
       showToast(e.message ?? "Something went wrong.", "error");
@@ -778,49 +810,13 @@ export default function FeeStructurePage() {
       {error && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
           <AlertCircle size={15} /> {error}
-          <button onClick={() => selectedClass && loadFees(selectedClass.id)} style={{ marginLeft: "auto", background: "none", border: "none", color: C.danger, cursor: "pointer", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
+          <button onClick={() => loadFees()} style={{ marginLeft: "auto", background: "none", border: "none", color: C.danger, cursor: "pointer", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
             <RefreshCw size={13} /> Retry
           </button>
         </div>
       )}
 
       <div className="fee-layout">
-
-        {/* ── Class selector panel ── */}
-        <div className="fee-class-panel">
-          <div style={{ background: C.card, borderRadius: 14, border: `1.5px solid ${C.border}`, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Select Class</p>
-            </div>
-            {/* Scrollable pill row (mobile) / vertical list (desktop) */}
-            <div className="fee-class-scroll">
-              {classes.map(cls => {
-                const isSelected = selectedClass?.id === cls.id;
-                return (
-                  <button
-                    key={cls.id}
-                    onClick={() => setSelectedClass(cls)}
-                    className="fee-class-btn-mobile"
-                    style={{
-                      textAlign: "left",
-                      background: isSelected ? C.accentSoft : "transparent",
-                      color: isSelected ? C.accent : C.text,
-                      fontWeight: isSelected ? 600 : 400,
-                      borderColor: isSelected ? C.accent : C.border,
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                    }}
-                  >
-                    {cls.school_class}
-                    {isSelected && <Settings2 size={13} color={C.accent} style={{ marginLeft: 6 }} />}
-                  </button>
-                );
-              })}
-              {classes.length === 0 && (
-                <p style={{ margin: "12px 8px", fontSize: 12, color: C.muted }}>No classes found</p>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* ── Fee table / card panel ── */}
         <div className="fee-table-panel" style={{ background: C.card, borderRadius: 14, border: `1.5px solid ${C.border}`, overflow: "hidden" }}>
@@ -829,30 +825,23 @@ export default function FeeStructurePage() {
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
             <div style={{ minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selectedClass ? `${selectedClass.school_class} Fee Structure` : "Fee Structure"}
+                All Fees
               </h2>
               <p style={{ margin: "3px 0 0", fontSize: 12, color: C.muted }}>
                 {fees.length} fee{fees.length !== 1 ? "s" : ""} configured
               </p>
             </div>
-            {selectedClass && (
-              <button
-                onClick={openAdd}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 9, border: "none", background: C.accent, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 14px rgba(99,102,241,0.28)" }}
-              >
-                <Plus size={14} />
-                Add Fee
-              </button>
-            )}
+            <button
+              onClick={openAdd}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 9, border: "none", background: C.accent, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 14px rgba(99,102,241,0.28)" }}
+            >
+              <Plus size={14} />
+              Add Fee
+            </button>
           </div>
 
           {/* Content */}
-          {!selectedClass ? (
-            <div style={{ padding: "48px 24px", textAlign: "center", color: C.muted }}>
-              <ChevronRight size={28} style={{ display: "block", margin: "0 auto 10px", opacity: 0.3 }} />
-              <p style={{ margin: 0, fontSize: 14 }}>Select a class to view its fee structure</p>
-            </div>
-          ) : feesLoading ? (
+          {feesLoading ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 48 }}>
               <Spinner size={26} />
             </div>
@@ -869,9 +858,9 @@ export default function FeeStructurePage() {
               {/* ── Desktop: column headers + grid rows ── */}
               <div
                 className="fee-desktop-header"
-                style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: "0 8px", padding: "10px 24px", background: C.bg, borderBottom: `1px solid ${C.border}` }}
+                style={{ gridTemplateColumns: "1.5fr 2fr 1fr 1fr 1fr auto", gap: "0 8px", padding: "10px 24px", background: C.bg, borderBottom: `1px solid ${C.border}` }}
               >
-                {["Fee Type", "Amount (₹)", "Billing Cycle", "Late Fee", "Action"].map(h => (
+                {["Class", "Fee Type", "Amount (₹)", "Billing Cycle", "Late Fee", "Action"].map(h => (
                   <span key={h} style={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: "0.05em", textTransform: "uppercase" }}>{h}</span>
                 ))}
               </div>
@@ -882,7 +871,7 @@ export default function FeeStructurePage() {
                   <div
                     className="fee-desktop-row"
                     style={{
-                      gridTemplateColumns: "2fr 1fr 1fr 1fr auto",
+                      gridTemplateColumns: "1.5fr 2fr 1fr 1fr 1fr auto",
                       gap: "0 8px",
                       padding: "16px 24px",
                       borderBottom: i < fees.length - 1 || expandedLateFee === fee.id ? `1px solid ${C.border}` : "none",
@@ -891,6 +880,7 @@ export default function FeeStructurePage() {
                       transition: "background 0.15s",
                     }}
                   >
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{fee.school_class_name}</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 38, height: 38, borderRadius: 10, background: iconBg(fee.feetype_name), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: iconColor(fee.feetype_name) }}>
                         <FeeIcon name={fee.feetype_name} size={17} />
@@ -948,13 +938,14 @@ export default function FeeStructurePage() {
         </div>
       </div>
 
-      {/* Modals */}
-      {showModal && selectedClass && (
+      {/* Modal */}
+      {showModal && (
         <FeeModal
           feeTypes={feeTypes}
-          classId={selectedClass.id}
+          classes={classes}
+          selectedClassIds={[]}
           editing={editingFee}
-          onClose={() => { setShowModal(false); setEditingFee(null); }}
+          onClose={() => setShowModal(false)}
           onSave={handleSave}
         />
       )}

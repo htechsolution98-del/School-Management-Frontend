@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { getWebSocketUrl } from "@/lib/config";
 import { getAnnouncements, type AnnouncementResponse } from "@/lib/principal";
+import { forceLogout } from "@/lib/auth";
 
 const LOCAL_STORAGE_KEY = "announcement_notifications";
 const READ_IDS_KEY = "read_announcement_ids";
@@ -186,6 +187,17 @@ export function useAnnouncementSocket() {
       try {
         const data = JSON.parse(event.data);
         console.log("WebSocket message received:", data);
+
+        // School deactivated → force logout immediately
+        if (data?.type === "logout" || data?.reason === "school_deactivated") {
+          toast.error("Session ended", {
+            description:
+              data?.message ||
+              "Your school has been deactivated. Contact administrator.",
+          });
+          setTimeout(() => forceLogout(), 1500);
+          return;
+        }
 
         // Standardize keys (handling nested payloads or direct fields)
         const announcement: AnnouncementResponse = {

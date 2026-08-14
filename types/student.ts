@@ -62,3 +62,55 @@ export type {
   RazorpayVerifyPayload,
   StudentFee,
 } from "@/types/fees";
+
+export interface StudentAttendanceRecord {
+  id: number;
+  is_present: boolean;
+  is_absent: boolean;
+  attendance_date: string;
+  created_at: string;
+  school: number;
+  student: number;
+  attendance_by: number;
+}
+
+// ─── Exam Timetable Types ─────────────────────────────────────────────────────
+
+export interface StudentExam {
+  id: number;
+  title: string;
+  description: string;
+  subject: number | null;
+  exam_date: string;
+  start_time: string;
+  end_time: string;
+  class_group: number;
+  class_group_name: string;
+}
+
+// ─── Exam Results & Rankings Types ────────────────────────────────────────────
+
+export interface StudentResult {
+  exam_title: string;
+  subject: string;
+  marks_obtained: string;
+  max_marks: string;
+  is_absent: boolean;
+  grade: string;
+  remarks: string;
+}
+
+export interface RankingEntry {
+  rank: number;
+  student: number;
+  student_name: string;
+  marks_obtained: number;
+  max_marks: number;
+  grade: string;
+}
+
+export interface ExamRankResponse {
+  exam: number;
+  ranking: RankingEntry[];
+}
+

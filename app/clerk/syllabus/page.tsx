@@ -12,6 +12,8 @@ import {
   FileDown,
   UploadCloud,
   X,
+  CheckCircle2,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +27,7 @@ import {
 } from "@/lib/clerk";
 import type { Division, SchoolClass, Subject, Syllabus } from "@/types/clerk";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SCHOOL_CLASS_OPTIONS } from "@/lib/form-builder-config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -67,9 +70,14 @@ export default function SyllabusPage() {
   const [deleteTarget, setDeleteTarget] = useState<Syllabus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Table selection state
+  const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
   // Form State
-  const [selectedDivisionId, setSelectedDivisionId] = useState<string>("");
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [selectedDivisionIds, setSelectedDivisionIds] = useState<number[]>([]);
+  const [selectedSubjectName, setSelectedSubjectName] = useState<string>("");
+  const [classFilter, setClassFilter] = useState<string>("all");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -101,6 +109,40 @@ export default function SyllabusPage() {
     fetchData();
   }, []);
 
+  const toggleDivision = (id: number) => {
+    setSelectedDivisionIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllDivisions = () => {
+    const visibleDivs =
+      classFilter === "all"
+        ? divisions
+        : divisions.filter((div) => div.SchoolClass?.toString() === classFilter);
+    const visibleIds = visibleDivs.map((d) => d.id!).filter(Boolean);
+    setSelectedDivisionIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const clearAllDivisions = () => {
+    setSelectedDivisionIds([]);
+  };
+
+  const toggleClassDivisions = (classId: number) => {
+    const classDivIds = divisions
+      .filter((d) => d.SchoolClass === classId)
+      .map((d) => d.id!)
+      .filter(Boolean);
+
+    const allSelected = classDivIds.every((id) => selectedDivisionIds.includes(id));
+
+    if (allSelected) {
+      setSelectedDivisionIds((prev) => prev.filter((id) => !classDivIds.includes(id)));
+    } else {
+      setSelectedDivisionIds((prev) => Array.from(new Set([...prev, ...classDivIds])));
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -111,12 +153,12 @@ export default function SyllabusPage() {
   const handleAddSyllabus = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedDivisionId) {
-      toast.error("Please select a division");
+    if (selectedDivisionIds.length === 0) {
+      toast.error("Please select at least one division");
       return;
     }
 
-    if (!selectedSubjectId) {
+    if (!selectedSubjectName) {
       toast.error("Please select a subject");
       return;
     }
@@ -128,18 +170,62 @@ export default function SyllabusPage() {
 
     setIsSaving(true);
     try {
-      const payload: Syllabus = {
-        syllabus_file: selectedFile,
-        division: parseInt(selectedDivisionId),
-        subject: parseInt(selectedSubjectId),
-      };
+      const uploadsToMake: { division: number; subject: number }[] = [];
+      const missingDivisions: string[] = [];
 
-      await saveSyllabus(payload);
-      toast.success("Syllabus uploaded successfully");
+      for (const divId of selectedDivisionIds) {
+        const matchingSub = subjects.find(
+          (s) =>
+            s.division === divId &&
+            s.name.trim().toLowerCase() === selectedSubjectName.trim().toLowerCase()
+        );
+
+        if (matchingSub?.id) {
+          uploadsToMake.push({ division: divId, subject: matchingSub.id });
+        } else {
+          missingDivisions.push(getDivisionLabel(divId));
+        }
+      }
+
+      if (uploadsToMake.length === 0) {
+        toast.error(
+          `Subject '${selectedSubjectName}' is not assigned to any of the selected divisions.`
+        );
+        return;
+      }
+
+      const replacedCount = uploadsToMake.filter((item) =>
+        syllabuses.some((sy) => sy.division === item.division && sy.subject === item.subject)
+      ).length;
+
+      await Promise.all(
+        uploadsToMake.map((item) =>
+          saveSyllabus({
+            syllabus_file: selectedFile!,
+            division: item.division,
+            subject: item.subject,
+          })
+        )
+      );
+
+      if (replacedCount > 0) {
+        toast.success(
+          `Syllabus updated for ${uploadsToMake.length} division(s) (replaced ${replacedCount} previous file${replacedCount > 1 ? "s" : ""})`
+        );
+      } else if (missingDivisions.length > 0) {
+        toast.success(
+          `Uploaded for ${uploadsToMake.length} division(s). (${missingDivisions.length} division(s) didn't have subject '${selectedSubjectName}')`
+        );
+      } else {
+        toast.success(
+          `Syllabus uploaded successfully for ${uploadsToMake.length} division(s)!`
+        );
+      }
 
       // Reset form
       setSelectedFile(null);
-      setSelectedSubjectId("");
+      setSelectedSubjectName("");
+      setSelectedDivisionIds([]);
 
       // Refresh list
       await fetchData();
@@ -197,10 +283,67 @@ export default function SyllabusPage() {
     return subName.includes(query) || divLabel.includes(query);
   });
 
-  // Filter subjects based on the selected division
-  const relevantSubjects = subjects.filter(
-    (s) => !selectedDivisionId || s.division === parseInt(selectedDivisionId),
-  );
+  const toggleTableSelect = (id: number) => {
+    setSelectedTableIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const visibleTableIds = filteredSyllabuses.map((s) => s.id!).filter(Boolean);
+  const isAllTableSelected =
+    visibleTableIds.length > 0 &&
+    visibleTableIds.every((id) => selectedTableIds.includes(id));
+
+  const toggleSelectAllTable = () => {
+    if (isAllTableSelected) {
+      setSelectedTableIds((prev) =>
+        prev.filter((id) => !visibleTableIds.includes(id))
+      );
+    } else {
+      setSelectedTableIds((prev) =>
+        Array.from(new Set([...prev, ...visibleTableIds]))
+      );
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTableIds.length === 0) return;
+
+    setIsDeleting(true);
+    try {
+      await Promise.allSettled(
+        selectedTableIds.map((id) => deleteSyllabus(id))
+      );
+      toast.success(
+        `Successfully deleted ${selectedTableIds.length} syllabus record(s)`
+      );
+      setSelectedTableIds([]);
+      setIsBulkDeleteOpen(false);
+      await fetchData();
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete selected syllabus records"
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Unique subject names across selected divisions (or all divisions)
+  const availableSubjectNames = Array.from(
+    new Set(
+      subjects
+        .filter(
+          (s) =>
+            s.division !== null &&
+            (selectedDivisionIds.length === 0 ||
+              selectedDivisionIds.includes(s.division))
+        )
+        .map((s) => s.name.trim())
+    )
+  ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const sortedDivisionsForSelect = [...divisions].sort((a, b) => {
     const classA = schoolClasses.find((c) => c.id === a.SchoolClass);
@@ -258,79 +401,176 @@ export default function SyllabusPage() {
                 Upload Syllabus
               </CardTitle>
               <CardDescription>
-                Select a division and subject to attach a file.
+                Attach a syllabus file to single or multiple divisions at once.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
               <form onSubmit={handleAddSyllabus} className="space-y-4">
+                {/* Division Multi-Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Division
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                      <Layers className="h-4 w-4 text-slate-500" />
+                      Select Divisions <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={selectAllDivisions}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={clearAllDivisions}
+                        className="text-slate-500 hover:text-slate-800 hover:underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter by Class */}
                   <Select
-                    value={selectedDivisionId}
-                    onValueChange={(val) => {
-                      setSelectedDivisionId(val || "");
-                      setSelectedSubjectId(""); // Reset subject when division changes
-                    }}
-                    disabled={isLoading || divisions.length === 0}
+                    value={classFilter}
+                    onValueChange={(val) => setClassFilter(val || "all")}
                   >
-                    <SelectTrigger className="w-full bg-slate-50 border-slate-200">
-                      <SelectValue placeholder="Select a division">
-                        {selectedDivisionId
-                          ? getDivisionLabel(parseInt(selectedDivisionId))
-                          : undefined}
-                      </SelectValue>
+                    <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs h-8">
+                      <SelectValue placeholder="Filter by Class" />
                     </SelectTrigger>
                     <SelectContent>
-                      {sortedDivisionsForSelect.map((div) => (
-                        <SelectItem key={div.id} value={div.id!.toString()}>
-                          {getDivisionLabel(div.id!)}
+                      <SelectItem value="all">All Classes</SelectItem>
+                      {schoolClasses.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id.toString()}>
+                          {SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label || cls.school_class}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Quick Class Badges */}
+                  {schoolClasses.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1 pb-1">
+                      {schoolClasses.map((cls) => {
+                        const classDivs = divisions.filter((d) => d.SchoolClass === cls.id);
+                        if (classDivs.length === 0) return null;
+                        const classDivIds = classDivs.map((d) => d.id!).filter(Boolean);
+                        const isFullySelected = classDivIds.every((id) => selectedDivisionIds.includes(id));
+                        const isPartiallySelected = classDivIds.some((id) => selectedDivisionIds.includes(id));
+                        const label = SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label || cls.school_class;
+
+                        return (
+                          <button
+                            key={cls.id}
+                            type="button"
+                            onClick={() => toggleClassDivisions(cls.id)}
+                            className={cn(
+                              "text-[11px] px-2 py-0.5 rounded-md border transition-all font-medium flex items-center gap-1",
+                              isFullySelected
+                                ? "bg-primary text-white border-primary"
+                                : isPartiallySelected
+                                ? "bg-primary/10 text-primary border-primary/30"
+                                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                            )}
+                          >
+                            {isFullySelected ? (
+                              <CheckCircle2 className="h-3 w-3" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Scrollable division checklist */}
+                  <ScrollArea className="h-44 rounded-lg border border-slate-200 bg-slate-50/50 p-2">
+                    {sortedDivisionsForSelect.length === 0 ? (
+                      <p className="text-xs text-slate-400 p-3 text-center">
+                        No divisions found. Create divisions first.
+                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        {sortedDivisionsForSelect
+                          .filter((div) => classFilter === "all" || div.SchoolClass?.toString() === classFilter)
+                          .map((div) => {
+                            const isSelected = selectedDivisionIds.includes(div.id!);
+                            return (
+                              <div
+                                key={div.id}
+                                onClick={() => toggleDivision(div.id!)}
+                                className={cn(
+                                  "flex items-center space-x-2 p-2 rounded-md border text-xs cursor-pointer transition-all select-none",
+                                  isSelected
+                                    ? "bg-white border-primary/40 shadow-2xs font-medium text-slate-900"
+                                    : "bg-white/50 border-slate-200/60 text-slate-600 hover:bg-white hover:border-slate-300"
+                                )}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleDivision(div.id!)}
+                                />
+                                <span className="flex-1">{getDivisionLabel(div.id!)}</span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </ScrollArea>
+
+                  {selectedDivisionIds.length > 0 && (
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {selectedDivisionIds.length} division{selectedDivisionIds.length > 1 ? "s" : ""} selected
+                    </p>
+                  )}
                 </div>
 
+                {/* Subject Selection */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
-                    Subject
+                    Subject <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    value={selectedSubjectId}
-                    onValueChange={(val) => setSelectedSubjectId(val || "")}
+                    value={selectedSubjectName}
+                    onValueChange={(val) => setSelectedSubjectName(val || "")}
                     disabled={
                       isLoading ||
-                      !selectedDivisionId ||
-                      relevantSubjects.length === 0
+                      selectedDivisionIds.length === 0 ||
+                      availableSubjectNames.length === 0
                     }
                   >
                     <SelectTrigger className="w-full bg-slate-50 border-slate-200">
                       <SelectValue
                         placeholder={
-                          selectedDivisionId
-                            ? "Select a subject"
-                            : "Select division first"
+                          selectedDivisionIds.length === 0
+                            ? "Select division(s) first"
+                            : availableSubjectNames.length === 0
+                            ? "No subjects in selected division(s)"
+                            : "Select a subject"
                         }
                       >
-                        {selectedSubjectId
-                          ? getSubjectLabel(parseInt(selectedSubjectId))
-                          : undefined}
+                        {selectedSubjectName || undefined}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {relevantSubjects.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id!.toString()}>
-                          {sub.name}
+                      {availableSubjectNames.map((subName) => (
+                        <SelectItem key={subName} value={subName}>
+                          {subName}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Syllabus File */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
-                    Syllabus File
+                    Syllabus File <span className="text-red-500">*</span>
                   </label>
                   <div
                     className={cn(
@@ -390,8 +630,8 @@ export default function SyllabusPage() {
                   className="w-full mt-2"
                   disabled={
                     isSaving ||
-                    !selectedDivisionId ||
-                    !selectedSubjectId ||
+                    selectedDivisionIds.length === 0 ||
+                    !selectedSubjectName ||
                     !selectedFile
                   }
                 >
@@ -401,7 +641,7 @@ export default function SyllabusPage() {
                       Uploading...
                     </>
                   ) : (
-                    "Upload record"
+                    `Upload Record ${selectedDivisionIds.length > 0 ? `(${selectedDivisionIds.length} Divisions)` : ""}`
                   )}
                 </Button>
               </form>
@@ -420,14 +660,27 @@ export default function SyllabusPage() {
                     Browse curriculum files by class and subject
                   </CardDescription>
                 </div>
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search file directory..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-sm bg-slate-50 border-slate-200"
-                  />
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {selectedTableIds.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setIsBulkDeleteOpen(true)}
+                      className="h-9 px-3 text-xs font-medium shrink-0 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Delete Selected ({selectedTableIds.length})
+                    </Button>
+                  )}
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search file directory..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9 text-sm bg-slate-50 border-slate-200"
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -443,6 +696,12 @@ export default function SyllabusPage() {
                     <table className="w-full min-w-[700px] text-sm">
                       <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100 text-slate-600">
                         <tr>
+                          <th className="w-10 px-4 py-3 text-left">
+                            <Checkbox
+                              checked={isAllTableSelected}
+                              onCheckedChange={toggleSelectAllTable}
+                            />
+                          </th>
                           <th className="px-6 py-3 text-left font-semibold">
                             Subject
                           </th>
@@ -458,54 +717,69 @@ export default function SyllabusPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {filteredSyllabuses.map((item, index) => (
-                          <tr
-                            key={item.id || index}
-                            className="hover:bg-primary/5 transition-colors group"
-                          >
-                            <td className="px-6 py-4">
-                              <div className="font-semibold text-slate-900 capitalize">
-                                {getSubjectLabel(item.subject)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <Badge
-                                variant="outline"
-                                className="bg-slate-50 text-slate-600 border-slate-200 whitespace-nowrap"
-                              >
-                                {getDivisionLabel(item.division)}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4">
-                              {item.syllabus_file &&
-                              typeof item.syllabus_file === "string" ? (
-                                <a
-                                  href={item.syllabus_file}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-primary hover:underline font-medium"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                  <span>View Document</span>
-                                </a>
-                              ) : (
-                                <span className="text-slate-400 italic">
-                                  No file attached
-                                </span>
+                        {filteredSyllabuses.map((item, index) => {
+                          const isRowSelected = item.id ? selectedTableIds.includes(item.id) : false;
+                          return (
+                            <tr
+                              key={item.id || index}
+                              onClick={() => item.id && toggleTableSelect(item.id)}
+                              className={cn(
+                                "transition-colors cursor-pointer group",
+                                isRowSelected
+                                  ? "bg-red-50/30 hover:bg-red-50/50"
+                                  : "hover:bg-primary/5"
                               )}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteTarget(item)}
-                                className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                            >
+                              <td className="w-10 px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={isRowSelected}
+                                  onCheckedChange={() => item.id && toggleTableSelect(item.id)}
+                                />
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-slate-900 capitalize">
+                                  {getSubjectLabel(item.subject)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-slate-50 text-slate-600 border-slate-200 whitespace-nowrap"
+                                >
+                                  {getDivisionLabel(item.division)}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                {item.syllabus_file &&
+                                typeof item.syllabus_file === "string" ? (
+                                  <a
+                                    href={item.syllabus_file}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-primary hover:underline font-medium"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                    <span>View Document</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-400 italic">
+                                    No file attached
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeleteTarget(item)}
+                                  className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -527,6 +801,7 @@ export default function SyllabusPage() {
         </div>
       </div>
 
+      {/* Single Delete Confirmation Dialog */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -562,6 +837,48 @@ export default function SyllabusPage() {
                 </>
               ) : (
                 "Delete Record"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={isBulkDeleteOpen}
+        onOpenChange={setIsBulkDeleteOpen}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-[400px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Delete Selected Syllabus Records</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-slate-900">
+                {selectedTableIds.length} syllabus record(s)
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsBulkDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedTableIds.length} Record(s)`
               )}
             </Button>
           </DialogFooter>

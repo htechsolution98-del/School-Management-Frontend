@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Plus,
-  Edit,
   Trash2,
   FileText,
   Paperclip,
@@ -17,182 +15,49 @@ import {
   Eye,
   CheckCircle,
   Clock,
-  AlertCircle,
   ClipboardList,
-  Users,
   Filter,
   X,
   Check,
 } from "lucide-react";
+import { toast } from "sonner";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Homework {
-  id: string;
-  title: string;
-  class: string;
-  division: string;
-  dueDate: string;
-  status: "Active" | "Inactive";
-  submitted: number;
-  total: number;
-  assignedDate: string;
-  description: string;
-  attachment?: string;
-  color: string;
-}
-
-interface Submission {
-  id: string;
-  name: string;
-  initials: string;
-  submittedAt: string | null;
-  status: "Submitted" | "Late" | "Pending";
-  attachment: string | null;
-  attachmentSize: string | null;
-  marks: number | null;
-  avatarColor: string;
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const homeworkList: Homework[] = [
-  {
-    id: "1",
-    title: "Chapter 5 Exercise",
-    class: "Class 10",
-    division: "Division A",
-    dueDate: "20 May 2026",
-    status: "Active",
-    submitted: 32,
-    total: 40,
-    assignedDate: "15 May 2026",
-    description: "Solve questions 1 to 10 from the textbook.",
-    attachment: "chapter-5-exercise.pdf",
-    color: "purple",
-  },
-  {
-    id: "2",
-    title: "Algebra Worksheet",
-    class: "Class 9",
-    division: "Division B",
-    dueDate: "22 May 2026",
-    status: "Active",
-    submitted: 28,
-    total: 35,
-    assignedDate: "14 May 2026",
-    description: "Complete the algebra worksheet covering chapters 3 and 4.",
-    attachment: "algebra-worksheet.pdf",
-    color: "amber",
-  },
-  {
-    id: "3",
-    title: "Science Project",
-    class: "Class 8",
-    division: "Division A",
-    dueDate: "25 May 2026",
-    status: "Active",
-    submitted: 18,
-    total: 30,
-    assignedDate: "12 May 2026",
-    description: "Prepare a project on renewable energy sources.",
-    color: "teal",
-  },
-  {
-    id: "4",
-    title: "History Notes",
-    class: "Class 10",
-    division: "Division B",
-    dueDate: "30 May 2026",
-    status: "Active",
-    submitted: 22,
-    total: 40,
-    assignedDate: "10 May 2026",
-    description: "Write detailed notes on the French Revolution.",
-    color: "green",
-  },
-  {
-    id: "5",
-    title: "English Essay",
-    class: "Class 9",
-    division: "Division A",
-    dueDate: "28 May 2026",
-    status: "Inactive",
-    submitted: 0,
-    total: 32,
-    assignedDate: "16 May 2026",
-    description: "Write a 500-word essay on environmental conservation.",
-    color: "pink",
-  },
-];
-
-const submissionsData: Submission[] = [
-  {
-    id: "1",
-    name: "Rahul Patel",
-    initials: "RP",
-    submittedAt: "15 May 2026\n10:20 AM",
-    status: "Submitted",
-    attachment: "homework.pdf",
-    attachmentSize: "245 KB",
-    marks: null,
-    avatarColor: "#6366f1",
-  },
-  {
-    id: "2",
-    name: "Anjali Sharma",
-    initials: "AS",
-    submittedAt: "15 May 2026\n11:05 AM",
-    status: "Submitted",
-    attachment: "ans.pdf",
-    attachmentSize: "312 KB",
-    marks: null,
-    avatarColor: "#ec4899",
-  },
-  {
-    id: "3",
-    name: "Dev Mehta",
-    initials: "DM",
-    submittedAt: "15 May 2026\n11:30 AM",
-    status: "Submitted",
-    attachment: "dev_ans.pdf",
-    attachmentSize: "280 KB",
-    marks: null,
-    avatarColor: "#14b8a6",
-  },
-  {
-    id: "4",
-    name: "Priya Singh",
-    initials: "PS",
-    submittedAt: "14 May 2026\n09:15 PM",
-    status: "Late",
-    attachment: "priya_homework.pdf",
-    attachmentSize: "300 KB",
-    marks: null,
-    avatarColor: "#f59e0b",
-  },
-  {
-    id: "5",
-    name: "Karan Joshi",
-    initials: "KJ",
-    submittedAt: null,
-    status: "Pending",
-    attachment: null,
-    attachmentSize: null,
-    marks: null,
-    avatarColor: "#64748b",
-  },
-];
+import { API_BASE_URL } from "@/lib/config";
+import { fetchWithAuth } from "@/lib/auth";
+import {
+  getTeacherHomework,
+  getHomeworkSubmissions,
+  createHomework,
+  deleteHomework,
+  gradeSubmission,
+} from "@/lib/teacher/homework";
+import { getStudentsForAttendance } from "@/lib/teacher/student-attendance";
+import type { HomeworkItem, HomeworkSubmission } from "@/types/teacher";
 
 // ─── Color Helpers ────────────────────────────────────────────────────────────
 
-const colorMap: Record<string, { bg: string; text: string; icon: string }> = {
-  purple: { bg: "#ede9fe", text: "#7c3aed", icon: "#7c3aed" },
-  amber: { bg: "#fef3c7", text: "#d97706", icon: "#d97706" },
-  teal: { bg: "#ccfbf1", text: "#0d9488", icon: "#0d9488" },
-  green: { bg: "#dcfce7", text: "#16a34a", icon: "#16a34a" },
-  pink: { bg: "#fce7f3", text: "#db2777", icon: "#db2777" },
-};
+const AVATAR_COLORS = [
+  "#6366f1", "#ec4899", "#14b8a6", "#f59e0b",
+  "#8b5cf6", "#10b981", "#ef4444", "#3b82f6",
+];
+
+function getInitials(name: string): string {
+  if (!name) return "?";
+  const words = name.trim().split(" ");
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return words[0].slice(0, 2).toUpperCase();
+}
+
+function formatToDDMMYYYY(dateStr: string): string {
+  if (!dateStr) return "";
+  const parts = dateStr.split("T")[0].split(/[-/]/);
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+}
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
@@ -200,11 +65,19 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, { bg: string; color: string }> = {
     Active: { bg: "#dcfce7", color: "#16a34a" },
     Inactive: { bg: "#f1f5f9", color: "#64748b" },
+    submitted: { bg: "#dbeafe", color: "#2563eb" },
     Submitted: { bg: "#dbeafe", color: "#2563eb" },
+    late: { bg: "#fee2e2", color: "#dc2626" },
     Late: { bg: "#fee2e2", color: "#dc2626" },
+    pending: { bg: "#fef9c3", color: "#ca8a04" },
     Pending: { bg: "#fef9c3", color: "#ca8a04" },
+    checked: { bg: "#dcfce7", color: "#16a34a" },
+    Checked: { bg: "#dcfce7", color: "#16a34a" },
   };
-  const s = styles[status] || { bg: "#f1f5f9", color: "#64748b" };
+  const key = status ? status.toLowerCase() : "pending";
+  const s = styles[status] || styles[key] || { bg: "#f1f5f9", color: "#64748b" };
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "Pending";
+
   return (
     <span
       style={{
@@ -218,7 +91,7 @@ function StatusBadge({ status }: { status: string }) {
         display: "inline-block",
       }}
     >
-      {status}
+      {label}
     </span>
   );
 }
@@ -230,11 +103,10 @@ function HomeworkCard({
   selected,
   onSelect,
 }: {
-  hw: Homework;
+  hw: HomeworkItem;
   selected: boolean;
   onSelect: () => void;
 }) {
-  const c = colorMap[hw.color];
   return (
     <button
       onClick={onSelect}
@@ -258,14 +130,14 @@ function HomeworkCard({
           width: 38,
           height: 38,
           borderRadius: 10,
-          background: c.bg,
+          background: "#ede9fe",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
         }}
       >
-        <FileText size={18} color={c.icon} />
+        <FileText size={18} color="#7c3aed" />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
@@ -289,28 +161,24 @@ function HomeworkCard({
           >
             {hw.title}
           </span>
-          <StatusBadge status={hw.status} />
+          <StatusBadge status={hw.is_active ? "Active" : "Inactive"} />
         </div>
         <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6 }}>
-          {hw.class} · {hw.division}
+          {hw.school_class_name || "Class"} · {hw.division_name || "Div"}
         </div>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 4,
+            fontSize: 11,
           }}
         >
-          <span style={{ fontSize: 11, color: "#ef4444", fontWeight: 500 }}>
-            Due: {hw.dueDate}
+          <span style={{ color: "#ef4444", fontWeight: 500 }}>
+            Due: {hw.due_date}
           </span>
-          <span style={{ fontSize: 11, color: "#64748b" }}>
-            <span style={{ fontWeight: 600, color: "#1e293b" }}>
-              {hw.submitted}
-            </span>{" "}
-            / {hw.total} Submitted
+          <span style={{ color: "#64748b", fontWeight: 600 }}>
+            {hw.submission_count ?? 0} Submissions
           </span>
         </div>
       </div>
@@ -318,168 +186,31 @@ function HomeworkCard({
   );
 }
 
-// ─── Mobile Submission Card ───────────────────────────────────────────────────
-
-function MobileSubmissionCard({
-  sub,
-  onMark,
-}: {
-  sub: Submission;
-  onMark: () => void;
-}) {
-  return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1.5px solid #f1f5f9",
-        borderRadius: 12,
-        padding: "14px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
-    >
-      {/* Top row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background: sub.avatarColor,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              fontWeight: 700,
-              color: "#fff",
-              flexShrink: 0,
-            }}
-          >
-            {sub.initials}
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-              {sub.name}
-            </div>
-            {sub.submittedAt && (
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                {sub.submittedAt.replace("\n", " ")}
-              </div>
-            )}
-          </div>
-        </div>
-        <StatusBadge status={sub.status} />
-      </div>
-
-      {/* Details row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
-        {sub.attachment ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              color: "#ef4444",
-              fontSize: 12,
-            }}
-          >
-            <FileText size={13} />
-            <span>{sub.attachment}</span>
-            <span style={{ color: "#94a3b8", fontSize: 11 }}>
-              ({sub.attachmentSize})
-            </span>
-          </div>
-        ) : (
-          <span style={{ color: "#cbd5e1", fontSize: 12 }}>No attachment</span>
-        )}
-
-        {sub.marks !== null ? (
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#6366f1" }}>
-            {sub.marks}/100
-          </span>
-        ) : (
-          <span style={{ fontSize: 12, color: "#cbd5e1" }}>No marks</span>
-        )}
-      </div>
-
-      {/* Action row */}
-      {sub.status !== "Pending" && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: 8,
-              border: "1.5px solid #e2e8f0",
-              background: "#fff",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#64748b",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            <Eye size={13} />
-            View
-          </button>
-          <button
-            onClick={onMark}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: 8,
-              border: "none",
-              background: sub.marks !== null ? "#dcfce7" : "#ede9fe",
-              fontSize: 12,
-              fontWeight: 600,
-              color: sub.marks !== null ? "#16a34a" : "#6366f1",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            {sub.marks !== null ? <Check size={13} /> : <Edit size={13} />}
-            {sub.marks !== null ? "Graded" : "Grade"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Mark Modal ───────────────────────────────────────────────────────────────
 
 function MarkModal({
-  student,
+  submission,
   onClose,
   onSave,
 }: {
-  student: Submission;
+  submission: HomeworkSubmission;
   onClose: () => void;
-  onSave: (id: string, marks: number) => void;
+  onSave: (marks: number, remark: string) => void;
 }) {
-  const [marks, setMarks] = useState<string>(student.marks?.toString() ?? "");
+  const [marks, setMarks] = useState<string>(
+    submission.marks !== null ? String(submission.marks) : ""
+  );
+  const [remark, setRemark] = useState(submission.teacher_remark || "");
+
+  const handleSave = () => {
+    const val = parseInt(marks, 10);
+    if (isNaN(val) || val < 0 || val > 100) {
+      toast.error("Please enter valid marks between 0 and 100.");
+      return;
+    }
+    onSave(val, remark);
+  };
+
   return (
     <div
       style={{
@@ -499,9 +230,9 @@ function MarkModal({
         style={{
           background: "#fff",
           borderRadius: 16,
-          padding: 28,
+          padding: 24,
           width: "100%",
-          maxWidth: 380,
+          maxWidth: 400,
           boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
           boxSizing: "border-box",
         }}
@@ -512,12 +243,10 @@ function MarkModal({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 20,
+            marginBottom: 16,
           }}
         >
-          <h3
-            style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}
-          >
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
             Grade Submission
           </h3>
           <button
@@ -527,20 +256,20 @@ function MarkModal({
               border: "none",
               cursor: "pointer",
               padding: 4,
-              borderRadius: 6,
               color: "#64748b",
             }}
           >
             <X size={18} />
           </button>
         </div>
+
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
-            marginBottom: 20,
-            padding: "12px 16px",
+            marginBottom: 16,
+            padding: "12px 14px",
             background: "#f8fafc",
             borderRadius: 10,
           }}
@@ -550,7 +279,7 @@ function MarkModal({
               width: 38,
               height: 38,
               borderRadius: "50%",
-              background: student.avatarColor,
+              background: "#6366f1",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -560,45 +289,63 @@ function MarkModal({
               flexShrink: 0,
             }}
           >
-            {student.initials}
+            {getInitials(submission.student_name)}
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>
-              {student.name}
+              {submission.student_name}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8" }}>
-              {student.submittedAt?.replace("\n", " ")}
+              Submitted: {submission.submitted_at || submission.submission_date}
             </div>
           </div>
         </div>
-        <label
-          style={{
-            display: "block",
-            fontSize: 13,
-            color: "#64748b",
-            marginBottom: 6,
-          }}
-        >
-          Marks (out of 100)
-        </label>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={marks}
-          onChange={(e) => setMarks(e.target.value)}
-          placeholder="Enter marks"
-          style={{
-            width: "100%",
-            padding: "10px 14px",
-            border: "1.5px solid #e2e8f0",
-            borderRadius: 8,
-            fontSize: 15,
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>
+            Marks (out of 100) *
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={marks}
+            onChange={(e) => setMarks(e.target.value)}
+            placeholder="Enter marks"
+            style={{
+              width: "100%",
+              padding: "9px 12px",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 14,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>
+            Teacher Remark (Optional)
+          </label>
+          <input
+            type="text"
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            placeholder="e.g. Excellent work!"
+            style={{
+              width: "100%",
+              padding: "9px 12px",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 14,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
             style={{
@@ -616,9 +363,7 @@ function MarkModal({
             Cancel
           </button>
           <button
-            onClick={() => {
-              if (marks !== "") onSave(student.id, Number(marks));
-            }}
+            onClick={handleSave}
             style={{
               flex: 1,
               padding: "10px",
@@ -631,7 +376,7 @@ function MarkModal({
               cursor: "pointer",
             }}
           >
-            Save Marks
+            Save Grade
           </button>
         </div>
       </div>
@@ -641,14 +386,120 @@ function MarkModal({
 
 // ─── Create Homework Modal ────────────────────────────────────────────────────
 
-function CreateHomeworkModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({
-    title: "",
-    class: "",
-    division: "",
-    dueDate: "",
-    description: "",
-  });
+interface TeacherAssignment {
+  id: number;
+  divisionId: number;
+  className: string;
+  divisionName: string;
+  fullDivisionLabel: string;
+  subjectId: number;
+  subjectName: string;
+}
+
+function CreateHomeworkModal({
+  divisions,
+  assignments,
+  onClose,
+  onSubmit,
+}: {
+  divisions: { id: number; name: string }[];
+  assignments: TeacherAssignment[];
+  onClose: () => void;
+  onSubmit: (data: {
+    divisionId: number;
+    subjectName: string;
+    title: string;
+    dueDate: string;
+    description: string;
+    file: File | null;
+  }) => void;
+}) {
+  const uniqueDivisions = useMemo(() => {
+    if (assignments.length > 0) {
+      const map = new Map<number, { id: number; name: string }>();
+      assignments.forEach((a) => {
+        if (a.divisionId && !map.has(a.divisionId)) {
+          map.set(a.divisionId, { id: a.divisionId, name: a.fullDivisionLabel });
+        }
+      });
+      if (map.size > 0) return Array.from(map.values());
+    }
+    return divisions;
+  }, [assignments, divisions]);
+
+  const [divisionId, setDivisionId] = useState<number>(uniqueDivisions[0]?.id || 0);
+  const [allSubjects, setAllSubjects] = useState<{ id: number; name: string; division: any }[]>([]);
+  const [subjectName, setSubjectName] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (uniqueDivisions.length > 0 && (!divisionId || !uniqueDivisions.some((d) => d.id === divisionId))) {
+      setDivisionId(uniqueDivisions[0].id);
+    }
+  }, [uniqueDivisions, divisionId]);
+
+  useEffect(() => {
+    async function fetchSubjects() {
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/setSubject/`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.data ?? data.results ?? []);
+          setAllSubjects(list);
+        }
+      } catch (e) {
+        console.error("Failed to load subjects:", e);
+      }
+    }
+    fetchSubjects();
+  }, []);
+
+  const availableSubjects = useMemo(() => {
+    if (!divisionId) return [];
+
+    const matchedAssignments = assignments.filter((a) => String(a.divisionId) === String(divisionId));
+    if (matchedAssignments.length > 0) {
+      const assignedSubs = matchedAssignments.map((a) => a.subjectName).filter(Boolean);
+      const unique = Array.from(new Set(assignedSubs));
+      if (unique.length > 0) return unique;
+    }
+
+    const fallback = allSubjects.filter(
+      (s) =>
+        String(s.division) === String(divisionId) ||
+        (s.division && String(s.division.id) === String(divisionId))
+    );
+    const subNames = (fallback.length > 0 ? fallback : allSubjects).map((s) => s.name).filter(Boolean);
+    return Array.from(new Set(subNames));
+  }, [assignments, divisionId, allSubjects]);
+
+  useEffect(() => {
+    if (availableSubjects.length > 0) {
+      setSubjectName(availableSubjects[0]);
+    } else {
+      setSubjectName("");
+    }
+  }, [availableSubjects]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      toast.error("Please enter a homework title.");
+      return;
+    }
+    if (!divisionId) {
+      toast.error("Please select a division.");
+      return;
+    }
+    if (!dueDate) {
+      toast.error("Please select a due date.");
+      return;
+    }
+    onSubmit({ divisionId, subjectName, title, dueDate, description, file });
+  };
 
   return (
     <div
@@ -684,22 +535,15 @@ function CreateHomeworkModal({ onClose }: { onClose: () => void }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 24,
+            marginBottom: 20,
           }}
         >
           <div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#1e293b",
-              }}
-            >
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
               Create Homework
             </h3>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>
-              Fill in the details to assign homework
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>
+              Fill in details to assign homework to your students
             </p>
           </div>
           <button
@@ -708,1199 +552,867 @@ function CreateHomeworkModal({ onClose }: { onClose: () => void }) {
               background: "#f8fafc",
               border: "none",
               cursor: "pointer",
-              width: 32,
-              height: 32,
+              width: 30,
+              height: 30,
               borderRadius: 8,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "#64748b",
-              flexShrink: 0,
             }}
           >
             <X size={16} />
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {(
-            [
-              {
-                label: "Title",
-                key: "title",
-                placeholder: "e.g. Chapter 5 Exercise",
-              },
-              {
-                label: "Class",
-                key: "class",
-                placeholder: "e.g. Class 10",
-              },
-              {
-                label: "Division",
-                key: "division",
-                placeholder: "e.g. Division A",
-              },
-              {
-                label: "Due Date",
-                key: "dueDate",
-                placeholder: "",
-                type: "date",
-              },
-            ] as Array<{
-              label: string;
-              key: keyof typeof form;
-              placeholder: string;
-              type?: string;
-            }>
-          ).map((f) => (
-            <div key={f.key}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 13,
-                  color: "#64748b",
-                  marginBottom: 6,
-                  fontWeight: 500,
-                }}
-              >
-                {f.label}
-              </label>
-              <input
-                type={f.type ?? "text"}
-                placeholder={f.placeholder}
-                value={form[f.key]}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  border: "1.5px solid #e2e8f0",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box",
-                  color: "#1e293b",
-                }}
-              />
-            </div>
-          ))}
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 13,
-                color: "#64748b",
-                marginBottom: 6,
-                fontWeight: 500,
-              }}
-            >
-              Description
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Homework Title *
             </label>
-            <textarea
-              placeholder="Instructions for students..."
-              rows={3}
-              value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
+            <input
+              type="text"
+              required
+              placeholder="e.g. Chapter 5 Exercise"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 14px",
+                padding: "9px 12px",
                 border: "1.5px solid #e2e8f0",
                 borderRadius: 8,
                 fontSize: 13,
                 outline: "none",
                 boxSizing: "border-box",
-                resize: "none",
-                fontFamily: "inherit",
-                color: "#1e293b",
               }}
             />
           </div>
-        </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1,
-              padding: "11px",
-              borderRadius: 8,
-              border: "1.5px solid #e2e8f0",
-              background: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#64748b",
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            style={{
-              flex: 2,
-              padding: "11px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            <Check size={15} />
-            Create Homework
-          </button>
-        </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Class / Division *
+            </label>
+            <select
+              value={divisionId}
+              onChange={(e) => setDivisionId(Number(e.target.value))}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                outline: "none",
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            >
+              {uniqueDivisions.length === 0 ? (
+                <option value={0}>Select Division...</option>
+              ) : (
+                uniqueDivisions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Subject *
+            </label>
+            <select
+              value={subjectName}
+              onChange={(e) => setSubjectName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                outline: "none",
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            >
+              {availableSubjects.length === 0 ? (
+                <option value="">No subject assigned for this division</option>
+              ) : (
+                availableSubjects.map((sName) => (
+                  <option key={sName} value={sName}>
+                    {sName}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Due Date *
+            </label>
+            <input
+              type="date"
+              required
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Description / Instructions
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Enter instructions for students..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                outline: "none",
+                resize: "vertical",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
+              Attach File (Optional PDF/Image)
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              style={{
+                width: "100%",
+                fontSize: 12,
+                color: "#475569",
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: 8,
+                border: "1.5px solid #e2e8f0",
+                background: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#64748b",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={{
+                flex: 2,
+                padding: "10px",
+                borderRadius: 8,
+                border: "none",
+                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              <Check size={15} /> Create Homework
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
 
-// ─── Pagination Button Style ──────────────────────────────────────────────────
-
-function pageBtnStyle(active: boolean): React.CSSProperties {
-  return {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    border: active ? "none" : "1.5px solid #e2e8f0",
-    background: active ? "#6366f1" : "#fff",
-    color: active ? "#fff" : "#64748b",
-    fontSize: 12,
-    fontWeight: active ? 600 : 400,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  };
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AllHomeworkPage() {
-  const [selected, setSelected] = useState<Homework>(homeworkList[0]);
+  const [homeworks, setHomeworks] = useState<HomeworkItem[]>([]);
+  const [selectedHw, setSelectedHw] = useState<HomeworkItem | null>(null);
+  const [submissions, setSubmissions] = useState<HomeworkSubmission[]>([]);
+  const [loadingHw, setLoadingHw] = useState(true);
+  const [loadingSub, setLoadingSub] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [divisions, setDivisions] = useState<{ id: number; name: string }[]>([]);
+  const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
+
   const [searchHW, setSearchHW] = useState("");
   const [searchStudent, setSearchStudent] = useState("");
-  const [activeTab, setActiveTab] = useState<"submissions" | "pending">(
-    "submissions"
-  );
+  const [activeTab, setActiveTab] = useState<"submissions" | "pending">("submissions");
   const [statusFilter, setStatusFilter] = useState("All Status");
-  const [submissions, setSubmissions] = useState<Submission[]>(submissionsData);
-  const [hwPage, setHwPage] = useState(1);
-  const [subPage, setSubPage] = useState(1);
-  const [markModal, setMarkModal] = useState<Submission | null>(null);
+
+  const [markModal, setMarkModal] = useState<HomeworkSubmission | null>(null);
   const [createModal, setCreateModal] = useState(false);
-  // Mobile: show list or detail
-  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
-  const hwPerPage = 4;
-  const subPerPage = 5;
+  // Fetch homework list from API
+  const fetchHomeworkList = useCallback(async () => {
+    setLoadingHw(true);
+    setError(null);
+    try {
+      const data = await getTeacherHomework();
+      setHomeworks(data);
+      if (data.length > 0) {
+        setSelectedHw((prev) => {
+          if (prev) {
+            const found = data.find((h) => h.id === prev.id);
+            return found || data[0];
+          }
+          return data[0];
+        });
+      } else {
+        setSelectedHw(null);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to load homework assignments.");
+    } finally {
+      setLoadingHw(false);
+    }
+  }, []);
 
-  const filteredHW = homeworkList.filter(
-    (h) =>
-      h.title.toLowerCase().includes(searchHW.toLowerCase()) ||
-      h.class.toLowerCase().includes(searchHW.toLowerCase())
-  );
-  const pagedHW = filteredHW.slice(
-    (hwPage - 1) * hwPerPage,
-    hwPage * hwPerPage
-  );
-  const hwTotalPages = Math.ceil(filteredHW.length / hwPerPage);
+  useEffect(() => {
+    fetchHomeworkList();
+  }, [fetchHomeworkList]);
 
-  const displayedSubs = submissions.filter((s) => {
-    const matchSearch = s.name
-      .toLowerCase()
-      .includes(searchStudent.toLowerCase());
-    const matchStatus =
-      statusFilter === "All Status" || s.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
-  const activeSubs = displayedSubs.filter((s) => s.status !== "Pending");
-  const pendingSubs = displayedSubs.filter((s) => s.status === "Pending");
-  const tabSubs = activeTab === "submissions" ? activeSubs : pendingSubs;
-  const pagedSubs = tabSubs.slice(
-    (subPage - 1) * subPerPage,
-    subPage * subPerPage
-  );
-  const subTotalPages = Math.ceil(tabSubs.length / subPerPage);
+  // Fetch teacher assigned classes and subjects
+  useEffect(() => {
+    async function loadTeacherAssignments() {
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/assignClass/`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.data ?? data.results ?? []);
+          const mapped: TeacherAssignment[] = list.map((item: any) => {
+            const divId = typeof item.division === "object" ? item.division?.id : item.division;
+            const className =
+              item.class_name ||
+              item.division?.SchoolClass?.school_class ||
+              (typeof item.division?.SchoolClass === "string" ? item.division?.SchoolClass : "") ||
+              "";
+            const divisionName =
+              item.division_name ||
+              (typeof item.division === "object" ? item.division?.division : "") ||
+              "";
+            const fullDivisionLabel =
+              className && divisionName
+                ? `${className} (Div ${divisionName})`
+                : divisionName
+                ? `Div ${divisionName}`
+                : className || `Division ${divId}`;
 
-  const pct = Math.round((selected.submitted / selected.total) * 100);
+            const subId = typeof item.subject === "object" ? item.subject?.id : item.subject;
+            const subName =
+              item.subject_name ||
+              (typeof item.subject === "object" ? item.subject?.name : "") ||
+              "";
 
-  const handleSaveMarks = (id: string, marks: number) => {
-    setSubmissions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, marks } : s))
-    );
-    setMarkModal(null);
+            return {
+              id: item.id,
+              divisionId: Number(divId),
+              className,
+              divisionName,
+              fullDivisionLabel,
+              subjectId: Number(subId),
+              subjectName: subName,
+            };
+          });
+
+          setTeacherAssignments(mapped);
+        }
+      } catch (e) {
+        console.error("Failed to load teacher assignments:", e);
+      }
+
+      // Fallback divisions
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/divisionlist/`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.data ?? data.results ?? []);
+          const mapped = list.map((item: any) => {
+            const className =
+              item.class_name ||
+              item.school_class_name ||
+              (typeof item.SchoolClass === "object" ? item.SchoolClass?.school_class : "") ||
+              "";
+            const divName = item.division || "";
+            const fullName =
+              className && divName
+                ? `${className} (Div ${divName})`
+                : divName
+                ? `Div ${divName}`
+                : className || `Division ${item.id}`;
+            return { id: item.id, name: fullName };
+          });
+          if (mapped.length > 0) {
+            setDivisions(mapped);
+          }
+        }
+      } catch {}
+    }
+
+    loadTeacherAssignments();
+  }, []);
+
+  // Fetch submissions whenever selected homework changes
+  const fetchSubmissions = useCallback(async (hwId: number) => {
+    setLoadingSub(true);
+    try {
+      const data = await getHomeworkSubmissions(hwId);
+      setSubmissions(data);
+    } catch {
+      setSubmissions([]);
+    } finally {
+      setLoadingSub(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedHw) {
+      fetchSubmissions(selectedHw.id);
+    } else {
+      setSubmissions([]);
+    }
+  }, [selectedHw, fetchSubmissions]);
+
+  // Create Homework Handler
+  const handleCreateSubmit = async (data: {
+    divisionId: number;
+    subjectName: string;
+    title: string;
+    dueDate: string;
+    description: string;
+    file: File | null;
+  }) => {
+    try {
+      const formattedDueDate = formatToDDMMYYYY(data.dueDate);
+      const fullTitle =
+        data.subjectName && !data.title.toLowerCase().includes(data.subjectName.toLowerCase())
+          ? `${data.subjectName}: ${data.title.trim()}`
+          : data.title.trim();
+
+      const fd = new FormData();
+      fd.append("division", String(data.divisionId));
+      fd.append("title", fullTitle);
+      fd.append("description", data.description.trim());
+      fd.append("due_date", formattedDueDate);
+      if (data.file) {
+        fd.append("attachment", data.file);
+      }
+
+      await createHomework(fd);
+      toast.success(`Homework "${fullTitle}" created successfully!`);
+      setCreateModal(false);
+      await fetchHomeworkList();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create homework.");
+    }
   };
 
+  // Delete Homework Handler
+  const handleDeleteHw = async (id: number, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    try {
+      await deleteHomework(id);
+      toast.success("Homework deleted successfully.");
+      await fetchHomeworkList();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete homework.");
+    }
+  };
+
+  // Grade Submission Handler
+  const handleGrade = async (marks: number, remark: string) => {
+    if (!markModal) return;
+    try {
+      await gradeSubmission(markModal.id, marks, remark);
+      toast.success("Submission graded successfully!");
+      setMarkModal(null);
+      if (selectedHw) {
+        await fetchSubmissions(selectedHw.id);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to grade submission.");
+    }
+  };
+
+  const filteredHW = useMemo(
+    () =>
+      homeworks.filter(
+        (h) =>
+          h.title.toLowerCase().includes(searchHW.toLowerCase()) ||
+          (h.school_class_name && h.school_class_name.toLowerCase().includes(searchHW.toLowerCase()))
+      ),
+    [homeworks, searchHW]
+  );
+
+  const displayedSubs = useMemo(
+    () =>
+      submissions.filter((s) => {
+        const matchSearch = s.student_name
+          .toLowerCase()
+          .includes(searchStudent.toLowerCase());
+        const matchStatus =
+          statusFilter === "All Status" ||
+          s.status.toLowerCase() === statusFilter.toLowerCase();
+        return matchSearch && matchStatus;
+      }),
+    [submissions, searchStudent, statusFilter]
+  );
+
+  const activeSubs = displayedSubs.filter((s) => s.status.toLowerCase() !== "pending");
+  const pendingSubs = displayedSubs.filter((s) => s.status.toLowerCase() === "pending");
+  const tabSubs = activeTab === "submissions" ? activeSubs : pendingSubs;
+
   return (
-    <>
-      {/* ── Global style to kill ALL scrollbars except the page itself ── */}
-      <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; overflow-x: hidden; }
-
-        /* Hide scrollbar but keep scroll functionality */
-        ::-webkit-scrollbar { width: 0px; height: 0px; }
-        * { scrollbar-width: none; -ms-overflow-style: none; }
-
-        /* Responsive helpers */
-        @media (max-width: 768px) {
-          .hw-layout { flex-direction: column !important; }
-          .hw-left   { width: 100% !important; }
-          .hw-right  { width: 100% !important; }
-          .info-grid { grid-template-columns: 1fr 1fr !important; }
-          .filter-row { flex-wrap: wrap !important; }
-          .table-wrap { display: none !important; }
-          .mobile-cards { display: flex !important; }
-          .desktop-only { display: none !important; }
-          .mobile-only  { display: flex !important; }
-          .page-header  { flex-wrap: wrap; gap: 10px; }
-        }
-        @media (min-width: 769px) {
-          .mobile-cards { display: none !important; }
-          .mobile-only  { display: none !important; }
-        }
-      `}</style>
-
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        fontFamily: "'Inter', sans-serif",
+        padding: "20px 16px",
+        boxSizing: "border-box",
+      }}
+    >
+      {/* Header */}
       <div
         style={{
-          minHeight: "100vh",
-          background: "#f8fafc",
-          fontFamily: "'Inter', sans-serif",
-          padding: "20px 16px",
-          overflowX: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 22,
         }}
       >
-        {/* ── Page Header ── */}
-        <div
-          className="page-header"
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e293b" }}>
+          All Homework
+        </h1>
+        <button
+          onClick={() => setCreateModal(true)}
           style={{
+            padding: "9px 18px",
+            borderRadius: 10,
+            border: "none",
+            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 22,
+            gap: 8,
+            boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
           }}
         >
-          <h1
+          <Plus size={16} /> Create Homework
+        </button>
+      </div>
+
+      {loadingHw ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+          Loading homework assignments...
+        </div>
+      ) : error ? (
+        <div style={{ padding: 30, background: "#fee2e2", borderRadius: 12, color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      ) : homeworks.length === 0 ? (
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 16,
+            border: "1.5px solid #e2e8f0",
+            padding: "60px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
             style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#1e293b",
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              background: "#ede9fe",
+              color: "#7c3aed",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
             }}
           >
-            All Homework
-          </h1>
+            <ClipboardList size={32} />
+          </div>
+          <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
+            No Homework Created Yet
+          </h3>
+          <p
+            style={{
+              margin: "0 0 20px",
+              fontSize: 13,
+              color: "#64748b",
+              maxWidth: 420,
+              marginLeft: "auto",
+              marginRight: "auto",
+            }}
+          >
+            You haven't assigned any homework yet. Click the button below to create your first homework assignment for your class.
+          </p>
           <button
             onClick={() => setCreateModal(true)}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 18px",
+              padding: "10px 22px",
               borderRadius: 10,
               border: "none",
               background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
               color: "#fff",
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: "pointer",
-              boxShadow: "0 4px 15px rgba(99,102,241,0.35)",
-              whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            <Plus size={16} />
-            Create Homework
+            <Plus size={16} /> Create Homework
           </button>
         </div>
-
-        {/* ── Two-column layout ── */}
-        <div
-          className="hw-layout"
-          style={{ display: "flex", gap: 20, alignItems: "flex-start" }}
-        >
-          {/* ════ LEFT PANEL ════ */}
-          <div
-            className="hw-left"
-            style={{
-              width: 300,
-              flexShrink: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {/* Search */}
+      ) : (
+        /* Main Layout Grid */
+        <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 20 }}>
+          {/* Left Column: Homework List */}
+          <div>
             <div
               style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                background: "#fff",
-                border: "1.5px solid #f1f5f9",
-                borderRadius: 10,
-                padding: "0 12px",
-                height: 40,
+                position: "relative",
+                marginBottom: 14,
               }}
             >
-              <Search size={14} color="#94a3b8" />
+              <Search
+                size={15}
+                color="#94a3b8"
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+              />
               <input
-                value={searchHW}
-                onChange={(e) => {
-                  setSearchHW(e.target.value);
-                  setHwPage(1);
-                }}
+                type="text"
                 placeholder="Search homework..."
+                value={searchHW}
+                onChange={(e) => setSearchHW(e.target.value)}
                 style={{
-                  flex: 1,
-                  border: "none",
-                  background: "transparent",
+                  width: "100%",
+                  padding: "9px 12px 9px 36px",
+                  borderRadius: 10,
+                  border: "1.5px solid #e2e8f0",
                   fontSize: 13,
                   outline: "none",
-                  color: "#1e293b",
-                  minWidth: 0,
+                  background: "#fff",
+                  boxSizing: "border-box",
                 }}
-              />
-              <Filter
-                size={14}
-                color="#94a3b8"
-                style={{ cursor: "pointer", flexShrink: 0 }}
               />
             </div>
 
-            {/* Homework Cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {pagedHW.map((hw) => (
+              {filteredHW.map((hw) => (
                 <HomeworkCard
                   key={hw.id}
                   hw={hw}
-                  selected={selected.id === hw.id}
-                  onSelect={() => {
-                    setSelected(hw);
-                    setMobileView("detail");
-                  }}
+                  selected={selectedHw?.id === hw.id}
+                  onSelect={() => setSelectedHw(hw)}
                 />
               ))}
             </div>
-
-            {/* Pagination */}
-            {hwTotalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 4,
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  onClick={() => setHwPage(1)}
-                  disabled={hwPage === 1}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronsLeft size={13} />
-                </button>
-                <button
-                  onClick={() => setHwPage((p) => Math.max(1, p - 1))}
-                  disabled={hwPage === 1}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronLeft size={13} />
-                </button>
-                {Array.from({ length: hwTotalPages }, (_, i) => i + 1).map(
-                  (p) => (
-                    <button
-                      key={p}
-                      onClick={() => setHwPage(p)}
-                      style={pageBtnStyle(p === hwPage)}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-                <button
-                  onClick={() =>
-                    setHwPage((p) => Math.min(hwTotalPages, p + 1))
-                  }
-                  disabled={hwPage === hwTotalPages}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronRight size={13} />
-                </button>
-                <button
-                  onClick={() => setHwPage(hwTotalPages)}
-                  disabled={hwPage === hwTotalPages}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronsRight size={13} />
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* ════ RIGHT PANEL ════ */}
-          <div
-            className="hw-right"
-            style={{
-              flex: 1,
-              background: "#fff",
-              borderRadius: 16,
-              border: "1.5px solid #f1f5f9",
-              minWidth: 0,
-            }}
-          >
-            {/* Mobile back button */}
+          {/* Right Column: Selected Homework Detail & Submissions */}
+          {selectedHw && (
             <div
-              className="mobile-only"
               style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid #f1f5f9",
-                alignItems: "center",
-                gap: 8,
+                background: "#fff",
+                borderRadius: 16,
+                border: "1.5px solid #f1f5f9",
+                padding: 24,
               }}
             >
-              <button
-                onClick={() => setMobileView("list")}
+              {/* Header */}
+              <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "none",
-                  border: "none",
-                  color: "#6366f1",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: 0,
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  marginBottom: 16,
                 }}
               >
-                <ChevronLeft size={16} />
-                Back to list
-              </button>
-            </div>
-
-            {/* ── Detail Header ── */}
-            <div
-              style={{
-                padding: "20px 20px",
-                borderBottom: "1px solid #f1f5f9",
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{ display: "flex", gap: 14, alignItems: "center", minWidth: 0 }}
-              >
-                <div
-                  style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 12,
-                    background: colorMap[selected.color].bg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <FileText size={20} color={colorMap[selected.color].icon} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 4,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: "#1e293b",
-                      }}
-                    >
-                      {selected.title}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
+                      {selectedHw.title}
                     </h2>
-                    <StatusBadge status={selected.status} />
+                    <StatusBadge status={selectedHw.is_active ? "Active" : "Inactive"} />
                   </div>
-                  <div style={{ fontSize: 13, color: "#94a3b8" }}>
-                    {selected.class} · {selected.division}
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                    {selectedHw.school_class_name || "Class"} · {selectedHw.division_name || "Div"}
                   </div>
                 </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "7px 12px",
-                    borderRadius: 8,
-                    border: "1.5px solid #e2e8f0",
-                    background: "#fff",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "#64748b",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Edit size={13} />
-                  Edit
-                </button>
-                <button
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "7px 12px",
-                    borderRadius: 8,
-                    border: "1.5px solid #fecaca",
-                    background: "#fff",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "#ef4444",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Trash2 size={13} />
-                  Delete
-                </button>
-              </div>
-            </div>
 
-            {/* ── Info Row ── */}
-            <div
-              style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #f1f5f9",
-              }}
-            >
-              <p
-                style={{
-                  margin: "0 0 12px",
-                  fontSize: 13,
-                  color: "#64748b",
-                  lineHeight: 1.6,
-                }}
-              >
-                {selected.description}
-              </p>
-              {selected.attachment && (
-                <div
+                <button
+                  onClick={() => handleDeleteHw(selectedHw.id, selectedHw.title)}
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
                     padding: "6px 12px",
                     borderRadius: 8,
-                    border: "1.5px solid #e2e8f0",
+                    border: "1px solid #fee2e2",
+                    background: "#fff",
+                    color: "#ef4444",
                     fontSize: 12,
-                    color: "#6366f1",
+                    fontWeight: 600,
                     cursor: "pointer",
-                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+
+              {/* Description & Attachment */}
+              {selectedHw.description && (
+                <p style={{ margin: "0 0 14px", fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
+                  {selectedHw.description}
+                </p>
+              )}
+
+              {selectedHw.attachment && (
+                <div style={{ marginBottom: 16 }}>
+                  <a
+                    href={selectedHw.attachment}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#6366f1",
+                      background: "#eef2ff",
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Paperclip size={13} /> Attachment File
+                  </a>
+                </div>
+              )}
+
+              {/* Info Badges */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 12,
+                  marginBottom: 24,
+                  padding: 14,
+                  background: "#f8fafc",
+                  borderRadius: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>DUE DATE</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", marginTop: 2 }}>
+                    {selectedHw.due_date}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>ASSIGNED DATE</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginTop: 2 }}>
+                    {selectedHw.assigned_date || selectedHw.created_at?.split("T")[0]}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>SUBMISSIONS</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#6366f1", marginTop: 2 }}>
+                    {submissions.length} Total
+                  </div>
+                </div>
+              </div>
+
+              {/* Submissions Section */}
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 18 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     marginBottom: 14,
                   }}
                 >
-                  <Paperclip size={13} />
-                  {selected.attachment}
-                </div>
-              )}
-
-              {/* Stats grid */}
-              <div
-                className="info-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: "10px 24px",
-                  marginTop: selected.attachment ? 0 : 4,
-                }}
-              >
-                {[
-                  {
-                    label: "Due Date",
-                    value: selected.dueDate,
-                    icon: <Clock size={14} color="#94a3b8" />,
-                  },
-                  {
-                    label: "Assigned Date",
-                    value: selected.assignedDate,
-                    icon: <ClipboardList size={14} color="#94a3b8" />,
-                  },
-                  {
-                    label: "Total Students",
-                    value: String(selected.total),
-                    icon: <Users size={14} color="#94a3b8" />,
-                  },
-                  {
-                    label: "Submissions",
-                    value: `${selected.submitted} (${pct}%)`,
-                    icon: <CheckCircle size={14} color="#94a3b8" />,
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    {item.icon}
-                    <div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                        {item.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#1e293b",
-                        }}
-                      >
-                        {item.value}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Progress bar ── */}
-            <div
-              style={{
-                padding: "12px 20px",
-                borderBottom: "1px solid #f1f5f9",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                  Submission Progress
-                </span>
-                <span
-                  style={{ fontSize: 12, fontWeight: 600, color: "#6366f1" }}
-                >
-                  {pct}%
-                </span>
-              </div>
-              <div
-                style={{ height: 6, background: "#f1f5f9", borderRadius: 99 }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${pct}%`,
-                    background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
-                    borderRadius: 99,
-                    transition: "width 0.4s ease",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* ── Tabs ── */}
-            <div
-              style={{
-                padding: "0 20px",
-                borderBottom: "1px solid #f1f5f9",
-                display: "flex",
-                gap: 0,
-              }}
-            >
-              {[
-                {
-                  key: "submissions" as const,
-                  label: `Submissions (${activeSubs.length})`,
-                },
-                {
-                  key: "pending" as const,
-                  label: `Pending (${pendingSubs.length})`,
-                },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    setSubPage(1);
-                  }}
-                  style={{
-                    padding: "13px 4px",
-                    marginRight: 20,
-                    border: "none",
-                    background: "transparent",
-                    fontSize: 13,
-                    fontWeight: activeTab === tab.key ? 600 : 400,
-                    color: activeTab === tab.key ? "#6366f1" : "#94a3b8",
-                    borderBottom:
-                      activeTab === tab.key
-                        ? "2.5px solid #6366f1"
-                        : "2.5px solid transparent",
-                    cursor: "pointer",
-                    marginBottom: -1,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* ── Filter Row ── */}
-            <div
-              className="filter-row"
-              style={{
-                padding: "12px 20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              {/* Search student */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: "#f8fafc",
-                  border: "1.5px solid #f1f5f9",
-                  borderRadius: 8,
-                  padding: "0 12px",
-                  height: 36,
-                  flex: 1,
-                  minWidth: 140,
-                }}
-              >
-                <Search size={13} color="#94a3b8" />
-                <input
-                  value={searchStudent}
-                  onChange={(e) => {
-                    setSearchStudent(e.target.value);
-                    setSubPage(1);
-                  }}
-                  placeholder="Search student..."
-                  style={{
-                    flex: 1,
-                    border: "none",
-                    background: "transparent",
-                    fontSize: 13,
-                    outline: "none",
-                    color: "#1e293b",
-                    minWidth: 0,
-                  }}
-                />
-              </div>
-
-              {/* Status filter */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "#f8fafc",
-                  border: "1.5px solid #f1f5f9",
-                  borderRadius: 8,
-                  padding: "0 10px 0 12px",
-                  height: 36,
-                  position: "relative",
-                }}
-              >
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setSubPage(1);
-                  }}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    fontSize: 13,
-                    outline: "none",
-                    color: "#1e293b",
-                    cursor: "pointer",
-                    appearance: "none",
-                    paddingRight: 18,
-                  }}
-                >
-                  {["All Status", "Submitted", "Late", "Pending"].map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  color="#94a3b8"
-                  style={{ pointerEvents: "none", flexShrink: 0 }}
-                />
-              </div>
-
-              {/* Export */}
-              <button
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "0 12px",
-                  height: 36,
-                  borderRadius: 8,
-                  border: "1.5px solid #e2e8f0",
-                  background: "#fff",
-                  fontSize: 13,
-                  color: "#64748b",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                <Download size={14} />
-                Export
-              </button>
-            </div>
-
-            {/* ── Desktop Table ── */}
-            <div className="table-wrap" style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 13,
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "#f8fafc" }}>
-                    {[
-                      "Student",
-                      "Submitted At",
-                      "Status",
-                      "Attachment",
-                      "Marks",
-                      "Action",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "10px 20px",
-                          textAlign: "left",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#94a3b8",
-                          letterSpacing: "0.05em",
-                          textTransform: "uppercase",
-                          whiteSpace: "nowrap",
-                          borderBottom: "1px solid #f1f5f9",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedSubs.map((sub, i) => (
-                    <tr
-                      key={sub.id}
+                  <div style={{ display: "flex", gap: 16 }}>
+                    <button
+                      onClick={() => setActiveTab("submissions")}
                       style={{
-                        borderBottom: "1px solid #f8fafc",
-                        background: i % 2 === 0 ? "#fff" : "#fafbfc",
+                        background: "none",
+                        border: "none",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: activeTab === "submissions" ? "#6366f1" : "#94a3b8",
+                        cursor: "pointer",
+                        paddingBottom: 4,
+                        borderBottom: activeTab === "submissions" ? "2px solid #6366f1" : "none",
                       }}
                     >
-                      {/* Student */}
-                      <td style={{ padding: "14px 20px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 34,
-                              height: 34,
-                              borderRadius: "50%",
-                              background: sub.avatarColor,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#fff",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {sub.initials}
-                          </div>
-                          <span
-                            style={{ fontWeight: 600, color: "#1e293b" }}
-                          >
-                            {sub.name}
-                          </span>
-                        </div>
-                      </td>
-                      {/* Submitted At */}
-                      <td style={{ padding: "14px 20px", color: "#64748b" }}>
-                        {sub.submittedAt ? (
-                          sub.submittedAt.split("\n").map((line, idx) => (
-                            <div
-                              key={idx}
-                              style={{
-                                fontSize: idx === 1 ? 11 : 13,
-                                color: idx === 1 ? "#94a3b8" : "#64748b",
-                              }}
-                            >
-                              {line}
-                            </div>
-                          ))
-                        ) : (
-                          <span style={{ color: "#cbd5e1" }}>—</span>
-                        )}
-                      </td>
-                      {/* Status */}
-                      <td style={{ padding: "14px 20px" }}>
-                        <StatusBadge status={sub.status} />
-                      </td>
-                      {/* Attachment */}
-                      <td style={{ padding: "14px 20px" }}>
-                        {sub.attachment ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              color: "#ef4444",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
-                          >
-                            <FileText size={14} />
-                            <div>
-                              <div>{sub.attachment}</div>
-                              <div style={{ color: "#94a3b8", fontSize: 11 }}>
-                                {sub.attachmentSize}
+                      Submissions ({activeSubs.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("pending")}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: activeTab === "pending" ? "#6366f1" : "#94a3b8",
+                        cursor: "pointer",
+                        paddingBottom: 4,
+                        borderBottom: activeTab === "pending" ? "2px solid #6366f1" : "none",
+                      }}
+                    >
+                      Pending ({pendingSubs.length})
+                    </button>
+                  </div>
+                </div>
+
+                {loadingSub ? (
+                  <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    Loading submissions...
+                  </div>
+                ) : tabSubs.length === 0 ? (
+                  <div style={{ padding: 30, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    No submissions found.
+                  </div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          STUDENT
+                        </th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          SUBMITTED AT
+                        </th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          STATUS
+                        </th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          MARKS
+                        </th>
+                        <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          ACTION
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tabSubs.map((sub, idx) => (
+                        <tr key={sub.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                          <td style={{ padding: "12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  background: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                                  color: "#fff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {getInitials(sub.student_name)}
                               </div>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                                {sub.student_name}
+                              </span>
                             </div>
-                          </div>
-                        ) : (
-                          <span style={{ color: "#cbd5e1" }}>—</span>
-                        )}
-                      </td>
-                      {/* Marks */}
-                      <td style={{ padding: "14px 20px" }}>
-                        {sub.marks !== null ? (
-                          <span
-                            style={{ fontWeight: 600, color: "#6366f1" }}
-                          >
-                            {sub.marks}/100
-                          </span>
-                        ) : (
-                          <span style={{ color: "#cbd5e1" }}>—</span>
-                        )}
-                      </td>
-                      {/* Action */}
-                      <td style={{ padding: "14px 20px" }}>
-                        {sub.status === "Pending" ? (
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: "#94a3b8",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            <Clock size={13} />
-                            Pending
-                          </span>
-                        ) : (
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: 6,
-                                border: "1.5px solid #e2e8f0",
-                                background: "#fff",
-                                fontSize: 12,
-                                fontWeight: 500,
-                                color: "#64748b",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
-                              }}
-                            >
-                              <Eye size={13} />
-                              View
-                            </button>
+                          </td>
+                          <td style={{ padding: "12px", fontSize: 12, color: "#64748b" }}>
+                            {sub.submitted_at || sub.submission_date || "—"}
+                          </td>
+                          <td style={{ padding: "12px" }}>
+                            <StatusBadge status={sub.status} />
+                          </td>
+                          <td style={{ padding: "12px", fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                            {sub.marks !== null ? `${sub.marks} / 100` : "—"}
+                          </td>
+                          <td style={{ padding: "12px", textAlign: "right" }}>
                             <button
                               onClick={() => setMarkModal(sub)}
                               style={{
-                                padding: "6px 12px",
-                                borderRadius: 6,
-                                border: "none",
-                                background:
-                                  sub.marks !== null ? "#dcfce7" : "#ede9fe",
+                                padding: "5px 12px",
+                                borderRadius: 7,
+                                border: "1px solid #c7d2fe",
+                                background: "#eef2ff",
+                                color: "#4f46e5",
                                 fontSize: 12,
                                 fontWeight: 600,
-                                color:
-                                  sub.marks !== null ? "#16a34a" : "#6366f1",
                                 cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
                               }}
                             >
-                              {sub.marks !== null ? (
-                                <Check size={13} />
-                              ) : (
-                                <Edit size={13} />
-                              )}
-                              {sub.marks !== null ? "Graded" : "Check"}
+                              Grade / Remark
                             </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {pagedSubs.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        style={{
-                          padding: "40px 20px",
-                          textAlign: "center",
-                          color: "#94a3b8",
-                          fontSize: 13,
-                        }}
-                      >
-                        <AlertCircle
-                          size={20}
-                          style={{ display: "block", margin: "0 auto 8px" }}
-                        />
-                        No students found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ── Mobile Cards ── */}
-            <div
-              className="mobile-cards"
-              style={{
-                flexDirection: "column",
-                gap: 10,
-                padding: "12px 16px",
-              }}
-            >
-              {pagedSubs.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: "center",
-                    color: "#94a3b8",
-                    fontSize: 13,
-                    padding: "30px 0",
-                  }}
-                >
-                  <AlertCircle
-                    size={20}
-                    style={{ display: "block", margin: "0 auto 8px" }}
-                  />
-                  No students found
-                </div>
-              ) : (
-                pagedSubs.map((sub) => (
-                  <MobileSubmissionCard
-                    key={sub.id}
-                    sub={sub}
-                    onMark={() => setMarkModal(sub)}
-                  />
-                ))
-              )}
-            </div>
-
-            {/* ── Table Pagination ── */}
-            <div
-              style={{
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderTop: "1px solid #f1f5f9",
-                flexWrap: "wrap",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                Showing{" "}
-                {tabSubs.length === 0
-                  ? 0
-                  : Math.min((subPage - 1) * subPerPage + 1, tabSubs.length)}
-                –{Math.min(subPage * subPerPage, tabSubs.length)} of{" "}
-                {tabSubs.length} students
-              </span>
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <button
-                  onClick={() => setSubPage((p) => Math.max(1, p - 1))}
-                  disabled={subPage === 1}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                {Array.from(
-                  { length: Math.max(1, subTotalPages) },
-                  (_, i) => i + 1
-                ).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setSubPage(p)}
-                    style={pageBtnStyle(p === subPage)}
-                  >
-                    {p}
-                  </button>
-                ))}
-                <button
-                  onClick={() =>
-                    setSubPage((p) => Math.min(subTotalPages, p + 1))
-                  }
-                  disabled={subPage === subTotalPages || subTotalPages === 0}
-                  style={pageBtnStyle(false)}
-                >
-                  <ChevronRight size={14} />
-                </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* ── Modals ── */}
-      {markModal && (
-        <MarkModal
-          student={markModal}
-          onClose={() => setMarkModal(null)}
-          onSave={handleSaveMarks}
+      {/* Modals */}
+      {createModal && (
+        <CreateHomeworkModal
+          divisions={divisions}
+          assignments={teacherAssignments}
+          onClose={() => setCreateModal(false)}
+          onSubmit={handleCreateSubmit}
         />
       )}
-      {createModal && (
-        <CreateHomeworkModal onClose={() => setCreateModal(false)} />
+
+      {markModal && (
+        <MarkModal
+          submission={markModal}
+          onClose={() => setMarkModal(null)}
+          onSave={handleGrade}
+        />
       )}
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 
 import {
   ChevronDown,
@@ -24,6 +25,7 @@ import {
   ArrowLeft,
   Download,
   Share2,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -34,6 +36,9 @@ import {
   createTimetable,
   updateTimetable,
   getAssignedTeachers,
+  autoGenerateTimetablePreview,
+  publishBulkTimetables,
+  type AutoGeneratePreviewResponse,
 } from "@/lib/clerk";
 import type {
   AssignedTeacher,
@@ -1982,6 +1987,757 @@ function TimetablePreviewModal({
   );
 }
 
+function AutoGenerateConfigModal({
+  isOpen,
+  onClose,
+  onGenerate,
+  isGenerating,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onGenerate: (config: {
+    start_time: string;
+    end_time: string;
+    total_lecture: number;
+    include_break: boolean;
+    break_duration: number;
+    break_after_lecture: number;
+  }) => void;
+  isGenerating: boolean;
+}) {
+  const [startTime, setStartTime] = useState("07:00");
+  const [endTime, setEndTime] = useState("12:16");
+  const [totalLectures, setTotalLectures] = useState(6);
+  const [includeBreak, setIncludeBreak] = useState(true);
+  const [breakDuration, setBreakDuration] = useState(20);
+  const [breakAfter, setBreakAfter] = useState(3);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-gray-100 animate-slide-up">
+        <div className="p-6 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md">
+              <Wand2 size={24} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Auto-Generate Timetable Settings</h2>
+              <p className="text-xs text-violet-100 mt-0.5">
+                Set school working hours and break slot parameters
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4 text-xs text-gray-700">
+          {/* Working Hours */}
+          <div className="bg-violet-50/70 border border-violet-100 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2 font-bold text-violet-900 text-sm">
+              <Clock size={16} className="text-violet-600" />
+              School Working Hours
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">School Start Time</label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">School End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-violet-700/80">
+              Timetable slots will strictly fit within {startTime} to {endTime} without exceeding end time.
+            </p>
+          </div>
+
+          {/* Lecture & Break Settings */}
+          <div className="space-y-3 border border-gray-100 rounded-2xl p-4 bg-slate-50/60">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">Teaching Lectures Count</label>
+                <input
+                  type="number"
+                  min={2}
+                  max={12}
+                  value={totalLectures}
+                  onChange={(e) => setTotalLectures(Number(e.target.value))}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">Recess / Lunch Break</label>
+                <label className="flex items-center gap-2 pt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeBreak}
+                    onChange={(e) => setIncludeBreak(e.target.checked)}
+                    className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500"
+                  />
+                  <span className="font-bold text-gray-800">Include Recess Slot</span>
+                </label>
+              </div>
+            </div>
+
+            {includeBreak && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200/60">
+                <div>
+                  <label className="font-semibold text-gray-600 mb-1 block">Break Duration (Mins)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={60}
+                    value={breakDuration}
+                    onChange={(e) => setBreakDuration(Number(e.target.value))}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-gray-600 mb-1 block">Recess After Lecture</label>
+                  <select
+                    value={breakAfter}
+                    onChange={(e) => setBreakAfter(Number(e.target.value))}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  >
+                    {Array.from({ length: Math.max(1, totalLectures - 1) }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        After Lecture {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            disabled={isGenerating}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-semibold transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() =>
+              onGenerate({
+                start_time: startTime,
+                end_time: endTime,
+                total_lecture: totalLectures,
+                include_break: includeBreak,
+                break_duration: breakDuration,
+                break_after_lecture: breakAfter,
+              })
+            }
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-md shadow-violet-200 transition-all disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Generating...
+              </>
+            ) : (
+              <>
+                <Wand2 size={16} /> Generate Draft Timetable
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditDraftSlotModal({
+  isOpen,
+  onClose,
+  slot,
+  subjects,
+  teachers,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  slot: {
+    slot_number: number;
+    is_lecture: boolean;
+    is_break: boolean;
+    slot_start_time: string;
+    slot_end_time: string;
+    teacher: number | null;
+    teacher_name: string;
+    subject: number | null;
+    subject_name: string;
+  } | null;
+  subjects: Subject[];
+  teachers: Teacher[];
+  onSave: (updated: {
+    slot_number: number;
+    is_lecture: boolean;
+    is_break: boolean;
+    slot_start_time: string;
+    slot_end_time: string;
+    teacher: number | null;
+    teacher_name: string;
+    subject: number | null;
+    subject_name: string;
+  }) => void;
+}) {
+  const [isBreak, setIsBreak] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [teacherId, setTeacherId] = useState<number | null>(null);
+  const [subjectId, setSubjectId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (slot) {
+      setIsBreak(slot.is_break);
+      setStartTime(slot.slot_start_time || "07:00");
+      setEndTime(slot.slot_end_time || "07:45");
+      setTeacherId(slot.teacher);
+      setSubjectId(slot.subject);
+    }
+  }, [slot]);
+
+  if (!isOpen || !slot) return null;
+
+  const handleSave = () => {
+    const chosenTeacher = teachers.find((t) => t.id === teacherId);
+    const chosenSubject = subjects.find((s) => s.id === subjectId);
+
+    onSave({
+      slot_number: slot.slot_number,
+      is_lecture: !isBreak,
+      is_break: isBreak,
+      slot_start_time: startTime,
+      slot_end_time: endTime,
+      teacher: isBreak ? null : teacherId,
+      teacher_name: isBreak ? "Recess / Break" : chosenTeacher ? chosenTeacher.name : slot.teacher_name,
+      subject: isBreak ? null : subjectId,
+      subject_name: isBreak ? "Recess / Lunch Break" : chosenSubject ? chosenSubject.name : slot.subject_name,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-gray-100 animate-slide-up">
+        {/* Header */}
+        <div className="p-5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+              <Pencil size={18} className="text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base">Edit Slot {slot.slot_number}</h3>
+              <p className="text-[11px] text-violet-100">Update time, subject, teacher or break status</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 text-xs text-gray-700">
+          {/* Slot Type Toggle */}
+          <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <span className="font-bold text-gray-800">Slot Type</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBreak(false)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                  !isBreak ? "bg-violet-600 text-white shadow-sm" : "bg-white text-gray-600 border border-gray-200"
+                }`}
+              >
+                Lecture Slot
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBreak(true)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                  isBreak ? "bg-amber-500 text-white shadow-sm" : "bg-white text-gray-600 border border-gray-200"
+                }`}
+              >
+                Recess / Break
+              </button>
+            </div>
+          </div>
+
+          {/* Time Inputs */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-gray-600 mb-1 block">Start Time</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-gray-600 mb-1 block">End Time</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {!isBreak && (
+            <>
+              {/* Subject Dropdown */}
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">Select Subject</label>
+                <select
+                  value={subjectId ?? ""}
+                  onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                >
+                  <option value="">-- Select Subject --</option>
+                  {subjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Teacher Dropdown */}
+              <div>
+                <label className="font-semibold text-gray-600 mb-1 block">Select Teacher</label>
+                <select
+                  value={teacherId ?? ""}
+                  onChange={(e) => setTeacherId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                >
+                  <option value="">-- Select Teacher --</option>
+                  {teachers.map((teach) => (
+                    <option key={teach.id} value={teach.id}>
+                      {teach.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-semibold transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex items-center gap-1.5 px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-md shadow-violet-200 transition-all"
+          >
+            <CheckCircle2 size={16} /> Save Slot
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftTimetablePreviewModal({
+  isOpen,
+  onClose,
+  draftData,
+  subjects,
+  teachers,
+  onRegenerate,
+  onPublish,
+  isRegenerating,
+  isPublishing,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  draftData: AutoGeneratePreviewResponse["draft_timetables"] | null;
+  subjects: Subject[];
+  teachers: Teacher[];
+  onRegenerate: () => void;
+  onPublish: (updatedDrafts: AutoGeneratePreviewResponse["draft_timetables"]) => void;
+  isRegenerating: boolean;
+  isPublishing: boolean;
+}) {
+  const [selectedDivId, setSelectedDivId] = useState<number | "all">("all");
+  const [selectedDay, setSelectedDay] = useState<string>("all");
+  const [localDrafts, setLocalDrafts] = useState<AutoGeneratePreviewResponse["draft_timetables"] | null>(null);
+
+  const [editingContext, setEditingContext] = useState<{
+    draftIndex: number;
+    slotIndex: number;
+    slot: any;
+  } | null>(null);
+
+  useEffect(() => {
+    if (draftData) {
+      setLocalDrafts(draftData);
+    }
+  }, [draftData]);
+
+  if (!isOpen || !localDrafts) return null;
+
+  const divMap = new Map<number, { id: number; name: string }>();
+  localDrafts.forEach((d) => {
+    if (!divMap.has(d.class_division)) {
+      divMap.set(d.class_division, {
+        id: d.class_division,
+        name: d.class_name ? `${d.class_name} - Div ${d.division_name}` : `Division ${d.division_name}`,
+      });
+    }
+  });
+  const divisionsList = Array.from(divMap.values());
+
+  const filteredDrafts = localDrafts
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .filter(({ item }) => {
+      if (selectedDivId !== "all" && item.class_division !== selectedDivId) return false;
+      if (selectedDay !== "all" && item.day.toLowerCase() !== selectedDay.toLowerCase()) return false;
+      return true;
+    });
+
+  const handleSlotSave = (updatedSlot: any) => {
+    if (!editingContext || !localDrafts) return;
+    const nextDrafts = [...localDrafts];
+    const targetDraft = { ...nextDrafts[editingContext.draftIndex] };
+    const nextSlots = [...targetDraft.slots];
+    nextSlots[editingContext.slotIndex] = updatedSlot;
+    targetDraft.slots = nextSlots;
+    nextDrafts[editingContext.draftIndex] = targetDraft;
+    setLocalDrafts(nextDrafts);
+    toast.success(`Slot ${updatedSlot.slot_number} updated in draft!`);
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100 animate-slide-up">
+          {/* Header */}
+          <div className="p-6 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md">
+                <Wand2 size={24} className="text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold">Auto-Generated Timetable Preview</h2>
+                  <span className="px-2.5 py-0.5 bg-amber-400/30 text-amber-100 border border-amber-300/40 text-xs font-bold rounded-full uppercase tracking-wider">
+                    Draft Preview
+                  </span>
+                </div>
+                <p className="text-xs text-violet-100 mt-0.5">
+                  Review and edit slot times, teachers or subjects before publishing to live database.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Filters bar */}
+          <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Class:</span>
+                <select
+                  value={selectedDivId}
+                  onChange={(e) => setSelectedDivId(e.target.value === "all" ? "all" : Number(e.target.value))}
+                  className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="all">All Classes ({divisionsList.length})</option>
+                  {divisionsList.map((div) => (
+                    <option key={div.id} value={div.id}>
+                      {div.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Day:</span>
+                <select
+                  value={selectedDay}
+                  onChange={(e) => setSelectedDay(e.target.value)}
+                  className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="all">All Days</option>
+                  {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((day) => (
+                    <option key={day} value={day}>
+                      {day.charAt(0).toUpperCase() + day.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-500 font-medium">
+              Showing <span className="font-bold text-violet-700">{filteredDrafts.length}</span> daily schedules
+            </div>
+          </div>
+
+          {/* Content Body */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+            {filteredDrafts.map(({ item, originalIndex }) => {
+              const classNameLabel = item.class_name
+                ? `${item.class_name} - Div ${item.division_name}`
+                : `Division ${item.division_name}`;
+
+              return (
+                <div key={originalIndex} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1 bg-violet-100 text-violet-700 text-xs font-bold rounded-xl">
+                        {classNameLabel}
+                      </span>
+                      <span className="text-sm font-bold text-gray-800 capitalize">
+                        {item.day}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium">
+                      {item.slots.length} Lectures ({item.start_time} - {item.end_time})
+                    </span>
+                  </div>
+
+                  {/* Slots Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {item.slots.map((slot, sIdx) => {
+                      if (slot.is_break) {
+                        return (
+                          <div
+                            key={slot.slot_number}
+                            className="p-3 rounded-xl border text-xs flex flex-col justify-between bg-amber-50/90 border-amber-200 ring-1 ring-amber-200 group relative hover:shadow-md transition-all"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold text-amber-800">
+                                Slot {slot.slot_number}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-md shadow-sm">
+                                  Recess / Break
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingContext({ draftIndex: originalIndex, slotIndex: sIdx, slot })}
+                                  className="p-1 text-amber-700 hover:text-amber-900 hover:bg-amber-100 rounded-lg transition-all"
+                                  title="Edit Slot Time / Details"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="font-bold text-amber-900 flex items-center gap-1.5 text-sm">
+                                <Coffee size={14} className="text-amber-600 shrink-0" />
+                                <span>{slot.subject_name || "Recess / Lunch Break"}</span>
+                              </div>
+                              <div className="text-amber-700/80 text-[11px]">
+                                Recess / Break Period
+                              </div>
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-700 font-medium">
+                              <span className="flex items-center gap-1">
+                                <Clock size={11} /> {slot.slot_start_time} - {slot.slot_end_time}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={slot.slot_number}
+                          className={`p-3 rounded-xl border text-xs flex flex-col justify-between group relative hover:shadow-md transition-all ${
+                            slot.slot_number === 1
+                              ? "bg-violet-50/90 border-violet-200 ring-1 ring-violet-200"
+                              : "bg-slate-50/80 border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-gray-700">
+                              Slot {slot.slot_number}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {slot.slot_number === 1 && (
+                                <span className="px-2 py-0.5 bg-violet-600 text-white text-[10px] font-bold rounded-md shadow-sm">
+                                  Class Teacher
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setEditingContext({ draftIndex: originalIndex, slotIndex: sIdx, slot })}
+                                className="p-1 text-gray-400 hover:text-violet-600 hover:bg-violet-100 rounded-lg transition-all"
+                                title="Edit Slot Time, Teacher, or Subject"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5 text-sm">
+                              <BookOpen size={14} className="text-violet-500 shrink-0" />
+                              <span className="truncate">{slot.subject_name || "Unassigned Subject"}</span>
+                            </div>
+                            <div className="text-gray-500 flex items-center gap-1.5">
+                              <span className="truncate">Teacher: {slot.teacher_name || "Unassigned"}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Clock size={11} /> {slot.slot_start_time} - {slot.slot_end_time}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <button
+              onClick={onRegenerate}
+              disabled={isRegenerating || isPublishing}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={isRegenerating ? "animate-spin" : ""} />
+              {isRegenerating ? "Regenerating..." : "Regenerate Different Timetable"}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                disabled={isPublishing}
+                className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-bold transition-colors"
+              >
+                Discard Draft
+              </button>
+              <button
+                onClick={() => onPublish(localDrafts)}
+                disabled={isPublishing}
+                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-200 disabled:opacity-50"
+              >
+                {isPublishing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Publishing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} /> Publish & Save Timetable
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <EditDraftSlotModal
+        isOpen={editingContext !== null}
+        onClose={() => setEditingContext(null)}
+        slot={editingContext?.slot || null}
+        subjects={subjects}
+        teachers={teachers}
+        onSave={handleSlotSave}
+      />
+    </>
+  );
+}
+
+function UnassignedClassTeachersModal({
+  isOpen,
+  onClose,
+  missingDivisions,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  missingDivisions: string[] | null;
+}) {
+  if (!isOpen || !missingDivisions || missingDivisions.length === 0) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 border border-gray-100 animate-slide-up text-center space-y-4">
+        <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+          <AlertCircle size={32} />
+        </div>
+
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Cannot Auto-Generate Timetable</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            All class divisions in the school must have a **Class Teacher** assigned before generating timetables.
+          </p>
+        </div>
+
+        <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 text-left max-h-48 overflow-y-auto">
+          <p className="text-xs font-bold text-amber-800 mb-2">Unassigned Class Divisions ({missingDivisions.length}):</p>
+          <ul className="space-y-1">
+            {missingDivisions.map((divName, idx) => (
+              <li key={idx} className="text-xs text-amber-900 flex items-center gap-2 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                {divName}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="pt-2 flex flex-col gap-2">
+          <a
+            href="/clerk/assign-teacher"
+            className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2"
+          >
+            Assign Class Teachers Now
+          </a>
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // TIMETABLE LIST PAGE — shown before the create form
 // ═══════════════════════════════════════════════════════════════════
@@ -2004,6 +2760,80 @@ function TimetableListPage({
   const [loadingAll, setLoadingAll] = useState(false);
   const [previewDivision, setPreviewDivision] = useState<string>("");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [draftTimetables, setDraftTimetables] = useState<AutoGeneratePreviewResponse["draft_timetables"] | null>(null);
+  const [missingDivisions, setMissingDivisions] = useState<string[] | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [lastAutoConfig, setLastAutoConfig] = useState<any>(null);
+
+  const handleAutoGenerateClick = () => {
+    setShowConfigModal(true);
+  };
+
+  const handleRunAutoGenerate = async (config: {
+    start_time: string;
+    end_time: string;
+    total_lecture: number;
+    include_break: boolean;
+    break_duration: number;
+    break_after_lecture: number;
+  }) => {
+    setIsAutoGenerating(true);
+    setMissingDivisions(null);
+    setLastAutoConfig(config);
+    try {
+      const res = await autoGenerateTimetablePreview(config);
+      setDraftTimetables(res.draft_timetables);
+      setShowConfigModal(false);
+      toast.success("Draft timetable generated for preview!");
+    } catch (err: any) {
+      if (err?.missing_divisions && err.missing_divisions.length > 0) {
+        setShowConfigModal(false);
+        setMissingDivisions(err.missing_divisions);
+      } else {
+        toast.error(err?.message || "Failed to auto-generate timetable draft.");
+      }
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
+
+  const handlePublishDraft = async () => {
+    if (!draftTimetables || draftTimetables.length === 0) return;
+    setIsPublishing(true);
+    try {
+      await publishBulkTimetables(draftTimetables);
+      toast.success("Timetables published successfully!");
+      setDraftTimetables(null);
+
+      if (divisions.length > 0) {
+        setLoadingAll(true);
+        Promise.all(
+          divisions.map((d) =>
+            getTimetable(d.id)
+              .then((res) => ({
+                id: d.id,
+                data: Array.isArray(res)
+                  ? (res as TimetableRecord[]).filter((r) => r.class_division === d.id)
+                  : [],
+              }))
+              .catch(() => ({ id: d.id, data: [] }))
+          )
+        )
+          .then((results) => {
+            const map: Record<number, TimetableRecord[]> = {};
+            results.forEach((r) => { map[r.id] = r.data; });
+            setAllTimetables(map);
+          })
+          .finally(() => setLoadingAll(false));
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to publish timetables.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
 
   // Load all timetables for all divisions on mount
@@ -2054,12 +2884,29 @@ function TimetableListPage({
             <h1 className="text-2xl font-black text-gray-900">Timetable</h1>
             <p className="text-sm text-gray-400 mt-1">View and manage all class timetables.</p>
           </div>
-          <button
-            onClick={() => onCreateNew("", "monday")}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 flex-shrink-0"
-          >
-            <Plus size={15} /> Create Timetable
-          </button>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              onClick={handleAutoGenerateClick}
+              disabled={isAutoGenerating}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 flex-shrink-0 disabled:opacity-50"
+            >
+              {isAutoGenerating ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Generating Draft...
+                </>
+              ) : (
+                <>
+                  <Wand2 size={15} /> Auto Generate Timetable
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => onCreateNew("", "monday")}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 flex-shrink-0"
+            >
+              <Plus size={15} /> Create Timetable
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2229,6 +3076,31 @@ function TimetableListPage({
         divisions={divisions}
         subjects={subjects}
         teachers={teachers}
+      />
+
+      <DraftTimetablePreviewModal
+        isOpen={draftTimetables !== null}
+        onClose={() => setDraftTimetables(null)}
+        draftData={draftTimetables}
+        subjects={subjects}
+        teachers={teachers}
+        onRegenerate={handleAutoGenerateClick}
+        onPublish={handlePublishDraft}
+        isRegenerating={isAutoGenerating}
+        isPublishing={isPublishing}
+      />
+
+      <UnassignedClassTeachersModal
+        isOpen={missingDivisions !== null}
+        onClose={() => setMissingDivisions(null)}
+        missingDivisions={missingDivisions}
+      />
+
+      <AutoGenerateConfigModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        onGenerate={handleRunAutoGenerate}
+        isGenerating={isAutoGenerating}
       />
     </div>
   );
@@ -2762,6 +3634,8 @@ export default function CreateTimetablePage() {
         subjects={subjects}
         teachers={teachers}
       />
+
+
 
     </div>
   );

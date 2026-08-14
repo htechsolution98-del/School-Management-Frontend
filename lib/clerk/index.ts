@@ -7,3 +7,4 @@ export * from "./assign-teacher";
 export * from "./admissions";
 export * from "./location-settings";
 export * from "./timetable";
+export * from "./leaves";

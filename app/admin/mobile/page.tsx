@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 interface ScreenItem {
   _id?: string;
@@ -76,6 +77,7 @@ const getIcon = (name: string, className?: string) => {
 const capIconOptions = ["Lock", "Wifi", "Bell", "Fingerprint", "Shield", "Activity", "Cpu", "Network", "HardDrive", "Sparkles"];
 
 export default function MobileEcosystemManager() {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -232,7 +234,7 @@ export default function MobileEcosystemManager() {
   };
 
   const handleDeleteScreen = async (index: number) => {
-    if (!confirm("Are you sure you want to delete this screenshot mockup?")) return;
+    if (!(await confirm("Are you sure you want to delete this screenshot mockup?"))) return;
     const updated = mobileScreens.filter((_, i) => i !== index);
     setMobileScreens(updated);
     toast.success("Screenshot deleted. Save settings below to apply.");
@@ -285,8 +287,8 @@ export default function MobileEcosystemManager() {
     setIsCapModalOpen(true);
   };
 
-  const handleDeleteCap = (index: number) => {
-    if (!confirm("Are you sure you want to delete this dynamic capabilities card?")) return;
+  const handleDeleteCap = async (index: number) => {
+    if (!(await confirm("Are you sure you want to delete this dynamic capabilities card?"))) return;
     const updated = mobileCapabilities.filter((_, i) => i !== index);
     setMobileCapabilities(updated);
     toast.success("Infrastructure card deleted. Click Save Settings below to apply.");

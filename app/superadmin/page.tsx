@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfirm } from "@/components/providers/confirm-provider";
 import {
   Plus,
   Users,
@@ -17,11 +18,17 @@ import {
   X,
   RefreshCw,
   Hash,
+  Edit2,
+  Trash2,
+  Power,
+  Image,
 } from "lucide-react";
 
 import {
   getSchools,
   createSchool,
+  updateSchool,
+  deleteSchool,
   updateFeatureStatus,
   createSchoolFeature,
   fetchFeaturesList,
@@ -54,6 +61,7 @@ type FormFieldKey = Exclude<
 >;
 
 export default function SuperAdminDashboard() {
+  const confirm = useConfirm();
   const [schools, setSchools] = useState<School[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +71,7 @@ export default function SuperAdminDashboard() {
   const [successMsg, setSuccessMsg] = useState("");
   const [features, setFeatures] = useState<Feature[]>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<number[]>([]);
+  const [editingSchoolId, setEditingSchoolId] = useState<number | null>(null);
   {
     /* New states for the Modal */
   }
@@ -70,6 +79,48 @@ export default function SuperAdminDashboard() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [loadingFeatureId, setLoadingFeatureId] = useState<number | null>(null);
   // --------
+
+  const handleDelete = async (id: number) => {
+    if (!(await confirm("Are you sure you want to delete this school?"))) return;
+    try {
+      await deleteSchool(id);
+      setSuccessMsg("School deleted successfully.");
+      fetchSchools();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete school");
+    }
+  };
+
+  const handleToggleActive = async (id: number, currentStatus: boolean) => {
+    if (!(await confirm(`Are you sure you want to ${currentStatus ? "deactivate" : "activate"} this school?`))) return;
+    try {
+      await updateSchool(id, { is_active: !currentStatus });
+      setSuccessMsg("School status updated successfully.");
+      fetchSchools();
+    } catch (err: any) {
+      setError(err.message || "Failed to update school status");
+    }
+  };
+
+  const handleEditClick = (school: School) => {
+    setEditingSchoolId(school.id || null);
+    setFormData({
+      name: school.name || "",
+      email: school.email || "",
+      phone: school.phone || "",
+      address: school.address || "",
+      city: school.city || "",
+      state: school.state || "",
+      country: school.country || "",
+      pincode: school.pincode || "",
+      feature_ids: school.feature_ids || [],
+      is_active: school.is_active ?? true,
+    });
+    setSelectedFeatures(school.feature_ids || []);
+    setIsAdding(true);
+    setError("");
+    setSuccessMsg("");
+  };
 
   const fetchSchools = useCallback(async () => {
     setIsFetching(true);
@@ -108,8 +159,13 @@ export default function SuperAdminDashboard() {
   }, [fetchSchools, fetchFeatures]);
 
   const handleChange =
-    (field: FormFieldKey) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    (field: FormFieldKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.type === "file") {
+        setFormData((prev) => ({ ...prev, [field]: e.target.files?.[0] || null }));
+      } else {
+        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      }
+    };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,25 +178,28 @@ export default function SuperAdminDashboard() {
         feature_ids: selectedFeatures,
       };
 
-      const res = await createSchool(payload);
-
-      setSuccessMsg(
-        res.meassage || res.message || "School created successfully.",
-      );
+      if (editingSchoolId) {
+        await updateSchool(editingSchoolId, payload);
+        setSuccessMsg("School updated successfully.");
+      } else {
+        const res = await createSchool(payload);
+        setSuccessMsg(
+          res.message || "School created successfully.",
+        );
+      }
 
       setTimeout(() => {
         setSuccessMsg("");
       }, 2000);
 
       setFormData(EMPTY_FORM);
-
       setSelectedFeatures([]);
-
+      setEditingSchoolId(null);
       setIsAdding(false);
 
       await fetchSchools();
     } catch (err: any) {
-      setError(err.message || "Failed to create school.");
+      setError(err.message || "Failed to save school.");
     } finally {
       setIsSubmitting(false);
     }
@@ -159,10 +218,9 @@ export default function SuperAdminDashboard() {
     currentStatus: boolean,
   ) => {
     try {
-      // Toggle value
       const updatedStatus = !currentStatus;
 
-      const confirmAction = window.confirm(
+      const confirmAction = await confirm(
         `Are you sure you want to ${
           updatedStatus ? "activate" : "disable"
         } this feature?`,
@@ -170,10 +228,8 @@ export default function SuperAdminDashboard() {
 
       if (!confirmAction) return;
 
-      // API CALL
       await updateFeatureStatus(schoolFeatureId, updatedStatus);
 
-      // Update local UI instantly
       if (!selectedSchool) return;
 
       setSelectedSchool({
@@ -197,7 +253,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  // this is for open modal
   const openFeatureModal = (school: School) => {
     setSelectedSchool(school);
     setSelectedFeatures(school.feature_ids || []);
@@ -268,6 +323,7 @@ export default function SuperAdminDashboard() {
     type?: string;
     icon: React.ElementType;
     span?: boolean;
+    accept?: string;
   }[] = [
     {
       key: "name",
@@ -275,6 +331,20 @@ export default function SuperAdminDashboard() {
       placeholder: "e.g. Sunrise Academy",
       icon: Building2,
       span: true,
+    },
+    {
+      key: "index_no",
+      label: "Index Number",
+      placeholder: "e.g. IND-123",
+      icon: Hash,
+    },
+    {
+      key: "logo",
+      label: "School Logo",
+      placeholder: "",
+      icon: Image as React.ElementType,
+      type: "file",
+      accept: "image/*",
     },
     {
       key: "email",
@@ -328,7 +398,14 @@ export default function SuperAdminDashboard() {
           </Button>
           <Button
             onClick={() => {
-              setIsAdding(!isAdding);
+              if (isAdding) {
+                setIsAdding(false);
+                setEditingSchoolId(null);
+                setFormData(EMPTY_FORM);
+                setSelectedFeatures([]);
+              } else {
+                setIsAdding(true);
+              }
               setError("");
               setSuccessMsg("");
             }}
@@ -375,49 +452,68 @@ export default function SuperAdminDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Create Form */}
+      {/* Create / Edit Form Modal */}
       <AnimatePresence>
         {isAdding && (
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-5">
-              Register New School
-            </h3>
-            <form
-              onSubmit={handleSubmit}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-5"
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="bg-white rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-6 md:p-8 w-full max-w-3xl overflow-hidden flex flex-col relative max-h-[90vh]"
             >
-              {fields.map(
-                ({ key, label, placeholder, type, icon: Icon, span }) => (
-                  <div
-                    key={key}
-                    className={`space-y-1.5 ${span ? "sm:col-span-2" : ""}`}
-                  >
-                    <Label
-                      htmlFor={key}
-                      className="text-sm font-medium text-gray-700"
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdding(false);
+                  setEditingSchoolId(null);
+                  setFormData(EMPTY_FORM);
+                  setSelectedFeatures([]);
+                  setError("");
+                  setSuccessMsg("");
+                }}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors z-10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-6">
+                {editingSchoolId ? "Edit School" : "Register New School"}
+              </h3>
+              
+              <div className="overflow-y-auto custom-scrollbar pr-2 flex-1">
+                <form
+                  onSubmit={handleSubmit}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-5 pb-4"
+                >
+                {fields.map(
+                  ({ key, label, placeholder, type, icon: Icon, span, accept }) => (
+                    <div
+                      key={key}
+                      className={`space-y-1.5 ${span ? "sm:col-span-2" : ""}`}
                     >
-                      {label}
-                    </Label>
-                    <div className="relative">
-                      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id={key}
-                        type={type || "text"}
-                        required
-                        placeholder={placeholder}
-                        value={formData[key]}
-                        onChange={handleChange(key)}
-                        className="pl-9 h-11 rounded-xl border-gray-200 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20"
-                      />
+                      <Label
+                        htmlFor={key}
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        {label}
+                      </Label>
+                      <div className="relative">
+                        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id={key}
+                          type={type || "text"}
+                          required={key !== "logo" && key !== "index_no"}
+                          placeholder={placeholder}
+                          value={type === "file" ? undefined : formData[key as keyof typeof formData] as string}
+                          accept={accept}
+                          onChange={handleChange(key)}
+                          className={`pl-9 h-11 rounded-xl border-gray-200 focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 ${type === 'file' ? 'pt-2' : ''}`}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ),
-              )}
+                  ),
+                )}
 
               <div className="sm:col-span-2 space-y-3">
                 <Label className="text-sm font-medium text-gray-700">
@@ -455,7 +551,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2 flex justify-end pt-2">
+              <div className="sm:col-span-2 flex justify-end pt-4 mt-2 border-t border-gray-100">
                 <Button
                   type="submit"
                   disabled={isSubmitting}
@@ -464,11 +560,13 @@ export default function SuperAdminDashboard() {
                   {isSubmitting && (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   )}
-                  {isSubmitting ? "Creating…" : "Create School"}
+                  {isSubmitting ? "Saving…" : editingSchoolId ? "Update School" : "Create School"}
                 </Button>
               </div>
-            </form>
-          </motion.div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -488,12 +586,13 @@ export default function SuperAdminDashboard() {
                 <th className="px-6 py-4">Pincode</th>
                 <th className="px-6 py-4">Features</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isFetching ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-[#4F46E5] mx-auto" />
                     <p className="text-gray-400 text-sm mt-2">
                       Loading schools…
@@ -502,7 +601,7 @@ export default function SuperAdminDashboard() {
                 </tr>
               ) : schools.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                     <p className="text-gray-400 text-sm">
                       No schools found. Create one to get started.
@@ -563,6 +662,33 @@ export default function SuperAdminDashboard() {
                       >
                         {(school.is_active ?? true) ? "Active" : "Inactive"}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleActive(school.id!, school.is_active ?? true)}
+                          className={`inline-flex items-center justify-center rounded-full p-2 hover:bg-gray-100 transition-colors ${
+                            (school.is_active ?? true) ? "text-red-500" : "text-emerald-500"
+                          }`}
+                          title={(school.is_active ?? true) ? "Deactivate School" : "Activate School"}
+                        >
+                          <Power className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditClick(school)}
+                          className="inline-flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded-full p-2 transition-colors"
+                          title="Edit School"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(school.id!)}
+                          className="inline-flex items-center justify-center text-red-600 hover:bg-red-50 rounded-full p-2 transition-colors"
+                          title="Delete School"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))
@@ -639,10 +765,10 @@ export default function SuperAdminDashboard() {
                       {/* Left Side: Toggle Switch & Name */}
                       <div
                         className={`flex items-center gap-5 flex-1 ${isThisLoading ? "opacity-50" : "cursor-pointer"}`}
-                        onClick={() => {
+                        onClick={async () => {
                           if (isThisLoading) return;
 
-                          const confirmAction = window.confirm(
+                          const confirmAction = await confirm(
                             `Are you sure you want to ${
                               !isSelected ? "enable" : "disable"
                             } ${feature.name}?`,

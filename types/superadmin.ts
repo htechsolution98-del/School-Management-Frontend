@@ -16,6 +16,8 @@ export interface School {
   state: string | null;
   country: string | null;
   pincode: string | null;
+  logo?: string | null;
+  index_no?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -33,6 +35,8 @@ export interface CreateSchoolPayload {
   state: string;
   country: string;
   pincode: string;
+  logo?: File | null;
+  index_no?: string;
   feature_ids: number[];
   is_active?: boolean;
 }

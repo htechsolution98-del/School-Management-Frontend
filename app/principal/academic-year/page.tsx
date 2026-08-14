@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
     Calendar, CheckCircle2, Clock, FileText,
-    Plus, Pencil, Trash2, Loader2, X, AlertCircle,
+    Plus, Pencil, Trash2, Loader2, X, AlertCircle, Power,
 } from "lucide-react";
 import {
     getAcademicYearsForPrincipal,
@@ -66,6 +67,45 @@ function buildBillingPeriods(
         if (periods.length > 24) break; // safety
     }
     return periods;
+}
+
+// ─── DERIVE STATUS ────────────────────────────────────────────────────────────
+// 4 states:
+//   Active      → is_active === true
+//   Deactivated → is_active === false  AND  year has started (current date ≥ first billing period)
+//   Upcoming    → year hasn't started yet (current date < first billing period)
+//   Completed   → year has fully ended   (current date > last billing period)
+function deriveStatus(year: AcademicYear): "Active" | "Deactivated" | "Completed" | "Upcoming" {
+    if (year.is_active === true) return "Active";
+
+    const now = new Date();
+    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    let periods = year.billing_periods ?? [];
+    if ((!periods || periods.length === 0) && year.name) {
+        const startYearStr = year.name.split("-")[0];
+        let startYear = parseInt(startYearStr, 10);
+        if (isNaN(startYear) && year.start_year) startYear = year.start_year;
+        if (!isNaN(startYear) && year.start_month && year.end_month) {
+            const built = buildBillingPeriods(year.name || `${startYear}-${startYear + 1}`, year.start_month, year.end_month);
+            periods = built.map((p) => p.code);
+        }
+    }
+
+    if (periods.length > 0) {
+        const first = periods[0];
+        const last = periods[periods.length - 1];
+
+        if (currentPeriod > last) return "Completed";
+        if (currentPeriod >= first) {
+            // Year has started — if manually deactivated show "Deactivated", else "Active"
+            return year.is_active === false ? "Deactivated" : "Active";
+        }
+        // currentPeriod < first → year hasn't started yet
+        return "Upcoming";
+    }
+
+    return "Upcoming";
 }
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
@@ -322,16 +362,34 @@ export default function AcademicYearPage() {
             await deleteAcademicYearForPrincipal(id);
             await load();
         } catch (e: unknown) {
-            alert(e instanceof Error ? e.message : "Delete failed.");
+            toast.error(e instanceof Error ? e.message : "Delete failed.");
         } finally {
             setDeletingId(null);
             setConfirmDeleteId(null);
         }
     };
 
+    const [togglingId, setTogglingId] = useState<number | null>(null);
+
+    const handleToggleActive = async (year: AcademicYear) => {
+        setTogglingId(year.id);
+        const newActiveState = !year.is_active;
+        try {
+            await updateAcademicYearForPrincipal(year.id, {
+                is_active: newActiveState,
+            });
+            toast.success(newActiveState ? "Academic Year activated!" : "Academic Year deactivated!");
+            await load();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Failed to update status.");
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
     // derive stats
-    const activeYear = years.find((y) => y.is_active);
-    const upcomingCount = years.filter((y) => !y.is_active).length;
+    const activeYear = years.find((y) => deriveStatus(y) === "Active");
+    const upcomingCount = years.filter((y) => deriveStatus(y) === "Upcoming").length;
     const activePeriod = activeYear
         ? monthCount(activeYear.start_month, activeYear.end_month)
         : 0;
@@ -407,7 +465,7 @@ export default function AcademicYearPage() {
                             <tbody>
                                 {years.map((year, i) => {
                                     const period = monthCount(year.start_month, year.end_month);
-                                    const isActive = !!year.is_active;
+                                    const status = deriveStatus(year);
                                     return (
                                         <tr key={year.id} className={`border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${i === years.length - 1 ? "border-b-0" : ""}`}>
                                             <td className="px-6 py-4 text-sm font-bold text-gray-800">
@@ -425,9 +483,17 @@ export default function AcademicYearPage() {
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-600">{period} Month{period !== 1 ? "s" : ""}</td>
                                             <td className="px-6 py-4">
-                                                {isActive ? (
+                                                {status === "Active" ? (
                                                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Active
+                                                    </span>
+                                                ) : status === "Deactivated" ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" /> Deactivated
+                                                    </span>
+                                                ) : status === "Completed" ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1 rounded-full">
+                                                        <CheckCircle2 size={12} className="text-gray-500" /> Completed
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
@@ -437,6 +503,22 @@ export default function AcademicYearPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleToggleActive(year)}
+                                                        disabled={togglingId === year.id}
+                                                        title={year.is_active ? "Deactivate Academic Year" : "Activate Academic Year"}
+                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all disabled:opacity-40 ${
+                                                            year.is_active
+                                                                ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-200"
+                                                                : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                                        }`}
+                                                    >
+                                                        {togglingId === year.id ? (
+                                                            <Loader2 size={14} className="animate-spin text-emerald-600" />
+                                                        ) : (
+                                                            <Power size={15} />
+                                                        )}
+                                                    </button>
                                                     <button
                                                         onClick={() => { setEditing(year); setShowModal(true); }}
                                                         className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"

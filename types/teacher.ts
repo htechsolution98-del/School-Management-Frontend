@@ -48,6 +48,10 @@ export interface StudentAttendanceListResponse {
     name: string;
     gr_no: string;
   }[];
+  assigned_divisions?: {
+    division_id: number;
+    division_name: string;
+  }[];
   message?: string;
 }
 
@@ -95,4 +99,92 @@ export interface HomeworkSubmission {
   checked_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ─── School Exam (Class Teacher) Types ──────────────────────────────────────
+
+export interface SchoolExamStudent {
+  student_id: number;
+  student_name: string;
+  gr_no: string;
+  marks_obtained: number | null;
+  max_marks: number | null;
+  is_absent: boolean;
+  remarks: string | null;
+  is_published: boolean;
+  percentage: number | null;
+  grade: string | null;
+}
+
+export interface SchoolExam {
+  id: number;
+  title: string;
+  description: string;
+  subject: number | null;
+  subject_name: string | null;
+  exam_date: string;
+  start_time: string;
+  end_time: string;
+  class_group: number;
+  class_group_name: string;
+  students: SchoolExamStudent[];
+  total_students: number;
+  marks_entered: number;
+  is_published: boolean;
+}
+
+// ─── Exam Types ───────────────────────────────────────────────────────────────
+
+export interface Exam {
+  id: number;
+  title: string;
+  description: string;
+  subject: number | null;
+  exam_date: string;
+  start_time: string;
+  end_time: string;
+  class_group: number;
+  class_group_name: string;
+}
+
+export interface CreateExamPayload {
+  title: string;
+  description: string;
+  subject: number | null;
+  exam_date: string;
+  start_time: string;
+  end_time: string;
+  class_group: number;
+}
+
+// ─── Results Management Types ─────────────────────────────────────────────────
+
+export interface RosterEntry {
+  student: number;
+  student_name: string;
+  gr_no: string;
+  marks_obtained: number | null;
+  max_marks: number | null;
+  is_absent: boolean;
+  remarks: string | null;
+  is_published: boolean;
+}
+
+export interface ExamRosterResponse {
+  exam: number;
+  class_group: number;
+  roster: RosterEntry[];
+}
+
+export interface BulkSaveEntry {
+  student: number;
+  marks_obtained: number;
+  is_absent: "True" | "False";
+  remarks: string;
+}
+
+export interface BulkSavePayload {
+  exam: number;
+  max_marks: number;
+  entries: BulkSaveEntry[];
 }

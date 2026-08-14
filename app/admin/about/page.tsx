@@ -23,8 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-
+import { useConfirm } from "@/components/providers/confirm-provider";
 export default function AboutManager() {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -208,7 +209,7 @@ export default function AboutManager() {
 
   // CRUD: Delete Highlight Card
   const handleDeleteHighlight = async (index: number) => {
-    if (!confirm("Are you sure you want to delete this highlight card?")) return;
+    if (!(await confirm("Are you sure you want to delete this highlight card?"))) return;
 
     const updatedHighlights = highlights.filter((_, i) => i !== index);
     

@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-
+import { useConfirm } from "@/components/providers/confirm-provider";
 // Predefined available icons for the user to select
 const AVAILABLE_ICONS = [
   { name: "Lightbulb", label: "Innovation/Idea" },
@@ -59,6 +59,7 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
 }
 
 export default function WhyChooseUsManager() {
+  const confirm = useConfirm();
   const [whyChooseUs, setWhyChooseUs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,8 +119,8 @@ export default function WhyChooseUsManager() {
     setIsOpen(true);
   };
 
-  const handleDelete = (index: number) => {
-    if (!confirm("Are you sure you want to remove this value proposition card?")) return;
+  const handleDelete = async (index: number) => {
+    if (!(await confirm("Are you sure you want to remove this value proposition card?"))) return;
     const updatedList = [...whyChooseUs];
     updatedList.splice(index, 1);
     setWhyChooseUs(updatedList);

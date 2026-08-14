@@ -7,8 +7,13 @@ import type {
 
 // ─── GET /get/attendance/students/ ────────────────────────────────────────────
 
-export async function getStudentsForAttendance(): Promise<StudentAttendanceListResponse> {
-  const url = `${API_BASE_URL}/get/attendance/students/`;
+export async function getStudentsForAttendance(
+  divisionId?: number | string
+): Promise<StudentAttendanceListResponse> {
+  let url = `${API_BASE_URL}/get/attendance/students/`;
+  if (divisionId) {
+    url += `?division_id=${divisionId}`;
+  }
   const response = await fetchWithAuth(url);
 
   const data = await response.json();
@@ -51,3 +56,18 @@ export async function submitStudentAttendance(
     }
   }
 }
+
+// ─── GET /student-attendance/ — retrieve marked student attendance records ────
+
+export async function getStudentAttendanceRecords(): Promise<any[]> {
+  const url = `${API_BASE_URL}/student-attendance/`;
+  const response = await fetchWithAuth(url);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch student attendance records.");
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results ?? data.data ?? [];
+}
+

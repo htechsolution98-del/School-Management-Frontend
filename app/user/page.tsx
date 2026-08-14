@@ -205,6 +205,7 @@ export default function AdmissionPortal() {
               key="list"
               onSelect={setSelectedChild}
               children={children}
+              formData={formData}
             />
           )
         ) : (
@@ -380,9 +381,11 @@ const generateReceiptPDF = (data: any) => {
 function ChildrenList({
   onSelect,
   children,
+  formData,
 }: {
   onSelect: (c: any) => void;
   children: any[];
+  formData?: any;
 }) {
   const [receiptChild, setReceiptChild] = useState<any>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -648,20 +651,32 @@ function ChildrenList({
       >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-5">
           <div>
-            <motion.span
-              initial={{ opacity: 0, scale: 0.9 }}
+            {/* School Info Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.35 }}
-              className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full mb-3"
+              className="flex flex-wrap items-center gap-2 mb-3"
             >
-              <motion.span
-                animate={{ rotate: [0, 15, -10, 0] }}
-                transition={{ delay: 0.6, duration: 0.5 }}
-              >
-                <Sparkles size={11} />
-              </motion.span>
-              Admission Portal
-            </motion.span>
+              <span className="inline-flex items-center gap-2 text-xs font-black capitalize tracking-wider text-white bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 rounded-full shadow-md shadow-indigo-100">
+                <GraduationCap size={15} />
+                <span>
+                  {formData?.[0]?.school_name ||
+                    formData?.school_name ||
+                    (typeof window !== "undefined"
+                      ? localStorage.getItem("school_name") ||
+                        (localStorage.getItem("school_slug") || "").replace(/-/g, " ")
+                      : "") ||
+                    "School Admission Portal"}
+                </span>
+              </span>
+
+              {(formData?.[0]?.title || formData?.title) ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {formData?.[0]?.title || formData?.title}
+                </span>
+              ) : null}
+            </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
@@ -686,7 +701,16 @@ function ChildrenList({
               transition={{ delay: 0.35, duration: 0.4 }}
               className="text-slate-500 mt-1.5 text-sm sm:text-base font-medium"
             >
-              Select a profile below to continue the application process.
+              Applying for admission at{" "}
+              <strong className="text-slate-800 font-bold capitalize">
+                {formData?.[0]?.school_name ||
+                  formData?.school_name ||
+                  (typeof window !== "undefined"
+                    ? localStorage.getItem("school_name") ||
+                      (localStorage.getItem("school_slug") || "").replace(/-/g, " ")
+                    : "") ||
+                  "your selected school"}
+              </strong>
             </motion.p>
           </div>
 
@@ -1090,11 +1114,11 @@ function MultiStepForm({
               toast.success("Online Payment Successful! 🎉");
               setTimeout(() => onPaymentSuccess(admission_number), 500);
             } else {
-              alert("Payment Verification Failed");
+              toast.error("Payment Verification Failed");
             }
           } catch (error) {
             console.log(error);
-            alert("Payment Verification Failed");
+            toast.error("Payment Verification Failed");
           }
         },
         prefill: { name: child.name, email: "", contact: "" },
@@ -1113,7 +1137,7 @@ function MultiStepForm({
       rzp.open();
     } catch (error) {
       console.log(error);
-      alert(error instanceof Error ? error.message : "Payment Failed");
+      toast.error(error instanceof Error ? error.message : "Payment Failed");
     }
   };
 

@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 // Mapping names to icons
 const getIcon = (name: string, className?: string) => {
@@ -185,6 +186,7 @@ const defaultEcosystemCards = [
 ];
 
 export default function ModulesManager() {
+  const confirm = useConfirm();
   const [modules, setModules] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -298,7 +300,7 @@ export default function ModulesManager() {
 
   const handleDeleteMarquee = async (id: string, selectedType: "module" | "badge") => {
     const itemLabel = selectedType === "module" ? "ERP showcase module" : "security/trust badge";
-    if (!confirm(`Are you sure you want to delete this ${itemLabel} from the scroll list?`)) return;
+    if (!(await confirm(`Are you sure you want to delete this ${itemLabel} from the scroll list?`))) return;
 
     try {
       const res = await fetch(`/api/landing/modules?id=${id}&type=${selectedType}`, {
@@ -437,8 +439,8 @@ export default function ModulesManager() {
     setIsCardModalOpen(true);
   };
 
-  const handleDeleteCard = (idx: number) => {
-    if (!confirm("Are you sure you want to delete this dynamic grid module card?")) return;
+  const handleDeleteCard = async (idx: number) => {
+    if (!(await confirm("Are you sure you want to delete this dynamic grid module card?"))) return;
     const updated = gridModules.filter((_, i) => i !== idx);
     setGridModules(updated);
     toast.success("Card deleted locally. Click Save Portal Settings below to persist.");
@@ -488,8 +490,8 @@ export default function ModulesManager() {
     toast.success("Showcase module card configured locally!");
   };
 
-  const handleRestoreDefaultCards = () => {
-    if (confirm("This will replace all listed grid cards with the default 7 ecosystem modules. Do you want to proceed?")) {
+  const handleRestoreDefaultCards = async () => {
+    if (await confirm("This will replace all listed grid cards with the default 7 ecosystem modules. Do you want to proceed?")) {
       setGridModules(defaultEcosystemCards);
       toast.success("Loaded default 7 dynamic ecosystem modules. Click Save Portal Settings below to apply permanently.");
     }

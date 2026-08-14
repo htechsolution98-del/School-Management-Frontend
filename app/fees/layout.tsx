@@ -21,21 +21,6 @@ const sidebarLinks = [
   },
   
   { 
-    title: "Salary Components", 
-    href: "/fees/salary-components", 
-    icon: Layers 
-  },
-  { 
-    title: "Staff Salary", 
-    href: "/fees/staff-salary", 
-    icon: Users 
-  },
-  { 
-    title: "Generate Salary", 
-    href: "/fees/generate-salary", 
-    icon: ReceiptText 
-  },
-  { 
     title: "Academic Year", 
     href: "/fees/academic-year", 
     icon: Calendar 
@@ -46,7 +31,8 @@ const sidebarLinks = [
     icon: Tags 
   },
   { title: "Fee Structure", href: "/fees/fee-structure", icon: LayoutDashboard },
-  { title: "Genrate Fee", href: "/fees/Genrate-Fees", icon: LayoutDashboard }
+  { title: "Genrate Fee", href: "/fees/Genrate-Fees", icon: LayoutDashboard },
+  { title: "Student Ledger", href: "/fees/student-ledger", icon: ReceiptText }
 ];
 
 export default function FeesLayout({

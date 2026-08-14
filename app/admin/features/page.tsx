@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 // Mapping names to icons
 const getIcon = (name: string, className?: string) => {
@@ -60,6 +61,7 @@ const colorOptions = [
 ];
 
 export default function FeaturesManager() {
+  const confirm = useConfirm();
   const [features, setFeatures] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -133,7 +135,7 @@ export default function FeaturesManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this feature card?")) return;
+    if (!(await confirm("Are you sure you want to delete this feature card?"))) return;
     try {
       const res = await fetch(`/api/landing/features?id=${id}`, { method: "DELETE" });
       const data = await res.json();

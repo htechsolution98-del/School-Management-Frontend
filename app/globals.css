@@ -209,3 +209,12 @@ html {
 .premium-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(40, 94, 137, 0.6);
 }
+
+/* Hide scrollbars utility while retaining scroll functionality */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}

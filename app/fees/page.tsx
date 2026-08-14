@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import {
   motion,
   AnimatePresence,
@@ -208,12 +209,9 @@ function VerifyModal({
   getClassName: (value: string) => string;
 }) {
   const studentName =
-    record.field_values.find((f) =>
-      f.field_label.toLowerCase().includes("full name"),
-    )?.value ??
-    record.field_values.find((f) =>
-      f.field_label.toLowerCase().includes("name"),
-    )?.value ??
+    record.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
+    record.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
+    record.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ??
     "Student";
 
   return (
@@ -382,8 +380,9 @@ function RecordCard({
   const [expanded, setExpanded] = useState(false);
 
   const studentName =
+    record.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
     record.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
-    record.field_values.find((f) => f.field_label.toLowerCase().includes("name"))?.value ??
+    record.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ??
     "—";
 
   const initials = studentName
@@ -649,7 +648,7 @@ export default function ClerkDashboard() {
         ),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Verification failed");
+      toast.error(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setVerifyingId(null);
     }
@@ -680,7 +679,9 @@ export default function ClerkDashboard() {
       // search: name, admission number, payment IDs, amount
       if (!q) return true;
       const name =
-        r.field_values.find((f) => f.field_label.toLowerCase().includes("name"))?.value ?? "";
+        r.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
+        r.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
+        r.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ?? "";
       const fields = r.field_values.map((f) => f.value).join(" ").toLowerCase();
       return (
         name.toLowerCase().includes(q) ||

@@ -13,15 +13,15 @@ export interface AcademicYear {
   end_month: number;
   billing_periods: string[];
   is_active?: boolean;
-  status?: "Active" | "Completed" | "Upcoming";
+  status?: "Active" | "Completed" | "Upcoming" | "Deactivated";
 }
 
 export interface AcademicYearPayload {
   name?: string;
-  start_year: number;
-  end_year: number;
-  start_month: number;
-  end_month: number;
+  start_year?: number;
+  end_year?: number;
+  start_month?: number;
+  end_month?: number;
   billing_periods?: string[];
   is_active?: boolean;
 }
@@ -34,6 +34,12 @@ export interface MainAcademicYear {
 export interface SchoolClass {
   id: number;
   school_class: string;
+  category?: number | null;
+}
+
+export interface ClassCategory {
+  id: number;
+  name: string;
 }
 
 export interface TempUser {

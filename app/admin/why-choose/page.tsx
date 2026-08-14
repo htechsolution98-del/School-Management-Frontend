@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 // Mapping names to icons
 const getIcon = (name: string, className?: string) => {
@@ -47,6 +48,7 @@ const colorOptions = [
 ];
 
 export default function WhyChooseUsManager() {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [storageMode, setStorageMode] = useState<"mongodb" | "file" | "error">("file");
@@ -155,7 +157,7 @@ export default function WhyChooseUsManager() {
 
   // Delete collage card
   const handleDeleteCollageCard = async (index: number) => {
-    if (!confirm("Are you sure you want to delete this floating collage card?")) return;
+    if (!(await confirm("Are you sure you want to delete this floating collage card?"))) return;
 
     const updated = whyCollageCards.filter((_, i) => i !== index);
     setWhyCollageCards(updated);
@@ -421,7 +423,7 @@ export default function WhyChooseUsManager() {
 
   // CRUD: Delete Card
   const handleDeleteCard = async (index: number) => {
-    if (!confirm("Delete this highlight benefit point?")) return;
+    if (!(await confirm("Delete this highlight benefit point?"))) return;
 
     const updated = highlights.filter((_, i) => i !== index);
 

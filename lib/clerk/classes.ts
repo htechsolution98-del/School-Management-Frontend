@@ -22,6 +22,22 @@ export async function getClasses(): Promise<SchoolClass[]> {
   return getSchoolClasses();
 }
 
+export async function getSchoolClassesForExam(): Promise<SchoolClass[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/classes/`);
+
+  if (!response.ok) {
+    let message = "Failed to fetch classes for exam timetable.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.data ?? data.results ?? [];
+}
+
 export async function saveSchoolClasses(classes: string[]): Promise<void> {
   const payload = classes.map((school_class) => ({ school_class }));
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SCHOOL_CLASS}`, {

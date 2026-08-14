@@ -4,8 +4,10 @@ import { useState } from "react";
 import { MessageSquare, Calendar, Mail, Trash2, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/providers/confirm-provider";
 
 export default function InquiriesManager() {
+  const confirm = useConfirm();
   const [inquiries, setInquiries] = useState<any[]>([
     {
       _id: "1",
@@ -27,8 +29,8 @@ export default function InquiriesManager() {
     }
   ]);
 
-  const handleDelete = (id: string) => {
-    if (confirm("Delete this inquiry record from list?")) {
+  const handleDelete = async (id: string) => {
+    if (await confirm("Delete this inquiry record from list?")) {
       setInquiries(inquiries.filter(item => item._id !== id));
     }
   };

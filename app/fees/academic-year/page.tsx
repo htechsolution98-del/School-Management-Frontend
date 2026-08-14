@@ -30,13 +30,24 @@ function formatPeriodLabel(code: string): string {
   return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
-/** Derive status from billing_periods relative to today */
-function deriveStatus(year: AcademicYear): "Active" | "Completed" | "Upcoming" {
+/** Derive status — 4 states:
+ *   Active      → is_active === true
+ *   Deactivated → is_active === false AND year has started
+ *   Upcoming    → year hasn't started yet
+ *   Completed   → year has fully ended
+ */
+function deriveStatus(year: AcademicYear): "Active" | "Deactivated" | "Completed" | "Upcoming" {
+  if (year.is_active === true) return "Active";
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const periods = year.billing_periods ?? [];
-  if (periods.includes(currentPeriod)) return "Active";
-  if (periods.length > 0 && periods[periods.length - 1] < currentPeriod) return "Completed";
+  if (periods.length > 0) {
+    const first = periods[0];
+    const last = periods[periods.length - 1];
+    if (currentPeriod > last) return "Completed";
+    if (currentPeriod >= first) return year.is_active === false ? "Deactivated" : "Active";
+    return "Upcoming";
+  }
   return "Upcoming";
 }
 
@@ -58,7 +69,7 @@ const MONTHS = [
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: "Active" | "Completed" | "Upcoming" }) {
+function StatusBadge({ status }: { status: "Active" | "Completed" | "Upcoming" | "Deactivated" }) {
   const config = {
     Active: {
       bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",
@@ -72,7 +83,14 @@ function StatusBadge({ status }: { status: "Active" | "Completed" | "Upcoming" }
       bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200",
       icon: <Calendar size={12} className="text-blue-500" />,
     },
-  }[status];
+    Deactivated: {
+      bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-200",
+      icon: <Clock size={12} className="text-rose-500" />,
+    },
+  }[status] ?? {
+    bg: "bg-slate-50", text: "text-slate-500", border: "border-slate-200",
+    icon: <Clock size={12} className="text-slate-400" />,
+  };
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
@@ -308,18 +326,15 @@ export default function AcademicYearPage() {
         </nav>
 
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Academic Years</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Manage academic years and billing periods</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              Academic Years
+            </h1>
+            <p className="text-sm text-slate-500 font-medium mt-1">
+              View academic years and billing periods
+            </p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-200 transition-all duration-150"
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            Create Academic Year
-          </button>
         </div>
 
         {/* Loading */}
@@ -345,21 +360,17 @@ export default function AcademicYearPage() {
         {!loading && !fetchError && (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             {/* Column headers */}
-            <div className="hidden sm:grid grid-cols-[2fr_2.5fr_1.5fr_1.5fr_1fr] px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-400">
+            <div className="hidden sm:grid grid-cols-[2fr_2.5fr_1.5fr_1.5fr] px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-400">
               <span>Year Name</span>
               <span>Duration</span>
               <span>Period Count</span>
               <span>Status</span>
-              <span className="text-right">Action</span>
             </div>
 
             {/* Empty state */}
             {years.length === 0 && (
               <div className="py-14 text-center text-slate-400 text-sm">
-                No academic years yet.{" "}
-                <button onClick={() => setShowModal(true)} className="text-indigo-600 font-semibold hover:underline">
-                  Create one
-                </button>
+                No academic years available.
               </div>
             )}
 
@@ -387,20 +398,6 @@ export default function AcademicYearPage() {
                       <span className="font-bold text-slate-800 text-sm">{year.name}</span>
                       <div className="flex items-center gap-1.5">
                         <StatusBadge status={status} />
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-slate-500 text-xs">
@@ -412,7 +409,7 @@ export default function AcademicYearPage() {
                   </div>
 
                   {/* ── Desktop grid layout ── */}
-                  <div className="hidden sm:grid grid-cols-[2fr_2.5fr_1.5fr_1.5fr_1fr] items-center">
+                  <div className="hidden sm:grid grid-cols-[2fr_2.5fr_1.5fr_1.5fr] items-center">
                     <span className="font-bold text-slate-800 text-sm">{year.name}</span>
                     <span className="text-slate-500 text-sm flex items-center gap-1.5">
                       <Calendar size={13} className="text-slate-300 shrink-0" />
@@ -422,22 +419,6 @@ export default function AcademicYearPage() {
                       {periods.length} {periods.length === 1 ? "Month" : "Months"}
                     </span>
                     <StatusBadge status={status} />
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
                   </div>
                 </div>
               );

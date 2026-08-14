@@ -12,9 +12,40 @@ export function formatCurrency(amount: string | number): string {
 
 export function formatBillingPeriod(period: string): string {
   if (!period) return "-";
+
+  const groupedPeriod = period.match(/^(.+)-(Q[1-4]|H[1-2])$/);
+  if (groupedPeriod) {
+    return `${groupedPeriod[2]} ${groupedPeriod[1]}`;
+  }
+
   const [year, month] = period.split("-");
+  if (!month || !/^\d{1,2}$/.test(month)) return period;
+
   const date = new Date(parseInt(year), parseInt(month) - 1);
   return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
+export function formatDisplayDate(value?: string | null): string {
+  const date = parseApiDate(value);
+  if (!date) return "N/A";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function parseApiDate(value?: string | null): Date | null {
+  if (!value) return null;
+
+  const indianDate = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  const normalized = indianDate
+    ? `${indianDate[3]}-${indianDate[2]}-${indianDate[1]}T00:00:00`
+    : value;
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function getUniqueClasses(students: Student[]): string[] {
