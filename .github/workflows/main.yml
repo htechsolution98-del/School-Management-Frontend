@@ -3,7 +3,7 @@ name: School-Management-Frontend
 on:
   push:
     branches:
-      - prd
+      - stg
 
 jobs:
   deploy:
