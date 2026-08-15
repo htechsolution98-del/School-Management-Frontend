@@ -1,0 +1,39 @@
+name: School-Management-Frontend
+
+on:
+  push:
+    branches:
+      - prd
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Install SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Frontend
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'SSHEOF'
+            set -e
+            cd ${{ secrets.FRONTEND_WORK_DIR }}
+
+            echo "=== Git Pull ==="
+            git pull origin ${{ secrets.FRONTEND_BRANCH }}
+
+            echo "=== Restart Container (triggers npm install && build && start) ==="
+            docker restart ${{ secrets.FRONTEND_CONT_NAME }}
+
+            echo "=== Deployment Successful... DevOps Team ==="
+          SSHEOF
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -rf ~/.ssh
