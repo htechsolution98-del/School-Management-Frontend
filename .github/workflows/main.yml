@@ -32,7 +32,7 @@ jobs:
             docker restart ${{ secrets.FRONTEND_CONT_NAME }}
             
             echo "=== Waiting 40s for build to complete ==="
-            sleep 30
+            sleep 60
             
             echo "=== Deployment Successful... DevOps Team ==="
           SSHEOF
