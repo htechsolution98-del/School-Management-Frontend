@@ -31,8 +31,8 @@ jobs:
             echo "=== Restart Container (triggers npm install && build && start) ==="
             docker restart ${{ secrets.FRONTEND_CONT_NAME }}
             
-            echo "=== Waiting 40s for build to complete ==="
-            sleep 60
+            echo "=== Waiting 50s for build to complete ==="
+            sleep 50
             
             echo "=== Deployment Successful... DevOps Team ==="
           SSHEOF
