@@ -56,6 +56,16 @@ const SCHOOL_FEATURES = [
     icon: ShieldCheck,
   },
   {
+    code: "VICE_PRINCIPAL",
+    label: "Vice Principal",
+    icon: ShieldCheck,
+  },
+  {
+    code: "ASSISTANT_CLERK",
+    label: "Assistant Clerk",
+    icon: Users,
+  },
+  {
     code: "TRANSPORTATION",
     label: "Transportation",
     icon: Bus,

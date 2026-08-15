@@ -103,6 +103,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleEditClick = (school: School) => {
+    fetchFeatures();
     setEditingSchoolId(school.id || null);
     setFormData({
       name: school.name || "",
@@ -404,6 +405,7 @@ export default function SuperAdminDashboard() {
                 setFormData(EMPTY_FORM);
                 setSelectedFeatures([]);
               } else {
+                fetchFeatures();
                 setIsAdding(true);
               }
               setError("");
