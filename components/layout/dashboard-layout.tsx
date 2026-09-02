@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { GraduationCap, Menu, X, LogOut, Bell, ChevronRight, ChevronDown, Search, Sparkles, Loader2, Megaphone, Trash2, School } from "lucide-react";
-import { logoutUser } from "@/lib/auth";
+import { GraduationCap, Menu, X, LogOut, Bell, ChevronRight, ChevronDown, Search, Sparkles, Loader2, Megaphone, Trash2, School, ShieldAlert } from "lucide-react";
+import { logoutUser, getDashboardRoute } from "@/lib/auth";
 import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
 import { type AnnouncementResponse } from "@/lib/principal";
 
@@ -304,6 +304,20 @@ function SidebarContent({
   );
 }
 
+const ROLE_ALLOWED_MAP: Record<string, string[]> = {
+  "Super Admin": ["super_admin", "superadmin"],
+  "Trustee": ["admin(trustee)", "trustee", "super_admin", "superadmin"],
+  "Principal": ["principal", "super_admin", "superadmin"],
+  "Clerk": ["clerk", "fees_clerk", "principal", "super_admin", "superadmin"],
+  "Teacher": ["teacher", "principal", "super_admin", "superadmin"],
+  "Librarian": ["librarian", "principal", "super_admin", "superadmin"],
+  "Inventory": ["inventory", "principal", "super_admin", "superadmin"],
+  "Fees": ["fees management", "fees", "fees_clerk", "clerk", "principal", "super_admin", "superadmin"],
+  "Student": ["student", "principal", "super_admin", "superadmin"],
+  "Parent": ["parents", "parent", "principal", "super_admin", "superadmin"],
+  "Applicant": ["temp_user", "user", "super_admin", "superadmin"],
+};
+
 export function DashboardLayout({
   children,
   roleTitle,
@@ -311,19 +325,59 @@ export function DashboardLayout({
   userName = "Admin",
 }: DashboardLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const [schoolName, setSchoolName] = useState<string | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const sn = localStorage.getItem("school_name");
-      if (sn) {
-        setSchoolName(sn);
-      }
+    if (typeof window === "undefined") return;
+
+    // 1. Check for valid access token in localStorage or cookies
+    const token =
+      localStorage.getItem("access_token") ||
+      document.cookie
+        .split("; ")
+        .some((row) => row.startsWith("access_token="));
+
+    if (!token) {
+      window.location.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+      return;
     }
-  }, []);
+
+    // 2. Validate user role authorization
+    try {
+      const storedRolesRaw = localStorage.getItem("roles");
+      const storedRoles: string[] = storedRolesRaw ? JSON.parse(storedRolesRaw) : [];
+      const normalizedStored = storedRoles.map((r) => String(r || "").toLowerCase().trim());
+
+      const allowedRoles = ROLE_ALLOWED_MAP[roleTitle] || [];
+      const isAllowed =
+        allowedRoles.length === 0 ||
+        allowedRoles.some((allowed) => normalizedStored.includes(allowed.toLowerCase()));
+
+      if (!isAllowed) {
+        const appropriateRoute = getDashboardRoute(storedRoles);
+        if (appropriateRoute && appropriateRoute !== pathname) {
+          window.location.replace(appropriateRoute);
+        } else {
+          window.location.replace("/login");
+        }
+        return;
+      }
+    } catch {
+      window.location.replace("/login");
+      return;
+    }
+
+    const sn = localStorage.getItem("school_name");
+    if (sn) {
+      setSchoolName(sn);
+    }
+    setIsAuthChecked(true);
+  }, [pathname, roleTitle, router]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -342,6 +396,7 @@ export function DashboardLayout({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [bellOpen]);
+
   const [selectedNotification, setSelectedNotification] = useState<AnnouncementResponse | null>(null);
   const { notifications, readIds, unreadCount, markAsRead } = useAnnouncementSocket();
   const config = roleConfig[roleTitle] ?? roleConfig["Super Admin"];
@@ -358,6 +413,22 @@ export function DashboardLayout({
               other.href.length > l.href.length
           ))
     )?.title || roleTitle;
+
+  if (!isAuthChecked) {
+    return (
+      <div className="flex h-svh w-full items-center justify-center bg-slate-950 text-white">
+        <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl">
+          <div className="relative flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-400 shadow-lg shadow-indigo-500/25 animate-pulse">
+            <GraduationCap className="h-8 w-8 text-white" />
+          </div>
+          <div className="flex items-center gap-2.5 text-slate-300 font-medium text-sm mt-2">
+            <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+            <span>Authenticating access permissions…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-svh w-full overflow-hidden bg-[#f1f5f9]">

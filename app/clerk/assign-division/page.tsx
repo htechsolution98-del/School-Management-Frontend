@@ -76,10 +76,16 @@ export default function AssignDivisionPage() {
   };
 
   const getStudentName = (adm: Admission): string => {
-    const fn = getFieldValue(adm, "first name") || getFieldValue(adm, "student name") || getFieldValue(adm, "name");
-    const ln = getFieldValue(adm, "last name") || getFieldValue(adm, "surname");
-    if (fn || ln) return `${fn} ${ln}`.trim();
-    return `Student ${adm.admission_number}`;
+    if (!adm) return "Student";
+    const surname = getFieldValue(adm, "surname") || getFieldValue(adm, "last name") || getFieldValue(adm, "lastname");
+    const studentName = getFieldValue(adm, "student name") || getFieldValue(adm, "first name") || getFieldValue(adm, "firstname") || getFieldValue(adm, "candidate name");
+    const fatherName = getFieldValue(adm, "father name") || getFieldValue(adm, "father") || getFieldValue(adm, "middle name") || getFieldValue(adm, "middlename");
+
+    const parts = [surname, studentName, fatherName].filter(Boolean);
+    if (parts.length > 0) return parts.join(" ");
+
+    const fallback = getFieldValue(adm, "full name") || getFieldValue(adm, "fullname") || getFieldValue(adm, "name");
+    return fallback || `Student ${adm.admission_number}`;
   };
 
   const getStudentClassId = (adm: Admission): number | null => {

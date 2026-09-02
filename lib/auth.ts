@@ -427,6 +427,7 @@ export function getDashboardRoute(roles: string[]): string {
   if (normalizedRoles.includes("principal")) return "/principal";
   if (normalizedRoles.includes("librarian")) return "/librarian";
   if (normalizedRoles.includes("clerk") || normalizedRoles.includes("fees_clerk")) return "/clerk";
+  if (normalizedRoles.includes("inventory")) return "/inventory";
   if (normalizedRoles.includes("temp_user")) return "/user";
   if (normalizedRoles.includes("fees management") || normalizedRoles.includes("fees")) return "/fees";
   if (normalizedRoles.includes("teacher")) return "/teacher";

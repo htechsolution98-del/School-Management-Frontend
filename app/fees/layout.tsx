@@ -32,7 +32,8 @@ const sidebarLinks = [
   },
   { title: "Fee Structure", href: "/fees/fee-structure", icon: LayoutDashboard },
   { title: "Genrate Fee", href: "/fees/Genrate-Fees", icon: LayoutDashboard },
-  { title: "Student Ledger", href: "/fees/student-ledger", icon: ReceiptText }
+  { title: "Student Ledger", href: "/fees/student-ledger", icon: ReceiptText },
+  { title: "RTE Claims & Quota", href: "/fees/rte-claims", icon: FileSpreadsheet }
 ];
 
 export default function FeesLayout({

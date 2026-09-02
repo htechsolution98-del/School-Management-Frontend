@@ -564,7 +564,8 @@ export default function AdmissionFormPage() {
       });
 
       setForms(sortedForms);
-      setFormLink(linkData.form_link);
+      const hasActive = sortedForms.some((f) => f.is_active);
+      setFormLink(hasActive && linkData.form_link ? linkData.form_link : "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load forms.");
     } finally {

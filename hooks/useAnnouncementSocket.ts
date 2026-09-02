@@ -199,6 +199,26 @@ export function useAnnouncementSocket() {
           return;
         }
 
+        // Feature status changed in real-time
+        if (data?.type === "feature_status_changed") {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("feature_status_changed", { detail: data }));
+          }
+          toast.info("Feature Access Updated", {
+            description: `${data.feature_name || "Module"} is now ${data.is_enabled ? "activated" : "deactivated"} for your school.`,
+            duration: 4000,
+          });
+          return;
+        }
+
+        // Staff status changed in real-time
+        if (data?.type === "staff_status_changed") {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("staff_status_changed", { detail: data }));
+          }
+          return;
+        }
+
         // Standardize keys (handling nested payloads or direct fields)
         const announcement: AnnouncementResponse = {
           id: data.id ?? Date.now(),

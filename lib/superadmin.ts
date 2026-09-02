@@ -21,6 +21,176 @@ const SCHOOL_LIST_URL = `${API_BASE_URL}/schoollist/`;
 
 // ================= SCHOOL APIS =================
 
+export interface SuperAdminAnalyticsSummary {
+  total_schools: number;
+  active_schools: number;
+  inactive_schools: number;
+  total_students: number;
+  total_boys: number;
+  total_girls: number;
+  other_gender: number;
+  total_staff: number;
+  active_staff: number;
+  teachers_count: number;
+  non_teaching_count: number;
+  total_features: number;
+}
+
+export interface SuperAdminSchoolRow {
+  id: number;
+  name: string;
+  code: string;
+  email: string;
+  phone: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+  is_active: boolean;
+  created_at?: string;
+  total_students: number;
+  total_boys: number;
+  total_girls: number;
+  total_staff: number;
+  active_staff: number;
+  enabled_features: number;
+}
+
+export interface SuperAdminAnalyticsResponse {
+  summary: SuperAdminAnalyticsSummary;
+  schools: SuperAdminSchoolRow[];
+}
+
+/**
+ * GET /SchoolView/analytics/ — fetch global superadmin analytics
+ */
+export async function getSuperAdminAnalytics(): Promise<SuperAdminAnalyticsResponse> {
+  const normalizedSchoolUrl = SCHOOL_URL.endsWith("/") ? SCHOOL_URL : `${SCHOOL_URL}/`;
+  try {
+    const response = await fetchWithAuth(`${normalizedSchoolUrl}analytics/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (e) {
+    console.warn("Analytics endpoint failed, falling back to school directory:", e);
+  }
+
+  // Graceful fallback if analytics endpoint unavailable
+  const schoolsList = await getSchools();
+  const activeCount = schoolsList.filter((s) => s.is_active ?? true).length;
+  const inactiveCount = schoolsList.length - activeCount;
+
+  return {
+    summary: {
+      total_schools: schoolsList.length,
+      active_schools: activeCount,
+      inactive_schools: inactiveCount,
+      total_students: 0,
+      total_boys: 0,
+      total_girls: 0,
+      other_gender: 0,
+      total_staff: 0,
+      active_staff: 0,
+      teachers_count: 0,
+      non_teaching_count: 0,
+      total_features: 10,
+    },
+    schools: schoolsList.map((s) => ({
+      id: s.id || 0,
+      name: s.name || "School",
+      code: s.code || "—",
+      email: s.email || "—",
+      phone: s.phone || "—",
+      city: s.city || "—",
+      state: s.state || "—",
+      country: s.country || "India",
+      pincode: s.pincode || "—",
+      is_active: s.is_active ?? true,
+      total_students: 0,
+      total_boys: 0,
+      total_girls: 0,
+      total_staff: 0,
+      active_staff: 0,
+      enabled_features: s.school_features?.filter((f) => f.is_enabled)?.length || 0,
+    })),
+  };
+}
+
+export interface SchoolDetailedStats {
+  school: {
+    id: number;
+    name: string;
+    code: string;
+    index_no?: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    pincode: string;
+    logo?: string | null;
+    is_active: boolean;
+    created_at?: string;
+  };
+  metrics: {
+    total_students: number;
+    total_boys: number;
+    total_girls: number;
+    other_gender: number;
+    rte_students: number;
+    total_staff: number;
+    active_staff: number;
+    teachers_count: number;
+    non_teaching_count: number;
+    total_classes: number;
+  };
+  classes: {
+    id: number;
+    name: string;
+    total_students: number;
+    boys: number;
+    girls: number;
+  }[];
+  staff: {
+    id: number;
+    name: string;
+    email: string;
+    mobile: string;
+    category: string;
+    is_active: boolean;
+  }[];
+  features: {
+    id: number;
+    feature_id: number;
+    name: string;
+    is_enabled: boolean;
+  }[];
+}
+
+/**
+ * GET /SchoolView/{id}/details/ — fetch detailed statistics for a specific school
+ */
+export async function getSchoolDetails(id: number): Promise<SchoolDetailedStats> {
+  const normalizedSchoolUrl = SCHOOL_URL.endsWith("/") ? SCHOOL_URL : `${SCHOOL_URL}/`;
+  const response = await fetchWithAuth(`${normalizedSchoolUrl}${id}/details/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch school details.");
+  }
+
+  return response.json();
+}
+
 /**
  * GET /SchoolView/ — fetch all schools from the backend.
  */

@@ -86,13 +86,15 @@ function getDueBadgeStyle(dateStr: string): { bg: string; text: string } {
   return { bg: "#dbeafe", text: "#2563eb" };
 }
 
-function getStatusConfig(status: HomeworkSubmission["status"]) {
-  return {
+function getStatusConfig(status?: string | null) {
+  const configs: Record<string, { label: string; bg: string; text: string; dot: string }> = {
     pending:   { label: "Pending",   bg: "#fef9c3", text: "#854d0e", dot: "#f59e0b" },
     submitted: { label: "Submitted", bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
     late:      { label: "Late",      bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
     checked:   { label: "Checked",   bg: "#d1fae5", text: "#065f46", dot: "#10b981" },
-  }[status];
+  };
+  const key = String(status || "").toLowerCase();
+  return configs[key] || { label: "Submitted", bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" };
 }
 
 // Subject color palette — cycles through for variety
@@ -490,6 +492,10 @@ function HomeworkDetailView({
   };
 
   const handleSubmit = async () => {
+    if (!selectedFile && !isAlreadySubmitted) {
+      setSubmitError("Please select/attach a completed homework file (PDF or Image) before submitting.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -828,9 +834,9 @@ function HomeworkDetailView({
                 )}
               </button>
 
-              {!selectedFile && (
-                <p className="text-center text-xs text-gray-400 mt-2">
-                  You can submit without a file attachment
+              {!selectedFile && !isAlreadySubmitted && (
+                <p className="text-center text-xs text-amber-600/90 font-medium mt-2">
+                  📎 Please attach your completed assignment file (PDF/Image) to submit.
                 </p>
               )}
             </div>

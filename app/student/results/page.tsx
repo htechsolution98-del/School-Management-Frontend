@@ -65,10 +65,11 @@ export default function StudentResultsPage() {
     setError(null);
 
     try {
-      const [resultsRes, examsRes, attendanceRes] = await Promise.allSettled([
+      const [resultsRes, examsRes, attendanceRes, profileRes] = await Promise.allSettled([
         getStudentResults(),
         getStudentExams(),
         getStudentAttendance(),
+        fetchWithAuth(`${API_BASE_URL}/studentget/me/`).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
 
       if (resultsRes.status === "fulfilled") {
@@ -81,8 +82,9 @@ export default function StudentResultsPage() {
         setExams(examsRes.value);
       }
 
-      // Try to determine the student ID from attendance records
-      if (attendanceRes.status === "fulfilled" && attendanceRes.value.length > 0) {
+      if (profileRes.status === "fulfilled" && profileRes.value?.id) {
+        setStudentId(profileRes.value.id);
+      } else if (attendanceRes.status === "fulfilled" && attendanceRes.value.length > 0) {
         setStudentId(attendanceRes.value[0].student);
       }
 
@@ -140,7 +142,7 @@ export default function StudentResultsPage() {
 
     const blob = await response.blob();
     const objectUrl = window.URL.createObjectURL(blob);
-    
+
     const a = document.createElement("a");
     a.href = objectUrl;
     a.download = `Report_Card_${sId}.pdf`;
@@ -189,10 +191,10 @@ export default function StudentResultsPage() {
     return [...filtered].sort((a, b) => {
       const examA = exams.find((e) => e.title.toLowerCase() === a.exam_title.toLowerCase());
       const examB = exams.find((e) => e.title.toLowerCase() === b.exam_title.toLowerCase());
-      
+
       const dateA = examA ? new Date(examA.exam_date).getTime() : 0;
       const dateB = examB ? new Date(examB.exam_date).getTime() : 0;
-      
+
       if (dateA !== dateB) {
         return dateB - dateA;
       }
@@ -248,7 +250,7 @@ export default function StudentResultsPage() {
             Track your semester marks, view leaderboard rankings, and download report cards.
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3 self-start sm:self-auto">
           <Button
             variant="outline"
@@ -387,7 +389,7 @@ export default function StudentResultsPage() {
                         </span>
                       </div>
                     </CardHeader>
-                    
+
                     <CardContent className="pt-0 flex flex-col gap-4 flex-1 justify-between">
                       <div>
                         {/* Progress slider bar */}
@@ -485,23 +487,21 @@ export default function StudentResultsPage() {
                     return (
                       <div
                         key={rank.student}
-                        className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                          isCurrentUser
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${isCurrentUser
                             ? "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200/50 shadow-sm"
                             : "bg-white border-slate-100/80 hover:bg-slate-50/50"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                              rank.rank === 1
+                            className={`h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${rank.rank === 1
                                 ? "bg-amber-100 text-amber-800"
                                 : rank.rank === 2
-                                ? "bg-slate-100 text-slate-800"
-                                : rank.rank === 3
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-slate-50 text-slate-500"
-                            }`}
+                                  ? "bg-slate-100 text-slate-800"
+                                  : rank.rank === 3
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-slate-50 text-slate-500"
+                              }`}
                           >
                             #{rank.rank}
                           </div>

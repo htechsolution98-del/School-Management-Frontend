@@ -3,6 +3,7 @@ export interface SchoolFeature {
   is_enabled: boolean;
   school: number;
   feature: number;
+  feature_name?: string;
 }
 
 export interface School {

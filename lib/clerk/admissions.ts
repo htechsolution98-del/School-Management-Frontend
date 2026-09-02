@@ -3,7 +3,9 @@ import { API_BASE_URL } from "@/lib/config";
 import type { Admission } from "@/types/clerk";
 
 export async function fetchAdmissions(): Promise<Admission[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/admissionview/`);
+  const response = await fetchWithAuth(`${API_BASE_URL}/admissionview/`, {
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     let message = "Failed to fetch admissions.";
