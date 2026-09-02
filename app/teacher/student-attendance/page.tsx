@@ -41,6 +41,7 @@ type View = "list" | "mark";
 interface Student {
   id: string;
   grNo: string;
+  rollNo?: string;
   name: string;
   initials: string;
   color: string;
@@ -877,13 +878,21 @@ function StudentListView({
 
   const filtered = useMemo(
     () =>
-      students.filter((s) => {
-        const q = search.toLowerCase();
-        return (
-          s.name.toLowerCase().includes(q) ||
-          s.grNo.toLowerCase().includes(q)
-        );
-      }),
+      students
+        .filter((s) => {
+          const q = search.toLowerCase();
+          return (
+            s.name.toLowerCase().includes(q) ||
+            s.grNo.toLowerCase().includes(q) ||
+            (s.rollNo && s.rollNo.toLowerCase().includes(q))
+          );
+        })
+        .sort((a, b) => {
+          const rA = parseInt(a.rollNo || "999999", 10);
+          const rB = parseInt(b.rollNo || "999999", 10);
+          if (!isNaN(rA) && !isNaN(rB) && rA !== rB) return rA - rB;
+          return (a.rollNo || "").localeCompare(b.rollNo || "") || a.name.localeCompare(b.name);
+        }),
     [search, students],
   );
 
@@ -1131,7 +1140,7 @@ function StudentListView({
           >
             <thead>
               <tr>
-                {["GR No.", "Student Name", "Today's Status", "Action"].map(
+                {["Roll No.", "GR No.", "Student Name", "Today's Status", "Action"].map(
                   (h) => (
                     <th key={h} style={S.th}>
                       {h}
@@ -1149,6 +1158,15 @@ function StudentListView({
                     background: i % 2 === 0 ? "#fff" : "#fefcff",
                   }}
                 >
+                  <td
+                    style={{
+                      ...S.tdBase,
+                      fontWeight: 700,
+                      color: "#4f46e5",
+                    }}
+                  >
+                    {s.rollNo ? s.rollNo : "—"}
+                  </td>
                   <td
                     style={{
                       ...S.tdBase,
@@ -2205,6 +2223,7 @@ export default function StudentAttendancePage() {
         return {
           id:          String(s.id),
           grNo:        s.gr_no,
+          rollNo:      s.roll_no || "",
           name:        [s.name, s.surname].filter(Boolean).join(" "),
           initials:    getInitials(s.name, s.surname),
           color:       AVATAR_COLORS[idx % AVATAR_COLORS.length],

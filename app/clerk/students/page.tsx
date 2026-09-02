@@ -459,7 +459,7 @@ function StudentDetailsModal({
                 <School className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Academic Info
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex-1 rounded-lg text-xs font-semibold">
-                <FileText className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Documents ({admission.documents.length})
+                <FileText className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Documents ({(admission.documents?.length || 0) + (admission.rte_documents?.length || 0)})
               </TabsTrigger>
             </TabsList>
 
@@ -618,14 +618,14 @@ function StudentDetailsModal({
               <div className="rounded-xl border dark:border-zinc-800 p-4 bg-slate-50/50 dark:bg-zinc-900/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5 text-primary" /> Uploaded Documents ({admission.documents.length})
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Uploaded Documents ({(admission.documents?.length || 0) + (admission.rte_documents?.length || 0)})
                   </h4>
                   <Button size="xs" variant="outline" onClick={onEditDocs} className="rounded-lg text-xs gap-1">
                     <UploadCloud className="h-3.5 w-3.5" /> Bulk Update Docs
                   </Button>
                 </div>
 
-                {admission.documents.length === 0 ? (
+                {(admission.documents?.length || 0) + (admission.rte_documents?.length || 0) === 0 ? (
                   <div className="text-center py-6 text-slate-400 text-xs">
                     No documents uploaded for this student yet.
                   </div>
@@ -717,6 +717,45 @@ function StudentDetailsModal({
                               </div>
                             </div>
                           )}
+                        </div>
+                      );
+                    })}
+                    {admission.rte_documents?.map((doc) => {
+                      return (
+                        <div
+                          key={`rte-${doc.id}`}
+                          className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border dark:border-zinc-800 shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center shrink-0">
+                                <FileText className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
+                                  {doc.document_name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {doc.document_file ? "Uploaded RTE Verification Document" : "No File Uploaded"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc.document_file && (
+                                <a
+                                  href={doc.document_file}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1"
+                                  title="View Document"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">View</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -895,15 +934,19 @@ export default function StudentRecordsPage() {
   };
 
   const getStudentName = (adm: Admission) => {
-    const fname = getFieldValue(adm, "first name", "firstname");
-    const mname = getFieldValue(adm, "middle name", "middlename");
-    const lname = getFieldValue(adm, "last name", "lastname", "surname");
-    const fullName = getFieldValue(adm, "full name", "fullname", "student name", "name");
+    if (!adm || !adm.field_values) return adm?.admission_number || "Student";
 
-    if (fname || lname) {
-      return [fname, mname, lname].filter(Boolean).join(" ");
+    const surname = getFieldValue(adm, "surname", "last name", "lastname");
+    const studentName = getFieldValue(adm, "student name", "first name", "firstname", "candidate name");
+    const fatherName = getFieldValue(adm, "father name", "father", "middle name", "middlename");
+
+    const parts = [surname, studentName, fatherName].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(" ");
     }
-    return fullName || adm.admission_number || "Student";
+
+    const fallbackName = getFieldValue(adm, "full name", "fullname", "name");
+    return fallbackName || adm.admission_number || "Student";
   };
 
   const getStudentClass = (adm: Admission) => {

@@ -46,7 +46,7 @@ export async function getClasses(): Promise<SchoolClass[]> {
   return getSchoolClasses();
 }
 
-export async function saveSchoolClasses(classes: { school_class: string; category: number }[]): Promise<void> {
+export async function saveSchoolClasses(classes: { school_class: string; category: number; is_rte_applicable?: boolean }[]): Promise<void> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SCHOOL_CLASS}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

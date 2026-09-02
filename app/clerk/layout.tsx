@@ -15,6 +15,7 @@ import {
   School,
   Layers,
   UserPlus,
+  Hash,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -50,6 +51,7 @@ const sidebarLinks = [
       { title: "Classes", href: "/clerk/classes", icon: School },
       { title: "Divisions", href: "/clerk/divisions", icon: LayoutGrid },
       { title: "Assign Division", href: "/clerk/assign-division", icon: Layers },
+      { title: "Assign Roll No.", href: "/clerk/assign-roll-no", icon: Hash },
     ]
   },
   {

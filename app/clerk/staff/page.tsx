@@ -72,6 +72,24 @@ export default function ClerkStaffDashboard() {
   const [editFormData, setEditFormData] = useState<CreateStaffPayload>(EMPTY_FORM);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const toApiDate = (val?: string) => {
+    if (!val) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      const [y, m, d] = val.split("-");
+      return `${d}-${m}-${y}`;
+    }
+    return val;
+  };
+
+  const toHTMLDate = (val?: string) => {
+    if (!val) return "";
+    if (/^\d{2}-\d{2}-\d{4}$/.test(val)) {
+      const [d, m, y] = val.split("-");
+      return `${y}-${m}-${d}`;
+    }
+    return val;
+  };
+
   const handleEditClick = (staff: Staff) => {
     setEditingStaff(staff);
     // Find the feature_id for the staff's category string
@@ -95,14 +113,57 @@ export default function ClerkStaffDashboard() {
     setIsAdding(false);
   };
 
+  const maxAllowedDob = useMemo(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const validateStaffAge = (dobString: string): boolean => {
+    if (!dobString) return false;
+    let year: number, month: number, day: number;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dobString)) {
+      const parts = dobString.split("-");
+      year = Number(parts[0]);
+      month = Number(parts[1]) - 1;
+      day = Number(parts[2]);
+    } else if (/^\d{2}-\d{2}-\d{4}$/.test(dobString)) {
+      const parts = dobString.split("-");
+      day = Number(parts[0]);
+      month = Number(parts[1]) - 1;
+      year = Number(parts[2]);
+    } else {
+      const dob = new Date(dobString);
+      if (isNaN(dob.getTime())) return false;
+      year = dob.getFullYear();
+      month = dob.getMonth();
+      day = dob.getDate();
+    }
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    const m = today.getMonth() - month;
+    if (m < 0 || (m === 0 && today.getDate() < day)) {
+      age--;
+    }
+    return age >= 18;
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaff) return;
+    if (editFormData.date_of_birth && !validateStaffAge(editFormData.date_of_birth)) {
+      setError("Staff member must be at least 18 years old (Age >= 18).");
+      return;
+    }
     setIsUpdating(true);
     setError("");
     setSuccessMsg("");
     try {
-      await updateStaff(editingStaff.id, editFormData);
+      const payload: any = {
+        ...editFormData,
+        date_of_birth: toApiDate(editFormData.date_of_birth),
+      };
+      await updateStaff(editingStaff.id, payload);
       setSuccessMsg("Staff member updated successfully.");
       setIsEditing(false);
       setEditingStaff(null);
@@ -184,6 +245,22 @@ export default function ClerkStaffDashboard() {
     fetchStaff();
     fetchCategories();
     fetchDepartments();
+
+    const handleRealtimeUpdate = () => {
+      fetchStaff();
+      fetchCategories();
+      fetchDepartments();
+    };
+
+    window.addEventListener("feature_status_changed", handleRealtimeUpdate);
+    window.addEventListener("staff_status_changed", handleRealtimeUpdate);
+    window.addEventListener("focus", handleRealtimeUpdate);
+
+    return () => {
+      window.removeEventListener("feature_status_changed", handleRealtimeUpdate);
+      window.removeEventListener("staff_status_changed", handleRealtimeUpdate);
+      window.removeEventListener("focus", handleRealtimeUpdate);
+    };
   }, [fetchStaff, fetchCategories, fetchDepartments]);
 
   const handleInputChange =
@@ -192,8 +269,8 @@ export default function ClerkStaffDashboard() {
         const value =
           field === "is_active"
             ? event.target.value === "true"
-            : field === "category"
-              ? Number(event.target.value)
+            : field === "category" || field === "department"
+              ? event.target.value ? Number(event.target.value) : undefined
               : event.target.value;
 
         setFormData((prev) => ({
@@ -204,12 +281,20 @@ export default function ClerkStaffDashboard() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (formData.date_of_birth && !validateStaffAge(formData.date_of_birth)) {
+      setError("Staff member must be at least 18 years old (Age >= 18).");
+      return;
+    }
     setIsSubmitting(true);
     setError("");
     setSuccessMsg("");
 
     try {
-      await createStaff(formData);
+      const payload: any = {
+        ...formData,
+        date_of_birth: toApiDate(formData.date_of_birth),
+      };
+      await createStaff(payload);
       setSuccessMsg("Staff member created successfully.");
       setFormData(EMPTY_FORM);
       setIsAdding(false);
@@ -430,11 +515,10 @@ export default function ClerkStaffDashboard() {
                 <Label htmlFor="date_of_birth">Date of Birth</Label>
                 <Input
                   id="date_of_birth"
-                  type="text"
+                  type="date"
+                  max={maxAllowedDob}
                   value={toHTMLDate(formData.date_of_birth)}
                   onChange={(e) => setFormData({ ...formData, date_of_birth: toApiDate(e.target.value) })}
-                  onFocus={(e) => (e.target.type = "date")}
-                  onBlur={(e) => { if (!e.target.value) e.target.type = "text" }}
                   required
                   placeholder="YYYY-MM-DD"
                 />
@@ -593,6 +677,7 @@ export default function ClerkStaffDashboard() {
                 <Input
                   id="edit-dob"
                   type="date"
+                  max={maxAllowedDob}
                   value={toHTMLDate(editFormData.date_of_birth)}
                   onChange={(e) => setEditFormData({ ...editFormData, date_of_birth: toApiDate(e.target.value) })}
                   required

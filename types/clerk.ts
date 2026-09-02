@@ -1,6 +1,7 @@
 export interface SchoolClass {
   id: number;
   school_class: string;
+  is_rte_applicable?: boolean;
 }
 
 export interface Division {
@@ -81,6 +82,13 @@ export interface Admission {
     document_field: number;
     document_label: string;
     file: string;
+  }[];
+  is_rte?: boolean;
+  rte_documents?: {
+    id: number;
+    document_name: string;
+    document_file: string;
+    is_verified: boolean;
   }[];
 }
 

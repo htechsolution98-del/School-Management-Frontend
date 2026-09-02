@@ -47,6 +47,7 @@ export interface StudentAttendanceListResponse {
     surname: string | null;
     name: string;
     gr_no: string;
+    roll_no?: string | null;
   }[];
   assigned_divisions?: {
     division_id: number;
@@ -90,6 +91,7 @@ export interface HomeworkSubmission {
   student: number;
   student_name: string;
   attachment: string | null;
+  file?: string | null;
   submitted_at: string;
   submission_date: string;
   status: "pending" | "submitted" | "late" | "checked";

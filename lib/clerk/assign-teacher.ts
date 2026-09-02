@@ -23,9 +23,10 @@ export async function assignClass(payload: AssignClassPayload): Promise<void> {
 export async function getAssignedTeachers(
   divisionId?: number | string
 ): Promise<AssignedTeacher[]> {
+  const timestamp = new Date().getTime();
   const url = divisionId
-    ? `${API_BASE_URL}${API_ENDPOINTS.ASSIGN_CLASS}?division=${divisionId}`
-    : `${API_BASE_URL}${API_ENDPOINTS.ASSIGN_CLASS}`;
+    ? `${API_BASE_URL}${API_ENDPOINTS.ASSIGN_CLASS}?division=${divisionId}&_t=${timestamp}`
+    : `${API_BASE_URL}${API_ENDPOINTS.ASSIGN_CLASS}?_t=${timestamp}`;
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {

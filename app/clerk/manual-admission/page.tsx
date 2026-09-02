@@ -94,6 +94,10 @@ export default function ManualAdmissionPage() {
   // File uploads state for document_fields (key = docField.id)
   const [docFiles, setDocFiles] = useState<Record<number, File>>({});
 
+  // RTE details
+  const [isRte, setIsRte] = useState(false);
+  const [rteDocument, setRteDocument] = useState<File | null>(null);
+
   useEffect(() => {
     async function loadData() {
       setLoadingInitial(true);
@@ -192,6 +196,7 @@ export default function ManualAdmissionPage() {
       const payload: any = {
         form: activeForm.id,
         field_values,
+        is_rte: isRte,
       };
 
       if (selectedAcademicYear) {
@@ -215,6 +220,7 @@ export default function ManualAdmissionPage() {
       }
 
       const admissionNumber = subData.admission_number || subData.id;
+      const admissionId = subData.id;
 
       // 2. Submit Documents if attached
       const docEntries = Object.entries(docFiles);
@@ -230,6 +236,19 @@ export default function ManualAdmissionPage() {
             body: formData,
           });
         }
+      }
+
+      // Submit RTE Document if attached
+      if (isRte && rteDocument && admissionId) {
+        const rteFormData = new FormData();
+        rteFormData.append("admission", String(admissionId));
+        rteFormData.append("document_name", "RTE Verification Document");
+        rteFormData.append("document_file", rteDocument);
+
+        await fetchWithAuth(`${API_BASE_URL}/rtedocument/`, {
+          method: "POST",
+          body: rteFormData,
+        });
       }
 
       // Identify student name for display
@@ -505,6 +524,57 @@ export default function ManualAdmissionPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* RTE SECTION */}
+          <Card className="rounded-2xl border-emerald-200 dark:border-emerald-900/50 shadow-sm overflow-hidden bg-emerald-50/30 dark:bg-emerald-950/20">
+            <CardHeader className="border-b border-emerald-100 dark:border-emerald-900/50 py-3.5 px-6">
+              <div className="flex items-center gap-2">
+                <FileCheck className="h-4 w-4 text-emerald-600" />
+                <CardTitle className="text-sm font-bold text-gray-900 dark:text-zinc-100">
+                  RTE (Right to Education) Applicable?
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_rte"
+                  checked={isRte}
+                  onChange={(e) => setIsRte(e.target.checked)}
+                  className="h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                />
+                <label htmlFor="is_rte" className="text-sm font-semibold text-gray-800 dark:text-zinc-200 cursor-pointer">
+                  Yes, this student is applying under the RTE Act (0 Fee)
+                </label>
+              </div>
+
+              {isRte && (
+                <div className="p-4 rounded-xl border border-emerald-200 bg-white dark:bg-zinc-900 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-800 dark:text-zinc-200">
+                      Upload RTE Verification Document <span className="text-red-500">*</span>
+                    </span>
+                    {rteDocument && (
+                      <span className="inline-flex items-center text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        <FileCheck size={12} className="mr-1" /> Selected
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    required={isRte}
+                    onChange={(e) => setRteDocument(e.target.files?.[0] || null)}
+                    className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition-colors"
+                  />
+                  <p className="text-[10px] text-gray-500">
+                    Provide the official RTE approval letter or relevant document for this student.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Submit Action Bar */}
           <div className="flex items-center justify-end gap-3 pt-2">
