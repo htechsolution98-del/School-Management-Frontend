@@ -59,9 +59,12 @@ export default function SuperAdminSubscriptionsPage() {
     total_schools: 0,
     active_paid: 0,
     active_trials: 0,
+    expiring_soon: 0,
     expired_overdue: 0,
     projected_monthly_revenue: 0,
+    projected_annual_revenue: 0,
   });
+
 
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,7 +81,8 @@ export default function SuperAdminSubscriptionsPage() {
   /* Edit Plan Form State */
   const [planType, setPlanType] = useState<"TRIAL" | "PAID">("PAID");
   const [billingModel, setBillingModel] = useState<"FLAT" | "PER_STUDENT">("FLAT");
-  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM">("MONTHLY");
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "CUSTOM">("MONTHLY");
+
   const [flatAmount, setFlatAmount] = useState<string>("5000");
   const [perStudentRate, setPerStudentRate] = useState<string>("15");
   const [dueDate, setDueDate] = useState<string>("");
@@ -860,8 +864,10 @@ export default function SuperAdminSubscriptionsPage() {
                       >
                         <option value="MONTHLY">Monthly</option>
                         <option value="QUARTERLY">Quarterly (3 Months)</option>
+                        <option value="HALF_YEARLY">Half Yearly (6 Months)</option>
                         <option value="YEARLY">Yearly (12 Months)</option>
                         <option value="CUSTOM">Custom</option>
+
                       </select>
                     </div>
                   </div>

@@ -57,8 +57,13 @@ export const API_ENDPOINTS = {
   BOOK_COPIES: "/book-copies/",
   BOOK_RESERVATIONS: "/book-reservations/",
   STUDENTS: "/get-student/",
+  SUBSCRIPTION_PLANS: "/subscription-plans/",
   SUBSCRIPTIONS: "/school-subscriptions/",
   INVOICES: "/school-invoices/",
+  SUBSCRIPTION_PAYMENTS: "/subscription-payments/",
+  SUBSCRIPTION_AUDIT_LOGS: "/subscription-audit-logs/",
+  SUBSCRIPTION_SETTINGS: "/subscription-settings/",
+
   ASSETS: "/asset/",
   ASSET_MAINTENANCE: "/asset-maintenance/",
   PROCUREMENT: "/procurement/",
