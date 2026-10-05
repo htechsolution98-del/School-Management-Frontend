@@ -97,6 +97,8 @@ export default function ClassesPage() {
     }
   }
 
+  const [isRteApplicable, setIsRteApplicable] = useState(false)
+
   const handleAddClass = async () => {
     if (!newClassName.trim() || !selectedCategoryId) {
       toast.error("Please enter a class name and select a category")
@@ -106,10 +108,12 @@ export default function ClassesPage() {
     try {
       await saveSchoolClasses([{
         school_class: newClassName.trim(),
-        category: parseInt(selectedCategoryId)
+        category: parseInt(selectedCategoryId),
+        is_rte_applicable: isRteApplicable
       }])
       toast.success("Class created successfully")
       setNewClassName("")
+      setIsRteApplicable(false)
       setIsClassDialogOpen(false)
       await fetchData()
     } catch {
@@ -320,16 +324,18 @@ export default function ClassesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Category</label>
-              <Select value={selectedCategoryId} onValueChange={(val) => setSelectedCategoryId(val ?? "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">Select a category</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id.toString()}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Class Name</label>
@@ -339,6 +345,18 @@ export default function ClassesPage() {
                 onChange={(e) => setNewClassName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAddClass() }}
               />
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                id="isRteApplicable"
+                checked={isRteApplicable}
+                onChange={(e) => setIsRteApplicable(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <label htmlFor="isRteApplicable" className="text-sm font-medium">
+                 RTE Applicable
+              </label>
             </div>
           </div>
           <DialogFooter>
@@ -362,16 +380,18 @@ export default function ClassesPage() {
           </DialogHeader>
           <div className="space-y-3 py-4">
             <label className="text-sm font-medium">Select Category</label>
-            <Select value={assignCategoryId} onValueChange={(val) => setAssignCategoryId(val ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={assignCategoryId}
+              onChange={(e) => setAssignCategoryId(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">Select a category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id.toString()}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Cancel</Button>

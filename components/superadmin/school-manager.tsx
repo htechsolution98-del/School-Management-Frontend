@@ -1,5 +1,8 @@
 "use client";
 
+import { SchoolDetails } from "@/components/superadmin/school-details";
+import { Building2 } from "lucide-react";
+
 import { useCallback, useEffect, useState } from "react";
 import { Check, Edit2, Loader2, Plus, Power, RefreshCw, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -46,6 +49,7 @@ export default function SchoolManager() {
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<number | null>(null);
   const [accessSchool, setAccessSchool] = useState<School | null>(null);
+  const [detailsSchool, setDetailsSchool] = useState<School | null>(null);
   const [busyFeature, setBusyFeature] = useState<number | null>(null);
   const [accessError, setAccessError] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
@@ -218,12 +222,14 @@ export default function SchoolManager() {
         match: (school, value) => school.city === value,
       }]}
       renderActions={school => [
+        { label: "View school details", icon: Building2, action: () => setDetailsSchool(school), color: "text-slate-600 hover:bg-slate-100" },
         { label: "Edit school", icon: Edit2, action: () => startForm(school), color: "text-blue-600 hover:bg-blue-50 hover:text-blue-700" },
         { label: (school.is_active ?? true) ? "Deactivate school" : "Activate school", icon: Power, action: () => changeStatus(school), color: (school.is_active ?? true) ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700" : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" },
         { label: "Delete school", icon: Trash2, action: () => remove(school), color: "text-red-600 hover:bg-red-50 hover:text-red-700" },
       ].map(action => <button key={action.label} type="button" title={action.label} aria-label={`${action.label}: ${camelCaseText(school.name)}`} disabled={actionId !== null || loading} onClick={action.action} className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${action.color}`}><action.icon className="h-4 w-4" /></button>)}
     />
 
+    <SchoolDetails school={detailsSchool} onClose={() => setDetailsSchool(null)} />
     <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
       <DialogContent className="admin-scroll-area flex h-[min(760px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b border-slate-200 p-6 pr-14"><DialogTitle className="text-lg font-semibold">{editing ? "Edit school" : "Add school"}</DialogTitle><DialogDescription>Enter school details and select feature access. Required fields are marked *.</DialogDescription></DialogHeader>

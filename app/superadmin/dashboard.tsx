@@ -9,7 +9,7 @@ import { SchoolLogo } from "@/components/superadmin/school-logo";
 import { StatusBadge } from "@/components/superadmin/status-badge";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import { camelCaseText } from "@/lib/table-utils";
-import { getSchools, getFeatures } from "@/lib/superadmin";
+import { getSchools, getFeatures, getSuperAdminAnalytics, type SuperAdminAnalyticsSummary } from "@/lib/superadmin";
 import type { School, FeatureType } from "@/types/superadmin";
 
 const overviewColumns: DataTableColumn<School>[] = [
@@ -50,6 +50,7 @@ const moduleIcons: Record<string, LucideIcon> = {
 export default function SuperAdminDashboard() {
   const [schools, setSchools] = useState<School[]>([]);
   const [features, setFeatures] = useState<FeatureType[]>([]);
+  const [summary, setSummary] = useState<SuperAdminAnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const reduceMotion = useReducedMotion();
@@ -57,9 +58,10 @@ export default function SuperAdminDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [schoolData, featureData] = await Promise.all([getSchools(), getFeatures()]);
+      const [schoolData, featureData, analytics] = await Promise.all([getSchools(), getFeatures(), getSuperAdminAnalytics()]);
       setSchools(schoolData);
       setFeatures(featureData);
+      setSummary(analytics.summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load dashboard.");
     } finally {
@@ -85,6 +87,8 @@ export default function SuperAdminDashboard() {
     { label: "Active schools", value: active, detail: `${inactive} inactive schools`, icon: CheckCircle2, color: "bg-slate-100 text-slate-600" },
     { label: "Platform features", value: features.length, detail: `${assignments} enabled school assignments`, icon: Layers3, color: "bg-slate-100 text-slate-600" },
     { label: "Cities covered", value: locations, detail: "Based on school addresses", icon: MapPin, color: "bg-slate-100 text-slate-600" },
+    { label: "Students", value: summary?.total_students ?? 0, detail: `${summary?.total_boys ?? 0} boys · ${summary?.total_girls ?? 0} girls`, icon: GraduationCap, color: "bg-slate-100 text-slate-600" },
+    { label: "Staff", value: summary?.total_staff ?? 0, detail: `${summary?.active_staff ?? 0} active · ${summary?.teachers_count ?? 0} teachers`, icon: Users, color: "bg-slate-100 text-slate-600" },
   ];
   const reveal = (delay = 0) => ({
     initial: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 },

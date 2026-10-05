@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bell, ChevronDown, Loader2, LogOut, Megaphone, Menu, School, X } from "lucide-react";
-import { logoutUser } from "@/lib/auth";
+import { logoutUser, getDashboardRoute } from "@/lib/auth";
 import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
 import { type AnnouncementResponse } from "@/lib/principal";
 import { getCurrentUserProfile } from "@/lib/current-user";
@@ -36,6 +36,20 @@ const MAX_WIDTH = 320;
 const EXPANDED_MIN = 224;
 const COMPACT_MAX = 160;
 const DEFAULT_WIDTH = 248;
+
+const ROLE_ALLOWED_MAP: Record<string, string[]> = {
+  "Super Admin": ["super_admin", "superadmin"],
+  Trustee: ["admin(trustee)", "trustee", "super_admin", "superadmin"],
+  Principal: ["principal", "super_admin", "superadmin"],
+  Clerk: ["clerk", "fees_clerk", "principal", "super_admin", "superadmin"],
+  Teacher: ["teacher", "principal", "super_admin", "superadmin"],
+  Librarian: ["librarian", "principal", "super_admin", "superadmin"],
+  Inventory: ["inventory", "principal", "super_admin", "superadmin"],
+  Fees: ["fees management", "fees", "fees_clerk", "clerk", "principal", "super_admin", "superadmin"],
+  Student: ["student", "principal", "super_admin", "superadmin"],
+  Parent: ["parents", "parent", "principal", "super_admin", "superadmin"],
+  Applicant: ["temp_user", "user", "super_admin", "superadmin"],
+};
 
 function widthStorageKey(roleTitle?: string) {
   return `sidebar_width:${roleTitle || "default"}`;
@@ -73,6 +87,30 @@ function resolveActiveTitle(links: SidebarLink[], pathname: string): string {
 
 export function AppShell({ children, links, roleTitle, userName, onSignOut }: AppShellProps) {
   const pathname = usePathname();
+  const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
+  const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
+
+  useEffect(() => {
+    if (!requiresRoleCheck) return;
+    try {
+      const token = localStorage.getItem("access_token") || document.cookie.split("; ").some(row => row.startsWith("access_token="));
+      if (!token) {
+        window.location.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+        return;
+      }
+      const roles: unknown = JSON.parse(localStorage.getItem("roles") || "[]");
+      if (!Array.isArray(roles)) throw new Error("Invalid stored roles");
+      const normalized = roles.map(role => String(role).toLowerCase().trim());
+      if (!ROLE_ALLOWED_MAP[roleTitle!].some(role => normalized.includes(role))) {
+        const route = getDashboardRoute(roles);
+        window.location.replace(route && route !== pathname ? route : "/login");
+        return;
+      }
+      setAuthorizedPath(pathname);
+    } catch {
+      window.location.replace("/login");
+    }
+  }, [pathname, roleTitle, requiresRoleCheck]);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [resizing, setResizing] = useState(false);
   const dragStart = useRef<{ x: number; width: number } | null>(null);
@@ -294,6 +332,10 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
     if (aRead !== bRead) return aRead ? 1 : -1;
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
+
+  if (requiresRoleCheck && authorizedPath !== pathname) {
+    return <div className="flex h-svh items-center justify-center bg-slate-50 text-slate-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking access…</div>;
+  }
 
   return (
     <div

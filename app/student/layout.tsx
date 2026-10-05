@@ -35,6 +35,11 @@ const sidebarLinks = [
     icon: Trophy,
   },
   {
+    title: "Library",
+    href: "/student/library",
+    icon: BookOpen,
+  },
+  {
     title: "Pay Fees",
     href: "/student/pay-fees",
     icon: CreditCard,

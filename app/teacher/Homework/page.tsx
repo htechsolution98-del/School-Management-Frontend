@@ -296,10 +296,49 @@ function MarkModal({
               {submission.student_name}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8" }}>
-              Submitted: {submission.submitted_at || submission.submission_date}
+              Submitted: {formatToDDMMYYYY(submission.submitted_at || submission.submission_date)}
             </div>
           </div>
         </div>
+
+        {/* Attached Submission File */}
+        {(submission.file || submission.attachment) && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              background: "#ede9fe",
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#6366f1" }}>
+              <Paperclip size={15} />
+              <span>Student Submitted File</span>
+            </div>
+            <a
+              href={submission.file || submission.attachment || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#4f46e5",
+                background: "#fff",
+                padding: "4px 10px",
+                borderRadius: 6,
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Download size={13} /> Open / Download
+            </a>
+          </div>
+        )}
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>
@@ -922,6 +961,7 @@ export default function AllHomeworkPage() {
       fd.append("title", fullTitle);
       fd.append("description", data.description.trim());
       fd.append("due_date", formattedDueDate);
+      fd.append("is_active", "true");
       if (data.file) {
         fd.append("attachment", data.file);
       }
@@ -1323,6 +1363,9 @@ export default function AllHomeworkPage() {
                           SUBMITTED AT
                         </th>
                         <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                          SUBMITTED FILE
+                        </th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                           STATUS
                         </th>
                         <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
@@ -1360,7 +1403,34 @@ export default function AllHomeworkPage() {
                             </div>
                           </td>
                           <td style={{ padding: "12px", fontSize: 12, color: "#64748b" }}>
-                            {sub.submitted_at || sub.submission_date || "—"}
+                            {formatToDDMMYYYY(sub.submitted_at || sub.submission_date) || "—"}
+                          </td>
+                          <td style={{ padding: "12px" }}>
+                            {(sub.file || sub.attachment) ? (
+                              <a
+                                href={sub.file || sub.attachment || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "4px 10px",
+                                  background: "#ede9fe",
+                                  color: "#6366f1",
+                                  borderRadius: 7,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  textDecoration: "none",
+                                  border: "1px solid #ddd6fe",
+                                }}
+                              >
+                                <Paperclip size={12} />
+                                View File
+                              </a>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "#94a3b8" }}>No file</span>
+                            )}
                           </td>
                           <td style={{ padding: "12px" }}>
                             <StatusBadge status={sub.status} />

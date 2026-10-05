@@ -1,13 +1,15 @@
 "use client";
+
 import React from "react";
 import { AdminShell } from "@/components/superadmin/admin-shell";
-import { Building2, LayoutDashboard , Sparkles , CreditCard  } from "lucide-react";
+import { Building2, LayoutDashboard , Sparkles , CreditCard, BadgePercent } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/superadmin", icon: LayoutDashboard, exact: true },
   { title: "Manage Schools", href: "/superadmin/schools", icon: Building2 },
+  { title: "Subscriptions", href: "/superadmin/subscriptions", icon: BadgePercent },
   { title: "Features", href: "/superadmin/fetures_select", icon: Sparkles },
-  { title: "Razorpay",   href: "/superadmin/razorpay",  icon: CreditCard }, 
+  { title: "Razorpay", href: "/superadmin/razorpay", icon: CreditCard },
 ];
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
