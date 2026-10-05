@@ -321,8 +321,12 @@ export default function ClassesPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Category</label>
               <Select value={selectedCategoryId} onValueChange={(val) => setSelectedCategoryId(val ?? "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a category">
+                    {selectedCategoryId
+                      ? categories.find((c) => c.id.toString() === selectedCategoryId)?.name
+                      : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map(cat => (
@@ -363,8 +367,12 @@ export default function ClassesPage() {
           <div className="space-y-3 py-4">
             <label className="text-sm font-medium">Select Category</label>
             <Select value={assignCategoryId} onValueChange={(val) => setAssignCategoryId(val ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a category">
+                  {assignCategoryId
+                    ? categories.find((c) => c.id.toString() === assignCategoryId)?.name
+                    : undefined}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {categories.map(cat => (
