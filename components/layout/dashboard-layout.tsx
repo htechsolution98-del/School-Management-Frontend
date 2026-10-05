@@ -84,13 +84,19 @@ function SidebarItem({
 }) {
   const hasSubLinks = !!link.subLinks?.length;
   
-  // Calculate if the current link or any of its sublinks are active
-  const isActive =
-    pathname === link.href ||
-    (pathname.startsWith(`${link.href}/`) &&
-      link.href !== "/" &&
-      (!hasSubLinks)) ||
-    (hasSubLinks && link.subLinks?.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`)));
+  const isMatch = (targetHref: string) => {
+    if (targetHref.includes("?")) {
+      if (pathname === targetHref) return true;
+      if (pathname.split("?")[0] === targetHref.split("?")[0] && !pathname.includes("?") && targetHref.includes("tab=overview")) return true;
+      return false;
+    }
+    return (
+      pathname.split("?")[0] === targetHref ||
+      (pathname.split("?")[0].startsWith(`${targetHref}/`) && targetHref !== "/")
+    );
+  };
+
+  const isActive = isMatch(link.href) || (hasSubLinks && link.subLinks?.some(sub => isMatch(sub.href)));
 
   if (hasSubLinks) {
     return (
@@ -129,7 +135,7 @@ function SidebarItem({
               className="overflow-hidden flex flex-col space-y-1 pl-10 pr-2 pt-1"
             >
               {link.subLinks?.map((subLink) => {
-                const isSubActive = pathname === subLink.href || pathname.startsWith(`${subLink.href}/`);
+                const isSubActive = isMatch(subLink.href);
                 return (
                   <Link
                     key={subLink.href}
@@ -201,10 +207,21 @@ function SidebarContent({
 
   // Open the active menu initially and on path change
   useEffect(() => {
+    const isMatch = (href: string) => {
+      if (href.includes("?")) {
+        if (pathname === href) return true;
+        if (pathname.split("?")[0] === href.split("?")[0] && !pathname.includes("?") && href.includes("tab=overview")) return true;
+        return false;
+      }
+      return (
+        pathname.split("?")[0] === href ||
+        (pathname.split("?")[0].startsWith(`${href}/`) && href !== "/")
+      );
+    };
+
     const activeLink = sidebarLinks.find(link => 
-      pathname === link.href ||
-      (pathname.startsWith(`${link.href}/`) && link.href !== "/" && !link.subLinks?.length) ||
-      (link.subLinks && link.subLinks.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`)))
+      isMatch(link.href) ||
+      (link.subLinks && link.subLinks.some(sub => isMatch(sub.href)))
     );
     if (activeLink) {
       setOpenMenuTitle(activeLink.title);
@@ -400,18 +417,55 @@ export function DashboardLayout({
   const [selectedNotification, setSelectedNotification] = useState<AnnouncementResponse | null>(null);
   const { notifications, readIds, unreadCount, markAsRead } = useAnnouncementSocket();
   const config = roleConfig[roleTitle] ?? roleConfig["Super Admin"];
+
+  const [currentSearch, setCurrentSearch] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentSearch(window.location.search);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      if (typeof window !== "undefined") {
+        setCurrentSearch(window.location.search);
+      }
+    };
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("click", () => {
+      setTimeout(handleUrlChange, 60);
+    });
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("click", handleUrlChange);
+    };
+  }, []);
+
+  const fullPath = currentSearch ? `${pathname}${currentSearch}` : pathname;
+
+  const isMatchLink = (targetHref: string) => {
+    if (targetHref.includes("?")) {
+      if (fullPath === targetHref) return true;
+      if (pathname === targetHref.split("?")[0] && !currentSearch && targetHref.includes("tab=overview")) return true;
+      return false;
+    }
+    return (
+      pathname === targetHref ||
+      (pathname.startsWith(`${targetHref}/`) &&
+        targetHref !== "/" &&
+        !sidebarLinks.some(
+          (other) =>
+            other.href !== targetHref &&
+            pathname.startsWith(other.href) &&
+            other.href.length > targetHref.length
+        ))
+    );
+  };
+
   const activeTitle =
     sidebarLinks.find(
-      (l) =>
-        pathname === l.href ||
-        (pathname.startsWith(`${l.href}/`) &&
-          l.href !== "/" &&
-          !sidebarLinks.some(
-            (other) =>
-              other.href !== l.href &&
-              pathname.startsWith(other.href) &&
-              other.href.length > l.href.length
-          ))
+      (l) => isMatchLink(l.href) || (l.subLinks && l.subLinks.some(sub => isMatchLink(sub.href)))
     )?.title || roleTitle;
 
   if (!isAuthChecked) {
@@ -445,7 +499,7 @@ export function DashboardLayout({
           <SidebarContent
             roleTitle={roleTitle}
             sidebarLinks={sidebarLinks}
-            pathname={pathname}
+            pathname={fullPath}
             schoolName={schoolName}
           />
         </div>
@@ -676,7 +730,7 @@ export function DashboardLayout({
                 <SidebarContent
                   roleTitle={roleTitle}
                   sidebarLinks={sidebarLinks}
-                  pathname={pathname}
+                  pathname={fullPath}
                   schoolName={schoolName}
                   onLinkClick={() => setSidebarOpen(false)}
                 />
