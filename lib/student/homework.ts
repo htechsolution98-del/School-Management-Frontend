@@ -30,6 +30,7 @@ export async function submitHomework(
   const formData = new FormData();
   formData.append("homework", String(homeworkId));
   if (attachment) {
+    formData.append("file", attachment);
     formData.append("attachment", attachment);
   }
 

@@ -81,11 +81,15 @@ export interface StudentExam {
   title: string;
   description: string;
   subject: number | null;
+  subject_name?: string | null;
   exam_date: string;
   start_time: string;
   end_time: string;
   class_group: number;
   class_group_name: string;
+  room_number?: string | null;
+  seat_number?: string | null;
+  building_block?: string | null;
 }
 
 // ─── Exam Results & Rankings Types ────────────────────────────────────────────

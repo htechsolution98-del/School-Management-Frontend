@@ -3,6 +3,7 @@ export interface SchoolFeature {
   is_enabled: boolean;
   school: number;
   feature: number;
+  feature_name?: string;
 }
 
 export interface School {
@@ -63,6 +64,7 @@ export interface CreateSchoolResponse {
 export interface FeatureType {
   id: number;
   name: string;
+  is_active: boolean;
 }
 
 export interface CreateFeaturePayload {
