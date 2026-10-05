@@ -194,6 +194,23 @@ function FieldItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatStudentFullName(fieldValues: { field_label: string; value: string }[], fallback = "Student"): string {
+  if (!fieldValues || fieldValues.length === 0) return fallback;
+  const getFv = (...labels: string[]) => {
+    const match = fieldValues.find((f) => labels.some((l) => f.field_label.toLowerCase().includes(l.toLowerCase())));
+    return match ? match.value : "";
+  };
+  const surname = getFv("surname", "last name", "lastname");
+  const studentName = getFv("student name", "first name", "firstname", "candidate name");
+  const fatherName = getFv("father name", "father", "middle name", "middlename");
+
+  const parts = [surname, studentName, fatherName].filter(Boolean);
+  if (parts.length > 0) return parts.join(" ");
+
+  const fullName = getFv("full name", "fullname", "name");
+  return fullName || fallback;
+}
+
 /* ─── Verify modal ───────────────────────────────────────────────────────── */
 function VerifyModal({
   record,
@@ -208,11 +225,7 @@ function VerifyModal({
   onConfirm: () => void;
   getClassName: (value: string) => string;
 }) {
-  const studentName =
-    record.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
-    record.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
-    record.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ??
-    "Student";
+  const studentName = formatStudentFullName(record.field_values, "Student");
 
   return (
     <motion.div
@@ -379,11 +392,7 @@ function RecordCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const studentName =
-    record.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
-    record.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
-    record.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ??
-    "—";
+  const studentName = formatStudentFullName(record.field_values, "—");
 
   const initials = studentName
     .split(" ")
@@ -678,10 +687,7 @@ export default function ClerkDashboard() {
 
       // search: name, admission number, payment IDs, amount
       if (!q) return true;
-      const name =
-        r.field_values.find((f) => f.field_label.toLowerCase() === "first name")?.value ??
-        r.field_values.find((f) => f.field_label.toLowerCase().includes("full name"))?.value ??
-        r.field_values.find((f) => f.field_label.toLowerCase().includes("name") && !f.field_label.toLowerCase().includes("surname") && !f.field_label.toLowerCase().includes("last"))?.value ?? "";
+      const name = formatStudentFullName(r.field_values, "");
       const fields = r.field_values.map((f) => f.value).join(" ").toLowerCase();
       return (
         name.toLowerCase().includes(q) ||

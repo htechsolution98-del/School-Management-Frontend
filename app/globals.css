@@ -218,3 +218,48 @@ html {
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, and Opera */
 }
+
+/* App shells (superadmin + every role dashboard) keep wheel, keyboard and touch
+   scrolling without visible tracks, matching the superadmin workspace. */
+html:has(.app-workspace),
+body:has(.app-workspace),
+.app-workspace,
+.app-workspace *,
+.admin-scroll-area {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scrollbar-gutter: auto;
+}
+html:has(.app-workspace)::-webkit-scrollbar,
+body:has(.app-workspace)::-webkit-scrollbar,
+.app-workspace ::-webkit-scrollbar,
+.admin-scroll-area::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.app-workspace :is(a, button, select, [role="switch"], label:has(input[type="checkbox"])),
+.admin-scroll-area :is(a, button, select, label:has(input[type="checkbox"])) {
+  cursor: pointer;
+}
+.app-workspace :is(button, select, input):disabled,
+.admin-scroll-area :is(button, select, input):disabled {
+  cursor: not-allowed;
+}
+.app-workspace[data-resizing="true"],
+.app-workspace[data-resizing="true"] * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* Public marketing/landing pages keep the same hidden-scrollbar treatment. */
+.no-scrollbar,
+.no-scrollbar * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

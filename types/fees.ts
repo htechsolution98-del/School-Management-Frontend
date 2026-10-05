@@ -186,6 +186,7 @@ export interface Student {
   school_class: number | null;
   class_name?: string;
   gr_no?: string | null;
+  is_rte?: boolean;
 }
 
 export interface CreateSingleFeePayload {

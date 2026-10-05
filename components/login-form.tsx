@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { loginUser, getDashboardRoute } from "@/lib/auth";
+import { MOBILE_LENGTH, MOBILE_ERROR_MESSAGE } from "@/lib/school-validation";
+import type { LoginRequest } from "@/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FaceScan } from "@/components/face-scan";
 
@@ -55,56 +57,45 @@ function LoginFormInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
 
-    // Determine payload based on input type
-    // const isEmail = username.includes("@");
-    // const isMobile = /^\d+$/.test(username);
+    const identifier = username.trim();
+    const isEmail = identifier.includes("@");
 
-    // let payload: any = { password };
+    // Non-email input is treated as a mobile number, so enforce the same
+    // exactly-10-digits rule the API applies before hitting the network.
+    if (!isEmail) {
+      const normalized = identifier.replace(/[\s()\-.]/g, "");
+      if (normalized && !new RegExp(`^[0-9]{${MOBILE_LENGTH}}$`).test(normalized)) {
+        setError(MOBILE_ERROR_MESSAGE);
+        return;
+      }
+    }
 
-    // if (isEmail) {
-    //   payload.email = username;
-    // } else if (isMobile) {
-    //   if (username.length !== 10) {
-    //     setError("Mobile number must be exactly 10 digits.");
-    //     setIsLoading(false);
-    //     return;
-    //   }
-    //   payload.mobile = username;
-    // } else {
-    //   setError("Please enter a valid email or 10-digit mobile number.");
-    //   setIsLoading(false);
-    //   return;
-    // }
+    setIsLoading(true);
 
-    // now this is for the studend 
-    const isEmail = username.includes("@");
-
-    let payload: any = { password };
-
+    const payload: LoginRequest = { password };
     if (isEmail) {
-      payload.email = username;
+      payload.email = identifier;
     } else {
-      payload.mobile = username;
+      payload.mobile = identifier.replace(/[\s()\-.]/g, "");
     }
 
     try {
       const response = await loginUser(payload);
-      // roles might be top-level or in user.roles depending on backend
-      console.log("response : ",response,"response.user?.roles : ",response.roles, response.user?.roles);
       const roles = response.roles || response.user?.roles || [];
       const route = getDashboardRoute(roles);
 
       if (typeof window !== "undefined") {
-        localStorage.setItem("username", username);
+        localStorage.setItem("username", identifier);
       }
 
       router.push(route);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(
-        err.message || "Failed to login. Please verify your credentials.",
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to login. Please verify your credentials.",
       );
       console.warn("Login failed:", err);
     } finally {

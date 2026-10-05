@@ -337,6 +337,24 @@ export default function StudentExamsPage() {
                             {formatExamTime(ex.start_time)} – {formatExamTime(ex.end_time)}
                           </span>
                         </div>
+
+                        {/* Hall Ticket & Room Info */}
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100/50">
+                          <span className="text-slate-400 font-medium">Exam Room</span>
+                          <span className="text-indigo-600 font-bold font-mono">
+                            {ex.room_number ? `${ex.room_number}${ex.building_block ? ` (${ex.building_block} Block)` : ""}` : "Room Allocated"}
+                          </span>
+                        </div>
+
+                        {/* Seat Number */}
+                        {ex.seat_number && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400 font-medium">Allocated Seat</span>
+                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold font-mono text-[11px]">
+                              {ex.seat_number}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

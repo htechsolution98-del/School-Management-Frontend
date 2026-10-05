@@ -21,9 +21,13 @@ import {
   Sparkles,
   ShieldCheck,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AdminButton as Button } from "@/components/superadmin/admin-button";
+import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
+import { camelCaseText } from "@/lib/table-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiValidationError } from "@/lib/api-errors";
+import { paymentFormSchema, validationErrors, type FieldErrors } from "@/lib/school-validation";
 import {
   getSchoolList,
   saveRazorpayData,
@@ -47,7 +51,7 @@ function MaskedField({ value, label }: { value: string; label: string }) {
       {value && (
         <button
           onClick={() => setShow((v) => !v)}
-          className={`transition-colors ${show ? "text-[#4F46E5]" : "text-slate-400 hover:text-slate-600"}`}
+          className={`transition-colors ${show ? "text-[#1D496C]" : "text-slate-400 hover:text-slate-600"}`}
         >
           {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </button>
@@ -79,13 +83,13 @@ function SchoolSelect({
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
         className={`w-full h-11 flex items-center justify-between gap-3 px-4 rounded-xl border-2 text-sm font-medium transition-all
-          ${open ? "border-[#4F46E5] bg-white ring-2 ring-[#4F46E5]/10" : "border-gray-200 bg-white hover:border-[#4F46E5]/50"}
+          ${open ? "border-[#1D496C] bg-white ring-2 ring-[#1D496C]/10" : "border-gray-200 bg-white hover:border-[#1D496C]/50"}
           ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
           <span className={`truncate ${selected ? "text-gray-800" : "text-gray-400"}`}>
-            {selected ? selected.name : "Select a school…"}
+            {selected ? camelCaseText(selected.name) : "Select a school…"}
           </span>
         </div>
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -100,7 +104,7 @@ function SchoolSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-30 mt-1.5 w-full bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-100/60 overflow-hidden"
+            className="absolute z-30 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl shadow-gray-100/60 overflow-hidden"
           >
             <div className="max-h-52 overflow-y-auto py-1.5">
               {schools.map((s) => (
@@ -109,11 +113,11 @@ function SchoolSelect({
                   type="button"
                   onClick={() => { onChange(s.id); setOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors
-                    ${value === s.id ? "bg-[#4F46E5]/5 text-[#4F46E5] font-semibold" : "text-gray-700 hover:bg-gray-50"}`}
+                    ${value === s.id ? "bg-[#1D496C]/5 text-[#1D496C] font-semibold" : "text-gray-700 hover:bg-gray-50"}`}
                 >
                   <Building2 className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                  {s.name}
-                  {value === s.id && <CheckCircle2 className="h-3.5 w-3.5 ml-auto text-[#4F46E5]" />}
+                  {camelCaseText(s.name)}
+                  {value === s.id && <CheckCircle2 className="h-3.5 w-3.5 ml-auto text-[#1D496C]" />}
                 </button>
               ))}
               {schools.length === 0 && (
@@ -148,29 +152,31 @@ function CredentialForm({
   const [showSecret, setShowSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const isEdit = !!existing?.id;
   const alreadyHasRecord = !isEdit && existingRecords.some((r) => r.school === schoolId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schoolId) { setErr("Please select a school"); return; }
-    if (!keyId.trim()) { setErr("Razorpay Key ID is required"); return; }
-    if (!secret.trim()) { setErr("Razorpay Secret Key is required"); return; }
-    if (alreadyHasRecord) { setErr("This school already has Razorpay credentials. Edit the existing record instead."); return; }
+    const result = paymentFormSchema.safeParse({ school: schoolId, razorpay_key_id: keyId, razorpay_secret_key: secret });
+    if (!result.success) { setFieldErrors(validationErrors(result.error.issues)); setErr("Please correct the highlighted fields."); return; }
+    if (alreadyHasRecord) { setFieldErrors({ school: "This school already has Razorpay credentials. Edit the existing record instead." }); return; }
 
     setSaving(true);
     setErr("");
+    setFieldErrors({});
     try {
-      const payload = { school: schoolId as number, razorpay_key_id: keyId.trim(), razorpay_secret_key: secret.trim() };
+      const payload = result.data;
       if (isEdit && existing?.id) {
         await updateRazorpayData(existing.id, payload);
       } else {
         await saveRazorpayData(payload);
       }
       onSuccess();
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e: unknown) {
+      if (e instanceof ApiValidationError) setFieldErrors(e.fieldErrors);
+      setErr(e instanceof Error ? e.message : "Unable to save credentials. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -181,7 +187,7 @@ function CredentialForm({
         initial={{ scale: 0.95, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 10 }}
-        className="bg-white rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-6 md:p-8 w-full max-w-2xl overflow-hidden flex flex-col relative max-h-[90vh]"
+        className="bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-6 md:p-8 w-full max-w-2xl overflow-hidden flex flex-col relative max-h-[calc(100dvh-2rem)]"
       >
         <button
           type="button"
@@ -191,26 +197,27 @@ function CredentialForm({
           <X className="h-5 w-5" />
         </button>
         
-        <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">
+        <h3 className="text-2xl font-semibold text-slate-800 tracking-tight mb-2">
           {isEdit ? "Edit Razorpay Credentials" : "Add Razorpay Credentials"}
         </h3>
         <p className="text-sm text-slate-500 mb-6">
           {isEdit ? `Updating for ${existing?.school_name}` : "Link a school to its payment gateway"}
         </p>
 
-        <div className="overflow-y-auto custom-scrollbar pr-2 flex-1">
-          <form onSubmit={handleSubmit} className="space-y-5 pb-4">
+        <div className="min-h-0 overflow-y-auto custom-scrollbar pr-2">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {/* School selector */}
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">School</Label>
           <SchoolSelect
             schools={schools}
             value={schoolId}
-            onChange={setSchoolId}
+            onChange={id => { setSchoolId(id); setFieldErrors(current => ({ ...current, school: "" })); }}
             disabled={isEdit}
           />
+          {fieldErrors.school && <p role="alert" className="text-xs text-red-600">{fieldErrors.school}</p>}
           {alreadyHasRecord && (
-            <p className="text-xs text-amber-600 font-medium flex items-center gap-1 mt-1">
+            <p className="text-xs text-slate-600 font-medium flex items-center gap-1 mt-1">
               <AlertCircle className="h-3.5 w-3.5" />
               This school already has credentials — edit the existing row instead.
             </p>
@@ -220,33 +227,44 @@ function CredentialForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Key ID */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <Label htmlFor="razorpay-key-id" className="text-sm font-medium text-slate-700">
               Razorpay Key ID
             </Label>
             <div className="relative">
               <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
+                id="razorpay-key-id"
+                required
+                maxLength={255}
+                aria-invalid={!!fieldErrors.razorpay_key_id}
+                aria-describedby={fieldErrors.razorpay_key_id ? "key-id-error" : undefined}
                 value={keyId}
-                onChange={(e) => setKeyId(e.target.value)}
+                onChange={(e) => { setKeyId(e.target.value); setFieldErrors(current => ({ ...current, razorpay_key_id: "" })); }}
                 placeholder="rzp_live_xxxxxxxxxx"
-                className="pl-9 h-11 rounded-xl border-gray-200 font-mono text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20"
+                className="pl-9 h-11 rounded-xl border-gray-200 font-mono text-sm focus:border-[#1D496C] focus:ring-2 focus:ring-[#1D496C]/20"
               />
             </div>
+            {fieldErrors.razorpay_key_id && <p id="key-id-error" className="text-xs text-red-600">{fieldErrors.razorpay_key_id}</p>}
           </div>
 
           {/* Secret */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <Label htmlFor="razorpay-secret" className="text-sm font-medium text-slate-700">
               Razorpay Secret Key
             </Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
+                id="razorpay-secret"
+                required
+                maxLength={255}
+                aria-invalid={!!fieldErrors.razorpay_secret_key}
+                aria-describedby={fieldErrors.razorpay_secret_key ? "secret-error" : undefined}
                 type={showSecret ? "text" : "password"}
                 value={secret}
-                onChange={(e) => setSecret(e.target.value)}
+                onChange={(e) => { setSecret(e.target.value); setFieldErrors(current => ({ ...current, razorpay_secret_key: "" })); }}
                 placeholder="••••••••••••••••"
-                className="pl-9 pr-10 h-11 rounded-xl border-gray-200 font-mono text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20"
+                className="pl-9 pr-10 h-11 rounded-xl border-gray-200 font-mono text-sm focus:border-[#1D496C] focus:ring-2 focus:ring-[#1D496C]/20"
               />
               <button
                 type="button"
@@ -256,6 +274,7 @@ function CredentialForm({
                 {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {fieldErrors.razorpay_secret_key && <p id="secret-error" className="text-xs text-red-600">{fieldErrors.razorpay_secret_key}</p>}
           </div>
         </div>
 
@@ -268,11 +287,11 @@ function CredentialForm({
 
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={onCancel}
-            className="h-10 px-5 rounded-xl text-sm font-semibold border-gray-200">
+           >
             Cancel
           </Button>
           <Button type="submit" disabled={saving}
-            className="h-10 px-6 rounded-xl text-sm font-semibold bg-[#4F46E5] hover:bg-[#4338CA] text-white">
+           >
             {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</> : <><Save className="h-4 w-4 mr-2" />{isEdit ? "Update" : "Save Credentials"}</>}
           </Button>
         </div>
@@ -302,28 +321,28 @@ function DeleteModal({
         initial={{ scale: 0.9, opacity: 0, y: 16 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 16 }}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
+        className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"
       >
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
             <AlertCircle className="h-5 w-5 text-red-500" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 text-sm">Delete Credentials</h3>
+            <h3 className="font-semibold text-gray-900 text-sm">Delete Credentials</h3>
             <p className="text-xs text-gray-500 mt-0.5">This action cannot be undone</p>
           </div>
         </div>
         <p className="text-sm text-gray-600 mb-5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
           You are about to delete Razorpay credentials for{" "}
-          <span className="font-bold text-gray-900">{record.school_name || `School #${record.school}`}</span>.
+          <span className="font-semibold text-gray-900">{record.school_name || `School #${record.school}`}</span>.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onCancel} disabled={loading}
-            className="flex-1 h-10 rounded-xl border-gray-200 text-sm font-semibold">
+           >
             Cancel
           </Button>
           <Button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold">
+           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
           </Button>
         </div>
@@ -333,6 +352,46 @@ function DeleteModal({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+
+const razorpayColumns: DataTableColumn<RazorpayRecord>[] = [
+  {
+    key: "school",
+    header: "School",
+    sticky: true,
+    search: record => [record.school_name, record.school],
+    render: record => (
+      <div className="flex items-center gap-2.5">
+        <div className="h-8 w-8 shrink-0 rounded-xl bg-[#1D496C]/8 flex items-center justify-center">
+          <Building2 className="h-3.5 w-3.5 text-[#1D496C]" />
+        </div>
+        <span className="text-sm font-semibold text-gray-800">
+          {camelCaseText(record.school_name) || `School #${record.school}`}
+        </span>
+      </div>
+    ),
+  },
+  {
+    key: "key_id",
+    header: "Key ID",
+    search: record => [record.razorpay_key_id],
+    render: record => (
+      <div className="flex items-center gap-2">
+        <Key className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+        <MaskedField value={record.razorpay_key_id} label="Key ID" />
+      </div>
+    ),
+  },
+  {
+    key: "secret_key",
+    header: "Secret Key",
+    render: record => (
+      <div className="flex items-center gap-2">
+        <Lock className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+        <MaskedField value={record.razorpay_secret_key} label="Secret" />
+      </div>
+    ),
+  },
+];
 
 export default function RazorpayCredentialsPage() {
   const [schools, setSchools] = useState<RazorpaySchool[]>([]);
@@ -404,10 +463,10 @@ export default function RazorpayCredentialsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="h-7 w-7 rounded-lg bg-[#4F46E5]/10 flex items-center justify-center">
-              <CreditCard className="h-3.5 w-3.5 text-[#4F46E5]" />
+            <div className="h-7 w-7 rounded-lg bg-[#1D496C]/10 flex items-center justify-center">
+              <CreditCard className="h-3.5 w-3.5 text-[#1D496C]" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">
               Razorpay Credentials
             </h2>
           </div>
@@ -417,12 +476,12 @@ export default function RazorpayCredentialsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={fetchAll} disabled={isFetching} title="Refresh"
-            className="h-9 w-9 rounded-lg border-gray-200">
+           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
           <Button
             onClick={() => { setIsAdding(!isAdding); setEditingRecord(null); setError(""); }}
-            className={`h-9 px-4 rounded-lg text-sm font-semibold transition-all ${isAdding ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200" : "bg-[#4F46E5] hover:bg-[#4338CA] text-white"}`}
+            className={`h-9 px-4 rounded-lg text-sm font-semibold transition-all ${isAdding ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200" : "bg-[#1D496C] hover:bg-[#163b58] text-white"}`}
           >
             {isAdding ? (<><X className="h-4 w-4 mr-1.5" />Cancel</>) : (<><Plus className="h-4 w-4 mr-1.5" />Add Credentials</>)}
           </Button>
@@ -472,21 +531,21 @@ export default function RazorpayCredentialsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { label: "Total Schools", value: schools.length, icon: Building2, color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
-          { label: "Configured", value: records.length, icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-          { label: "Pending Setup", value: schoolsWithoutRecord.length, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+          { label: "Configured", value: records.length, icon: ShieldCheck, color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
+          { label: "Pending Setup", value: schoolsWithoutRecord.length, icon: AlertCircle, color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
-            className={`flex items-center gap-3 p-4 rounded-2xl border ${stat.bg} ${stat.border}`}
+            className={`flex items-center gap-3 p-4 rounded-xl border ${stat.bg} ${stat.border}`}
           >
             <div className={`h-9 w-9 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm`}>
               <stat.icon className={`h-4.5 w-4.5 ${stat.color}`} />
             </div>
             <div>
-              <p className="text-xl font-black text-gray-900 leading-none">{isFetching ? "—" : stat.value}</p>
+              <p className="text-xl font-semibold text-gray-900 leading-none">{isFetching ? "—" : stat.value}</p>
               <p className="text-xs font-medium text-gray-500 mt-0.5">{stat.label}</p>
             </div>
           </motion.div>
@@ -494,124 +553,55 @@ export default function RazorpayCredentialsPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto -mx-0">
-          <table className="w-full text-sm text-left min-w-[600px]">
-            <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4">School</th>
-                <th className="px-6 py-4">Key ID</th>
-                <th className="px-6 py-4">Secret Key</th>
-                <th className="px-6 py-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {isFetching ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-14 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-[#4F46E5] mx-auto" />
-                    <p className="text-gray-400 text-sm mt-2">Loading credentials…</p>
-                  </td>
-                </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-14 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="h-14 w-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-gray-300" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-500">No credentials yet</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Click "Add Credentials" to get started</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                records.map((record, idx) => (
-                  <motion.tr
-                    key={record.id ?? idx}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: idx * 0.04 }}
-                    className="hover:bg-gray-50/60 transition-colors group"
-                  >
-                    {/* School */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-xl bg-[#4F46E5]/8 flex items-center justify-center shrink-0">
-                          <Building2 className="h-3.5 w-3.5 text-[#4F46E5]" />
-                        </div>
-                        <span className="font-semibold text-gray-800 text-sm">
-                          {record.school_name || `School #${record.school}`}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Key ID */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Key className="h-3.5 w-3.5 text-gray-300 shrink-0" />
-                        <MaskedField value={record.razorpay_key_id} label="Key ID" />
-                      </div>
-                    </td>
-
-                    {/* Secret */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Lock className="h-3.5 w-3.5 text-gray-300 shrink-0" />
-                        <MaskedField value={record.razorpay_secret_key} label="Secret" />
-                      </div>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingRecord(record);
-                            setIsAdding(false);
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all border-[#4F46E5] text-[#4F46E5] sm:border-gray-200 sm:text-gray-600 hover:bg-[#4F46E5] hover:text-white hover:border-[#4F46E5] active:bg-[#4F46E5] active:text-white active:border-[#4F46E5]"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setDeletingRecord(record)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all border-red-400 text-red-500 sm:border-gray-200 sm:text-gray-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-500 active:text-white active:border-red-500"
-
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pending schools footer */}
-        {!isFetching && schoolsWithoutRecord.length > 0 && (
-          <div className="border-t border-gray-50 px-6 py-4 bg-amber-50/50">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold text-amber-700">
-                  {schoolsWithoutRecord.length} school{schoolsWithoutRecord.length > 1 ? "s" : ""} without Razorpay setup:
-                </p>
-                <p className="text-xs text-amber-600 mt-0.5 font-medium">
-                  {schoolsWithoutRecord.map((s) => s.name).join(", ")}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <DataTable
+        data={records}
+        columns={razorpayColumns}
+        getRowId={(record, idx) => record.id ?? idx}
+        createdDate
+        createdDateRange
+        search
+        searchPlaceholder="Search school or key ID"
+        searchAriaLabel="Search Razorpay credentials"
+        loading={isFetching}
+        loadingLabel="Loading credentials…"
+        emptyTitle="No credentials yet"
+        emptyDescription='Click "Add Credentials" to get started.'
+        noResultsTitle="No credentials match your search."
+        caption="Razorpay credentials"
+        minWidth={720}
+        filters={[{
+          key: "school",
+          label: "School",
+          optionsFrom: rows => dynamicOptions(rows, record => record.school_name || null),
+          match: (record, value) => (record.school_name || null) === value,
+        }]}
+        footerNote={!isFetching && schoolsWithoutRecord.length > 0 ? (
+          <span className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+            <span>
+              <span className="block font-semibold text-slate-600">
+                {schoolsWithoutRecord.length} school{schoolsWithoutRecord.length > 1 ? "s" : ""} without Razorpay setup:
+              </span>
+              <span className="mt-0.5 block font-medium text-slate-600">
+                {schoolsWithoutRecord.map(s => camelCaseText(s.name)).join(", ")}
+              </span>
+            </span>
+          </span>
+        ) : undefined}
+        renderActions={record => [
+          {
+            label: "Edit credentials",
+            icon: Edit3,
+            onClick: () => {
+              setEditingRecord(record);
+              setIsAdding(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            },
+            color: "text-blue-600 hover:bg-blue-50 hover:text-blue-700",
+          },
+          { label: "Delete credentials", icon: X, onClick: () => setDeletingRecord(record), color: "text-red-600 hover:bg-red-50 hover:text-red-700" },
+        ].map(action => <button key={action.label} type="button" title={action.label} aria-label={`${action.label}: ${record.school_name ?? record.school}`} disabled={isFetching} onClick={action.onClick} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:border-slate-200 sm:text-slate-600 ${action.color}`}><action.icon className="h-3.5 w-3.5" />{action.label.replace(" credentials", "")}</button>)}
+      />
 
       {/* ── Delete modal ── */}
       <AnimatePresence>

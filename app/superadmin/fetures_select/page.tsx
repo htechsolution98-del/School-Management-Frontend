@@ -16,15 +16,16 @@ import {
   Bus,
   Wallet,
   Boxes,
-  Power,
+  Trash2,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { AdminButton as Button } from "@/components/superadmin/admin-button"
+import { StatusBadge } from "@/components/superadmin/status-badge"
 import {
   getFeatures,
   createFeature,
   deleteFeature,
+  updateFeatureActivity,
 } from "@/lib/superadmin"
 import { useConfirm } from "@/components/providers/confirm-provider"
 import type { FeatureType } from "@/types"
@@ -77,6 +78,18 @@ const SCHOOL_FEATURES = [
   },
 ]
 
+const FEATURE_DESCRIPTIONS: Record<string, string> = {
+  TEACHER: "Classroom, attendance and student progress",
+  CLERK: "Admissions and student records",
+  LIBRARIAN: "Library catalog and book circulation",
+  FEE_MANAGEMENT: "Student fees, payments and receipts",
+  PRINCIPAL: "School administration and academic oversight",
+  VICE_PRINCIPAL: "Academic coordination and school operations",
+  ASSISTANT_CLERK: "Support for admissions and office tasks",
+  TRANSPORTATION: "Transport routes and student travel",
+  INVENTORY: "School assets, stock and procurement",
+}
+
 // ================= PAGE =================
 
 export default function FeaturesManagerPage() {
@@ -85,6 +98,7 @@ export default function FeaturesManagerPage() {
   const [selectedFeature, setSelectedFeature] = useState("")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [busyFeatureId, setBusyFeatureId] = useState<number | null>(null)
   const [success, setSuccess] = useState("")
   const [error, setError] = useState("")
 
@@ -179,21 +193,36 @@ export default function FeaturesManagerPage() {
     }
   }
 
-  const handleDeactivate = async (id: number) => {
-    if (!(await confirm("Are you sure you want to deactivate and remove this feature? This might affect schools currently using it."))) {
-      return
-    }
-
+  const handleToggle = async (feature: FeatureType) => {
+    if (busyFeatureId !== null) return
+    setBusyFeatureId(feature.id)
+    setError("")
+    setSuccess("")
     try {
-      setLoading(true)
-      await deleteFeature(id)
-      setSuccess("Feature deactivated successfully.")
-      setTimeout(() => setSuccess(""), 2000)
-      await fetchFeatures()
-    } catch (err: any) {
-      setError(err.message || "Failed to deactivate feature.")
+      const updated = await updateFeatureActivity(feature.id, !(feature.is_active ?? true))
+      setFeatures(current => current.map(item => item.id === updated.id ? updated : item))
+      setSuccess(`${feature.name} ${updated.is_active ? "activated" : "deactivated"} successfully.`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update feature status.")
     } finally {
-      setLoading(false)
+      setBusyFeatureId(null)
+    }
+  }
+
+  const handleDelete = async (feature: FeatureType) => {
+    if (busyFeatureId !== null) return
+    if (!(await confirm(`Delete ${feature.name}? This removes its school assignments and associated modules. Use the switch to temporarily deactivate it instead.`))) return
+    setBusyFeatureId(feature.id)
+    setError("")
+    setSuccess("")
+    try {
+      await deleteFeature(feature.id)
+      setFeatures(current => current.filter(item => item.id !== feature.id))
+      setSuccess(`${feature.name} deleted successfully.`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete feature.")
+    } finally {
+      setBusyFeatureId(null)
     }
   }
 
@@ -204,7 +233,7 @@ export default function FeaturesManagerPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-semibold text-slate-900">
             School Features
           </h1>
 
@@ -217,7 +246,7 @@ export default function FeaturesManagerPage() {
           variant="outline"
           size="icon"
           onClick={fetchFeatures}
-          disabled={loading}
+          disabled={loading || submitting || busyFeatureId !== null}
         >
           <RefreshCw
             className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -234,7 +263,7 @@ export default function FeaturesManagerPage() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
           >
             <CheckCircle2 className="h-4 w-4" />
             {success}
@@ -257,10 +286,10 @@ export default function FeaturesManagerPage() {
 
       {/* ================= CREATE FEATURE ================= */}
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
 
         <div className="flex items-center gap-2 mb-5">
-          <Sparkles className="h-5 w-5 text-violet-600" />
+          <Sparkles className="h-5 w-5 text-slate-600" />
           <h2 className="text-lg font-semibold text-slate-900">
             Add Feature
           </h2>
@@ -290,12 +319,12 @@ export default function FeaturesManagerPage() {
                     setSelectedFeature(item.code)
                   }
                 }}
-                className={`border rounded-2xl p-5 text-left transition-all
+                className={`border rounded-xl p-5 text-left transition-all
                   ${alreadyExists
-                    ? "border-emerald-200 bg-emerald-50 cursor-not-allowed opacity-70"
+                    ? "border-slate-200 bg-slate-50 cursor-not-allowed opacity-70"
                     : isSelected
-                      ? "border-violet-500 bg-violet-50"
-                      : "border-slate-200 hover:border-violet-300 hover:bg-slate-50"
+                      ? "border-[#1D496C] bg-slate-50"
+                      : "border-slate-200 hover:border-slate-200 hover:bg-slate-50"
                   }
                 `}
               >
@@ -304,9 +333,9 @@ export default function FeaturesManagerPage() {
                   <div
                     className={`h-11 w-11 rounded-xl flex items-center justify-center
                     ${alreadyExists
-                        ? "bg-emerald-600 text-white"
+                        ? "bg-[#1D496C] text-white"
                         : isSelected
-                          ? "bg-violet-600 text-white"
+                          ? "bg-[#1D496C] text-white"
                           : "bg-slate-100 text-slate-600"
                       }`}
                   >
@@ -324,9 +353,7 @@ export default function FeaturesManagerPage() {
                   </div>
 
                   {alreadyExists && (
-                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                      Added
-                    </Badge>
+                    <StatusBadge label="Added" />
                   )}
 
                 </div>
@@ -338,8 +365,8 @@ export default function FeaturesManagerPage() {
         <div className="mt-6 flex justify-end">
           <Button
             onClick={handleCreateFeature}
-            disabled={submitting}
-            className="bg-violet-600 hover:bg-violet-700 text-white"
+            disabled={loading || submitting || busyFeatureId !== null}
+
           >
             {submitting ? (
               <>
@@ -358,17 +385,18 @@ export default function FeaturesManagerPage() {
 
       {/* ================= FEATURES LIST ================= */}
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">
-            Active Features
-          </h2>
+      <section aria-labelledby="active-features-title" className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-5 sm:px-6">
+          <div>
+            <h2 id="active-features-title" className="text-base font-semibold text-slate-900">Feature Controls</h2>
+            <p className="mt-1 text-sm text-slate-500">Manage availability across all schools.</p>
+          </div>
+          {!loading && <span className="text-xs font-medium tabular-nums text-slate-500">{features.filter(feature => feature.is_active ?? true).length} active ? {features.length} total</span>}
         </div>
 
         {loading ? (
           <div className="py-16 flex flex-col items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-slate-600" />
             <p className="text-sm text-slate-400 mt-2">
               Loading features...
             </p>
@@ -381,41 +409,35 @@ export default function FeaturesManagerPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-
-            {features.map((feature) => (
-              <div
-                key={feature.id}
-                className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-              >
-                <div>
-                  <h3 className="font-medium text-slate-800">
-                    {feature.name}
-                  </h3>
-
-                  <p className="text-sm text-slate-400 mt-1">
-                    {feature.name}
-                  </p>
+          <ul className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3">
+            {features.map(feature => {
+              const definition = SCHOOL_FEATURES.find(item => item.label.toLowerCase().replace(/[^a-z]/g, "") === feature.name.toLowerCase().replace(/[^a-z]/g, ""))
+              const Icon = definition?.icon ?? Sparkles
+              const active = feature.is_active ?? true
+              const busy = busyFeatureId === feature.id
+              return <li key={feature.id} className="flex flex-col rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-sm">
+                <div className="flex items-center justify-between gap-3 px-5 pt-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                  <StatusBadge active={active} />
                 </div>
-
-                <div className="flex items-center gap-4">
-                  <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                    Active
-                  </Badge>
-                  <button
-                    onClick={() => handleDeactivate(feature.id)}
-                    className="inline-flex items-center justify-center rounded-full p-2 hover:bg-red-50 text-red-500 transition-colors"
-                    title="Deactivate Feature"
-                  >
-                    <Power className="h-4 w-4" />
-                  </button>
+                <div className="flex-1 px-5 pb-5 pt-4">
+                  <h3 className="text-sm font-semibold text-slate-900">{definition?.label ?? feature.name}</h3>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{definition ? FEATURE_DESCRIPTIONS[definition.code] : "Available for assigned schools"}</p>
                 </div>
-              </div>
-            ))}
-
-          </div>
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <button type="button" role="switch" aria-checked={active} aria-label={`${active ? "Deactivate" : "Activate"} ${feature.name}`} aria-busy={busy} onClick={() => handleToggle(feature)} disabled={busyFeatureId !== null || submitting} className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1D496C] disabled:cursor-wait disabled:opacity-60 ${active ? "bg-[#1D496C]" : "bg-slate-300"}`}>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${active ? "translate-x-5" : "translate-x-0.5"}`}>{busy && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}</span>
+                    </button>
+                    <span className="text-xs font-medium text-slate-600">{active ? "Enabled" : "Disabled"}</span>
+                  </div>
+                  <button type="button" onClick={() => handleDelete(feature)} disabled={busyFeatureId !== null || submitting} aria-label={`Delete ${feature.name} feature`} className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />Delete</button>
+                </div>
+              </li>
+            })}
+          </ul>
         )}
-      </div>
+      </section>
     </div>
   )
 }

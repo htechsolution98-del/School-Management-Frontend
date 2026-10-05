@@ -77,6 +77,7 @@ function buildBillingPeriods(
 //   Completed   → year has fully ended   (current date > last billing period)
 function deriveStatus(year: AcademicYear): "Active" | "Deactivated" | "Completed" | "Upcoming" {
     if (year.is_active === true) return "Active";
+    if (year.is_active === false) return "Deactivated";
 
     const now = new Date();
     const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -97,15 +98,10 @@ function deriveStatus(year: AcademicYear): "Active" | "Deactivated" | "Completed
         const last = periods[periods.length - 1];
 
         if (currentPeriod > last) return "Completed";
-        if (currentPeriod >= first) {
-            // Year has started — if manually deactivated show "Deactivated", else "Active"
-            return year.is_active === false ? "Deactivated" : "Active";
-        }
-        // currentPeriod < first → year hasn't started yet
-        return "Upcoming";
+        if (currentPeriod < first) return "Upcoming";
     }
 
-    return "Upcoming";
+    return "Deactivated";
 }
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────

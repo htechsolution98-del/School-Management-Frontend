@@ -73,6 +73,7 @@ import {
   assignGrNumber,
   getClasses,
 } from "@/lib/clerk";
+import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import type { Admission } from "@/types/clerk";
 
 // ─── StatusBadge ──────────────────────────────────────────────────────────────
@@ -459,7 +460,7 @@ function StudentDetailsModal({
                 <School className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Academic Info
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex-1 rounded-lg text-xs font-semibold">
-                <FileText className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Documents ({admission.documents.length})
+                <FileText className="h-3.5 w-3.5 mr-1.5 shrink-0" /> Documents ({(admission.documents?.length || 0) + (admission.rte_documents?.length || 0)})
               </TabsTrigger>
             </TabsList>
 
@@ -618,14 +619,14 @@ function StudentDetailsModal({
               <div className="rounded-xl border dark:border-zinc-800 p-4 bg-slate-50/50 dark:bg-zinc-900/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5 text-primary" /> Uploaded Documents ({admission.documents.length})
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Uploaded Documents ({(admission.documents?.length || 0) + (admission.rte_documents?.length || 0)})
                   </h4>
                   <Button size="xs" variant="outline" onClick={onEditDocs} className="rounded-lg text-xs gap-1">
                     <UploadCloud className="h-3.5 w-3.5" /> Bulk Update Docs
                   </Button>
                 </div>
 
-                {admission.documents.length === 0 ? (
+                {(admission.documents?.length || 0) + (admission.rte_documents?.length || 0) === 0 ? (
                   <div className="text-center py-6 text-slate-400 text-xs">
                     No documents uploaded for this student yet.
                   </div>
@@ -717,6 +718,45 @@ function StudentDetailsModal({
                               </div>
                             </div>
                           )}
+                        </div>
+                      );
+                    })}
+                    {admission.rte_documents?.map((doc) => {
+                      return (
+                        <div
+                          key={`rte-${doc.id}`}
+                          className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border dark:border-zinc-800 shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center shrink-0">
+                                <FileText className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
+                                  {doc.document_name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {doc.document_file ? "Uploaded RTE Verification Document" : "No File Uploaded"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc.document_file && (
+                                <a
+                                  href={doc.document_file}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1"
+                                  title="View Document"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">View</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -895,15 +935,19 @@ export default function StudentRecordsPage() {
   };
 
   const getStudentName = (adm: Admission) => {
-    const fname = getFieldValue(adm, "first name", "firstname");
-    const mname = getFieldValue(adm, "middle name", "middlename");
-    const lname = getFieldValue(adm, "last name", "lastname", "surname");
-    const fullName = getFieldValue(adm, "full name", "fullname", "student name", "name");
+    if (!adm || !adm.field_values) return adm?.admission_number || "Student";
 
-    if (fname || lname) {
-      return [fname, mname, lname].filter(Boolean).join(" ");
+    const surname = getFieldValue(adm, "surname", "last name", "lastname");
+    const studentName = getFieldValue(adm, "student name", "first name", "firstname", "candidate name");
+    const fatherName = getFieldValue(adm, "father name", "father", "middle name", "middlename");
+
+    const parts = [surname, studentName, fatherName].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(" ");
     }
-    return fullName || adm.admission_number || "Student";
+
+    const fallbackName = getFieldValue(adm, "full name", "fullname", "name");
+    return fallbackName || adm.admission_number || "Student";
   };
 
   const getStudentClass = (adm: Admission) => {
@@ -924,6 +968,70 @@ export default function StudentRecordsPage() {
   const getStudentGuardian = (adm: Admission) => {
     return getFieldValue(adm, "father", "guardian", "parent", "mother");
   };
+
+  const studentColumns: DataTableColumn<Admission>[] = [
+    {
+      key: "student",
+      header: "Student Name & Adm No",
+      sticky: true,
+      search: adm => [getStudentName(adm), adm.admission_number],
+      render: adm => (
+        <div className="flex min-w-[200px] items-center gap-3">
+          <StudentAvatar name={getStudentName(adm)} />
+          <div>
+            <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">{getStudentName(adm)}</p>
+            <p className="font-mono text-[10px] text-slate-400">Adm: {adm.admission_number}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "gr_no",
+      header: "GR Number",
+      search: adm => adm.gr_no,
+      render: adm => adm.gr_no ? (
+        <Badge className="whitespace-nowrap px-2 py-0.5 font-mono text-[11px] font-bold text-white shadow-2xs bg-emerald-500">GR: {adm.gr_no}</Badge>
+      ) : (
+        <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:border-amber-800/60 dark:bg-amber-950/50">No GR Assigned</span>
+      ),
+    },
+    {
+      key: "class_div",
+      header: "Class & Div",
+      search: adm => [getStudentClass(adm), getStudentDivision(adm)],
+      render: adm => {
+        const sDiv = getStudentDivision(adm);
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className="whitespace-nowrap border-indigo-200 bg-indigo-50 font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">Class {getStudentClass(adm)}</Badge>
+            {sDiv && sDiv !== "N/A" ? (
+              <Badge variant="outline" className="whitespace-nowrap border-purple-200 bg-purple-50 font-bold text-purple-700 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300">Div {sDiv}</Badge>
+            ) : (
+              <span className="text-[10px] italic text-slate-400">No Div</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "guardian",
+      header: "Father / Guardian",
+      search: adm => getStudentGuardian(adm),
+      render: adm => <span className="whitespace-nowrap font-medium text-slate-700 dark:text-zinc-300">{getStudentGuardian(adm) || "—"}</span>,
+    },
+    {
+      key: "contact",
+      header: "Contact No",
+      search: adm => getStudentMobile(adm),
+      render: adm => <span className="whitespace-nowrap font-mono text-slate-700 dark:text-zinc-300">{getStudentMobile(adm) || "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      search: adm => adm.status,
+      render: adm => <StatusBadge status={adm.status} />,
+    },
+  ];
 
   // ── Extract Available Classes & Divisions ─────────────────────────────────
 
@@ -1325,150 +1433,91 @@ export default function StudentRecordsPage() {
       </div>
 
       {/* Student List View */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-zinc-900 rounded-2xl border dark:border-zinc-800">
-          <Loader2 className="h-8 w-8 text-primary animate-spin mb-3" />
-          <p className="text-xs text-muted-foreground font-medium">Loading class student records...</p>
-        </div>
-      ) : filteredAdmissions.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-zinc-900 rounded-2xl border dark:border-zinc-800 p-6 space-y-3">
-          <Users className="h-10 w-10 text-slate-300 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">No students found</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            No student records match the selected class, division, or search criteria.
-          </p>
-        </div>
-      ) : viewMode === "table" ? (
-        /* Sleek Data Table View */
-        <Card className="rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs overflow-hidden bg-white dark:bg-zinc-950">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
-                <tr>
-                  <th className="px-4 py-3.5 w-12 text-center">#</th>
-                  <th className="px-4 py-3.5">Student Name & Adm No</th>
-                  <th className="px-4 py-3.5">GR Number</th>
-                  <th className="px-4 py-3.5">Class & Div</th>
-                  <th className="px-4 py-3.5">Father / Guardian</th>
-                  <th className="px-4 py-3.5">Contact No</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 font-medium">
-                {filteredAdmissions.map((adm, index) => {
-                  const sName = getStudentName(adm);
-                  const sClass = getStudentClass(adm);
-                  const sDiv = getStudentDivision(adm);
-                  const sPhone = getStudentMobile(adm);
-                  const sGuardian = getStudentGuardian(adm);
-
-                  return (
-                    <tr
-                      key={adm.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-zinc-900/50 transition-colors"
-                    >
-                      {/* Index */}
-                      <td className="px-4 py-3 text-center text-slate-400 font-mono text-[11px]">
-                        {index + 1}
-                      </td>
-
-                      {/* Student Info */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-[200px]">
-                          <StudentAvatar name={sName} />
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-zinc-100 text-xs">{sName}</p>
-                            <p className="text-[10px] font-mono text-slate-400">Adm: {adm.admission_number}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* GR Number */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {adm.gr_no ? (
-                          <Badge className="font-mono bg-emerald-500 text-white font-bold text-[11px] px-2 py-0.5 shadow-2xs">
-                            GR: {adm.gr_no}
-                          </Badge>
-                        ) : (
-                          <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-full">
-                            No GR Assigned
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Class & Division */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
-                            Class {sClass}
-                          </Badge>
-                          {sDiv && sDiv !== "N/A" ? (
-                            <Badge variant="outline" className="font-bold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
-                              Div {sDiv}
-                            </Badge>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 italic">No Div</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Guardian */}
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-700 dark:text-zinc-300 font-medium">
-                        {sGuardian || "—"}
-                      </td>
-
-                      {/* Phone */}
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-slate-700 dark:text-zinc-300">
-                        {sPhone || "—"}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <StatusBadge status={adm.status} />
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-4 py-3 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            size="xs"
-                            onClick={() => setSelectedDetailStudent(adm)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs gap-1 h-7 px-2.5 shadow-2xs"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            <span>View Details</span>
-                          </Button>
-
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => openFieldEdit(adm)}
-                            className="rounded-lg h-7 w-7 p-0 text-slate-600 hover:text-slate-900 border-slate-200"
-                            title="Edit Information"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </Button>
-                          {!adm.gr_no && (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => setGrAdmission(adm)}
-                              className="h-7 w-7 p-0 rounded-lg text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50"
-                              title="Assign GR Number"
-                            >
-                              <Hash className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      {viewMode === "table" ? (
+/* Standardised data table (matches the Manage Schools reference) */
+        <DataTable
+          data={filteredAdmissions}
+          columns={studentColumns}
+          getRowId={adm => adm.id}
+          createdDate
+          createdDateKey="submitted_at"
+          createdDateRange
+          search
+          searchPlaceholder="Search name, admission no, GR no or mobile"
+          searchAriaLabel="Search students"
+          searchExtra={adm => [
+            getStudentName(adm),
+            adm.admission_number,
+            adm.gr_no,
+            getStudentMobile(adm),
+            getStudentGuardian(adm),
+          ]}
+          loading={isLoading}
+          loadingLabel="Loading class student records…"
+          emptyTitle="No students found"
+          emptyDescription="No student records match the selected class, division, or search criteria."
+          noResultsTitle="No students found"
+          noResultsDescription="Adjust the class, division, status filters or search keywords."
+          caption="Student records"
+          minWidth={1080}
+          filters={[
+            {
+              key: "class",
+              label: "Class",
+              options: availableClasses.map(value => ({ value, label: value })),
+              match: (adm, value) => getStudentClass(adm) === value,
+            },
+            {
+              key: "division",
+              label: "Division",
+              options: availableDivisions.map(value => ({ value, label: value })),
+              match: (adm, value) => getStudentDivision(adm) === value,
+            },
+            {
+              key: "status",
+              label: "Status",
+              options: dynamicOptions(filteredAdmissions, adm => adm.status),
+              match: (adm, value) => adm.status === value,
+            },
+          ]}
+          renderActions={adm => [
+            <Button
+              key="view"
+              size="xs"
+              onClick={() => setSelectedDetailStudent(adm)}
+              className="h-8 gap-1 rounded-lg bg-indigo-600 px-2.5 text-xs text-white shadow-2xs hover:bg-indigo-700"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span>View Details</span>
+            </Button>,
+            <Button
+              key="edit"
+              size="xs"
+              variant="outline"
+              onClick={() => openFieldEdit(adm)}
+              className="h-10 w-10 cursor-pointer rounded-lg p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+              title="Edit Information"
+              aria-label={`Edit Information: ${getStudentName(adm)}`}
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+            </Button>,
+            ...(adm.gr_no
+              ? []
+              : [
+                  <Button
+                    key="gr"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setGrAdmission(adm)}
+                    className="h-10 w-10 cursor-pointer rounded-lg p-0 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                    title="Assign GR Number"
+                    aria-label={`Assign GR Number: ${getStudentName(adm)}`}
+                  >
+                    <Hash className="h-3.5 w-3.5" />
+                  </Button>,
+                ]),
+          ]}
+        />
       ) : (
         /* Grid View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
