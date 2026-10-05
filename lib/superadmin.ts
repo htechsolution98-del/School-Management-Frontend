@@ -1,3 +1,4 @@
+import { apiValidationError } from "./api-errors";
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
 import { fetchWithAuth } from "./auth";
 import {
@@ -32,7 +33,9 @@ export async function getSchools(): Promise<School[]> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch schools.");
+    if (response.status === 401) throw new Error("Your session has expired. Please sign in again.");
+    if (response.status === 403) throw new Error("School management requires a superadmin account. Please sign in as superadmin.");
+    throw await apiValidationError(response, `Unable to load schools (HTTP ${response.status}). Please try again.`);
   }
 
   const data = await response.json();
@@ -61,15 +64,7 @@ export async function createSchool(
   });
 
   if (!response.ok) {
-    let message = "Failed to create school.";
-    try {
-      const err = await response.json();
-      const fieldErrors = Object.values(err || {})
-        .flat()
-        .filter((value): value is string => typeof value === "string");
-      message = err?.detail || err?.message || fieldErrors[0] || message;
-    } catch { /* ignore */ }
-    throw new Error(message);
+    throw await apiValidationError(response, "Failed to create school.");
   }
 
   return response.json();
@@ -88,7 +83,7 @@ export async function updateSchool(
     if (key === "feature_ids") {
       (value as number[]).forEach(id => formData.append("feature_ids", id.toString()));
     } else if (value !== null && value !== undefined) {
-      if (!(typeof value === 'string' && value.startsWith('http'))) {
+      if (key !== "logo" || value instanceof Blob) {
         formData.append(key, value as string | Blob);
       }
     }
@@ -100,15 +95,7 @@ export async function updateSchool(
   });
 
   if (!response.ok) {
-    let message = "Failed to update school.";
-    try {
-      const err = await response.json();
-      const fieldErrors = Object.values(err || {})
-        .flat()
-        .filter((value): value is string => typeof value === "string");
-      message = err?.detail || err?.message || fieldErrors[0] || message;
-    } catch { /* ignore */ }
-    throw new Error(message);
+    throw await apiValidationError(response, "Failed to update school.");
   }
 
   return response.json();
@@ -142,7 +129,10 @@ export async function getFeatures(): Promise<FeatureType[]> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch features");
+    throw await apiValidationError(
+      response,
+      `Unable to load features (HTTP ${response.status}). Please try again.`
+    );
   }
 
   const data = await response.json();
@@ -175,12 +165,7 @@ export async function createFeature(payload: CreateFeaturePayload): Promise<Feat
   });
 
   if (!response.ok) {
-    let message = "Failed to create feature";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { /* ignore */ }
-    throw new Error(message);
+    throw await apiValidationError(response, "Failed to create feature.");
   }
 
   return response.json();
@@ -249,13 +234,14 @@ export async function fetchFeaturesList() {
     },
   });
 
-  const data = await response.json();
-
   if (!response.ok) {
-    throw new Error(data?.detail || "Failed to fetch features");
+    throw await apiValidationError(
+      response,
+      `Unable to load features (HTTP ${response.status}). Please try again.`
+    );
   }
 
-  return data;
+  return response.json();
 }
 
 // ================= RAZORPAY APIS =================
@@ -283,12 +269,7 @@ export async function saveRazorpayData(
   });
 
   if (!res.ok) {
-    let msg = "Failed to save credentials";
-    try {
-      const err = await res.json();
-      msg = err?.detail || err?.message || msg;
-    } catch { /* ignore */ }
-    throw new Error(msg);
+    throw await apiValidationError(res, "Failed to save credentials.");
   }
 
   return res.json();
@@ -308,12 +289,7 @@ export async function updateRazorpayData(
   });
 
   if (!res.ok) {
-    let msg = "Failed to update credentials";
-    try {
-      const err = await res.json();
-      msg = err?.detail || err?.message || msg;
-    } catch { /* ignore */ }
-    throw new Error(msg);
+    throw await apiValidationError(res, "Failed to update credentials.");
   }
 
   return res.json();
@@ -337,4 +313,14 @@ export async function getRazorpayList(): Promise<RazorpayRecord[]> {
   if (!res.ok) throw new Error("Failed to fetch Razorpay records");
   const data = await res.json();
   return Array.isArray(data) ? data : data.results ?? [];
+}
+
+export async function updateFeatureActivity(id: number, isActive: boolean): Promise<FeatureType> {
+  const response = await fetchWithAuth(`${FEATURE_URL}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  if (!response.ok) throw await apiValidationError(response, "Failed to update feature status.");
+  return response.json();
 }

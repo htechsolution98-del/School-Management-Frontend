@@ -63,6 +63,7 @@ export interface CreateSchoolResponse {
 export interface FeatureType {
   id: number;
   name: string;
+  is_active: boolean;
 }
 
 export interface CreateFeaturePayload {

@@ -13,26 +13,38 @@ const REFRESH_TOKEN_COOKIE = "refresh_token";
 const COOKIE_PATH = "path=/";
 const COOKIE_SAME_SITE = "SameSite=Lax";
 
+/**
+ * Shared toast id for transport-level failures.
+ *
+ * Every failed request funnels through `apiFetch`, so reusing one id means a
+ * burst of parallel failures (e.g. `Promise.all` on a dashboard) collapses into
+ * a single toast that is updated in place, instead of one identical toast per
+ * request.
+ */
+export const API_ERROR_TOAST_ID = "api-error";
+
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const { headers, body, ...rest } = init;
   const isFormData = body instanceof FormData;
+  const requestHeaders = new Headers(headers);
+  if (isFormData) {
+    requestHeaders.delete("Content-Type");
+  } else if (body && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(input, {
     ...COOKIE_FETCH_OPTIONS,
     ...rest,
     body,
-    headers: isFormData
-      ? { ...(headers as Record<string, string>) }        // ← no Content-Type for FormData
-      : {
-          "Content-Type": "application/json",             // ← default for JSON
-          ...(headers as Record<string, string>),
-        },
+    headers: requestHeaders,
   });
 
   if (!response.ok && response.status !== 401) {
     try {
       if (response.status >= 500) {
         toast.error(`Server Error (${response.status})`, {
+          id: API_ERROR_TOAST_ID,
           description: "An unexpected error occurred on the server.",
         });
       } else {
@@ -54,10 +66,10 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
            }
         }
         
-        toast.error("Error", { description: errorDesc });
+        toast.error("Error", { id: API_ERROR_TOAST_ID, description: errorDesc });
       }
     } catch (e) {
-      toast.error(`Request Failed (${response.status})`);
+      toast.error(`Request Failed (${response.status})`, { id: API_ERROR_TOAST_ID });
     }
   }
 
@@ -149,20 +161,25 @@ function clearLegacyLocalTokens() {
 }
 
 function getAccessToken(): string | null {
-  return getCookie(ACCESS_TOKEN_COOKIE);
+  return getCookie(ACCESS_TOKEN_COOKIE) || (typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_COOKIE) : null);
 }
 
 function getRefreshToken(): string | null {
-  return getCookie(REFRESH_TOKEN_COOKIE);
+  return getCookie(REFRESH_TOKEN_COOKIE) || (typeof window !== "undefined" ? localStorage.getItem(REFRESH_TOKEN_COOKIE) : null);
 }
 
 function setTokens(access: string, refresh?: string | null) {
+  const nextRefresh = refresh || getRefreshToken();
   clearLegacyLocalTokens();
 
   setCookie(ACCESS_TOKEN_COOKIE, access, getTokenMaxAge(access));
 
-  if (typeof refresh === "string" && refresh.length > 0) {
-    setCookie(REFRESH_TOKEN_COOKIE, refresh, getTokenMaxAge(refresh));
+  if (nextRefresh) {
+    setCookie(REFRESH_TOKEN_COOKIE, nextRefresh, getTokenMaxAge(nextRefresh));
+  }
+  if (typeof window !== "undefined") {
+    localStorage.setItem(ACCESS_TOKEN_COOKIE, access);
+    if (nextRefresh) localStorage.setItem(REFRESH_TOKEN_COOKIE, nextRefresh);
   }
 }
 
@@ -195,10 +212,6 @@ export async function loginUser(credentials: LoginRequest): Promise<LoginRespons
   const data = await response.json() as LoginResponse;
   if (data.access) {
     setTokens(data.access, data.refresh);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", data.access);
-      if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
-    }
   }
 
   if (typeof window !== "undefined") {
@@ -281,13 +294,7 @@ export async function verifyOtp(payload: {
 
 // ─── Token Refresh ────────────────────────────────────────────────────────────
 
-let isRefreshing = false;
-let refreshSubscribers: Array<(ok: boolean) => void> = [];
-
-function onRefreshDone(success: boolean) {
-  refreshSubscribers.forEach((cb) => cb(success));
-  refreshSubscribers = [];
-}
+let refreshPromise: Promise<boolean> | null = null;
 
 export async function refreshToken(): Promise<boolean> {
   const refresh = getRefreshToken();
@@ -302,7 +309,9 @@ export async function refreshToken(): Promise<boolean> {
     });
 
     if (response.ok) {
-      // Server sets new cookies automatically — nothing to store manually
+      const data = await response.json() as { access?: string; refresh?: string };
+      if (!data.access) return false;
+      setTokens(data.access, data.refresh);
       return true;
     }
     return false;
@@ -319,22 +328,13 @@ export async function fetchWithAuth(
 ): Promise<Response> {
 
   const url = String(input);
-  const token = getAccessToken() || (typeof window !== "undefined" ? localStorage.getItem("access_token") : null);
-  const authHeaders: Record<string, string> = {};
-  if (token) {
-    authHeaders["Authorization"] = `Bearer ${token}`;
-  }
-
-  // COOKIE & HEADER BASED REQUEST
-  let response = await apiFetch(url, {
-    ...init,
-    headers: {
-      ...authHeaders,
-      ...(init.headers as Record<string, string>),
-    },
-    credentials: "include",
-    cache: "no-store",
-  });
+  const sendRequest = () => {
+    const headers = new Headers(init.headers);
+    const token = getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return apiFetch(url, { ...init, headers, credentials: "include", cache: "no-store" });
+  };
+  const response = await sendRequest();
 
   // SUCCESS
   if (response.status !== 401) {
@@ -354,27 +354,11 @@ export async function fetchWithAuth(
     }
   } catch { /* ignore */ }
 
-  // WAIT IF TOKEN REFRESH RUNNING
-  if (isRefreshing) {
-
-    await new Promise<boolean>((resolve) =>
-      refreshSubscribers.push(resolve)
-    );
-
-    return apiFetch(url, {
-      ...init,
-      credentials: "include",
-    });
+  // Parallel dashboard requests share one refresh, including token rotation.
+  if (!refreshPromise) {
+    refreshPromise = refreshToken().finally(() => { refreshPromise = null; });
   }
-
-  // REFRESH FLOW
-  isRefreshing = true;
-
-  const refreshed = await refreshToken();
-
-  isRefreshing = false;
-
-  onRefreshDone(refreshed);
+  const refreshed = await refreshPromise;
 
   // REFRESH FAILED
   if (!refreshed) {
@@ -383,10 +367,7 @@ export async function fetchWithAuth(
   }
 
   // RETRY REQUEST
-  return apiFetch(url, {
-    ...init,
-    credentials: "include",
-  });
+  return sendRequest();
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
