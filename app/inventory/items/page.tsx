@@ -5,20 +5,12 @@ import {
   Package,
   Plus,
   Search,
-  Filter,
   Edit2,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
   Tag,
-  Boxes,
   Loader2,
   X
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function ItemMasterPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -53,22 +45,20 @@ export default function ItemMasterPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      let itemUrl = `${API_BASE}/inventory/items/?`;
+      let itemUrl = "/items/?";
       if (categoryFilter) itemUrl += `category=${categoryFilter}&`;
       if (statusFilter !== "all") itemUrl += `is_active=${statusFilter === "active"}&`;
 
       const [itemsRes, catRes] = await Promise.all([
-        axios.get(itemUrl, { headers }),
-        axios.get(`${API_BASE}/inventory/categories/`, { headers }),
+        inventoryApi.get(itemUrl),
+        inventoryApi.get("/categories/"),
       ]);
 
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
+      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
+      setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data.results || []);
     } catch (err) {
       console.error("Error fetching items:", err);
+      showApiError(err, "Failed to load item catalog.");
     } finally {
       setLoading(false);
     }
@@ -113,9 +103,6 @@ export default function ItemMasterPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload: any = {
         ...formData,
         category: formData.category ? Number(formData.category) : null,
@@ -124,15 +111,17 @@ export default function ItemMasterPage() {
       };
 
       if (editingItem) {
-        await axios.put(`${API_BASE}/inventory/items/${editingItem.id}/`, payload, { headers });
+        await inventoryApi.put(`/items/${editingItem.id}/`, payload);
+        showSuccess("Item updated successfully");
       } else {
-        await axios.post(`${API_BASE}/inventory/items/`, payload, { headers });
+        await inventoryApi.post("/items/", payload);
+        showSuccess("Item created successfully");
       }
 
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to save item. Ensure item code is unique.");
+      showApiError(err, "Failed to save item. Ensure item code is unique.");
     } finally {
       setSubmitting(false);
     }
@@ -140,12 +129,11 @@ export default function ItemMasterPage() {
 
   const handleToggleActive = async (item: any) => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      await axios.patch(`${API_BASE}/inventory/items/${item.id}/`, { is_active: !item.is_active }, { headers });
+      await inventoryApi.patch(`/items/${item.id}/`, { is_active: !item.is_active });
+      showSuccess(`Item marked ${!item.is_active ? "Active" : "Inactive"}`);
       fetchData();
     } catch (err) {
-      alert("Failed to toggle item status.");
+      showApiError(err, "Failed to toggle item status.");
     }
   };
 

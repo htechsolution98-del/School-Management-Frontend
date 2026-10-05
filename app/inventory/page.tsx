@@ -17,9 +17,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function InventoryDashboardPage() {
   const [stats, setStats] = useState({
@@ -46,13 +44,10 @@ export default function InventoryDashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [summaryRes, lowStockRes, issuesRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/reports/dashboard-summary/`, { headers }).catch(() => ({ data: {} })),
-        axios.get(`${API_BASE}/inventory/items/low-stock/`, { headers }).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE}/inventory/issues/`, { headers }).catch(() => ({ data: [] })),
+        inventoryApi.get("/reports/dashboard-summary/").catch(() => ({ data: {} })),
+        inventoryApi.get("/items/low-stock/").catch(() => ({ data: [] })),
+        inventoryApi.get("/issues/").catch(() => ({ data: [] })),
       ]);
 
       if (summaryRes.data) {
@@ -66,6 +61,7 @@ export default function InventoryDashboardPage() {
       }
     } catch (err) {
       console.error("Failed to load inventory dashboard data:", err);
+      showApiError(err, "Failed to load dashboard metrics.");
     } finally {
       setLoading(false);
     }

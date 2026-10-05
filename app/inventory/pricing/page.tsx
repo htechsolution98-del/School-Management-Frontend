@@ -4,20 +4,13 @@ import React, { useState, useEffect } from "react";
 import {
   BadgePercent,
   Plus,
-  Search,
-  Filter,
   Edit2,
   Calendar,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
   Loader2,
   X,
   Coins
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function PricingAndFeeMappingPage() {
   const [pricings, setPricings] = useState<any[]>([]);
@@ -58,42 +51,38 @@ export default function PricingAndFeeMappingPage() {
 
   const fetchInitialData = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [itemsRes, yearsRes, feesRes, classRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/items/`, { headers }),
-        axios.get(`${API_BASE}/academic-year/`, { headers }),
-        axios.get(`${API_BASE}/feetype/`, { headers }),
-        axios.get(`${API_BASE}/class/`, { headers }).catch(() => ({ data: [] })),
+        inventoryApi.get("/items/"),
+        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
+        inventoryApi.get("/feetype/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/feetype/`).catch(() => ({ data: [] }))),
+        inventoryApi.get("/class/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/class/`).catch(() => ({ data: [] }))),
       ]);
 
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      const years = Array.isArray(yearsRes.data) ? yearsRes.data : [];
+      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
       setAcademicYears(years);
       if (years.length > 0 && !yearFilter) {
         setYearFilter(years[0].id);
       }
-      setFeeTypes(Array.isArray(feesRes.data) ? feesRes.data : []);
-      setClasses(Array.isArray(classRes.data) ? classRes.data : []);
+      setFeeTypes(Array.isArray(feesRes.data) ? feesRes.data : feesRes.data.results || []);
+      setClasses(Array.isArray(classRes.data) ? classRes.data : classRes.data.results || []);
     } catch (err) {
       console.error("Error fetching dependencies:", err);
+      showApiError(err, "Failed to load pricing dependencies.");
     }
   };
 
   const fetchPricings = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      let url = `${API_BASE}/inventory/pricing/?`;
+      let url = "/pricing/?";
       if (yearFilter) url += `academic_year=${yearFilter}&`;
 
-      const res = await axios.get(url, { headers });
-      setPricings(Array.isArray(res.data) ? res.data : []);
+      const res = await inventoryApi.get(url);
+      setPricings(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch (err) {
       console.error("Error fetching pricing matrix:", err);
+      showApiError(err, "Failed to load pricing records.");
     } finally {
       setLoading(false);
     }
@@ -136,9 +125,6 @@ export default function PricingAndFeeMappingPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload: any = {
         item: Number(formData.item),
         academic_year: Number(formData.academic_year),
@@ -153,15 +139,17 @@ export default function PricingAndFeeMappingPage() {
       };
 
       if (editingId) {
-        await axios.put(`${API_BASE}/inventory/pricing/${editingId}/`, payload, { headers });
+        await inventoryApi.put(`/pricing/${editingId}/`, payload);
+        showSuccess("Pricing configuration updated successfully");
       } else {
-        await axios.post(`${API_BASE}/inventory/pricing/`, payload, { headers });
+        await inventoryApi.post("/pricing/", payload);
+        showSuccess("Pricing configuration created successfully");
       }
 
       setIsModalOpen(false);
       fetchPricings();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to save pricing configuration.");
+      showApiError(err, "Failed to save pricing configuration.");
     } finally {
       setSubmitting(false);
     }

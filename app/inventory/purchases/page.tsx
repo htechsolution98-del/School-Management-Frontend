@@ -4,21 +4,12 @@ import React, { useState, useEffect } from "react";
 import {
   Truck,
   Plus,
-  Search,
-  Filter,
   CheckCircle2,
-  Clock,
-  Trash2,
-  Edit2,
   FileText,
-  Boxes,
   Loader2,
-  X,
-  AlertCircle
+  X
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function PurchasesAndSuppliersPage() {
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">("purchases");
@@ -63,25 +54,22 @@ export default function PurchasesAndSuppliersPage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [purchRes, suppRes, itemsRes, sizesRes, colorsRes, yearsRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/purchases/`, { headers }),
-        axios.get(`${API_BASE}/inventory/suppliers/`, { headers }),
-        axios.get(`${API_BASE}/inventory/items/`, { headers }),
-        axios.get(`${API_BASE}/inventory/sizes/`, { headers }),
-        axios.get(`${API_BASE}/inventory/colors/`, { headers }),
-        axios.get(`${API_BASE}/academic-year/`, { headers }),
+        inventoryApi.get("/purchases/"),
+        inventoryApi.get("/suppliers/"),
+        inventoryApi.get("/items/"),
+        inventoryApi.get("/sizes/"),
+        inventoryApi.get("/colors/"),
+        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
       ]);
 
-      setPurchases(Array.isArray(purchRes.data) ? purchRes.data : []);
-      const supps = Array.isArray(suppRes.data) ? suppRes.data : [];
+      setPurchases(Array.isArray(purchRes.data) ? purchRes.data : purchRes.data.results || []);
+      const supps = Array.isArray(suppRes.data) ? suppRes.data : suppRes.data.results || [];
       setSuppliers(supps);
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : []);
-      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : []);
-      const years = Array.isArray(yearsRes.data) ? yearsRes.data : [];
+      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
+      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
+      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
       setAcademicYears(years);
 
       if (years.length > 0 && !purchaseForm.academic_year) {
@@ -89,6 +77,7 @@ export default function PurchasesAndSuppliersPage() {
       }
     } catch (err) {
       console.error("Error fetching purchases data:", err);
+      showApiError(err, "Failed to load purchases data.");
     } finally {
       setLoading(false);
     }
@@ -151,9 +140,6 @@ export default function PurchasesAndSuppliersPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const grandTotal = calculateGrandTotal();
       const payload = {
         supplier: Number(purchaseForm.supplier),
@@ -179,11 +165,12 @@ export default function PurchasesAndSuppliersPage() {
         }))
       };
 
-      await axios.post(`${API_BASE}/inventory/purchases/`, payload, { headers });
+      await inventoryApi.post("/purchases/", payload);
+      showSuccess("Purchase invoice confirmed & stock updated successfully");
       setIsPurchaseModalOpen(false);
       fetchInitialData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to create purchase invoice.");
+      showApiError(err, "Failed to create purchase invoice.");
     } finally {
       setSubmitting(false);
     }
@@ -193,10 +180,8 @@ export default function PurchasesAndSuppliersPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      await axios.post(`${API_BASE}/inventory/suppliers/`, supplierFormData, { headers });
+      await inventoryApi.post("/suppliers/", supplierFormData);
+      showSuccess("Supplier registered successfully");
       setIsSupplierModalOpen(false);
       setSupplierFormData({
         supplier_name: "",
@@ -208,7 +193,7 @@ export default function PurchasesAndSuppliersPage() {
       });
       fetchInitialData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to save supplier.");
+      showApiError(err, "Failed to save supplier.");
     } finally {
       setSubmitting(false);
     }

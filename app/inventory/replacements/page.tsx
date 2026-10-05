@@ -3,20 +3,11 @@
 import React, { useState, useEffect } from "react";
 import {
   RefreshCw,
-  Plus,
-  Search,
-  Filter,
-  CheckCircle2,
-  XCircle,
-  Clock,
   RotateCcw,
   Loader2,
-  X,
-  AlertTriangle
+  X
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function ReplacementsAndReturnsPage() {
   const [activeTab, setActiveTab] = useState<"replacements" | "returns">("replacements");
@@ -57,34 +48,32 @@ export default function ReplacementsAndReturnsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [repRes, retRes, itemsRes, sizesRes, colorsRes, studsRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/replacements/`, { headers }),
-        axios.get(`${API_BASE}/inventory/returns/`, { headers }),
-        axios.get(`${API_BASE}/inventory/items/`, { headers }),
-        axios.get(`${API_BASE}/inventory/sizes/`, { headers }),
-        axios.get(`${API_BASE}/inventory/colors/`, { headers }),
-        axios.get(`${API_BASE}/get-student/`, { headers }).catch(() => ({ data: [] })),
+        inventoryApi.get("/replacements/"),
+        inventoryApi.get("/returns/"),
+        inventoryApi.get("/items/"),
+        inventoryApi.get("/sizes/"),
+        inventoryApi.get("/colors/"),
+        inventoryApi.get("/get-student/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/get-student/`).catch(() => ({ data: [] }))),
       ]);
 
-      setReplacements(Array.isArray(repRes.data) ? repRes.data : []);
-      setReturns(Array.isArray(retRes.data) ? retRes.data : []);
-      const its = Array.isArray(itemsRes.data) ? itemsRes.data : [];
+      setReplacements(Array.isArray(repRes.data) ? repRes.data : repRes.data.results || []);
+      setReturns(Array.isArray(retRes.data) ? retRes.data : retRes.data.results || []);
+      const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
       setItems(its);
       if (its.length > 0 && !returnForm.item) {
         setReturnForm(prev => ({ ...prev, item: its[0].id }));
       }
-      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : []);
-      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : []);
-      const st = Array.isArray(studsRes.data) ? studsRes.data : [];
+      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
+      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
+      const st = Array.isArray(studsRes.data) ? studsRes.data : studsRes.data.results || [];
       setStudents(st);
       if (st.length > 0 && !returnForm.student) {
         setReturnForm(prev => ({ ...prev, student: st[0].id }));
       }
     } catch (err) {
       console.error("Error fetching replacements:", err);
+      showApiError(err, "Failed to load replacement and return records.");
     } finally {
       setLoading(false);
     }
@@ -104,24 +93,24 @@ export default function ReplacementsAndReturnsPage() {
     if (!selectedReplacement) return;
     setSubmittingReview(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       if (reviewAction === "APPROVE") {
-        await axios.post(`${API_BASE}/inventory/replacements/${selectedReplacement.id}/approve/`, { admin_remarks: adminRemarks }, { headers });
+        await inventoryApi.post(`/replacements/${selectedReplacement.id}/approve/`, { admin_remarks: adminRemarks });
+        showSuccess("Replacement Request Approved");
       } else if (reviewAction === "REJECT") {
-        await axios.post(`${API_BASE}/inventory/replacements/${selectedReplacement.id}/reject/`, { admin_remarks: adminRemarks }, { headers });
+        await inventoryApi.post(`/replacements/${selectedReplacement.id}/reject/`, { admin_remarks: adminRemarks });
+        showSuccess("Replacement Request Rejected");
       } else if (reviewAction === "ISSUE") {
-        await axios.post(`${API_BASE}/inventory/replacements/${selectedReplacement.id}/issue/`, {
+        await inventoryApi.post(`/replacements/${selectedReplacement.id}/issue/`, {
           charging_type: chargingType,
           charged_amount: chargedAmount,
-        }, { headers });
+        });
+        showSuccess("Replacement Item Issued", "Inventory stock has been deducted.");
       }
 
       setIsReviewModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || err.response?.data?.detail || "Action failed.");
+      showApiError(err, "Replacement action failed.");
     } finally {
       setSubmittingReview(false);
     }
@@ -131,9 +120,6 @@ export default function ReplacementsAndReturnsPage() {
     e.preventDefault();
     setSubmittingReturn(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         student: Number(returnForm.student),
         item: Number(returnForm.item),
@@ -144,11 +130,12 @@ export default function ReplacementsAndReturnsPage() {
         reason: returnForm.reason,
       };
 
-      await axios.post(`${API_BASE}/inventory/returns/`, payload, { headers });
+      await inventoryApi.post("/returns/", payload);
+      showSuccess("Return Processed", returnForm.condition === "GOOD" ? "Item restocked into inventory." : "Item recorded as damaged.");
       setIsReturnModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to record return.");
+      showApiError(err, "Failed to record student return.");
     } finally {
       setSubmittingReturn(false);
     }
@@ -231,7 +218,7 @@ export default function ReplacementsAndReturnsPage() {
                     <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-slate-900 dark:text-white">{r.student_name}</div>
-                        <div className="text-xs text-slate-400">Roll #{r.student_roll}</div>
+                        <div className="text-xs text-slate-400">Roll #{r.student_roll || "—"}</div>
                       </td>
                       <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
                         {r.item_name} (x{r.quantity})
@@ -376,7 +363,7 @@ export default function ReplacementsAndReturnsPage() {
                           name="chargingType"
                           value="FREE"
                           checked={chargingType === "FREE"}
-                          onChange={(e) => {
+                          onChange={() => {
                             setChargingType("FREE");
                             setChargedAmount("0.00");
                           }}
@@ -394,7 +381,7 @@ export default function ReplacementsAndReturnsPage() {
                           name="chargingType"
                           value="SEPARATE_CHARGE"
                           checked={chargingType === "SEPARATE_CHARGE"}
-                          onChange={(e) => setChargingType("SEPARATE_CHARGE")}
+                          onChange={() => setChargingType("SEPARATE_CHARGE")}
                           className="hidden"
                         />
                         <span className="text-xs">Chargeable Replacement</span>
@@ -472,7 +459,7 @@ export default function ReplacementsAndReturnsPage() {
                 >
                   <option value="">Select Student</option>
                   {students.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} {s.surname} (Roll #{s.roll_no})</option>
+                    <option key={s.id} value={s.id}>{s.name} {s.surname} (Roll #{s.roll_no || "—"})</option>
                   ))}
                 </select>
               </div>

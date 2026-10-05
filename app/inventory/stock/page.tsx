@@ -5,20 +5,14 @@ import {
   Boxes,
   Plus,
   Search,
-  Filter,
   ArrowDownLeft,
   ArrowUpRight,
-  ShieldAlert,
   Sliders,
   History,
-  CheckCircle2,
-  AlertTriangle,
   Loader2,
   X
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function StockAndLedgerPage() {
   const [activeTab, setActiveTab] = useState<"balances" | "ledger">("balances");
@@ -66,22 +60,19 @@ export default function StockAndLedgerPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [itemsRes, txnRes, sizesRes, colorsRes, yearsRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/items/`, { headers }),
-        axios.get(`${API_BASE}/inventory/stock/`, { headers }),
-        axios.get(`${API_BASE}/inventory/sizes/`, { headers }),
-        axios.get(`${API_BASE}/inventory/colors/`, { headers }),
-        axios.get(`${API_BASE}/academic-year/`, { headers }),
+        inventoryApi.get("/items/"),
+        inventoryApi.get("/stock-transactions/"),
+        inventoryApi.get("/sizes/"),
+        inventoryApi.get("/colors/"),
+        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
       ]);
 
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      setTransactions(Array.isArray(txnRes.data) ? txnRes.data : []);
-      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : []);
-      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : []);
-      const years = Array.isArray(yearsRes.data) ? yearsRes.data : [];
+      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
+      setTransactions(Array.isArray(txnRes.data) ? txnRes.data : txnRes.data.results || []);
+      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
+      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
       setAcademicYears(years);
 
       if (years.length > 0 && !openingForm.academic_year) {
@@ -89,6 +80,7 @@ export default function StockAndLedgerPage() {
       }
     } catch (err) {
       console.error("Failed to load stock data:", err);
+      showApiError(err, "Failed to load stock balances & ledger.");
     } finally {
       setLoading(false);
     }
@@ -98,9 +90,6 @@ export default function StockAndLedgerPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         item: Number(openingForm.item),
         academic_year: Number(openingForm.academic_year),
@@ -111,11 +100,12 @@ export default function StockAndLedgerPage() {
         remarks: openingForm.remarks,
       };
 
-      await axios.post(`${API_BASE}/inventory/stock/opening-stock/`, payload, { headers });
+      await inventoryApi.post("/stock-transactions/opening-stock/", payload);
+      showSuccess("Opening stock recorded successfully");
       setIsOpeningModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to record opening stock.");
+      showApiError(err, "Failed to record opening stock.");
     } finally {
       setSubmitting(false);
     }
@@ -125,9 +115,6 @@ export default function StockAndLedgerPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         item: Number(adjustForm.item),
         size: adjustForm.size ? Number(adjustForm.size) : null,
@@ -138,11 +125,12 @@ export default function StockAndLedgerPage() {
         remarks: adjustForm.remarks,
       };
 
-      await axios.post(`${API_BASE}/inventory/adjustments/`, payload, { headers });
+      await inventoryApi.post("/adjustments/", payload);
+      showSuccess("Stock adjustment recorded successfully");
       setIsAdjustModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to adjust stock.");
+      showApiError(err, "Failed to adjust stock.");
     } finally {
       setSubmitting(false);
     }
@@ -250,12 +238,12 @@ export default function StockAndLedgerPage() {
           >
             <option value="all">All Movement Types</option>
             <option value="OPENING">Opening Stock</option>
-            <option value="PURCHASE">Purchases (+)</option>
-            <option value="ISSUE">Student Issues (-)</option>
-            <option value="RETURN">Returns (+)</option>
+            <option value="PURCHASE_IN">Purchases (+)</option>
+            <option value="STUDENT_ISSUE">Student Issues (-)</option>
+            <option value="STUDENT_RETURN_GOOD">Returns (+)</option>
+            <option value="REPLACEMENT_ISSUE">Replacements (-)</option>
             <option value="ADJUSTMENT_IN">Adjustment In (+)</option>
             <option value="ADJUSTMENT_OUT">Adjustment Out (-)</option>
-            <option value="DAMAGE">Damaged Stock (-)</option>
           </select>
         )}
       </div>
@@ -354,7 +342,7 @@ export default function StockAndLedgerPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold ${
-                          t.transaction_type === "PURCHASE" || t.transaction_type === "OPENING" || t.transaction_type === "RETURN"
+                          isInflow
                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                             : "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
                         }`}>

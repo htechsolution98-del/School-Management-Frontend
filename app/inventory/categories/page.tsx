@@ -5,17 +5,13 @@ import {
   Tags,
   Plus,
   Edit2,
-  Trash2,
   Tag,
   Palette,
   Maximize2,
   Loader2,
   X,
-  CheckCircle2
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function CategoriesAndVariantsPage() {
   const [activeTab, setActiveTab] = useState<"categories" | "sizes" | "colors">("categories");
@@ -44,20 +40,18 @@ export default function CategoriesAndVariantsPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [catRes, sizeRes, colorRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/categories/`, { headers }),
-        axios.get(`${API_BASE}/inventory/sizes/`, { headers }),
-        axios.get(`${API_BASE}/inventory/colors/`, { headers }),
+        inventoryApi.get("/categories/"),
+        inventoryApi.get("/sizes/"),
+        inventoryApi.get("/colors/"),
       ]);
 
-      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
-      setSizes(Array.isArray(sizeRes.data) ? sizeRes.data : []);
-      setColors(Array.isArray(colorRes.data) ? colorRes.data : []);
+      setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data.results || []);
+      setSizes(Array.isArray(sizeRes.data) ? sizeRes.data : sizeRes.data.results || []);
+      setColors(Array.isArray(colorRes.data) ? colorRes.data : colorRes.data.results || []);
     } catch (err) {
       console.error("Failed to load categories/variants:", err);
+      showApiError(err, "Failed to load categories and variants.");
     } finally {
       setLoading(false);
     }
@@ -82,36 +76,39 @@ export default function CategoriesAndVariantsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       if (activeTab === "categories") {
         const payload = { name: catName, description: catDesc };
         if (editingId) {
-          await axios.put(`${API_BASE}/inventory/categories/${editingId}/`, payload, { headers });
+          await inventoryApi.put(`/categories/${editingId}/`, payload);
+          showSuccess("Category updated successfully");
         } else {
-          await axios.post(`${API_BASE}/inventory/categories/`, payload, { headers });
+          await inventoryApi.post("/categories/", payload);
+          showSuccess("Category created successfully");
         }
       } else if (activeTab === "sizes") {
         const payload = { name: sizeName, size_type: sizeType };
         if (editingId) {
-          await axios.put(`${API_BASE}/inventory/sizes/${editingId}/`, payload, { headers });
+          await inventoryApi.put(`/sizes/${editingId}/`, payload);
+          showSuccess("Size variant updated successfully");
         } else {
-          await axios.post(`${API_BASE}/inventory/sizes/`, payload, { headers });
+          await inventoryApi.post("/sizes/", payload);
+          showSuccess("Size variant created successfully");
         }
       } else {
         const payload = { name: colorName, hex_code: colorHex };
         if (editingId) {
-          await axios.put(`${API_BASE}/inventory/colors/${editingId}/`, payload, { headers });
+          await inventoryApi.put(`/colors/${editingId}/`, payload);
+          showSuccess("Color variant updated successfully");
         } else {
-          await axios.post(`${API_BASE}/inventory/colors/`, payload, { headers });
+          await inventoryApi.post("/colors/", payload);
+          showSuccess("Color variant created successfully");
         }
       }
 
       setIsModalOpen(false);
       fetchAll();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to save record. Ensure the name is unique.");
+      showApiError(err, "Failed to save record. Ensure the name is unique.");
     } finally {
       setSubmitting(false);
     }

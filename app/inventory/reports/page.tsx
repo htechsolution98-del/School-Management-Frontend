@@ -18,9 +18,7 @@ import {
   ShoppingBag,
   FileSpreadsheet
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = "http://127.0.0.1:8000/api/inventory";
+import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function InventoryReportsPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "purchases" | "free" | "replacements">("overview");
@@ -70,27 +68,26 @@ export default function InventoryReportsPage() {
   const fetchReports = async () => {
     setLoading(true);
     const params = getDateRangeParams();
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") || localStorage.getItem("token") : null;
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
       // 1. Profit & Loss Summary
-      const plRes = await axios.get(`${API_BASE}/reports/profit-loss/`, { headers, params });
+      const plRes = await inventoryApi.get("/reports/profit-loss/", { params });
       setPlSummary(plRes.data);
 
       // 2. Sales / Issues Summary
-      const salesRes = await axios.get(`${API_BASE}/reports/sales-summary/`, { headers, params });
-      setSalesRows(salesRes.data);
+      const salesRes = await inventoryApi.get("/reports/sales-summary/", { params });
+      setSalesRows(Array.isArray(salesRes.data) ? salesRes.data : salesRes.data.results || []);
 
       // 3. Purchases
-      const purRes = await axios.get(`${API_BASE}/purchases/`, { headers, params });
-      setPurchasesRows(purRes.data.results || purRes.data);
+      const purRes = await inventoryApi.get("/purchases/", { params });
+      setPurchasesRows(Array.isArray(purRes.data) ? purRes.data : purRes.data.results || []);
 
       // 4. Replacements Summary
-      const replRes = await axios.get(`${API_BASE}/reports/replacements-summary/`, { headers, params });
-      setReplacementsRows(replRes.data);
+      const replRes = await inventoryApi.get("/reports/replacements-summary/", { params });
+      setReplacementsRows(Array.isArray(replRes.data) ? replRes.data : replRes.data.results || []);
     } catch (err) {
       console.error("Error fetching inventory reports:", err);
+      showApiError(err, "Failed to load inventory reports.");
     } finally {
       setLoading(false);
     }

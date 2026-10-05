@@ -6,19 +6,13 @@ import {
   Plus,
   Users,
   Search,
-  Filter,
-  CheckCircle2,
-  AlertTriangle,
   Send,
   Boxes,
   Loader2,
   X,
-  ShieldAlert,
-  ArrowRight
+  ShieldAlert
 } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { inventoryApi, showApiError, showSuccess, showWarning } from "@/lib/inventory-client";
 
 export default function StudentItemIssuePage() {
   const [activeTab, setActiveTab] = useState<"single" | "bulk" | "entitlements">("single");
@@ -29,7 +23,6 @@ export default function StudentItemIssuePage() {
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [entitlements, setEntitlements] = useState<any[]>([]);
-  const [issuesHistory, setIssuesHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Single Issue Form
@@ -74,21 +67,17 @@ export default function StudentItemIssuePage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const [itemsRes, classRes, sizesRes, colorsRes, yearsRes, entRes, issuesRes, studsRes] = await Promise.all([
-        axios.get(`${API_BASE}/inventory/items/`, { headers }),
-        axios.get(`${API_BASE}/class/`, { headers }).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE}/inventory/sizes/`, { headers }),
-        axios.get(`${API_BASE}/inventory/colors/`, { headers }),
-        axios.get(`${API_BASE}/academic-year/`, { headers }),
-        axios.get(`${API_BASE}/inventory/entitlements/`, { headers }),
-        axios.get(`${API_BASE}/inventory/issues/`, { headers }),
-        axios.get(`${API_BASE}/get-student/`, { headers }).catch(() => ({ data: [] })),
+      const [itemsRes, classRes, sizesRes, colorsRes, yearsRes, entRes, studsRes] = await Promise.all([
+        inventoryApi.get("/items/"),
+        inventoryApi.get("/class/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/class/`).catch(() => ({ data: [] }))),
+        inventoryApi.get("/sizes/"),
+        inventoryApi.get("/colors/"),
+        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
+        inventoryApi.get("/entitlements/"),
+        inventoryApi.get("/get-student/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/get-student/`).catch(() => ({ data: [] }))),
       ]);
 
-      const its = Array.isArray(itemsRes.data) ? itemsRes.data : [];
+      const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
       setItems(its);
       if (its.length > 0) {
         setSingleItem(its[0].id);
@@ -96,26 +85,26 @@ export default function StudentItemIssuePage() {
         setEntitleItem(its[0].id);
       }
 
-      const cl = Array.isArray(classRes.data) ? classRes.data : [];
+      const cl = Array.isArray(classRes.data) ? classRes.data : classRes.data.results || [];
       setClasses(cl);
       if (cl.length > 0) {
         setBulkClass(cl[0].id);
         setEntitleClass(cl[0].id);
       }
 
-      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : []);
-      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : []);
-      const years = Array.isArray(yearsRes.data) ? yearsRes.data : [];
+      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
+      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
       setAcademicYears(years);
       if (years.length > 0) {
         setEntitleYear(years[0].id);
       }
 
-      setEntitlements(Array.isArray(entRes.data) ? entRes.data : []);
-      setIssuesHistory(Array.isArray(issuesRes.data) ? issuesRes.data : []);
-      setStudents(Array.isArray(studsRes.data) ? studsRes.data : []);
+      setEntitlements(Array.isArray(entRes.data) ? entRes.data : entRes.data.results || []);
+      setStudents(Array.isArray(studsRes.data) ? studsRes.data : studsRes.data.results || []);
     } catch (err) {
       console.error("Failed to load issue data:", err);
+      showApiError(err, "Failed to load student issue dependencies.");
     } finally {
       setLoading(false);
     }
@@ -123,14 +112,11 @@ export default function StudentItemIssuePage() {
 
   const fetchClassStudents = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      let url = `${API_BASE}/get-student/?school_class=${bulkClass}`;
+      let url = `/get-student/?school_class=${bulkClass}`;
       if (bulkDivision) url += `&division=${bulkDivision}`;
 
-      const res = await axios.get(url, { headers });
-      const list = Array.isArray(res.data) ? res.data : [];
+      const res = await inventoryApi.get(url).catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api${url}`));
+      const list = Array.isArray(res.data) ? res.data : res.data.results || [];
       setBulkStudents(list);
       setSelectedStudentIds(list.map((s: any) => s.id));
     } catch (err) {
@@ -144,14 +130,11 @@ export default function StudentItemIssuePage() {
   const handleSingleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) {
-      alert("Please select a student to issue the item.");
+      showWarning("Select Student", "Please select a student to issue the item.");
       return;
     }
     setSingleSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         student: selectedStudent.id,
         item: Number(singleItem),
@@ -162,13 +145,13 @@ export default function StudentItemIssuePage() {
         issue_reason: singleReason,
       };
 
-      await axios.post(`${API_BASE}/inventory/issues/`, payload, { headers });
-      alert(`Item successfully issued to ${selectedStudent.name} ${selectedStudent.surname}!`);
+      await inventoryApi.post("/issues/", payload);
+      showSuccess("Item Issued", `Item successfully issued to ${selectedStudent.name || ""} ${selectedStudent.surname || ""}!`);
       setSelectedStudent(null);
       setSingleStudentSearch("");
       fetchInitialData();
     } catch (err: any) {
-      alert(err.response?.data?.error || err.response?.data?.detail || "Failed to issue item.");
+      showApiError(err, "Failed to issue item.");
     } finally {
       setSingleSubmitting(false);
     }
@@ -176,26 +159,19 @@ export default function StudentItemIssuePage() {
 
   const handleBulkIssue = async () => {
     if (selectedStudentIds.length === 0) {
-      alert("Please select at least one student.");
+      showWarning("Select Students", "Please select at least one student.");
       return;
     }
     const totalReq = selectedStudentIds.length * bulkQtyPerStudent;
     const available = bulkItemObj ? bulkItemObj.current_stock : 0;
 
     if (available < totalReq) {
-      alert(`Insufficient stock! Available: ${available} units, Required: ${totalReq} units.`);
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to issue ${bulkItemObj?.item_name} to ${selectedStudentIds.length} students (${totalReq} total units)?`)) {
+      showWarning("Insufficient Stock", `Available: ${available} units, Required: ${totalReq} units.`);
       return;
     }
 
     setBulkSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         item: Number(bulkItem),
         academic_year: academicYears.length > 0 ? academicYears[0].id : 1,
@@ -205,11 +181,11 @@ export default function StudentItemIssuePage() {
         color: bulkColor ? Number(bulkColor) : null,
       };
 
-      const res = await axios.post(`${API_BASE}/inventory/issues/bulk-issue/`, payload, { headers });
-      alert(res.data.message || "Bulk issue completed successfully!");
+      const res = await inventoryApi.post("/issues/bulk-issue/", payload);
+      showSuccess("Bulk Issue Complete", res.data.message || "Bulk issue completed successfully!");
       fetchInitialData();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Bulk issue failed.");
+      showApiError(err, "Bulk issue failed.");
     } finally {
       setBulkSubmitting(false);
     }
@@ -219,9 +195,6 @@ export default function StudentItemIssuePage() {
     e.preventDefault();
     setGeneratingEntitlement(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
       const payload = {
         academic_year: Number(entitleYear),
         school_class: Number(entitleClass),
@@ -229,12 +202,12 @@ export default function StudentItemIssuePage() {
         quantity: Number(entitleQty),
       };
 
-      const res = await axios.post(`${API_BASE}/inventory/entitlements/generate-bulk/`, payload, { headers });
-      alert(res.data.message || "Entitlements generated!");
+      const res = await inventoryApi.post("/entitlements/generate-bulk/", payload);
+      showSuccess("Entitlements Generated", res.data.message || "Entitlements generated successfully!");
       setIsEntitlementModalOpen(false);
       fetchInitialData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to generate entitlements.");
+      showApiError(err, "Failed to generate entitlements.");
     } finally {
       setGeneratingEntitlement(false);
     }
@@ -343,7 +316,7 @@ export default function StudentItemIssuePage() {
                         key={st.id}
                         onClick={() => {
                           setSelectedStudent(st);
-                          setSingleStudentSearch(`${st.name} ${st.surname} (Roll ${st.roll_no})`);
+                          setSingleStudentSearch(`${st.name || ""} ${st.surname || ""} (Roll ${st.roll_no || "N/A"})`);
                         }}
                         className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between"
                       >
@@ -352,7 +325,7 @@ export default function StudentItemIssuePage() {
                             {st.name} {st.surname}
                           </div>
                           <div className="text-xs text-slate-400">
-                            Class: {st.school_class_name || "N/A"} | Roll: {st.roll_no} | GR: {st.gr_no}
+                            Class: {st.school_class_name || "N/A"} | Roll: {st.roll_no || "N/A"} | GR: {st.gr_no || "N/A"}
                           </div>
                         </div>
                         <span className="text-xs text-blue-600 font-semibold">Select</span>
@@ -369,7 +342,7 @@ export default function StudentItemIssuePage() {
                       {selectedStudent.name} {selectedStudent.surname}
                     </div>
                     <div className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                      Roll #{selectedStudent.roll_no} | GR #{selectedStudent.gr_no}
+                      Roll #{selectedStudent.roll_no || "N/A"} | GR #{selectedStudent.gr_no || "N/A"}
                     </div>
                   </div>
                   <button
@@ -690,11 +663,11 @@ export default function StudentItemIssuePage() {
                           onChange={() => {}}
                         />
                       </td>
-                      <td className="py-2.5 px-4 font-mono">{st.roll_no}</td>
+                      <td className="py-2.5 px-4 font-mono">{st.roll_no || "—"}</td>
                       <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
                         {st.name} {st.surname}
                       </td>
-                      <td className="py-2.5 px-4 text-slate-500">{st.gr_no}</td>
+                      <td className="py-2.5 px-4 text-slate-500">{st.gr_no || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
