@@ -1,9 +1,10 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://school-management-system-sms-xtgf.onrender.com/api";
+  process.env.NEXT_PUBLIC_API_URL || "https://school-management-system-sms-z8kv.onrender.com/api";
 
 export const API_ENDPOINTS = {
   LOGIN: "/api-login/",
   REFRESH: "/refresh/",
+  CURRENT_USER: "/me/",
   SCHOOL: "/SchoolView/",
   STAFF: "/StaffView/",
   DEPARTMENTS: "/departments/",

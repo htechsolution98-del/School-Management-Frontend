@@ -23,6 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createStaff, getStaffCategories, getStaffList, updateStaff, deleteStaff, getDepartments } from "@/lib/staff";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
+import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
+import { StatusBadge } from "@/components/superadmin/status-badge";
+import { formatDDMMYYYY } from "@/lib/table-utils";
 import { CreateStaffPayload, Staff, StaffCategory, Department } from "@/types";
 
 const STAFF_CATEGORIES: { label: string; value: StaffCategory }[] = [
@@ -46,6 +49,78 @@ const EMPTY_FORM: CreateStaffPayload = {
   salary: "",
   is_active: true,
 };
+
+function staffColumnsFor(departments: Department[], categoryLabel: (category: StaffCategory) => string): DataTableColumn<Staff>[] {
+  const departmentName = (id: number | null) => departments.find(d => d.id === id)?.name || "-";
+  return [
+    {
+      key: "staff",
+      header: "Staff",
+      sticky: true,
+      search: member => [member.name, member.id],
+      render: member => (
+        <div>
+          <div className="font-medium text-gray-900">{member.name || "-"}</div>
+          <div className="text-xs text-gray-500">ID #{member.id}</div>
+        </div>
+      ),
+    },
+    { key: "department", header: "Department", search: member => departmentName(member.department), render: member => departmentName(member.department) },
+    { key: "category", header: "Role", search: member => member.category, render: member => <span className="text-gray-600">{categoryLabel(member.category)}</span> },
+    {
+      key: "contact",
+      header: "Contact",
+      search: member => [member.email, member.mobile],
+      render: member => (
+        <div className="space-y-1 text-gray-600">
+          <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-gray-400" /><span className="break-all">{member.email || "-"}</span></div>
+          <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-gray-400" /><span>{member.mobile || "-"}</span></div>
+        </div>
+      ),
+    },
+    {
+      key: "address",
+      header: "Address",
+      search: member => member.address,
+      render: member => (
+        <div className="flex items-start gap-2 text-gray-600">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <span>{member.address || "-"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "dob",
+      header: "DOB",
+      search: member => member.date_of_birth,
+      render: member => (
+        <div className="flex items-center gap-2 text-gray-600">
+          <Calendar className="h-3.5 w-3.5 text-gray-400" />
+          <span className="whitespace-nowrap">{formatDDMMYYYY(member.date_of_birth)}</span>
+        </div>
+      ),
+    },
+    { key: "joining", header: "Joined", search: member => member.joining_date, render: member => <span className="whitespace-nowrap text-gray-600">{formatDDMMYYYY(member.joining_date)}</span> },
+    {
+      key: "salary",
+      header: "Salary",
+      numeric: true,
+      search: member => member.salary,
+      render: member => (
+        <div className="flex items-center justify-end gap-2 text-gray-600">
+          <BadgeIndianRupee className="h-3.5 w-3.5 text-gray-400" />
+          <span>{member.salary || "-"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      search: member => (member.is_active ? "active" : "inactive"),
+      render: member => <StatusBadge active={Boolean(member.is_active)} />,
+    },
+  ];
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -308,6 +383,11 @@ export default function ClerkStaffDashboard() {
 
   const categoryLabel = (category: StaffCategory) =>
     STAFF_CATEGORIES.find((item) => item.value === category)?.label ?? category;
+
+  const staffColumns = useMemo(
+    () => staffColumnsFor(departments, categoryLabel),
+    [departments],
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -706,151 +786,67 @@ export default function ClerkStaffDashboard() {
         )}
       </AnimatePresence>
 
-      <div className="rounded-3xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-gray-100 px-6 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">Staff list</h3>
-          <p className="text-sm text-gray-500">Live data from the staff API.</p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-6 py-4">Staff</th>
-                <th className="px-6 py-4">Department</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Contact</th>
-                <th className="px-6 py-4">Address</th>
-                <th className="px-6 py-4">DOB</th>
-                <th className="px-6 py-4">Joined</th>
-                <th className="px-6 py-4">Salary</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {isFetching ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-14 text-center">
-                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-600" />
-                    <p className="mt-2 text-sm text-gray-500">
-                      Loading staff...
-                    </p>
-                  </td>
-                </tr>
-              ) : staff.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-14 text-center">
-                    <Users className="mx-auto h-8 w-8 text-gray-300" />
-                    <p className="mt-2 text-sm text-gray-500">
-                      No staff records found.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                staff.map((member, index) => (
-                  <motion.tr
-                    key={member.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="align-top hover:bg-slate-50/70"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">
-                        {member.name || "-"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        ID #{member.id}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {departments.find((d) => d.id === member.department)?.name || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {categoryLabel(member.category)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1 text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-3.5 w-3.5 text-gray-400" />
-                          <span>{member.email || "-"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-3.5 w-3.5 text-gray-400" />
-                          <span>{member.mobile || "-"}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 text-gray-400" />
-                        <span>{member.address || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{member.date_of_birth || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {member.joining_date || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <BadgeIndianRupee className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{member.salary || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${member.is_active
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-red-50 text-red-700"
-                          }`}
-                      >
-                        {member.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleActive(member)}
-                          title={member.is_active ? "Deactivate" : "Activate"}
-                          className={member.is_active ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(member)}
-                          title="Edit"
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(member.id)}
-                          title="Delete"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        data={staff}
+        columns={staffColumns}
+        getRowId={member => member.id}
+        createdDate
+        createdDateKey="created_at"
+        createdDateRange
+        search
+        searchPlaceholder="Search staff, email or mobile"
+        searchAriaLabel="Search staff"
+        searchExtra={member => [`ID #${member.id}`]}
+        loading={isFetching}
+        loadingLabel="Loading staff…"
+        emptyTitle="No staff records found."
+        emptyDescription="Create a staff member to get started."
+        noResultsTitle="No staff records match your search."
+        caption="Staff list"
+        minWidth={1180}
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }],
+            match: (member, value) => (value === "active") === Boolean(member.is_active),
+          },
+          {
+            key: "category",
+            label: "Role",
+            optionsFrom: rows => dynamicOptions(rows, member => member.category),
+            match: (member, value) => member.category === value,
+          },
+          {
+            key: "department",
+            label: "Department",
+            optionsFrom: () => departments.map(department => ({ value: String(department.id), label: department.name })),
+            match: (member, value) => String(member.department ?? "") === value,
+          },
+        ]}
+        renderActions={member => [
+          {
+            label: member.is_active ? "Deactivate" : "Activate",
+            icon: Power,
+            onClick: () => handleToggleActive(member),
+            color: member.is_active ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700" : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700",
+          },
+          { label: "Edit", icon: Edit2, onClick: () => handleEditClick(member), color: "text-blue-600 hover:bg-blue-50 hover:text-blue-700" },
+          { label: "Delete", icon: Trash2, onClick: () => handleDelete(member.id), color: "text-red-600 hover:bg-red-50 hover:text-red-700" },
+        ].map(action => (
+          <button
+            key={action.label}
+            type="button"
+            title={action.label}
+            aria-label={`${action.label}: ${member.name ?? "staff"}`}
+            disabled={isFetching}
+            onClick={action.onClick}
+            className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${action.color}`}
+          >
+            <action.icon className="h-4 w-4" />
+          </button>
+        ))}
+      />
     </div>
   );
 }

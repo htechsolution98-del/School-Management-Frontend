@@ -1,6 +1,7 @@
 export interface SchoolClass {
   id: number;
   school_class: string;
+  created_at?: string | null;
   is_rte_applicable?: boolean;
 }
 
@@ -10,6 +11,7 @@ export interface Division {
   class_name?: string;
   division: string;
   capacity: number | null;
+  created_at?: string | null;
 }
 
 export interface Subject {
@@ -17,6 +19,7 @@ export interface Subject {
   name: string;
   division: number | null;
   school?: number;
+  created_at?: string | null;
 }
 
 export interface TimetableDivision {
@@ -25,6 +28,7 @@ export interface TimetableDivision {
   division: string;
   SchoolClass?: number | null;
   capacity?: number | null;
+  created_at?: string | null;
 }
 
 export interface TimetableSubject {
@@ -32,6 +36,7 @@ export interface TimetableSubject {
   name: string;
   division?: number | null;
   school?: number;
+  created_at?: string | null;
 }
 
 export interface Syllabus {
@@ -39,11 +44,13 @@ export interface Syllabus {
   syllabus_file: string | File | null;
   division: number | null;
   subject: number | null;
+  created_at?: string | null;
 }
 
 export interface Teacher {
   id: number;
   name: string;
+  created_at?: string | null;
 }
 
 export interface AssignClassPayload {
@@ -69,6 +76,8 @@ export interface Admission {
   id: number;
   admission_number: string;
   status: "pending" | "approved" | "rejected";
+  submitted_at?: string | null;
+  created_at?: string | null;
   gr_no?: string | null;
   division?: string | null;
   field_values: {
@@ -104,6 +113,7 @@ export interface LocationSettings {
 
 export interface LocationSettingsRecord extends LocationSettings {
   id?: number | string;
+  created_at?: string | null;
 }
 
 export interface TimetableLectureSlot {
@@ -171,4 +181,5 @@ export interface TimetableRecord {
   start_time: string;
   end_time: string;
   slots: TimetableSlot[];
+  created_at?: string | null;
 }

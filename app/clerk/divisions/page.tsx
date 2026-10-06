@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  LayoutGrid,
-  Search,
   Plus,
   Loader2,
   RefreshCw,
   AlertCircle,
-  MoreVertical,
   Trash2,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +17,6 @@ import {
   deleteDivision,
 } from "@/lib/clerk";
 import type { Division, SchoolClass } from "@/types/clerk";
-import { Badge } from "@/components/ui/badge";
 import { SCHOOL_CLASS_OPTIONS } from "@/lib/form-builder-config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,7 +29,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -51,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 
 export default function DivisionsPage() {
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -65,7 +60,6 @@ export default function DivisionsPage() {
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [divisionName, setDivisionName] = useState("");
   const [capacity, setCapacity] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -199,12 +193,38 @@ export default function DivisionsPage() {
     );
   };
 
-  const filteredDivisions = divisions.filter((d) => {
-    const classLabel = getClassLabel(d.SchoolClass).toLowerCase();
-    const divName = d.division.toLowerCase();
-    const query = searchQuery.toLowerCase();
-    return classLabel.includes(query) || divName.includes(query);
-  });
+  const divisionColumns = useMemo<DataTableColumn<Division>[]>(
+    () => [
+      {
+        key: "class",
+        header: "School Class",
+        sticky: true,
+        headClassName: "bg-slate-50",
+        cellClassName: "whitespace-nowrap font-medium text-slate-700",
+        search: div => [getClassLabel(div.SchoolClass)],
+        render: div => getClassLabel(div.SchoolClass),
+      },
+      {
+        key: "division",
+        header: "Division",
+        search: div => [div.division],
+        render: div => (
+          <span className="font-semibold text-slate-900">{div.division}</span>
+        ),
+      },
+      {
+        key: "capacity",
+        header: "Student Capacity",
+        align: "right",
+        numeric: true,
+        search: div => [div.capacity],
+        render: div => (
+          <span className="text-slate-600">{div.capacity ?? "—"}</span>
+        ),
+      },
+    ],
+    [schoolClasses],
+  );
 
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-white min-h-screen overflow-x-hidden">
@@ -333,103 +353,59 @@ export default function DivisionsPage() {
         <div className="xl:col-span-8">
           <Card className="shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Existing Divisions</CardTitle>
-                  <CardDescription>
-                    All active divisions across classes
-                  </CardDescription>
-                </div>
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search divisions..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-sm bg-slate-50 border-slate-200"
-                  />
-                </div>
+              <div>
+                <CardTitle className="text-lg">Existing Divisions</CardTitle>
+                <CardDescription>
+                  All active divisions across classes
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent className="px-0 pb-0">
-              <ScrollArea className="h-[350px]">
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center h-48 py-20 text-muted-foreground">
-                    <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary/40" />
-                    <p>Loading divisions...</p>
-                  </div>
-                ) : filteredDivisions.length > 0 ? (
-                  <div className="w-full overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-sm">
-                      <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100 text-slate-600">
-                        <tr>
-                          <th className="px-6 py-3 text-left font-semibold">
-                            School Class
-                          </th>
-                          <th className="px-6 py-3 text-left font-semibold">
-                            Division
-                          </th>
-                          <th className="px-6 py-3 text-left font-semibold">
-                            Capacity
-                          </th>
-                          <th className="px-6 py-3 text-right font-semibold">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {filteredDivisions.map((div, index) => (
-                          <tr
-                            key={div.id || index}
-                            className="hover:bg-primary/5 transition-colors group"
-                          >
-                            <td className="px-6 py-4">
-                              <div className="font-medium text-slate-900">
-                                {getClassLabel(div.SchoolClass)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <Badge
-                                variant="outline"
-                                className="bg-primary/5 text-primary border-primary/20 hover:bg-primary/10 transition-colors"
-                              >
-                                Division {div.division}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <Users className="h-4 w-4 text-slate-400" />
-                                {div.capacity} students
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteTarget(div)}
-                                className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <div className="bg-slate-50 p-4 rounded-full mb-4">
-                      <LayoutGrid className="h-10 w-10 text-slate-200" />
-                    </div>
-                    <p className="text-sm text-slate-400 max-w-[200px]">
-                      {searchQuery
-                        ? "No divisions match your search"
-                        : "No divisions created yet"}
-                    </p>
-                  </div>
+              <DataTable
+                data={divisions}
+                columns={divisionColumns}
+                getRowId={(div, index) => div.id ?? index}
+                createdDate
+                createdDateRange
+                search
+                searchPlaceholder="Search classes or divisions..."
+                searchAriaLabel="Search divisions"
+                searchExtra={div => [getClassLabel(div.SchoolClass)]}
+                loading={isLoading}
+                loadingLabel="Loading divisions..."
+                emptyTitle="No divisions created yet"
+                emptyDescription="Create a division to get started."
+                noResultsTitle="No divisions match your search"
+                caption="Existing divisions"
+                minWidth={700}
+                filters={[
+                  {
+                    key: "class",
+                    label: "School Class",
+                    optionsFrom: rows => dynamicOptions(rows, div => getClassLabel(div.SchoolClass)),
+                    match: (div, value) => getClassLabel(div.SchoolClass) === value,
+                  },
+                  {
+                    key: "division",
+                    label: "Division",
+                    optionsFrom: rows => dynamicOptions(rows, div => div.division),
+                    match: (div, value) => div.division === value,
+                  },
+                ]}
+                renderActions={div => (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteTarget(div)}
+                    title={`Delete Division ${div.division}`}
+                    aria-label={`Delete Division ${div.division} for ${getClassLabel(div.SchoolClass)}`}
+                    disabled={isDeleting}
+                    className="h-10 w-10 cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
-              </ScrollArea>
+              />
             </CardContent>
           </Card>
         </div>

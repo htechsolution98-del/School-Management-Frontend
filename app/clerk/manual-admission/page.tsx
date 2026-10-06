@@ -203,11 +203,33 @@ export default function ManualAdmissionPage() {
         payload.academic_year = parseInt(selectedAcademicYear);
       }
 
-      const subRes = await fetchWithAuth(`${API_BASE_URL}/submissions/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const docEntries = Object.entries(docFiles);
+      let subRes: Response;
+
+      if (docEntries.length > 0) {
+        const formData = new FormData();
+        formData.append("form", String(activeForm.id));
+        formData.append("field_values", JSON.stringify(field_values));
+        if (selectedAcademicYear) {
+          formData.append("academic_year", String(selectedAcademicYear));
+        }
+        for (const [docFieldId, file] of docEntries) {
+          formData.append("document_field", docFieldId);
+          formData.append("file", file);
+          formData.append(`document_${docFieldId}`, file);
+        }
+
+        subRes = await fetchWithAuth(`${API_BASE_URL}/submissions/`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        subRes = await fetchWithAuth(`${API_BASE_URL}/submissions/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       const subData = await subRes.json();
 
@@ -222,9 +244,8 @@ export default function ManualAdmissionPage() {
       const admissionNumber = subData.admission_number || subData.id;
       const admissionId = subData.id;
 
-      // 2. Submit Documents if attached
-      const docEntries = Object.entries(docFiles);
-      if (admissionNumber && docEntries.length > 0) {
+      // 2. Submit Documents via /documentsubmission/ only if not already saved
+      if (admissionNumber && docEntries.length > 0 && (!subData.documents || subData.documents.length === 0)) {
         for (const [docFieldId, file] of docEntries) {
           const formData = new FormData();
           formData.append("admission_number", String(admissionNumber));

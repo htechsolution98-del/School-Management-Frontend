@@ -10,7 +10,9 @@ export interface LoginResponse {
   user?: {
     id: number;
     username: string;
+    name?: string;
     email: string;
+    mobile?: string | null;
     roles: string[];
   };
   roles?: string[]; 
@@ -19,6 +21,43 @@ export interface LoginResponse {
   school_slug?: string;
   modules?: string[];
 
+}
+
+/** Shape returned by GET /api/me/ for the authenticated user. */
+export interface CurrentUserProfile {
+  id: number;
+  username: string;
+  name: string;
+  email: string | null;
+  mobile: string | null;
+  role: string | null;
+  roles: string[];
+  initials: string;
+  avatar: string | null;
+  is_superuser: boolean;
+  is_active: boolean;
+  date_joined: string | null;
+  last_login: string | null;
+  school: { id: number; name: string; slug: string | null } | null;
+  modules: string[];
+  staff_profile: {
+    id: number;
+    name: string | null;
+    category: string | null;
+    address: string | null;
+    date_of_birth: string | null;
+    joining_date: string | null;
+    department: string | null;
+  } | null;
+  student_profile: {
+    id: number;
+    name: string | null;
+    surname: string | null;
+    gr_no: string | null;
+    division: string | null;
+    date_of_birth: string | null;
+    school_class: string | null;
+  } | null;
 }
 
 export * from "./superadmin";
