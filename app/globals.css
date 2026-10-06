@@ -263,3 +263,14 @@ body:has(.app-workspace)::-webkit-scrollbar,
   width: 0;
   height: 0;
 }
+
+.workspace-navigation :where(a, button):focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 3px;
+}
+.dark .student-profile-list :where(.bg-white, .bg-slate-50) { background-color: #18181b; }
+.dark .student-profile-list :where(.border-slate-200, .border-slate-100) { border-color: #3f3f46; }
+.dark .student-profile-list :where(.text-slate-900, .text-slate-800, .text-slate-700) { color: #e4e4e7; }
+.dark .student-profile-list :where(.text-slate-600, .text-slate-500) { color: #a1a1aa; }
+.dark .student-profile-list :where(select, input) { background-color: #18181b; color: #e4e4e7; border-color: #3f3f46; }
+.dark .student-profile-list tbody tr:hover td { background-color: #27272a; }

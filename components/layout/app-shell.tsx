@@ -51,10 +51,6 @@ const ROLE_ALLOWED_MAP: Record<string, string[]> = {
   Applicant: ["temp_user", "user", "super_admin", "superadmin"],
 };
 
-function widthStorageKey(roleTitle?: string) {
-  return `sidebar_width:${roleTitle || "default"}`;
-}
-
 function clampWidth(width: number) {
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
 }
@@ -65,24 +61,9 @@ function settleWidth(width: number) {
 
 /** Finds the deepest link matching the current path so nested groups resolve. */
 function findActive(links: SidebarLink[], pathname: string): SidebarLink | undefined {
-  return links.find((link) => {
-    if (link.subLinks?.length) {
-      return link.subLinks.some(
-        (sub) => pathname === sub.href || (!sub.exact && pathname.startsWith(`${sub.href}/`)),
-      );
-    }
-    return pathname === link.href || (!link.exact && pathname.startsWith(`${link.href}/`));
-  });
-}
-
-/** The label shown in the header: the child page when inside a group. */
-function resolveActiveTitle(links: SidebarLink[], pathname: string): string {
-  for (const link of links) {
-    for (const sub of link.subLinks ?? []) {
-      if (pathname === sub.href || (!sub.exact && pathname.startsWith(`${sub.href}/`))) return sub.title;
-    }
-  }
-  return findActive(links, pathname)?.title || "Dashboard";
+  const leaves = links.flatMap(link => link.subLinks?.length ? link.subLinks : [link]);
+  return leaves.filter(link => pathname === link.href || (!link.exact && link !== links[0] && pathname.startsWith(`${link.href}/`)))
+    .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
 export function AppShell({ children, links, roleTitle, userName, onSignOut }: AppShellProps) {
@@ -111,7 +92,7 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
       window.location.replace("/login");
     }
   }, [pathname, roleTitle, requiresRoleCheck]);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useState(MIN_WIDTH);
   const [resizing, setResizing] = useState(false);
   const dragStart = useRef<{ x: number; width: number } | null>(null);
   const expanded = sidebarWidth >= COMPACT_MAX;
@@ -136,31 +117,20 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   }, []);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(widthStorageKey(roleTitle));
-      if (stored) setSidebarWidth(clampWidth(Number(stored) || DEFAULT_WIDTH));
-    } catch {
-      /* ignore storage failures (private mode / quota) */
-    }
-  }, [roleTitle]);
-
-  useEffect(() => {
     try { setSchoolName(localStorage.getItem("school_name")); } catch { /* ignore */ }
   }, []);
 
   // Auto-expand the group that owns the active page.
   useEffect(() => {
-    const owner = links.find((link) =>
-      link.subLinks?.some((sub) => pathname === sub.href || pathname.startsWith(`${sub.href}/`)),
-    );
+    const active = findActive(links, pathname);
+    const owner = links.find(link => active && link.subLinks?.includes(active));
     if (owner) setOpenGroup(owner.title);
   }, [pathname, links]);
 
   const updateWidth = useCallback((width: number) => {
     const next = clampWidth(width);
     setSidebarWidth(next);
-    try { localStorage.setItem(widthStorageKey(roleTitle), String(next)); } catch { /* ignore */ }
-  }, [roleTitle]);
+  }, []);
 
   const resizeSidebar = (event: PointerEvent<HTMLDivElement>) => {
     if (!dragStart.current) return;
@@ -209,35 +179,32 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   };
 
   const subtitle = roleTitle || "Super Admin";
-  const pageTitle = resolveActiveTitle(links, pathname);
+  const activeLink = findActive(links, pathname);
 
   const navItem = (link: SidebarLink, compact: boolean, onNavigate?: () => void) => {
-    const selected = !link.subLinks?.length && findActive([link], pathname) !== undefined;
+    const selected = link === activeLink || !!link.subLinks?.includes(activeLink!);
     const Icon = link.icon;
     const base = `flex h-11 w-full items-center rounded-lg text-sm font-medium transition-colors ${compact ? "justify-center px-0" : "gap-3 px-3"}`;
     const tone = selected
-      ? "bg-[#1D496C] text-white"
-      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+      ? "bg-[#1D496C]/10 text-[#1D496C] ring-1 ring-[#1D496C]/10 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/15"
+      : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
 
     if (link.subLinks?.length) {
       const groupOpen = !compact && openGroup === link.title;
-      const groupActive = link.subLinks.some(
-        (sub) => pathname === sub.href || pathname.startsWith(`${sub.href}/`),
-      );
       const childClasses = (active: boolean) =>
         `flex h-10 items-center rounded-lg text-sm transition-colors ${active
-          ? "bg-[#1D496C]/10 font-medium text-[#1D496C]"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`;
+          ? "bg-[#1D496C]/10 font-semibold text-[#1D496C] dark:bg-sky-400/10 dark:text-sky-300"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"}`;
 
       return (
         <div key={link.href} className="space-y-1">
           <button
             type="button"
-            onClick={() => compact ? undefined : setOpenGroup(groupOpen ? null : link.title)}
+            onClick={() => { if (compact) updateWidth(DEFAULT_WIDTH); setOpenGroup(groupOpen ? null : link.title); }}
             title={compact ? link.title : undefined}
             aria-label={compact ? link.title : undefined}
             aria-expanded={compact ? undefined : groupOpen}
-            className={`${base} ${groupActive ? "text-slate-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+            className={`${base} ${tone}`}
           >
             <Icon className="h-[18px] w-[18px] shrink-0" />
             {!compact && <>
@@ -257,7 +224,7 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                 >
                   <div className="space-y-1 pb-1 pl-6 pr-1">
                     {link.subLinks.map((sub) => {
-                      const subActive = pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+                      const subActive = sub === activeLink;
                       return (
                         <Link
                           key={sub.href}
@@ -297,27 +264,27 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
 
   const navigation = (compact: boolean, onNavigate?: () => void) => (
     <>
-      <div className={`flex h-16 shrink-0 items-center border-b border-slate-200 ${compact ? "justify-center" : "gap-3 px-5"}`}>
-        <img src="/logo.png" alt="VidyaSanchalan" className="h-9 w-9 shrink-0 object-contain" />
+      <div className={`flex h-16 shrink-0 items-center border-b border-slate-200 dark:border-zinc-800 ${compact ? "justify-center" : "gap-3 px-5"}`}>
+        <button type="button" aria-label={expanded ? "Collapse navigation" : "Expand navigation"} onClick={() => updateWidth(expanded ? MIN_WIDTH : DEFAULT_WIDTH)} className="shrink-0 rounded-xl focus-visible:outline-2"><img src="/logo.png" alt="VidyaSanchalan" className="h-10 w-10 rounded-xl bg-white object-contain p-1" /></button>
         {!compact && (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-slate-900">VidyaSanchalan</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">{subtitle}</p>
+            <p className="truncate text-sm font-semibold tracking-tight text-slate-900 dark:text-zinc-100">VidyaSanchalan</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-zinc-400">{subtitle}</p>
           </div>
         )}
       </div>
-      {!compact && <p className="px-6 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Workspace</p>}
+      {!compact && <p className="px-6 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Workspace</p>}
       <nav className={`flex-1 space-y-1 overflow-y-auto no-scrollbar p-3 ${compact ? "pt-6" : ""}`} aria-label={`${subtitle} navigation`}>
         {links.map((link) => navItem(link, compact, onNavigate))}
       </nav>
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-slate-200 dark:border-zinc-800 p-3">
         <button
           type="button"
           onClick={signOut}
           disabled={signingOut}
           title={compact ? (signingOut ? "Signing out…" : "Sign out") : undefined}
           aria-label="Sign out"
-          className={`flex h-11 w-full items-center rounded-lg text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-red-600 disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3"}`}
+          className={`flex h-11 w-full items-center rounded-lg text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-400 dark:hover:bg-rose-950 dark:hover:text-rose-300 disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3"}`}
         >
           {signingOut ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <LogOut className="h-[18px] w-[18px]" />}
           {!compact && <span>{signingOut ? "Signing out…" : "Sign out"}</span>}
@@ -340,14 +307,14 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   return (
     <div
       data-resizing={resizing}
-      className={`app-workspace flex h-svh overflow-hidden bg-slate-50 text-slate-900 ${resizing ? "cursor-col-resize select-none" : ""}`}
+      className={`app-workspace flex h-svh overflow-hidden bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-100 ${resizing ? "cursor-col-resize select-none" : ""}`}
     >
       <motion.aside
         id="app-desktop-sidebar"
         animate={{ width: sidebarWidth }}
         initial={false}
         transition={{ duration: reducedMotion || resizing ? 0 : 0.15 }}
-        className="relative hidden shrink-0 flex-col border-r border-slate-200 bg-white lg:flex"
+        className="workspace-navigation relative hidden shrink-0 flex-col border-r border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 lg:flex"
       >
         <div className="flex h-full min-w-0 flex-col overflow-hidden">{navigation(!expanded)}</div>
         <div
@@ -381,27 +348,8 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
       </motion.aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open navigation"
-              aria-expanded={mobileOpen}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden"
-            >
-              <Menu className="h-4 w-4" />
-            </button>
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="truncate font-semibold">{pageTitle}</span>
-            </div>
-            {schoolName && (
-              <div className="hidden min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 sm:flex">
-                <School className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                <span className="max-w-[220px] truncate">{schoolName}</span>
-              </div>
-            )}
-          </div>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[#1D496C] dark:bg-sky-400/10 dark:text-sky-300"><School className="h-5 w-5" /></span><span className="truncate text-sm font-semibold tracking-tight sm:text-base">{profile?.school?.name || schoolName || "School"}</span></div>
 
           <div className="flex items-center gap-3">
             <div ref={notificationRef} className="relative">
@@ -492,6 +440,7 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
         <main className="min-h-0 flex-1 overflow-y-auto no-scrollbar p-4 lg:p-6">{children}</main>
       </div>
 
+      <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation" className="fixed bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-xl bg-[#1D496C] text-white shadow-lg lg:hidden"><Menu className="h-5 w-5" /></button>
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
 
       <AnimatePresence>
@@ -587,14 +536,14 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
               exit={{ x: reducedMotion ? 0 : -280 }}
               transition={{ duration: reducedMotion ? 0 : 0.2 }}
               aria-label="Mobile navigation"
-              className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white lg:hidden"
+              className="workspace-navigation fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 lg:hidden"
             >
               {navigation(false, () => setMobileOpen(false))}
               <button
                 type="button"
                 aria-label="Close navigation"
                 onClick={() => setMobileOpen(false)}
-                className="absolute right-2 top-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-500"
+                className="absolute right-2 top-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-500 dark:bg-zinc-900 dark:text-zinc-400"
               >
                 <X className="h-4 w-4" />
               </button>
