@@ -14,7 +14,7 @@ export interface StudentProfileData {
   name: string; surname: string | null; father_name: string | null; mother_name: string | null; full_name: string;
   date_of_birth: string | null; mobile: string | null; email: string | null;
   school_class: number | null; class_name: string | null; academic_year: number | null; academic_year_name: string | null;
-  admission_date: string | null; aadhar_number: string | null; abc_id: string | null; udise_no: string | null;
+  admission_date: string | null; address?: string | null; aadhar_number: string | null; abc_id: string | null; udise_no: string | null;
   is_rte: boolean; is_verified: boolean; verified_by: number | null; verified_by_name: string | null;
   verified_at: string | null; photo_url: string | null; documents: StudentDocumentItem[];
   is_active: boolean; created_at: string; admission_number: string | null;

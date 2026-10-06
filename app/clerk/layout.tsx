@@ -16,30 +16,42 @@ import {
   Layers,
   UserPlus,
   Hash,
+  Award,
+  Rocket,
+  PhoneCall,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
   {
+    title: "Certificates & G.R.",
+    href: "/clerk/docs",
+    icon: Award,
+    subLinks: [
+      { title: "Certificate Desk (LC/TC)", href: "/clerk/certificates", icon: Award },
+      { title: "General Register (G.R. Book)", href: "/clerk/general-register", icon: BookOpen },
+    ],
+  },
+  {
     title: "HR Management",
-    href: "/clerk/hr", // dummy href to group, or could omit if not strictly navigating
+    href: "/clerk/hr",
     icon: Users,
     subLinks: [
       { title: "Departments", href: "/clerk/departments", icon: Users },
       { title: "Staff", href: "/clerk/staff", icon: Users },
-    ]
+    ],
   },
   {
     title: "Admissions",
-    href: "/clerk/admissions", // dummy href to group
+    href: "/clerk/admissions",
     icon: Users,
     subLinks: [
       { title: "Admission Form", href: "/clerk/admission-form", icon: FileText },
       { title: "Manual Admission", href: "/clerk/manual-admission", icon: UserPlus },
       { title: "Temp Users", href: "/clerk/temp-users", icon: Users },
       { title: "Student Directory", href: "/clerk/students", icon: Users },
-    ]
+    ],
   },
   {
     title: "School Management",
@@ -53,7 +65,17 @@ const sidebarLinks = [
       { title: "Divisions", href: "/clerk/divisions", icon: LayoutGrid },
       { title: "Assign Division", href: "/clerk/assign-division", icon: Layers },
       { title: "Assign Roll No.", href: "/clerk/assign-roll-no", icon: Hash },
-    ]
+      { title: "Student Promotion", href: "/clerk/student-promotion", icon: Rocket },
+    ],
+  },
+  {
+    title: "Attendance Desk",
+    href: "/clerk/att-desk",
+    icon: CalendarCheck,
+    subLinks: [
+      { title: "Absentee Calling Desk", href: "/clerk/absentee-desk", icon: PhoneCall },
+      { title: "Attendance Zone", href: "/clerk/location-settings", icon: MapPin },
+    ],
   },
   {
     title: "Curriculum",
@@ -62,17 +84,14 @@ const sidebarLinks = [
     subLinks: [
       { title: "Subjects", href: "/clerk/subjects", icon: BookOpen },
       { title: "Syllabus", href: "/clerk/syllabus", icon: FileText },
-    ]
+    ],
   },
-  { title: "Attendance Zone", href: "/clerk/location-settings", icon: MapPin },
   { title: "Assign Teacher", href: "/clerk/assign-teacher", icon: Plus },
   { title: "Timetable", href: "/clerk/timetable", icon: Calendar },
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },
 ];
-
-
 
 export default function ClerkLayout({ children }: { children: React.ReactNode }) {
   return (
