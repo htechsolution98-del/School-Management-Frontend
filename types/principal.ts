@@ -35,6 +35,7 @@ export interface SchoolClass {
   id: number;
   school_class: string;
   category?: number | null;
+  is_rte_applicable?: boolean;
 }
 
 export interface ClassCategory {

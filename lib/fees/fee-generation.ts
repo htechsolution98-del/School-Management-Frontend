@@ -14,9 +14,16 @@ import type {
   CollectFeePayload,
 } from "@/types/fees";
 
-export async function fetchStudents(): Promise<ApiResponse<Student[]>> {
+export async function fetchStudents(params?: {
+  class_id?: string | number;
+  academic_year?: string | number;
+}): Promise<ApiResponse<Student[]>> {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/studentget/`);
+    const query = new URLSearchParams();
+    if (params?.class_id) query.append("class_id", String(params.class_id));
+    if (params?.academic_year) query.append("academic_year", String(params.academic_year));
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetchWithAuth(`${API_BASE_URL}/studentget/${qs}`);
     if (!response.ok) throw new Error("Failed to fetch students");
     return { data: await response.json(), error: null, success: true };
   } catch (error) {
@@ -119,16 +126,20 @@ export async function generateSingleVirtualFee(payload: {
 }
 
 export async function createMonthlyStudentFee(payload: CreateMonthlyFeePayload): Promise<ApiResponse<StudentFee>> {
+  let dueDate = payload.due_date;
+  if (!dueDate && payload.billing_period && /^\d{4}-\d{2}$/.test(payload.billing_period)) {
+    dueDate = `${payload.billing_period}-10`;
+  }
   return createStudentFeeResponse({
     ...payload,
-    due_date: payload.due_date ?? "",
+    ...(dueDate ? { due_date: dueDate } : {}),
   });
 }
 
 export async function createSingleStudentFee(payload: CreateSingleFeePayload): Promise<ApiResponse<StudentFee>> {
   return createStudentFeeResponse({
     ...payload,
-    due_date: payload.due_date ?? "",
+    ...(payload.due_date ? { due_date: payload.due_date } : {}),
     billing_period: "",
   });
 }

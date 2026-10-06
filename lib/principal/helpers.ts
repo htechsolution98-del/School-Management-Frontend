@@ -33,7 +33,10 @@ export async function apiFetch<T>(
   let url = path;
   if (!path.startsWith("http")) {
     const cleanBase = API_BASE_URL.replace(/\/$/, "");
-    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    let cleanPath = path.startsWith("/") ? path : `/${path}`;
+    if (cleanBase.endsWith("/api") && cleanPath.startsWith("/api/")) {
+      cleanPath = cleanPath.substring(4);
+    }
     url = `${cleanBase}${cleanPath}`;
   }
   const response = await fetchWithAuth(url, {
