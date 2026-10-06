@@ -5,6 +5,10 @@ on:
     branches:
       - stg
 
+concurrency:
+  group: frontend-stg-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -21,19 +25,36 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'SSHEOF'
+          ssh -T "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'SSHEOF'
             set -e
-            cd ${{ secrets.FRONTEND_WORK_DIR }}
+            cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
+
+            # npm install in the running container can modify the tracked lockfile.
+            # Preserve that version before restoring only this generated file.
+            if git ls-files --error-unmatch -- package-lock.json >/dev/null 2>&1; then
+              if ! git diff --quiet -- package-lock.json || ! git diff --cached --quiet -- package-lock.json; then
+                backup_root="${DEPLOY_BACKUP_ROOT:-$HOME/.local/state/school-management-deploy/frontend}"
+                mkdir -p -- "$backup_root"
+                backup_dir=$(mktemp -d "$backup_root/$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+                if [ -e package-lock.json ]; then
+                  cp -p -- package-lock.json "$backup_dir/package-lock.json"
+                fi
+                git diff --cached --binary -- package-lock.json > "$backup_dir/package-lock-staged.patch"
+                git diff --binary -- package-lock.json > "$backup_dir/package-lock-unstaged.patch"
+                git restore --source=HEAD --staged --worktree -- package-lock.json
+                echo "Saved server lockfile changes in $backup_dir"
+              fi
+            fi
 
             echo "=== Git Pull ==="
-            git pull origin ${{ secrets.FRONTEND_BRANCH }}
+            git pull --ff-only origin "${{ secrets.FRONTEND_BRANCH }}"
 
-            echo "=== Restart Container (triggers npm install && build && start) ==="
+            echo "=== Restart Container (triggers dependency install, build and start) ==="
             docker restart ${{ secrets.FRONTEND_CONT_NAME }}
-            
+
             echo "=== Waiting 50s for build to complete ==="
             sleep 50
-            
+
             echo "=== Deployment Successful... DevOps Team ==="
           SSHEOF
 
