@@ -254,12 +254,14 @@ const CreateFeeModal = ({
     message: string;
   } | null>(null);
 
+  const initialMonth = new Date().toISOString().slice(0, 7);
   const [form, setForm] = useState({
     student: "",
     academic_year: "",
     fee_wise_class: "",
     feetype: "",
-    billing_period: new Date().toISOString().slice(0, 7),
+    billing_period: initialMonth,
+    due_date: `${initialMonth}-10`,
     selected_class: "",
   });
 
@@ -269,12 +271,14 @@ const CreateFeeModal = ({
 
   useEffect(() => {
     if (isOpen) {
+      const curMonth = new Date().toISOString().slice(0, 7);
       setForm({
         student: "",
         academic_year: "",
         fee_wise_class: "",
         feetype: "",
-        billing_period: new Date().toISOString().slice(0, 7),
+        billing_period: curMonth,
+        due_date: `${curMonth}-10`,
         selected_class: "",
       });
       setErrors({});
@@ -283,9 +287,10 @@ const CreateFeeModal = ({
   }, [isOpen]);
 
   const uniqueClassOptions = Array.from(
-    new Map(
-      feeWiseClasses.map((fc) => [fc.school_class, fc.school_class_name]),
-    ).entries(),
+    new Map([
+      ...feeWiseClasses.map((fc) => [String(fc.school_class), fc.school_class_name] as [string, string]),
+      ...students.filter((s) => s.school_class && s.class_name).map((s) => [String(s.school_class), s.class_name!] as [string, string]),
+    ]).entries(),
   ).map(([id, name]) => ({ id, name }));
   const filteredFeeClasses = form.selected_class 
     ? feeWiseClasses.filter((fc) => String(fc.school_class) === form.selected_class)
@@ -300,6 +305,14 @@ const CreateFeeModal = ({
     if (!form.fee_wise_class) errs.fee_wise_class = "Fee structure is required";
     if (!form.billing_period) errs.billing_period = "Billing period is required";
 
+    let finalDueDate = form.due_date;
+    if (!finalDueDate && form.billing_period) {
+      finalDueDate = `${form.billing_period}-10`;
+    }
+    if (!finalDueDate) {
+      errs.due_date = "Due date is required";
+    }
+
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
@@ -311,6 +324,7 @@ const CreateFeeModal = ({
         fee_wise_class: parseInt(form.fee_wise_class),
         feetype: parseInt(form.feetype),
         billing_period: form.billing_period,
+        due_date: finalDueDate,
       };
 
       const result = await createMonthlyStudentFee(payload); // Using this as it passes all fields including billing_period
@@ -374,15 +388,22 @@ const CreateFeeModal = ({
             disabled={!form.selected_class}
             placeholder={form.selected_class ? "Select student..." : "Select class first"}
             options={students
-              .filter((s) => String(s.school_class) === form.selected_class)
+              .filter((s) => {
+                if (!form.selected_class) return false;
+                const matchId = String(s.school_class) === String(form.selected_class);
+                const selectedClsObj = uniqueClassOptions.find((c) => String(c.id) === String(form.selected_class));
+                const matchName = selectedClsObj && s.class_name && selectedClsObj.name.toLowerCase() === s.class_name.toLowerCase();
+                const matchDirectName = s.class_name && s.class_name.toLowerCase() === form.selected_class.toLowerCase();
+                return matchId || matchName || matchDirectName;
+              })
               .map((s) => {
-                const fName = s.name === "null" ? "" : s.name;
-                const lName = s.surname === "null" ? "" : s.surname;
-                const fthName = s.father_name === "null" ? "" : s.father_name;
+                const fName = s.name === "null" ? "" : (s.name || "");
+                const lName = s.surname === "null" ? "" : (s.surname || "");
+                const fthName = s.father_name === "null" ? "" : (s.father_name || "");
                 const fullName = [fName, lName].filter(Boolean).join(" ");
                 return { 
                   value: String(s.id), 
-                  label: `${fullName || "No Name"} - Father: ${fthName || "N/A"}` 
+                  label: `${fullName || "Student #" + s.id} - Father: ${fthName || "N/A"}` 
                 };
               })}
             error={!!errors.student}
@@ -429,7 +450,26 @@ const CreateFeeModal = ({
             type="month"
             className={inputClass}
             value={form.billing_period}
-            onChange={(e) => update("billing_period", e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              update("billing_period", val);
+              if (val && /^\d{4}-\d{2}$/.test(val)) {
+                update("due_date", `${val}-10`);
+              }
+            }}
+          />
+        </FormField>
+
+        <FormField
+          label="Due Date"
+          error={errors.due_date}
+          required
+        >
+          <input
+            type="date"
+            className={inputClass}
+            value={form.due_date}
+            onChange={(e) => update("due_date", e.target.value)}
           />
         </FormField>
 
