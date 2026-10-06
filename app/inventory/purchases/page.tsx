@@ -9,7 +9,7 @@ import {
   Loader2,
   X
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function PurchasesAndSuppliersPage() {
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">("purchases");
@@ -60,7 +60,7 @@ export default function PurchasesAndSuppliersPage() {
         inventoryApi.get("/items/"),
         inventoryApi.get("/sizes/"),
         inventoryApi.get("/colors/"),
-        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
+        coreApi.get("/academic-year/").catch(() => ({ data: [] })),
       ]);
 
       setPurchases(Array.isArray(purchRes.data) ? purchRes.data : purchRes.data.results || []);

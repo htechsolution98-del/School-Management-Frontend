@@ -12,7 +12,7 @@ import {
   X,
   ShieldAlert
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess, showWarning } from "@/lib/inventory-client";
+import { inventoryApi, coreApi, showApiError, showSuccess, showWarning } from "@/lib/inventory-client";
 
 export default function StudentItemIssuePage() {
   const [activeTab, setActiveTab] = useState<"single" | "bulk" | "entitlements">("single");
@@ -69,12 +69,12 @@ export default function StudentItemIssuePage() {
     try {
       const [itemsRes, classRes, sizesRes, colorsRes, yearsRes, entRes, studsRes] = await Promise.all([
         inventoryApi.get("/items/"),
-        inventoryApi.get("/class/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/class/`).catch(() => ({ data: [] }))),
+        coreApi.get("/getclass/").catch(() => coreApi.get("/classes/")).catch(() => ({ data: [] })),
         inventoryApi.get("/sizes/"),
         inventoryApi.get("/colors/"),
-        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
+        coreApi.get("/academic-year/").catch(() => coreApi.get("/main-academic-year/")).catch(() => ({ data: [] })),
         inventoryApi.get("/entitlements/"),
-        inventoryApi.get("/get-student/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/get-student/`).catch(() => ({ data: [] }))),
+        coreApi.get("/get-student/").catch(() => ({ data: [] })),
       ]);
 
       const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
@@ -115,7 +115,7 @@ export default function StudentItemIssuePage() {
       let url = `/get-student/?school_class=${bulkClass}`;
       if (bulkDivision) url += `&division=${bulkDivision}`;
 
-      const res = await inventoryApi.get(url).catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api${url}`));
+      const res = await coreApi.get(url);
       const list = Array.isArray(res.data) ? res.data : res.data.results || [];
       setBulkStudents(list);
       setSelectedStudentIds(list.map((s: any) => s.id));
@@ -549,7 +549,9 @@ export default function StudentItemIssuePage() {
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
               >
                 {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.school_class}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.school_class || c.class_name || c.name || `Class ${c.id}`}
+                  </option>
                 ))}
               </select>
             </div>
@@ -786,7 +788,9 @@ export default function StudentItemIssuePage() {
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                 >
                   {classes.map((c) => (
-                    <option key={c.id} value={c.id}>{c.school_class}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.school_class || c.class_name || c.name || `Class ${c.id}`}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -5,12 +5,13 @@ import {
   BadgePercent,
   Plus,
   Edit2,
+  Trash2,
   Calendar,
   Loader2,
   X,
   Coins
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function PricingAndFeeMappingPage() {
   const [pricings, setPricings] = useState<any[]>([]);
@@ -53,9 +54,9 @@ export default function PricingAndFeeMappingPage() {
     try {
       const [itemsRes, yearsRes, feesRes, classRes] = await Promise.all([
         inventoryApi.get("/items/"),
-        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
-        inventoryApi.get("/feetype/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/feetype/`).catch(() => ({ data: [] }))),
-        inventoryApi.get("/class/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/class/`).catch(() => ({ data: [] }))),
+        coreApi.get("/academic-year/").catch(() => coreApi.get("/main-academic-year/")).catch(() => ({ data: [] })),
+        coreApi.get("/feetype/").catch(() => ({ data: [] })),
+        coreApi.get("/getclass/").catch(() => coreApi.get("/classes/")).catch(() => ({ data: [] })),
       ]);
 
       setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
@@ -152,6 +153,17 @@ export default function PricingAndFeeMappingPage() {
       showApiError(err, "Failed to save pricing configuration.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to remove this pricing configuration?")) return;
+    try {
+      await inventoryApi.delete(`/pricing/${id}/`);
+      showSuccess("Pricing configuration removed successfully");
+      fetchPricings();
+    } catch (err) {
+      showApiError(err, "Failed to delete pricing configuration.");
     }
   };
 
@@ -290,12 +302,22 @@ export default function PricingAndFeeMappingPage() {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => handleOpenModal(p)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-blue-600 dark:text-slate-400 transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenModal(p)}
+                          title="Edit Pricing"
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-blue-600 dark:text-slate-400 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          title="Delete Pricing"
+                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -369,7 +391,9 @@ export default function PricingAndFeeMappingPage() {
                 >
                   <option value="">Applicable to All Classes</option>
                   {classes.map((c) => (
-                    <option key={c.id} value={c.id}>{c.school_class}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.school_class || c.class_name || c.name || `Class ${c.id}`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -447,7 +471,9 @@ export default function PricingAndFeeMappingPage() {
                   >
                     <option value="">Select Existing Fee Type</option>
                     {feeTypes.map((ft) => (
-                      <option key={ft.id} value={ft.id}>{ft.name} ({ft.billing_cycle || "General"})</option>
+                      <option key={ft.id} value={ft.id}>
+                        {ft.name || ft.feetype_name || ft.fee_type || `Fee Type ${ft.id}`} {ft.billing_cycle ? `(${ft.billing_cycle})` : ""}
+                      </option>
                     ))}
                   </select>
                   <p className="text-[11px] text-blue-700 dark:text-blue-300">

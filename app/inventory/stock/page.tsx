@@ -12,7 +12,7 @@ import {
   Loader2,
   X
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function StockAndLedgerPage() {
   const [activeTab, setActiveTab] = useState<"balances" | "ledger">("balances");
@@ -65,7 +65,7 @@ export default function StockAndLedgerPage() {
         inventoryApi.get("/stock-transactions/"),
         inventoryApi.get("/sizes/"),
         inventoryApi.get("/colors/"),
-        inventoryApi.get("/academic-year/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/academic-year/`).catch(() => ({ data: [] }))),
+        coreApi.get("/academic-year/").catch(() => ({ data: [] })),
       ]);
 
       setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
