@@ -89,6 +89,21 @@ const attachRefreshInterceptor = (instance: any) => {
     async (error: any) => {
       const originalRequest = error.config;
       if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+        if (typeof window !== "undefined" && window.location.pathname.startsWith("/login")) {
+          return Promise.reject(error);
+        }
+
+        const refreshTokenVal =
+          getCookie("refresh_token") ||
+          (typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null);
+
+        if (!refreshTokenVal) {
+          if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+            window.location.href = "/login";
+          }
+          return Promise.reject(error);
+        }
+
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -106,13 +121,9 @@ const attachRefreshInterceptor = (instance: any) => {
         isRefreshing = true;
 
         try {
-          const refreshTokenVal =
-            getCookie("refresh_token") ||
-            (typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null);
-
           const refreshRes = await axios.post(
             `${API_BASE_URL}/refresh/`,
-            refreshTokenVal ? { refresh: refreshTokenVal } : {},
+            { refresh: refreshTokenVal },
             { withCredentials: true }
           );
 
@@ -131,13 +142,7 @@ const attachRefreshInterceptor = (instance: any) => {
         } catch (refreshErr) {
           processQueue(refreshErr, null);
           if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-            toast.error("Session Expired", {
-              description: "Your session has expired. Please log in again.",
-              duration: 4000,
-            });
-            setTimeout(() => {
-              window.location.href = "/login";
-            }, 1500);
+            window.location.href = "/login";
           }
           return Promise.reject(refreshErr);
         } finally {
