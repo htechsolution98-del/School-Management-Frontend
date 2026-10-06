@@ -26,7 +26,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/principal/helpers"
-import { getDocumentBlob, getDocumentBlobUrl, openAuthenticatedDocument } from "@/lib/document-viewer"
+import Link from "next/link"
+import { aadhaarSchema, AADHAAR_ERROR } from "@/lib/student-profile-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,48 +42,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-export interface StudentDocumentItem {
-  id: string
-  raw_id: number
-  title: string
-  label: string
-  file_url: string | null
-  url: string | null
-  type: string
-  uploaded_at: string | null
-}
-
-export interface StudentProfileData {
-  id: number
-  gr_no: string | null
-  roll_no: string | null
-  division: string | null
-  name: string
-  surname: string | null
-  father_name: string | null
-  mother_name: string | null
-  full_name: string
-  date_of_birth: string | null
-  mobile: string | null
-  email: string | null
-  school_class: number | null
-  class_name: string | null
-  academic_year: number | null
-  academic_year_name: string | null
-  admission_date: string | null
-  aadhar_number: string | null
-  abc_id: string | null
-  udise_no: string | null
-  is_rte: boolean
-  is_verified: boolean
-  verified_by: number | null
-  verified_by_name: string | null
-  verified_at: string | null
-  photo_url: string | null
-  documents: StudentDocumentItem[]
-  is_active: boolean
-  created_at: string
-}
+import type { StudentProfileData, StudentDocumentItem } from "@/types/student-profile"
+import { getDocumentBlob, openAuthenticatedDocument } from "@/lib/document-viewer"
+export type { StudentProfileData, StudentDocumentItem } from "@/types/student-profile"
 
 interface StudentProfileDrawerProps {
   studentId: number | null
@@ -198,6 +160,7 @@ export function StudentProfileDrawer({
     if (e) e.preventDefault()
     if (!student) return
 
+    if (!aadhaarSchema.safeParse(formData.aadhar_number).success) { toast.error(AADHAAR_ERROR); return }
     setIsSaving(true)
     try {
       const payload = {
@@ -302,9 +265,8 @@ export function StudentProfileDrawer({
               )}
               {student && (
                 <div
-                  className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center ${
-                    student.is_verified ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
-                  }`}
+                  className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center ${student.is_verified ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                    }`}
                   title={student.is_verified ? "Verified Student" : "Pending Verification"}
                 >
                   {student.is_verified ? (
@@ -394,22 +356,20 @@ export function StudentProfileDrawer({
         <div className="flex border-b border-slate-200 dark:border-zinc-800 px-6 bg-white dark:bg-zinc-950">
           <button
             onClick={() => setActiveTab("details")}
-            className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === "details"
+            className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === "details"
                 ? "border-primary text-primary"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-            }`}
+              }`}
           >
             <User className="w-4 h-4" />
             Profile & Government IDs
           </button>
           <button
             onClick={() => setActiveTab("documents")}
-            className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === "documents"
+            className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === "documents"
                 ? "border-primary text-primary"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-            }`}
+              }`}
           >
             <FileText className="w-4 h-4" />
             Cloudinary Documents ({student?.documents?.length || 0})
@@ -495,7 +455,8 @@ export function StudentProfileDrawer({
                     placeholder="12-digit Aadhaar Number"
                     value={formData.aadhar_number}
                     onChange={(e) => handleInputChange("aadhar_number", e.target.value)}
-                    maxLength={16}
+                    maxLength={12}
+                    inputMode="numeric"
                     className="font-mono text-sm bg-white dark:bg-zinc-900"
                   />
                 </div>
@@ -756,6 +717,7 @@ export function StudentProfileDrawer({
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            {student && <Link href={`/clerk/student-profiles/${student.id}`} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-indigo-600 dark:border-zinc-700 dark:text-indigo-300">Full Student 360</Link>}
             <Button variant="outline" onClick={onClose} size="sm">
               Close
             </Button>

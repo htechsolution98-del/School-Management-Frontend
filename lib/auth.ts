@@ -40,7 +40,8 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
     headers: requestHeaders,
   });
 
-  if (!response.ok && response.status !== 401) {
+  const isRefreshRequest = String(input).includes("/refresh");
+  if (!response.ok && response.status !== 401 && !isRefreshRequest) {
     try {
       if (response.status >= 500) {
         toast.error(`Server Error (${response.status})`, {
@@ -66,7 +67,9 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
            }
         }
         
-        toast.error("Error", { id: API_ERROR_TOAST_ID, description: errorDesc });
+        if (!errorDesc.includes("Refresh token is required")) {
+          toast.error("Error", { id: API_ERROR_TOAST_ID, description: errorDesc });
+        }
       }
     } catch (e) {
       toast.error(`Request Failed (${response.status})`, { id: API_ERROR_TOAST_ID });

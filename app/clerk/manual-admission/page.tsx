@@ -24,6 +24,7 @@ import {
 
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { aadhaarSchema, isAadhaarField, AADHAAR_ERROR } from "@/lib/student-profile-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -205,6 +206,7 @@ export default function ManualAdmissionPage() {
     for (const sec of activeForm.sections || []) {
       for (const f of sec.fields || []) {
         const val = dynamicValues[f.id];
+        if (isAadhaarField(f) && !aadhaarSchema.safeParse(String(val ?? "")).success) { setErrorMsg(AADHAAR_ERROR); return; }
         if (f.is_required && (val === undefined || val === null || String(val).trim() === "")) {
           setErrorMsg(`Please fill in required field: "${f.label}"`);
           return;
@@ -520,7 +522,7 @@ export default function ManualAdmissionPage() {
                           required={field.is_required}
                           className="rounded-xl text-sm"
                         />
-                      ) : field.field_type === "number" ? (
+                      ) : field.field_type === "number" && !isAadhaarField(field) ? (
                         <Input
                           type="number"
                           value={val}
@@ -532,6 +534,8 @@ export default function ManualAdmissionPage() {
                       ) : (
                         <Input
                           type="text"
+                          maxLength={isAadhaarField(field) ? 12 : undefined}
+                          inputMode={isAadhaarField(field) ? "numeric" : undefined}
                           value={val}
                           onChange={(e) => handleDynamicChange(field.id, e.target.value)}
                           required={field.is_required}

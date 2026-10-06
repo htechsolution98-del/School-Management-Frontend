@@ -26,11 +26,13 @@ export interface FeeType {
   id: number;
   name: string;
   billing_cycle: BillingCycle;
+  is_rte_applicable?: boolean;
 }
 
 export interface FeeTypeFormData {
   name: string;
   billing_cycle: BillingCycle;
+  is_rte_applicable?: boolean;
 }
 
 export type LateFeeType = "per_day" | "flat";
@@ -40,6 +42,7 @@ export interface FeeWiseClass {
   feetype: number;
   feetype_name: string;
   billing_cycle: string;
+  is_rte_applicable?: boolean;
   school_class: number;
   school_class_name: string;
   amount: string;
@@ -79,7 +82,15 @@ export interface StudentFee {
   academic_year_name: string;
   fee_wise_class: number;
   fee_wise_class_name: string;
+  feetype?: number;
   feetype_name: string;
+  is_rte_student?: boolean;
+  is_rte_applicable?: boolean;
+  is_rte_govt_claim?: boolean;
+  rte_govt_claim_amount?: string;
+  rte_govt_paid_amount?: string;
+  rte_govt_balance_amount?: string;
+  rte_govt_status?: "not_applicable" | "pending" | "partially_received" | "received" | string;
   class_name: string;
   billing_period: string;
   due_date: string;
@@ -97,7 +108,7 @@ export interface StudentFee {
   payments?: Payment[];
 }
 
-export type PaymentMode = "cash" | "online" | "cheque" | "bank_transfer" | "upi";
+export type PaymentMode = "cash" | "online" | "cheque" | "bank_transfer" | "upi" | "govt_rte";
 
 export interface Payment {
   id: number;
@@ -122,7 +133,12 @@ export interface Payment {
   fee_payable_amount?: string;
   fee_paid_amount?: string;
   fee_balance_amount?: string;
+  is_rte_govt_claim?: boolean;
+  rte_govt_claim_amount?: string;
+  rte_govt_paid_amount?: string;
+  rte_govt_status?: string;
   fee_status?: StudentFeeStatusValue | string;
+  payer_type?: "student" | "government" | string;
   amount: string;
   payment_mode: PaymentMode | string;
   transaction_id?: string | null;
@@ -218,6 +234,7 @@ export interface CollectFeePayload {
   student_fee: number;
   amount: string;
   payment_mode: string;
+  payer_type?: "student" | "government" | string;
   transaction_id?: string;
   receipt_number?: string;
   note?: string;

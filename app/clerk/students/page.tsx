@@ -35,6 +35,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { aadhaarSchema, isAadhaarField, AADHAAR_ERROR, maskAadhaar } from "@/lib/student-profile-validation";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -533,7 +534,7 @@ function StudentDetailsModal({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Aadhaar Number</span>
-                      <span className="font-mono font-semibold text-slate-800 dark:text-zinc-200">{aadhaarVal}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-zinc-200">{aadhaarVal === "—" ? aadhaarVal : maskAadhaar(aadhaarVal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1159,6 +1160,9 @@ export default function StudentRecordsPage() {
 
   const handleSaveFields = async () => {
     if (!editingAdmission) return;
+    for (const field of editingAdmission.field_values) {
+      if (isAadhaarField({ label: field.field_label || "" }) && !aadhaarSchema.safeParse(editedFields[String(field.field)] ?? field.value ?? "").success) { toast.error(AADHAAR_ERROR); return; }
+    }
     setIsSavingFields(true);
     try {
       await patchFieldValues(
@@ -1775,6 +1779,8 @@ export default function StudentRecordsPage() {
                   </label>
                   <Input
                     value={editedFields[String(fv.field)] ?? fv.value}
+                    maxLength={isAadhaarField({ label: fv.field_label }) ? 12 : undefined}
+                    inputMode={isAadhaarField({ label: fv.field_label }) ? "numeric" : undefined}
                     onChange={(e) =>
                       setEditedFields((prev) => ({
                         ...prev,
