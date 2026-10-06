@@ -822,6 +822,7 @@ const CollectFeeModal = ({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [payerType, setPayerType] = useState<"student" | "government">("student");
   
   const [form, setForm] = useState({
     amount: "",
@@ -834,16 +835,45 @@ const CollectFeeModal = ({
 
   useEffect(() => {
     if (fee) {
+      const isGovtDefault = Boolean(fee.is_rte_govt_claim && parseFloat(fee.balance_amount || "0") <= 0);
+      const initialPayer = isGovtDefault ? "government" : "student";
+      setPayerType(initialPayer);
+      
+      const defaultAmount = initialPayer === "government"
+        ? (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+        : (fee.balance_amount || "0.00");
+
       setForm({
-        amount: fee.balance_amount || "0.00",
-        payment_mode: "cash",
+        amount: defaultAmount,
+        payment_mode: initialPayer === "government" ? "govt_rte" : "cash",
         payment_date: new Date().toISOString().split('T')[0],
         transaction_id: "",
         receipt_number: "",
-        note: "",
+        note: initialPayer === "government" ? "RTE Government reimbursement payment" : "",
       });
     }
   }, [fee]);
+
+  const handlePayerChange = (newPayer: "student" | "government") => {
+    setPayerType(newPayer);
+    if (!fee) return;
+    if (newPayer === "government") {
+      const govtBal = Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0"));
+      setForm((prev) => ({
+        ...prev,
+        amount: govtBal.toFixed(2),
+        payment_mode: "govt_rte",
+        note: "RTE Government reimbursement payment",
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        amount: fee.balance_amount || "0.00",
+        payment_mode: "cash",
+        note: "",
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -853,7 +883,7 @@ const CollectFeeModal = ({
     if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
     if (!form.payment_date) errs.payment_date = "Payment date is required";
     
-    if (["cheque", "upi", "card"].includes(form.payment_mode) && !form.transaction_id) {
+    if (["cheque", "upi", "card", "govt_rte"].includes(form.payment_mode) && !form.transaction_id && form.payment_mode !== "govt_rte") {
        errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
     }
 
@@ -865,10 +895,11 @@ const CollectFeeModal = ({
       const { collectStudentFeePayment } = await import("@/lib/fees/fee-generation");
       const result = await collectStudentFeePayment({
         student_fee: fee.id,
+        payer_type: payerType,
         ...form
       });
       if (result.success) {
-        setToast({ type: "success", message: "Fee collected successfully!" });
+        setToast({ type: "success", message: payerType === "government" ? "Government RTE claim payment recorded!" : "Fee collected successfully!" });
         setTimeout(() => {
           onSuccess();
           onClose();
@@ -889,25 +920,73 @@ const CollectFeeModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Collect Fee">
+    <Modal isOpen={isOpen} onClose={onClose} title={payerType === "government" ? "Record RTE Government Claim Payment" : "Collect Student Fee"}>
       {fee && (
         <div className="bg-blue-50 rounded-xl p-4 mb-5 border border-blue-100 flex items-center justify-between">
             <div>
-              <p className="font-semibold text-gray-900">{fee.student_name}</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-semibold text-gray-900">{fee.student_name}</p>
+                {fee.is_rte_govt_claim && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    RTE Student Claim
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{fee.class_name} • {formatBillingPeriod(fee.billing_period)}</p>
             </div>
             <div className="text-right">
-              <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
-                <span className="text-[10px] font-semibold uppercase tracking-wider">
-                  {formatCurrency(fee.amount)} BASE 
-                  {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
-                  {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
-                  =
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Total Balance</p>
-              <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+              {payerType === "government" ? (
+                <>
+                  <p className="text-xs text-indigo-600 font-semibold uppercase tracking-wider">Govt Claim Receivable</p>
+                  <p className="text-lg font-bold text-indigo-700">
+                    {formatCurrency(
+                      (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+                    )}
+                  </p>
+                  <p className="text-[10px] text-gray-500">Status: {fee.rte_govt_status || "pending"}</p>
+                </>
+              ) : (
+                <>
+                  <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                      {formatCurrency(fee.amount)} BASE 
+                      {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
+                      {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
+                      =
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Student Balance</p>
+                  <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+                </>
+              )}
             </div>
+        </div>
+      )}
+
+      {fee?.is_rte_govt_claim && (
+        <div className="flex rounded-lg bg-gray-100 p-1 mb-4">
+          <button
+            type="button"
+            onClick={() => handlePayerChange("government")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              payerType === "government"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            🏛️ Government RTE Claim
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePayerChange("student")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              payerType === "student"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            👤 Student / Guardian
+          </button>
         </div>
       )}
 
@@ -920,16 +999,27 @@ const CollectFeeModal = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="Amount to Collect (₹)" error={errors.amount} required>
-            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" max={fee?.balance_amount} />
+          <FormField label={payerType === "government" ? "Govt Reimbursement Amount (₹)" : "Amount to Collect (₹)"} error={errors.amount} required>
+            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" />
           </FormField>
           
           <FormField label="Payment Mode" error={errors.payment_mode} required>
              <select className={inputClass} value={form.payment_mode} onChange={(e) => update("payment_mode", e.target.value)}>
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
+                {payerType === "government" ? (
+                  <>
+                    <option value="govt_rte">Government Direct Credit (RTGS/Treasury)</option>
+                    <option value="cheque">Cheque / Demand Draft</option>
+                    <option value="upi">UPI / Online</option>
+                    <option value="cash">Cash Voucher</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                  </>
+                )}
              </select>
           </FormField>
         </div>
@@ -938,13 +1028,13 @@ const CollectFeeModal = ({
           <FormField label="Payment Date" error={errors.payment_date} required>
              <input type="date" className={inputClass} value={form.payment_date} onChange={(e) => update("payment_date", e.target.value)} />
           </FormField>
-          <FormField label="Receipt No. (Optional)" error={errors.receipt_number}>
+          <FormField label="Receipt / Sanction No. (Optional)" error={errors.receipt_number}>
              <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
           </FormField>
         </div>
 
-        {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card") && (
-          <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : "Reference No. *"} error={errors.transaction_id}>
+        {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card" || form.payment_mode === "govt_rte") && (
+          <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : form.payment_mode === "govt_rte" ? "Govt Claim / Sanction Order Ref No." : "Reference / Transaction No. *"} error={errors.transaction_id}>
              <input type="text" className={inputClass} value={form.transaction_id} onChange={(e) => update("transaction_id", e.target.value)} />
           </FormField>
         )}
@@ -955,8 +1045,8 @@ const CollectFeeModal = ({
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-          <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Collecting...</> : "Collect Payment"}
+          <button type="submit" disabled={loading} className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${payerType === "government" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-blue-600 hover:bg-blue-700"}`}>
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Recording...</> : (payerType === "government" ? "Record Govt Reimbursement" : "Collect Payment")}
           </button>
         </div>
       </form>
@@ -1493,9 +1583,16 @@ export default function GenerateFeesPage() {
                         <div className="flex items-center gap-3">
                           <StudentAvatar name={fee.student_name} />
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {fee.student_name}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {fee.student_name}
+                              </p>
+                              {fee.is_rte_govt_claim && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  RTE
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-400">
                               ID#{fee.student.toString().padStart(3, "0")}
                             </p>
@@ -1544,6 +1641,11 @@ export default function GenerateFeesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={fee.status} />
+                        {fee.is_rte_govt_claim && (
+                          <div className="text-[10px] text-indigo-700 font-semibold mt-0.5">
+                            Govt: {fee.rte_govt_status || 'pending'}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">

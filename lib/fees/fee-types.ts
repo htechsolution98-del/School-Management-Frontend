@@ -43,6 +43,7 @@ export const feeTypeSchema = z.object({
   billing_cycle: z.enum(["single", "monthly", "quarterly", "half_yearly", "yearly"], {
     error: "Please select a billing cycle",
   }),
+  is_rte_applicable: z.boolean().default(false),
 });
 
 export async function getFeeTypes(): Promise<FeeType[]> {

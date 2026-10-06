@@ -61,11 +61,19 @@ export default function RTEClaimsPage() {
   const loadRTEData = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/rte/summary/`, {
+      let res = await fetchWithAuth(`${API_BASE_URL}/rte/summary/`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
       });
+
+      if (!res.ok) {
+        res = await fetchWithAuth(`${API_BASE_URL}/finance/rte-summary/`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+      }
 
       if (res.ok) {
         const json = await res.json();
@@ -83,7 +91,7 @@ export default function RTEClaimsPage() {
   }, []);
 
   const handleExportClaim = () => {
-    if (!data || data.students.length === 0) return;
+    if (!data || !data.students || data.students.length === 0) return;
     const csvContent =
       "data:text/csv;charset=utf-8," +
       ["GR Number,Student Name,Class,Division,Claim Amount,Status"]
@@ -139,7 +147,7 @@ export default function RTEClaimsPage() {
           <div className="flex flex-wrap gap-3">
             <Button
               onClick={handleExportClaim}
-              disabled={!data || data.students.length === 0}
+              disabled={!data || !data.students || data.students.length === 0}
               className="bg-white text-emerald-900 hover:bg-emerald-50 font-semibold shadow-lg"
             >
               <Download className="mr-1.5 h-4 w-4" /> Export Claim Dossier (CSV)
@@ -173,8 +181,8 @@ export default function RTEClaimsPage() {
             {[
               {
                 label: "RTE Enrolled Students",
-                value: data.total_rte_students,
-                sub: `Total: ${data.total_students} Enrolled`,
+                value: (data.total_rte_students ?? 0).toLocaleString("en-IN"),
+                sub: `Total: ${(data.total_students ?? 0).toLocaleString("en-IN")} Enrolled`,
                 icon: Users,
                 color: "text-teal-600",
                 bg: "bg-teal-50",
@@ -182,16 +190,16 @@ export default function RTEClaimsPage() {
               },
               {
                 label: "Overall RTE Quota",
-                value: `${data.overall_rte_percentage}%`,
+                value: `${data.overall_rte_percentage ?? 0}%`,
                 sub: "Statutory Mandate: 25.0%",
                 icon: Percent,
-                color: data.overall_rte_percentage >= 25 ? "text-emerald-600" : "text-amber-600",
-                bg: data.overall_rte_percentage >= 25 ? "bg-emerald-50" : "bg-amber-50",
-                border: data.overall_rte_percentage >= 25 ? "border-emerald-100" : "border-amber-100",
+                color: (data.overall_rte_percentage ?? 0) >= 25 ? "text-emerald-600" : "text-amber-600",
+                bg: (data.overall_rte_percentage ?? 0) >= 25 ? "bg-emerald-50" : "bg-amber-50",
+                border: (data.overall_rte_percentage ?? 0) >= 25 ? "border-emerald-100" : "border-amber-100",
               },
               {
                 label: "Standard Claim Rate",
-                value: `₹${data.standard_reimbursement_rate.toLocaleString()}`,
+                value: `₹${(data.standard_reimbursement_rate ?? 0).toLocaleString("en-IN")}`,
                 sub: "Per Student / Academic Year",
                 icon: DollarSign,
                 color: "text-indigo-600",
@@ -200,7 +208,7 @@ export default function RTEClaimsPage() {
               },
               {
                 label: "Estimated State Claim",
-                value: `₹${data.total_estimated_claim.toLocaleString()}`,
+                value: `₹${(data.total_estimated_claim ?? 0).toLocaleString("en-IN")}`,
                 sub: "Eligible for Gov. Submission",
                 icon: FileSpreadsheet,
                 color: "text-emerald-600",
@@ -237,7 +245,7 @@ export default function RTEClaimsPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data.class_quota.map((cq) => (
+              {(data.class_quota || []).map((cq) => (
                 <div key={cq.class_id} className="rounded-2xl border border-gray-100 bg-slate-50/70 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-gray-900 text-sm">{cq.class_name}</span>
@@ -262,7 +270,7 @@ export default function RTEClaimsPage() {
                         className={`h-full rounded-full transition-all ${
                           cq.compliant ? "bg-emerald-500" : "bg-amber-500"
                         }`}
-                        style={{ width: `${Math.min(cq.percentage, 100)}%` }}
+                        style={{ width: `${Math.min(cq.percentage || 0, 100)}%` }}
                       />
                     </div>
                   </div>
@@ -296,7 +304,7 @@ export default function RTEClaimsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {data.students.length === 0 ? (
+                  {!data.students || data.students.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                         No RTE students enrolled for the current academic session.
@@ -314,7 +322,7 @@ export default function RTEClaimsPage() {
                         </td>
                         <td className="px-6 py-4 text-gray-600">{s.admission_date || "—"}</td>
                         <td className="px-6 py-4 text-right font-bold text-gray-900">
-                          ₹{s.reimbursement_claim_amount.toLocaleString()}
+                          ₹{(s.reimbursement_claim_amount ?? 0).toLocaleString("en-IN")}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
