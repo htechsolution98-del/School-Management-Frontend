@@ -3,19 +3,28 @@ import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { Subject } from "@/types/clerk";
 
 export async function getSubjects(): Promise<Subject[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SET_SUBJECT}`);
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SET_SUBJECT}`);
 
-  if (!response.ok) {
-    let message = "Failed to fetch subjects.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    if (!response.ok) {
+      let message = "Failed to fetch subjects.";
+      try {
+        const err = await response.json();
+        message = err?.detail || err?.message || message;
+      } catch {}
+      console.warn("Failed to fetch subjects:", response.status, message);
+      return [];
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
+  } catch (err) {
+    console.error("Error in getSubjects:", err);
+    return [];
   }
-
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.data ?? data.results ?? [];
 }
 
 export async function saveSubject(payload: Subject): Promise<void> {

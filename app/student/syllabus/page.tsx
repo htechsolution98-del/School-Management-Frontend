@@ -19,6 +19,11 @@ import { getStudentSyllabus, type StudentSyllabusItem } from "@/lib/student";
 import { getClasses, getDivisions, getSubjects } from "@/lib/clerk";
 import type { Division, SchoolClass, Subject } from "@/types/clerk";
 import { API_BASE_URL } from "@/lib/config";
+import {
+  getSyllabusStreamUrl,
+  openAuthenticatedDocument,
+  getDocumentBlobUrl,
+} from "@/lib/document-viewer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -80,10 +85,7 @@ export default function StudentSyllabusPage() {
   const handleDownload = async (url: string, fileName: string, id: number) => {
     setDownloadingId(id);
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("CORS or network error");
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      const blobUrl = await getDocumentBlobUrl(url, url);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = fileName;
@@ -91,8 +93,7 @@ export default function StudentSyllabusPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      // Fallback: open in new tab if CORS blocks direct fetch
+    } catch {
       window.open(url, "_blank");
     } finally {
       setDownloadingId(null);
@@ -328,25 +329,31 @@ export default function StudentSyllabusPage() {
                             </div>
                           )}
                           <div className="flex items-center gap-2.5 w-full">
-                            <a
-                              href={resolvedUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1"
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                openAuthenticatedDocument(
+                                  item.id ? getSyllabusStreamUrl(item.id) : resolvedUrl,
+                                  item.subject_name,
+                                  resolvedUrl
+                                )
+                              }
+                              className="flex-1 text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 h-10 shadow-sm transition-colors cursor-pointer"
                             >
-                              <Button
-                                variant="outline"
-                                className="w-full text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 h-10 shadow-sm transition-colors"
-                              >
-                                <ExternalLink size={14} />
-                                View
-                              </Button>
-                            </a>
+                              <ExternalLink size={14} />
+                              View
+                            </Button>
                             <div className="flex-1">
                               <Button
-                                onClick={() => handleDownload(resolvedUrl, fileName, item.id)}
+                                onClick={() =>
+                                  handleDownload(
+                                    item.id ? getSyllabusStreamUrl(item.id) : resolvedUrl,
+                                    fileName,
+                                    item.id
+                                  )
+                                }
                                 disabled={downloadingId === item.id}
-                                className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 h-10 shadow-md hover:shadow-lg transition-all"
+                                className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 h-10 shadow-md hover:shadow-lg transition-all cursor-pointer"
                               >
                                 {downloadingId === item.id ? (
                                   <Loader2 size={14} className="animate-spin text-white" />

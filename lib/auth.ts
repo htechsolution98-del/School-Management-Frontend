@@ -163,11 +163,11 @@ function clearLegacyLocalTokens() {
   localStorage.removeItem("authToken");
 }
 
-function getAccessToken(): string | null {
+export function getAccessToken(): string | null {
   return getCookie(ACCESS_TOKEN_COOKIE) || (typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_COOKIE) : null);
 }
 
-function getRefreshToken(): string | null {
+export function getRefreshToken(): string | null {
   return getCookie(REFRESH_TOKEN_COOKIE) || (typeof window !== "undefined" ? localStorage.getItem(REFRESH_TOKEN_COOKIE) : null);
 }
 

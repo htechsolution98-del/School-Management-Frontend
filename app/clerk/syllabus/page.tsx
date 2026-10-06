@@ -25,6 +25,7 @@ import {
   saveSyllabus,
   deleteSyllabus,
 } from "@/lib/clerk";
+import { getSyllabusStreamUrl, openAuthenticatedDocument } from "@/lib/document-viewer";
 import type { Division, SchoolClass, Subject, Syllabus } from "@/types/clerk";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -80,6 +81,25 @@ export default function SyllabusPage() {
   const [classFilter, setClassFilter] = useState<string>("all");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadingDocId, setLoadingDocId] = useState<number | null>(null);
+
+  const handleViewSyllabus = async (item: Syllabus) => {
+    if (!item.id && !item.syllabus_file) return;
+
+    const streamUrl = item.id ? getSyllabusStreamUrl(item.id) : (item.syllabus_file as string);
+    const fallbackUrl = typeof item.syllabus_file === "string" ? item.syllabus_file : undefined;
+
+    setLoadingDocId(item.id ?? null);
+    try {
+      await openAuthenticatedDocument(
+        streamUrl,
+        `Syllabus - ${getSubjectLabel(item.subject)}`,
+        fallbackUrl
+      );
+    } finally {
+      setLoadingDocId(null);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -116,11 +136,7 @@ export default function SyllabusPage() {
   };
 
   const selectAllDivisions = () => {
-    const visibleDivs =
-      classFilter === "all"
-        ? divisions
-        : divisions.filter((div) => div.SchoolClass?.toString() === classFilter);
-    const visibleIds = visibleDivs.map((d) => d.id!).filter(Boolean);
+    const visibleIds = sortedDivisionsForSelect.map((d) => d.id!).filter(Boolean) as number[];
     setSelectedDivisionIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
   };
 
@@ -145,9 +161,25 @@ export default function SyllabusPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    if (!file) return;
+
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    const maxPhotoSize = 500 * 1024; // 500KB
+    const maxDocSize = 2 * 1024 * 1024; // 2MB
+    const limit = isImage ? maxPhotoSize : maxDocSize;
+
+    if (file.size > limit) {
+      if (isImage) {
+        toast.error(`Image size exceeds 500KB limit (${(file.size / 1024).toFixed(1)}KB). Please choose a smaller photo.`);
+      } else {
+        toast.error(`Document size exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB). Please choose a smaller file.`);
+      }
+      e.target.value = "";
+      setSelectedFile(null);
+      return;
     }
+
+    setSelectedFile(file);
   };
 
   const handleAddSyllabus = async (e: React.FormEvent) => {
@@ -165,6 +197,20 @@ export default function SyllabusPage() {
 
     if (!selectedFile) {
       toast.error("Please select a syllabus file");
+      return;
+    }
+
+    const isImage = selectedFile.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(selectedFile.name);
+    const maxPhotoSize = 500 * 1024; // 500KB
+    const maxDocSize = 2 * 1024 * 1024; // 2MB
+    const limit = isImage ? maxPhotoSize : maxDocSize;
+
+    if (selectedFile.size > limit) {
+      if (isImage) {
+        toast.error(`Image size exceeds 500KB limit (${(selectedFile.size / 1024).toFixed(1)}KB). Please choose a smaller photo.`);
+      } else {
+        toast.error(`Document size exceeds 2MB limit (${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB). Please choose a smaller file.`);
+      }
       return;
     }
 
@@ -362,6 +408,13 @@ export default function SyllabusPage() {
     return a.division.localeCompare(b.division, undefined, { numeric: true });
   });
 
+  const getDivisionSelectTriggerLabel = () => {
+    if (selectedDivisionIds.length === 0) {
+      return "Select divisions...";
+    }
+    return `${selectedDivisionIds.length} selected`;
+  };
+
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-white min-h-screen overflow-x-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -432,23 +485,84 @@ export default function SyllabusPage() {
                     </div>
                   </div>
 
-                  {/* Filter by Class */}
+                  {/* Select Divisions Dropdown */}
                   <Select
-                    value={classFilter}
-                    onValueChange={(val) => setClassFilter(val || "all")}
+                    multiple
+                    value={selectedDivisionIds.map(String)}
+                    onValueChange={(val: string[]) => {
+                      const ids = Array.isArray(val)
+                        ? val.map((v) => Number(v)).filter((n) => !isNaN(n))
+                        : [];
+                      setSelectedDivisionIds(ids);
+                    }}
                   >
-                    <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs h-8">
-                      <SelectValue placeholder="Filter by Class" />
+                    <SelectTrigger
+                      className="w-full bg-slate-50 border-slate-200 text-xs h-9 cursor-pointer"
+                      title={selectedDivisionIds.map((id) => getDivisionLabel(id)).join(", ")}
+                    >
+                      <SelectValue placeholder="Select divisions...">
+                        {getDivisionSelectTriggerLabel()}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Classes</SelectItem>
-                      {schoolClasses.map((cls) => (
-                        <SelectItem key={cls.id} value={cls.id.toString()}>
-                          {SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label || cls.school_class}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      {sortedDivisionsForSelect.length === 0 ? (
+                        <div className="p-3 text-xs text-slate-400 text-center">
+                          No divisions found. Create divisions first.
+                        </div>
+                      ) : (
+                        sortedDivisionsForSelect.map((div) => {
+                          const isSelected = selectedDivisionIds.includes(div.id!);
+                          return (
+                            <SelectItem key={div.id} value={div.id!.toString()}>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={cn(
+                                    "h-3.5 w-3.5 rounded border flex items-center justify-center transition-colors shrink-0",
+                                    isSelected
+                                      ? "bg-primary border-primary text-white"
+                                      : "border-slate-300 bg-white"
+                                  )}
+                                >
+                                  {isSelected && <CheckCircle2 className="h-3 w-3" />}
+                                </div>
+                                <span className="truncate">{getDivisionLabel(div.id!)}</span>
+                              </div>
+                            </SelectItem>
+                          );
+                        })
+                      )}
                     </SelectContent>
                   </Select>
+
+                  {/* Selected Division Pills (removable) */}
+                  {selectedDivisionIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1 pb-0.5">
+                      {selectedDivisionIds.map((id) => {
+                        const label = getDivisionLabel(id);
+                        return (
+                          <Badge
+                            key={id}
+                            variant="secondary"
+                            className="bg-primary/10 text-primary border border-primary/20 text-xs px-2 py-0.5 flex items-center gap-1 font-medium group select-none hover:bg-primary/15 transition-colors"
+                          >
+                            <span>{label}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleDivision(id);
+                              }}
+                              className="hover:text-red-600 text-primary/70 transition-colors ml-0.5 focus:outline-none"
+                              title={`Remove ${label}`}
+                              aria-label={`Remove ${label}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Quick Class Badges */}
                   {schoolClasses.length > 0 && (
@@ -495,29 +609,27 @@ export default function SyllabusPage() {
                       </p>
                     ) : (
                       <div className="space-y-1">
-                        {sortedDivisionsForSelect
-                          .filter((div) => classFilter === "all" || div.SchoolClass?.toString() === classFilter)
-                          .map((div) => {
-                            const isSelected = selectedDivisionIds.includes(div.id!);
-                            return (
-                              <div
-                                key={div.id}
-                                onClick={() => toggleDivision(div.id!)}
-                                className={cn(
-                                  "flex items-center space-x-2 p-2 rounded-md border text-xs cursor-pointer transition-all select-none",
-                                  isSelected
-                                    ? "bg-white border-primary/40 shadow-2xs font-medium text-slate-900"
-                                    : "bg-white/50 border-slate-200/60 text-slate-600 hover:bg-white hover:border-slate-300"
-                                )}
-                              >
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={() => toggleDivision(div.id!)}
-                                />
-                                <span className="flex-1">{getDivisionLabel(div.id!)}</span>
-                              </div>
-                            );
-                          })}
+                        {sortedDivisionsForSelect.map((div) => {
+                          const isSelected = selectedDivisionIds.includes(div.id!);
+                          return (
+                            <div
+                              key={div.id}
+                              onClick={() => toggleDivision(div.id!)}
+                              className={cn(
+                                "flex items-center space-x-2 p-2 rounded-md border text-xs cursor-pointer transition-all select-none",
+                                isSelected
+                                  ? "bg-white border-primary/40 shadow-2xs font-medium text-slate-900"
+                                  : "bg-white/50 border-slate-200/60 text-slate-600 hover:bg-white hover:border-slate-300"
+                              )}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleDivision(div.id!)}
+                              />
+                              <span className="flex-1">{getDivisionLabel(div.id!)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </ScrollArea>
@@ -528,6 +640,11 @@ export default function SyllabusPage() {
                       {selectedDivisionIds.length} division{selectedDivisionIds.length > 1 ? "s" : ""} selected
                     </p>
                   )}
+
+                  {/* Hidden inputs to sync with form state */}
+                  {selectedDivisionIds.map((id) => (
+                    <input key={id} type="hidden" name="divisions" value={id} />
+                  ))}
                 </div>
 
                 {/* Subject Selection */}
@@ -618,7 +735,7 @@ export default function SyllabusPage() {
                           Click to browse or drag & drop
                         </p>
                         <p className="text-[10px] text-slate-400 mt-1">
-                          PDF, DOC, PNG, JPG (Max 5MB)
+                          PDF, DOC (Max 2MB) | PNG, JPG (Max 500KB)
                         </p>
                       </div>
                     )}
@@ -752,15 +869,19 @@ export default function SyllabusPage() {
                               <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                 {item.syllabus_file &&
                                 typeof item.syllabus_file === "string" ? (
-                                  <a
-                                    href={item.syllabus_file}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-primary hover:underline font-medium"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewSyllabus(item)}
+                                    disabled={loadingDocId === item.id}
+                                    className="flex items-center gap-2 text-primary hover:underline font-medium cursor-pointer"
                                   >
-                                    <FileText className="h-4 w-4" />
-                                    <span>View Document</span>
-                                  </a>
+                                    {loadingDocId === item.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                    ) : (
+                                      <FileText className="h-4 w-4" />
+                                    )}
+                                    <span>{loadingDocId === item.id ? "Loading..." : "View Document"}</span>
+                                  </button>
                                 ) : (
                                   <span className="text-slate-400 italic">
                                     No file attached

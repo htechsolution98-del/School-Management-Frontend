@@ -30,6 +30,7 @@ import {
 } from "@/lib/student";
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { getSyllabusStreamUrl, openAuthenticatedDocument } from "@/lib/document-viewer";
 
 // ─────────────────────────────────────────────
 // Animation Variants
@@ -479,14 +480,19 @@ export default function StudentDashboardPage() {
                     </span>
                   </div>
                   {syl.syllabus_file && (
-                    <a
-                      href={syl.syllabus_file}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] font-bold text-indigo-600 hover:underline bg-indigo-50/80 px-2.5 py-1 rounded-lg"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAuthenticatedDocument(
+                          syl.id ? getSyllabusStreamUrl(syl.id) : syl.syllabus_file,
+                          syl.subject_name || "Syllabus",
+                          syl.syllabus_file
+                        )
+                      }
+                      className="text-[11px] font-bold text-indigo-600 hover:underline bg-indigo-50/80 px-2.5 py-1 rounded-lg cursor-pointer flex items-center gap-1"
                     >
                       📄 Download PDF
-                    </a>
+                    </button>
                   )}
                 </div>
               ))}
