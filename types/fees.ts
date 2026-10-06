@@ -148,8 +148,9 @@ export interface StudentFeePayload {
   student: number;
   academic_year: number;
   fee_wise_class: number;
+  feetype?: number;
   billing_period: string;
-  due_date: string;
+  due_date?: string;
 }
 
 export interface DiscountPayload {
@@ -193,14 +194,16 @@ export interface CreateSingleFeePayload {
   student: number;
   academic_year: number;
   fee_wise_class: number;
-  billing_period: string;
-  due_date: string;
+  feetype?: number;
+  billing_period?: string;
+  due_date?: string;
 }
 
 export interface CreateMonthlyFeePayload {
   student: number;
   academic_year: number;
   fee_wise_class: number;
+  feetype?: number;
   billing_period: string;
   due_date?: string;
 }
