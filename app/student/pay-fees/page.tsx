@@ -54,6 +54,7 @@ const modeEmoji: Record<PaymentMode, string> = {
   online: "💳",
   cheque: "🧾",
   bank_transfer: "🏦",
+  govt_rte: "🏛️",
 };
 
 const PaymentModeIcon = ({ mode }: { mode: PaymentMode }) => (

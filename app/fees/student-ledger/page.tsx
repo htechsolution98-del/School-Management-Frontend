@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import ReceiptModal from "./ReceiptModal";
+import ReceiptHistoryModal from "./ReceiptHistoryModal";
 import {
   Users,
   IndianRupee,
@@ -29,6 +30,9 @@ import {
   UserX,
   LayoutGrid,
   Table as TableIcon,
+  Printer,
+  Receipt,
+  FileText,
 } from "lucide-react";
 import {
   fetchStudents,
@@ -50,6 +54,7 @@ import {
   type AcademicYear,
   type FeeWiseClass,
 } from "@/lib/fees";
+import type { Payment } from "@/types/fees";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
 
 // Status Badge Component
@@ -808,7 +813,6 @@ const DiscountModal = ({
   );
 };
 
-// Collect Fee Modal
 const CollectFeeModal = ({
   isOpen,
   onClose,
@@ -818,11 +822,12 @@ const CollectFeeModal = ({
   isOpen: boolean;
   onClose: () => void;
   fee: StudentFee | null;
-  onSuccess: () => void;
+  onSuccess: (receiptNumber?: string) => void;
 }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [payerType, setPayerType] = useState<"student" | "government">("student");
   
   const [form, setForm] = useState({
     amount: "",
@@ -835,16 +840,45 @@ const CollectFeeModal = ({
 
   useEffect(() => {
     if (fee) {
+      const isGovtDefault = Boolean(fee.is_rte_govt_claim && parseFloat(fee.balance_amount || "0") <= 0);
+      const initialPayer = isGovtDefault ? "government" : "student";
+      setPayerType(initialPayer);
+      
+      const defaultAmount = initialPayer === "government"
+        ? (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+        : (fee.balance_amount || "0.00");
+
       setForm({
-        amount: fee.balance_amount || "0.00",
-        payment_mode: "cash",
+        amount: defaultAmount,
+        payment_mode: initialPayer === "government" ? "govt_rte" : "cash",
         payment_date: new Date().toISOString().split('T')[0],
         transaction_id: "",
         receipt_number: "",
-        note: "",
+        note: initialPayer === "government" ? "RTE Government reimbursement payment" : "",
       });
     }
   }, [fee]);
+
+  const handlePayerChange = (newPayer: "student" | "government") => {
+    setPayerType(newPayer);
+    if (!fee) return;
+    if (newPayer === "government") {
+      const govtBal = Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0"));
+      setForm((prev) => ({
+        ...prev,
+        amount: govtBal.toFixed(2),
+        payment_mode: "govt_rte",
+        note: "RTE Government reimbursement payment",
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        amount: fee.balance_amount || "0.00",
+        payment_mode: "cash",
+        note: "",
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -854,7 +888,7 @@ const CollectFeeModal = ({
     if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
     if (!form.payment_date) errs.payment_date = "Payment date is required";
     
-    if (["cheque", "upi", "card"].includes(form.payment_mode) && !form.transaction_id) {
+    if (["cheque", "upi", "card", "govt_rte"].includes(form.payment_mode) && !form.transaction_id && form.payment_mode !== "govt_rte") {
        errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
     }
 
@@ -866,14 +900,16 @@ const CollectFeeModal = ({
       const { collectStudentFeePayment } = await import("@/lib/fees/fee-generation");
       const result = await collectStudentFeePayment({
         student_fee: fee.id,
+        payer_type: payerType,
         ...form
       });
       if (result.success) {
-        setToast({ type: "success", message: "Fee collected successfully!" });
+        setToast({ type: "success", message: payerType === "government" ? "Government RTE claim payment recorded!" : "Fee collected successfully!" });
+        const receiptNo = result.data?.receipt_number;
         setTimeout(() => {
-          onSuccess();
+          onSuccess(receiptNo);
           onClose();
-        }, 1500);
+        }, 1200);
       } else {
         setToast({ type: "error", message: result.error || "Failed to collect fee" });
       }
@@ -890,25 +926,73 @@ const CollectFeeModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Collect Fee">
+    <Modal isOpen={isOpen} onClose={onClose} title={payerType === "government" ? "Record RTE Government Claim Payment" : "Collect Student Fee"}>
       {fee && (
         <div className="bg-blue-50 rounded-xl p-4 mb-5 border border-blue-100 flex items-center justify-between">
             <div>
-              <p className="font-semibold text-gray-900">{fee.student_name}</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-semibold text-gray-900">{fee.student_name}</p>
+                {fee.is_rte_govt_claim && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    🏛️ RTE Claim
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{fee.class_name} • {formatBillingPeriod(fee.billing_period)}</p>
             </div>
             <div className="text-right">
-              <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
-                <span className="text-[10px] font-semibold uppercase tracking-wider">
-                  {formatCurrency(fee.amount)} BASE 
-                  {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
-                  {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
-                  =
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Total Balance</p>
-              <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+              {payerType === "government" ? (
+                <>
+                  <p className="text-xs text-indigo-600 font-semibold uppercase tracking-wider">Govt Claim Receivable</p>
+                  <p className="text-lg font-bold text-indigo-700">
+                    {formatCurrency(
+                      (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+                    )}
+                  </p>
+                  <p className="text-[10px] text-gray-500">Status: {fee.rte_govt_status || "pending"}</p>
+                </>
+              ) : (
+                <>
+                  <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                      {formatCurrency(fee.amount)} BASE 
+                      {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
+                      {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
+                      =
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Student Balance</p>
+                  <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+                </>
+              )}
             </div>
+        </div>
+      )}
+
+      {fee?.is_rte_govt_claim && (
+        <div className="flex rounded-lg bg-gray-100 p-1 mb-4">
+          <button
+            type="button"
+            onClick={() => handlePayerChange("government")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              payerType === "government"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            🏛️ Government RTE Claim
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePayerChange("student")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              payerType === "student"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            👤 Student / Guardian
+          </button>
         </div>
       )}
 
@@ -921,16 +1005,27 @@ const CollectFeeModal = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="Amount to Collect (₹)" error={errors.amount} required>
-            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" max={fee?.balance_amount} />
+          <FormField label={payerType === "government" ? "Govt Reimbursement Amount (₹)" : "Amount to Collect (₹)"} error={errors.amount} required>
+            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" />
           </FormField>
           
           <FormField label="Payment Mode" error={errors.payment_mode} required>
              <select className={inputClass} value={form.payment_mode} onChange={(e) => update("payment_mode", e.target.value)}>
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
+                {payerType === "government" ? (
+                  <>
+                    <option value="govt_rte">Government Direct Credit (RTGS/Treasury)</option>
+                    <option value="cheque">Cheque / Demand Draft</option>
+                    <option value="upi">UPI / Online</option>
+                    <option value="cash">Cash Voucher</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                  </>
+                )}
              </select>
           </FormField>
         </div>
@@ -939,13 +1034,13 @@ const CollectFeeModal = ({
           <FormField label="Payment Date" error={errors.payment_date} required>
              <input type="date" className={inputClass} value={form.payment_date} onChange={(e) => update("payment_date", e.target.value)} />
           </FormField>
-          <FormField label="Receipt No. (Optional)" error={errors.receipt_number}>
+          <FormField label="Receipt / Sanction No. (Optional)" error={errors.receipt_number}>
              <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
           </FormField>
         </div>
 
-        {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card") && (
-          <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : "Reference No. *"} error={errors.transaction_id}>
+        {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card" || form.payment_mode === "govt_rte") && (
+          <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : form.payment_mode === "govt_rte" ? "Govt Claim / Sanction Order Ref No." : "Reference / Transaction No. *"} error={errors.transaction_id}>
              <input type="text" className={inputClass} value={form.transaction_id} onChange={(e) => update("transaction_id", e.target.value)} />
           </FormField>
         )}
@@ -956,8 +1051,308 @@ const CollectFeeModal = ({
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-          <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Collecting...</> : "Collect Payment"}
+          <button type="submit" disabled={loading} className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${payerType === "government" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-blue-600 hover:bg-blue-700"}`}>
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Recording...</> : (payerType === "government" ? "Record Govt Reimbursement" : "Collect Payment")}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const CollectMultipleFeesModal = ({
+  isOpen,
+  onClose,
+  fees,
+  student,
+  academicYearId,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  fees: StudentFee[];
+  student: Student | null;
+  academicYearId: number | null;
+  onSuccess: (receiptNumber?: string) => void;
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const [payerType, setPayerType] = useState<"student" | "government">("student");
+
+  const [form, setForm] = useState({
+    payment_mode: "cash",
+    payment_date: new Date().toISOString().split('T')[0],
+    transaction_id: "",
+    note: "",
+  });
+
+  useEffect(() => {
+    if (fees.length > 0) {
+      const isGovt = fees.every(f => f.is_rte_govt_claim && parseFloat(f.balance_amount || "0") <= 0);
+      setPayerType(isGovt ? "government" : "student");
+      setForm({
+        payment_mode: isGovt ? "govt_rte" : "cash",
+        payment_date: new Date().toISOString().split('T')[0],
+        transaction_id: "",
+        note: isGovt ? `RTE Government claim reimbursement for ${fees.length} installments` : `Combined payment for ${fees.length} fee items`,
+      });
+    }
+  }, [fees]);
+
+  const handlePayerChange = (newPayer: "student" | "government") => {
+    setPayerType(newPayer);
+    if (newPayer === "government") {
+      setForm((prev) => ({
+        ...prev,
+        payment_mode: "govt_rte",
+        note: `RTE Government claim reimbursement for ${fees.length} installments`,
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        payment_mode: "cash",
+        note: `Combined payment for ${fees.length} fee items`,
+      }));
+    }
+  };
+
+  const totalCalculatedAmount = fees.reduce((sum, f) => {
+    if (payerType === "government") {
+      const claim = parseFloat(f.rte_govt_claim_amount || f.amount || "0");
+      const paid = parseFloat(f.rte_govt_paid_amount || "0");
+      return sum + Math.max(0, claim - paid);
+    }
+    return sum + parseFloat(f.balance_amount || "0");
+  }, 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (fees.length === 0) return;
+
+    const errs: Record<string, string> = {};
+    if (totalCalculatedAmount <= 0) errs.amount = "Total payable amount must be greater than 0";
+    if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
+    if (!form.payment_date) errs.payment_date = "Payment date is required";
+
+    if (["cheque", "upi", "card"].includes(form.payment_mode) && !form.transaction_id) {
+       errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
+    }
+
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLoading(true);
+    try {
+      const { bulkCollectStudentFeePayments } = await import("@/lib/fees/fee-generation");
+      const items = fees.map(f => ({
+        student_fee_id: f.is_virtual ? undefined : f.id,
+        student: student?.id || (typeof f.student === "object" ? (f.student as any)?.id : f.student),
+        academic_year: academicYearId || undefined,
+        fee_wise_class: f.fee_wise_class,
+        billing_period: f.billing_period,
+        due_date: f.due_date,
+        amount: payerType === "government" 
+          ? Math.max(0, parseFloat(f.rte_govt_claim_amount || f.amount || "0") - parseFloat(f.rte_govt_paid_amount || "0")).toFixed(2)
+          : f.balance_amount,
+      }));
+
+      const result = await bulkCollectStudentFeePayments({
+        items,
+        payer_type: payerType,
+        ...form
+      });
+
+      if (result.success && result.data) {
+        setToast({ type: "success", message: `Successfully collected ${fees.length} fees! Generating combined receipt...` });
+        const receiptNo = result.data?.receipt_number;
+        setTimeout(() => {
+          onSuccess(receiptNo);
+          onClose();
+        }, 1200);
+      } else {
+        setToast({ type: "error", message: result.error || "Failed to collect fees" });
+      }
+    } catch (error: any) {
+      setToast({ type: "error", message: error.message || "Failed to collect fees" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const update = (key: string, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Collect Multiple Fees (${fees.length} Selected)`}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {toast && (
+          <div className={`p-3 rounded-xl text-xs font-semibold ${toast.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+            {toast.message}
+          </div>
+        )}
+
+        {/* Selected Student Details */}
+        {student && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3.5 border border-blue-100 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-gray-900">{student.name} {student.surname}</p>
+              <p className="text-xs text-gray-500">GR No: {student.gr_no || "-"} • Class: {student.class_name || "-"}</p>
+            </div>
+            <div className="text-right">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm">
+                {fees.length} Fees
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Payer Type Selection */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+          <button
+            type="button"
+            onClick={() => handlePayerChange("student")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              payerType === "student" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            👤 Student / Parent Payment
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePayerChange("government")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              payerType === "government" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            🏛️ Government RTE Claim
+          </button>
+        </div>
+
+        {/* Selected Items List */}
+        <div className="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase font-semibold sticky top-0">
+              <tr>
+                <th className="p-2.5">#</th>
+                <th className="p-2.5">Period / Fee</th>
+                <th className="p-2.5 text-right">Base</th>
+                <th className="p-2.5 text-right">{payerType === "government" ? "Govt Claim" : "Payable"}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {fees.map((f, idx) => {
+                const itemPayable = payerType === "government"
+                  ? Math.max(0, parseFloat(f.rte_govt_claim_amount || f.amount || "0") - parseFloat(f.rte_govt_paid_amount || "0"))
+                  : parseFloat(f.balance_amount || "0");
+                return (
+                  <tr key={f.id} className="hover:bg-gray-50/50">
+                    <td className="p-2.5 text-gray-400">{idx + 1}</td>
+                    <td className="p-2.5 font-medium text-gray-800">
+                      {f.feetype_name} ({formatBillingPeriod(f.billing_period || "")})
+                      {f.is_rte_govt_claim && <span className="ml-1 text-[10px] text-indigo-600 font-bold">🏛️ RTE</span>}
+                    </td>
+                    <td className="p-2.5 text-right text-gray-600">₹{parseFloat(f.amount || "0").toLocaleString("en-IN")}</td>
+                    <td className="p-2.5 text-right font-bold text-gray-900">₹{itemPayable.toLocaleString("en-IN")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Grand Total Box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-xs font-bold text-blue-900 uppercase">Total Amount to Collect:</span>
+          <span className="text-lg font-black text-blue-700">₹{totalCalculatedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+        </div>
+
+        {/* Payment Fields */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Mode *</label>
+            <select
+              value={form.payment_mode}
+              onChange={(e) => update("payment_mode", e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              {payerType === "government" ? (
+                <>
+                  <option value="govt_rte">Government RTE Direct Credit</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="cash">Cash</option>
+                </>
+              ) : (
+                <>
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </>
+              )}
+            </select>
+            {errors.payment_mode && <p className="text-[11px] text-red-500 mt-0.5">{errors.payment_mode}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Date *</label>
+            <input
+              type="date"
+              value={form.payment_date}
+              onChange={(e) => update("payment_date", e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            />
+            {errors.payment_date && <p className="text-[11px] text-red-500 mt-0.5">{errors.payment_date}</p>}
+          </div>
+
+          {["cheque", "upi", "card", "bank_transfer"].includes(form.payment_mode) && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                {form.payment_mode === "cheque" ? "Cheque Number *" : "Reference / Transaction ID *"}
+              </label>
+              <input
+                type="text"
+                placeholder={form.payment_mode === "cheque" ? "e.g. CHQ-981240" : "e.g. UPI-TXN-872134"}
+                value={form.transaction_id}
+                onChange={(e) => update("transaction_id", e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              />
+              {errors.transaction_id && <p className="text-[11px] text-red-500 mt-0.5">{errors.transaction_id}</p>}
+            </div>
+          )}
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Notes / Remarks</label>
+            <input
+              type="text"
+              placeholder="Optional notes or remarks..."
+              value={form.note}
+              onChange={(e) => update("note", e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || totalCalculatedAmount <= 0}
+            className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-colors shadow-sm shadow-blue-200 flex items-center justify-center gap-1.5"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+            {loading ? "Processing..." : `Collect ₹${totalCalculatedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} & Get Receipt`}
           </button>
         </div>
       </form>
@@ -1051,12 +1446,47 @@ const ViewFeeModal = ({
             </div>
           )}
           <div className="flex justify-between text-sm font-bold text-gray-900 pt-2 border-t border-blue-200">
-            <span>Payable Amount</span>
+            <span>Student Payable Amount</span>
             <span className="text-blue-600">
               {formatCurrency(fee.payable_amount)}
             </span>
           </div>
         </div>
+
+        {fee.is_rte_govt_claim && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                🏛️ RTE Government Claim / Receivable
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                fee.rte_govt_status === "received"
+                  ? "bg-green-100 text-green-700"
+                  : fee.rte_govt_status === "partially_received"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-orange-100 text-orange-700"
+              }`}>
+                {fee.rte_govt_status || "pending"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-indigo-900">
+              <span>Total Government Claim</span>
+              <span className="font-bold">{formatCurrency(fee.rte_govt_claim_amount || fee.amount)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-green-700">
+              <span>Reimbursement Received</span>
+              <span className="font-bold">{formatCurrency(fee.rte_govt_paid_amount || "0")}</span>
+            </div>
+            <div className="flex justify-between text-sm text-orange-700 pt-1 border-t border-indigo-100">
+              <span>Pending Government Balance</span>
+              <span className="font-bold">
+                {formatCurrency(
+                  (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+                )}
+              </span>
+            </div>
+          </div>
+        )}
 
         {fee.discount_reference && (
           <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
@@ -1259,6 +1689,10 @@ export default function StudentLedgerPage() {
   const [activeAcademicYearId, setActiveAcademicYearId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
+  // Multi-selection state
+  const [selectedFeeKeys, setSelectedFeeKeys] = useState<string[]>([]);
+  const [isCollectMultipleModalOpen, setIsCollectMultipleModalOpen] = useState(false);
+
   // Modals
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
@@ -1266,10 +1700,12 @@ export default function StudentLedgerPage() {
   const [selectedFee, setSelectedFee] = useState<StudentFee | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  // Receipt Search
+  // Receipt Search & History
   const [receiptSearchQuery, setReceiptSearchQuery] = useState("");
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isReceiptHistoryModalOpen, setIsReceiptHistoryModalOpen] = useState(false);
   const [searchedReceiptNumber, setSearchedReceiptNumber] = useState<string | null>(null);
+  const [selectedReceiptPayments, setSelectedReceiptPayments] = useState<Payment[] | null>(null);
 
   useEffect(() => {
     async function loadStudentsAndYears() {
@@ -1289,6 +1725,7 @@ export default function StudentLedgerPage() {
   const loadLedgerData = useCallback(async () => {
     if (!selectedLedgerStudent) {
       setLedgerFees([]);
+      setSelectedFeeKeys([]);
       return;
     }
     setLedgerLoading(true);
@@ -1308,6 +1745,53 @@ export default function StudentLedgerPage() {
   useEffect(() => {
     loadLedgerData();
   }, [loadLedgerData]);
+
+  // Helper to get unique key for fee item
+  const getFeeKey = (fee: StudentFee): string => String(fee.id);
+
+  // Compute selectable fees
+  const selectableFees = useMemo(() => {
+    return ledgerFees.filter((fee: StudentFee) => {
+      const studentBal = parseFloat(fee.balance_amount || "0");
+      const govtBal = fee.is_rte_govt_claim
+        ? Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount || "0") - parseFloat(fee.rte_govt_paid_amount || "0"))
+        : 0;
+      return (studentBal > 0 || govtBal > 0 || fee.status !== "paid");
+    });
+  }, [ledgerFees]);
+
+  const isAllSelected = selectableFees.length > 0 && selectedFeeKeys.length === selectableFees.length;
+  const isSomeSelected = selectedFeeKeys.length > 0 && selectedFeeKeys.length < selectableFees.length;
+
+  const toggleSelectFee = (fee: StudentFee | string) => {
+    const key = typeof fee === "string" ? fee : getFeeKey(fee);
+    setSelectedFeeKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedFeeKeys([]);
+    } else {
+      setSelectedFeeKeys(selectableFees.map((f: StudentFee) => getFeeKey(f)));
+    }
+  };
+
+  const selectedFeeObjects = useMemo(() => {
+    return ledgerFees.filter((f: StudentFee) => selectedFeeKeys.includes(getFeeKey(f)));
+  }, [ledgerFees, selectedFeeKeys]);
+
+  const selectedTotalAmount = useMemo(() => {
+    return selectedFeeObjects.reduce((sum: number, f: StudentFee) => {
+      const studentBal = parseFloat(f.balance_amount || "0");
+      if (f.is_rte_govt_claim && studentBal <= 0) {
+        const govtBal = parseFloat(f.rte_govt_claim_amount || f.amount || "0") - parseFloat(f.rte_govt_paid_amount || "0");
+        return sum + Math.max(0, govtBal);
+      }
+      return sum + studentBal;
+    }, 0);
+  }, [selectedFeeObjects]);
 
   const handleDiscount = (fee: StudentFee) => {
     setSelectedFee(fee);
@@ -1458,76 +1942,218 @@ export default function StudentLedgerPage() {
       {selectedLedgerStudent && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
            {/* Summary Cards */}
-           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-             <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 p-4 rounded-2xl border border-gray-200">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white"><IndianRupee size={16} /></div>
-                  <p className="text-sm font-medium text-gray-900">Base Fees</p>
+           {(() => {
+             const isRteStudent = Boolean(
+               selectedLedgerStudent?.is_rte ||
+               ledgerFees.some((f) => f.is_rte_student || f.is_rte_govt_claim)
+             );
+
+             const totalBaseFees = ledgerFees.reduce((sum, f) => sum + parseFloat(f.amount || "0"), 0);
+             const totalPenalty = ledgerFees.reduce((sum, f) => sum + parseFloat(f.fine_amount || "0"), 0);
+             const totalStudentPayable = ledgerFees.reduce((sum, f) => sum + parseFloat(f.payable_amount || "0"), 0);
+             const totalStudentPaid = ledgerFees.reduce((sum, f) => sum + parseFloat(f.paid_amount || "0"), 0);
+             const totalStudentBalance = ledgerFees.reduce((sum, f) => sum + parseFloat(f.balance_amount || "0"), 0);
+
+             const totalGovtClaim = ledgerFees.reduce(
+               (sum, f) => sum + (f.is_rte_govt_claim ? parseFloat(f.rte_govt_claim_amount || f.amount || "0") : 0),
+               0
+             );
+             const totalGovtPaid = ledgerFees.reduce(
+               (sum, f) => sum + (f.is_rte_govt_claim ? parseFloat(f.rte_govt_paid_amount || "0") : 0),
+               0
+             );
+             const totalGovtPending = Math.max(0, totalGovtClaim - totalGovtPaid);
+
+             return isRteStudent ? (
+               <div className="space-y-3 mb-6">
+                 {/* RTE Student Tag Banner */}
+                 <div className="flex flex-wrap items-center justify-between bg-indigo-50/80 border border-indigo-200 px-4 py-2.5 rounded-2xl gap-2">
+                   <div className="flex items-center gap-2">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[11px]">
+                       RTE
+                     </span>
+                     <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide">
+                       RTE Quota Student — Fee & Government Reimbursement Breakdown
+                     </span>
+                   </div>
+                   <span className="text-xs font-bold text-indigo-700 bg-white px-3 py-1 rounded-lg border border-indigo-200 shadow-sm">
+                     Total Govt Claim: ₹{totalGovtClaim.toLocaleString("en-IN")}
+                   </span>
+                 </div>
+
+                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                   {/* 1. Base Fees */}
+                   <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 p-4 rounded-2xl border border-gray-200">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-gray-500 flex items-center justify-center text-white">
+                         <IndianRupee size={14} />
+                       </div>
+                       <p className="text-xs font-medium text-gray-700">Base Fees</p>
+                     </div>
+                     <p className="text-lg font-bold text-gray-950">₹{totalBaseFees.toLocaleString("en-IN")}</p>
+                   </div>
+
+                   {/* 2. Student Payable */}
+                   <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-2xl border border-blue-100">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white">
+                         <IndianRupee size={14} />
+                       </div>
+                       <p className="text-xs font-medium text-blue-900">Student Payable</p>
+                     </div>
+                     <p className="text-lg font-bold text-blue-950">₹{totalStudentPayable.toLocaleString("en-IN")}</p>
+                   </div>
+
+                   {/* 3. Student Paid */}
+                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-4 rounded-2xl border border-emerald-200">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+                         <CheckCircle2 size={14} />
+                       </div>
+                       <p className="text-xs font-medium text-emerald-900">Student Paid</p>
+                     </div>
+                     <p className="text-lg font-bold text-emerald-950">₹{totalStudentPaid.toLocaleString("en-IN")}</p>
+                   </div>
+
+                   {/* 4. Student Balance */}
+                   <div className="bg-gradient-to-br from-red-50 to-red-100/50 p-4 rounded-2xl border border-red-100">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center text-white">
+                         <AlertCircle size={14} />
+                       </div>
+                       <p className="text-xs font-medium text-red-900">Student Balance</p>
+                     </div>
+                     <p className="text-lg font-bold text-red-950">₹{totalStudentBalance.toLocaleString("en-IN")}</p>
+                   </div>
+
+                   {/* 5. Govt Paid (Received) */}
+                   <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-100/60 p-4 rounded-2xl border-2 border-indigo-300 shadow-sm">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">
+                         🏛️
+                       </div>
+                       <p className="text-xs font-bold text-indigo-900">Govt Paid (Received)</p>
+                     </div>
+                     <p className="text-lg font-extrabold text-indigo-950">₹{totalGovtPaid.toLocaleString("en-IN")}</p>
+                     <p className="text-[10px] text-indigo-700 font-semibold mt-0.5">Cleared by Govt</p>
+                   </div>
+
+                   {/* 6. Govt Pending (Receivable) */}
+                   <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/60 p-4 rounded-2xl border-2 border-amber-300 shadow-sm">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-7 h-7 rounded-lg bg-amber-600 flex items-center justify-center text-white">
+                         <Clock size={14} />
+                       </div>
+                       <p className="text-xs font-bold text-amber-900">Govt Pending</p>
+                     </div>
+                     <p className="text-lg font-extrabold text-amber-950">₹{totalGovtPending.toLocaleString("en-IN")}</p>
+                     <p className="text-[10px] text-amber-700 font-semibold mt-0.5">Claim Receivable</p>
+                   </div>
+                 </div>
                </div>
-               <p className="text-xl font-bold text-gray-950">₹{ledgerFees.reduce((sum, f) => sum + parseFloat(f.amount || "0"), 0).toLocaleString("en-IN")}</p>
-             </div>
-             <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 p-4 rounded-2xl border border-orange-200">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white"><AlertCircle size={16} /></div>
-                  <p className="text-sm font-medium text-orange-900">Total Penalty</p>
+             ) : (
+               /* Normal Student Summary Cards */
+               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                 <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 p-4 rounded-2xl border border-gray-200">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white"><IndianRupee size={16} /></div>
+                     <p className="text-sm font-medium text-gray-900">Base Fees</p>
+                   </div>
+                   <p className="text-xl font-bold text-gray-950">₹{totalBaseFees.toLocaleString("en-IN")}</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 p-4 rounded-2xl border border-orange-200">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white"><AlertCircle size={16} /></div>
+                     <p className="text-sm font-medium text-orange-900">Total Penalty</p>
+                   </div>
+                   <p className="text-xl font-bold text-orange-950">₹{totalPenalty.toLocaleString("en-IN")}</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-2xl border border-blue-100">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white"><IndianRupee size={16} /></div>
+                     <p className="text-sm font-medium text-blue-900">Student Payable</p>
+                   </div>
+                   <p className="text-xl font-bold text-blue-950">₹{totalStudentPayable.toLocaleString("en-IN")}</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-green-50 to-green-100/50 p-4 rounded-2xl border border-green-100">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white"><CheckCircle2 size={16} /></div>
+                     <p className="text-sm font-medium text-green-900">Student Paid</p>
+                   </div>
+                   <p className="text-xl font-bold text-green-950">₹{totalStudentPaid.toLocaleString("en-IN")}</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-red-50 to-red-100/50 p-4 rounded-2xl border border-red-100">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white"><AlertCircle size={16} /></div>
+                     <p className="text-sm font-medium text-red-900">Student Balance</p>
+                   </div>
+                   <p className="text-xl font-bold text-red-950">₹{totalStudentBalance.toLocaleString("en-IN")}</p>
+                 </div>
                </div>
-               <p className="text-xl font-bold text-orange-950">₹{ledgerFees.reduce((sum, f) => sum + parseFloat(f.fine_amount || "0"), 0).toLocaleString("en-IN")}</p>
-             </div>
-             <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-2xl border border-blue-100">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white"><IndianRupee size={16} /></div>
-                  <p className="text-sm font-medium text-blue-900">Total Payable</p>
-               </div>
-               <p className="text-xl font-bold text-blue-950">₹{ledgerFees.reduce((sum, f) => sum + parseFloat(f.payable_amount || "0"), 0).toLocaleString("en-IN")}</p>
-             </div>
-             <div className="bg-gradient-to-br from-green-50 to-green-100/50 p-4 rounded-2xl border border-green-100">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white"><CheckCircle2 size={16} /></div>
-                  <p className="text-sm font-medium text-green-900">Total Paid</p>
-               </div>
-               <p className="text-xl font-bold text-green-950">₹{ledgerFees.reduce((sum, f) => sum + parseFloat(f.paid_amount || "0"), 0).toLocaleString("en-IN")}</p>
-             </div>
-             <div className="bg-gradient-to-br from-red-50 to-red-100/50 p-4 rounded-2xl border border-red-100">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white"><AlertCircle size={16} /></div>
-                  <p className="text-sm font-medium text-red-900">Total Balance</p>
-               </div>
-               <p className="text-xl font-bold text-red-950">₹{ledgerFees.reduce((sum, f) => sum + parseFloat(f.balance_amount || "0"), 0).toLocaleString("en-IN")}</p>
-             </div>
-           </div>
+             );
+           })()}
 
            {/* Ledger Table / Cards */}
-           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white">
+           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white mb-20">
              <div className="bg-gray-50 px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                   <h3 className="font-semibold text-gray-900">Fee Records for Academic Year</h3>
+                   {selectableFees.length > 0 && (
+                     <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-gray-700 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
+                       <input
+                         type="checkbox"
+                         checked={isAllSelected}
+                         ref={(el) => {
+                           if (el) el.indeterminate = isSomeSelected;
+                         }}
+                         onChange={toggleSelectAll}
+                         className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                       />
+                       <span>Select All Pending ({selectableFees.length})</span>
+                     </label>
+                   )}
                    <span className="text-xs font-medium bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm text-gray-600">
                      {ledgerFees.length} Records
                    </span>
+                   {(selectedLedgerStudent?.is_rte || ledgerFees.some(f => f.is_rte_student || f.is_rte_govt_claim)) && (
+                     <span className="text-xs font-semibold bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                       RTE Student
+                     </span>
+                   )}
                 </div>
 
-                {/* View Switcher Toggle */}
-                <div className="flex items-center bg-gray-200/70 p-1 rounded-xl gap-1">
+                {/* View Switcher Toggle & View Receipts */}
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setViewMode("cards")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      viewMode === "cards"
-                        ? "bg-white text-blue-600 shadow-sm font-semibold"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    onClick={() => setIsReceiptHistoryModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-gray-700 hover:text-blue-600 border border-gray-200 shadow-sm hover:shadow transition-all hover:bg-gray-50 active:scale-95"
+                    title="View all receipts for this student"
                   >
-                    <LayoutGrid size={14} /> Cards
+                    <Receipt size={14} className="text-blue-600" />
+                    <span>View Receipts</span>
                   </button>
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      viewMode === "table"
-                        ? "bg-white text-blue-600 shadow-sm font-semibold"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <TableIcon size={14} /> Table
-                  </button>
+
+                  <div className="flex items-center bg-gray-200/70 p-1 rounded-xl gap-1">
+                    <button
+                      onClick={() => setViewMode("cards")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        viewMode === "cards"
+                          ? "bg-white text-blue-600 shadow-sm font-semibold"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <LayoutGrid size={14} /> Cards
+                    </button>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        viewMode === "table"
+                          ? "bg-white text-blue-600 shadow-sm font-semibold"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <TableIcon size={14} /> Table
+                    </button>
+                  </div>
                 </div>
              </div>
 
@@ -1542,80 +2168,145 @@ export default function StudentLedgerPage() {
                 /* Cards View */
                 <div className="p-5 pb-12">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {ledgerFees.map(fee => (
-                      <div key={fee.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
-                        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
-                          <div>
-                             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider border border-blue-100 mb-2">
-                               {fee.feetype_name}
-                             </span>
-                             {fee.billing_period ? (
-                               <h4 className="font-semibold text-gray-900">{formatBillingPeriod(fee.billing_period)}</h4>
-                             ) : (
-                               <h4 className="font-semibold text-gray-900">Due: {formatDisplayDate(fee.due_date)}</h4>
-                             )}
+                    {ledgerFees.map(fee => {
+                      const isPaid = fee.status === "paid";
+                      const isSelectable = !isPaid;
+                      const isSelected = selectedFeeKeys.includes(getFeeKey(fee));
+
+                      return (
+                        <div
+                          key={fee.id}
+                          className={`rounded-2xl border transition-all overflow-hidden flex flex-col ${
+                            isSelected
+                              ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-white"
+                              : isPaid
+                                ? "border-emerald-200 bg-emerald-50/25 shadow-sm hover:shadow-md"
+                                : "bg-white border-gray-200 shadow-sm hover:shadow-md"
+                          }`}
+                        >
+                          <div className={`p-4 border-b flex justify-between items-start gap-2 ${
+                            isPaid ? "border-emerald-100 bg-emerald-50/50" : "border-gray-100 bg-gray-50/50"
+                          }`}>
+                            <div className="flex items-start gap-2.5">
+                              {isSelectable && (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectFee(fee)}
+                                  className="w-4 h-4 mt-0.5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                                />
+                              )}
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+                                    {fee.feetype_name}
+                                  </span>
+                                  {fee.is_rte_govt_claim && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold uppercase tracking-wider border border-indigo-200">
+                                      🏛️ RTE Claim
+                                    </span>
+                                  )}
+                                </div>
+                                {fee.billing_period ? (
+                                  <h4 className="font-semibold text-gray-900">{formatBillingPeriod(fee.billing_period)}</h4>
+                                ) : (
+                                  <h4 className="font-semibold text-gray-900">Due: {formatDisplayDate(fee.due_date)}</h4>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                              <StatusBadge status={fee.status as any} />
+                              {fee.is_rte_govt_claim && (
+                                <span className={`text-[10px] font-bold uppercase mt-1 px-1.5 py-0.5 rounded ${
+                                  fee.rte_govt_status === 'received' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  Govt: {fee.rte_govt_status || 'pending'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <StatusBadge status={fee.status as any} />
+                          
+                          <div className="p-4 grid grid-cols-2 gap-4 flex-1">
+                            <div>
+                               <p className="text-[10px] uppercase text-gray-500 font-medium">Base Amount</p>
+                               <p className="text-sm font-semibold text-gray-900">₹{parseFloat(fee.amount).toLocaleString("en-IN")}</p>
+                            </div>
+                            <div>
+                               <p className="text-[10px] uppercase text-gray-500 font-medium">Penalty</p>
+                               <p className="text-sm font-semibold text-orange-600">{parseFloat(fee.fine_amount ?? "0") > 0 ? `+ ₹${parseFloat(fee.fine_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}</p>
+                            </div>
+                            <div>
+                               <p className="text-[10px] uppercase text-gray-500 font-medium">Discount</p>
+                               <p className="text-sm font-semibold text-green-600">{parseFloat(fee.discount_amount ?? "0") > 0 ? `- ₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}</p>
+                            </div>
+                            <div>
+                               <p className="text-[10px] uppercase text-gray-500 font-medium">Student Payable</p>
+                               <p className="text-sm font-bold text-gray-900">₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}</p>
+                            </div>
+                            {fee.is_rte_govt_claim && (
+                              <div className="col-span-2 bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100 text-xs flex justify-between items-center">
+                                <div>
+                                  <span className="font-semibold text-indigo-900">Govt Claim:</span> ₹{parseFloat(fee.rte_govt_claim_amount || fee.amount).toLocaleString("en-IN")}
+                                </div>
+                                <span className="text-indigo-700 font-medium">
+                                  Paid: ₹{parseFloat(fee.rte_govt_paid_amount || "0").toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            )}
+                            <div className={`col-span-2 pt-3 mt-1 border-t flex justify-between items-center -mx-4 -mb-4 px-4 py-3 ${
+                              isPaid ? "border-emerald-100 bg-emerald-50/40" : "border-gray-100 bg-gray-50"
+                            }`}>
+                               <div>
+                                 <p className="text-[10px] uppercase text-gray-500 font-medium">Student Paid</p>
+                                 <p className="text-sm font-bold text-green-600">₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}</p>
+                               </div>
+                               <div className="text-right">
+                                 <p className="text-[10px] uppercase text-gray-500 font-medium">Student Balance</p>
+                                 <p className="text-sm font-bold text-red-600">₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}</p>
+                               </div>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-white border-t border-gray-100 mt-4">
+                            {isPaid ? (
+                              <div className="flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl border border-emerald-200">
+                                <CheckCircle2 size={15} /> Fee Paid & Cleared
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => handleCollect(fee)}
+                                  className="flex items-center justify-center gap-1.5 py-2 px-2 bg-blue-600 text-white text-xs font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
+                                >
+                                  <IndianRupee size={14} /> Collect Pay
+                                </button>
+                                {!fee.is_virtual && (
+                                  <button
+                                    onClick={() => handleDiscount(fee)}
+                                    className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                                  >
+                                    <Percent size={14} className="text-gray-500" /> Discount
+                                  </button>
+                                )}
+                                {!fee.is_virtual && fee.status === "unpaid" && (
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm("Are you sure you want to delete this fee record?")) {
+                                        await deleteStudentFee(fee.id);
+                                        setLedgerFees((prev) => prev.filter((f) => f.id !== fee.id));
+                                      }
+                                    }}
+                                    className="col-span-2 flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-red-100 text-red-600 text-xs font-medium rounded-xl hover:bg-red-50 transition-colors shadow-sm"
+                                  >
+                                    <X size={14} /> Delete
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        
-                        <div className="p-4 grid grid-cols-2 gap-4 flex-1">
-                          <div>
-                             <p className="text-[10px] uppercase text-gray-500 font-medium">Base Amount</p>
-                             <p className="text-sm font-semibold text-gray-900">₹{parseFloat(fee.amount).toLocaleString("en-IN")}</p>
-                          </div>
-                          <div>
-                             <p className="text-[10px] uppercase text-gray-500 font-medium">Penalty</p>
-                             <p className="text-sm font-semibold text-orange-600">{parseFloat(fee.fine_amount ?? "0") > 0 ? `+ ₹${parseFloat(fee.fine_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}</p>
-                          </div>
-                          <div>
-                             <p className="text-[10px] uppercase text-gray-500 font-medium">Discount</p>
-                             <p className="text-sm font-semibold text-green-600">{parseFloat(fee.discount_amount ?? "0") > 0 ? `- ₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}</p>
-                          </div>
-                          <div>
-                             <p className="text-[10px] uppercase text-gray-500 font-medium">Payable</p>
-                             <p className="text-sm font-bold text-gray-900">₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}</p>
-                          </div>
-                          <div className="col-span-2 pt-3 mt-1 border-t border-gray-100 flex justify-between items-center bg-gray-50 -mx-4 -mb-4 px-4 py-3">
-                             <div>
-                               <p className="text-[10px] uppercase text-gray-500 font-medium">Paid</p>
-                               <p className="text-sm font-bold text-green-600">₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}</p>
-                             </div>
-                             <div className="text-right">
-                               <p className="text-[10px] uppercase text-gray-500 font-medium">Balance</p>
-                               <p className="text-sm font-bold text-red-600">₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}</p>
-                             </div>
-                          </div>
-                        </div>
-                        
-                        <div className="p-3 bg-white border-t border-gray-100 grid grid-cols-2 gap-2 mt-4">
-                          {!fee.is_virtual && (
-                             <button onClick={() => handleView(fee)} className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-                               <Eye size={14} className="text-gray-500" /> View Details
-                             </button>
-                          )}
-                          {fee.status !== "paid" && (
-                             <button onClick={() => handleCollect(fee)} className="flex items-center justify-center gap-1.5 py-2 px-2 bg-blue-600 text-white text-xs font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200">
-                               <IndianRupee size={14} /> Collect Pay
-                             </button>
-                          )}
-                          {!fee.is_virtual && fee.status !== "paid" && (
-                             <button onClick={() => handleDiscount(fee)} className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-                               <Percent size={14} className="text-gray-500" /> Discount
-                             </button>
-                          )}
-                          {!fee.is_virtual && fee.status === "unpaid" && (
-                             <button onClick={async () => {
-                               if(confirm('Are you sure you want to delete this fee record?')) {
-                                 await deleteStudentFee(fee.id);
-                                 setLedgerFees((prev) => prev.filter((f) => f.id !== fee.id));
-                               }
-                             }} className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-red-100 text-red-600 text-xs font-medium rounded-xl hover:bg-red-50 transition-colors shadow-sm">
-                               <X size={14} /> Delete
-                             </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
              ) : (
@@ -1624,107 +2315,189 @@ export default function StudentLedgerPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-50/80 border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                        <th className="py-3.5 px-3 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = isSomeSelected;
+                            }}
+                            onChange={toggleSelectAll}
+                            disabled={selectableFees.length === 0}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer disabled:opacity-40"
+                            title="Select / Deselect all pending fees"
+                          />
+                        </th>
                         <th className="py-3.5 px-4">Fee Name / Period</th>
                         <th className="py-3.5 px-4">Due Date</th>
                         <th className="py-3.5 px-4 text-center">Status</th>
                         <th className="py-3.5 px-4 text-right">Base Amount</th>
                         <th className="py-3.5 px-4 text-right">Penalty</th>
                         <th className="py-3.5 px-4 text-right">Discount</th>
-                        <th className="py-3.5 px-4 text-right">Payable</th>
-                        <th className="py-3.5 px-4 text-right">Paid</th>
-                        <th className="py-3.5 px-4 text-right">Balance</th>
+                        <th className="py-3.5 px-4 text-right">Student Payable</th>
+                        <th className="py-3.5 px-4 text-right">Student Paid</th>
+                        <th className="py-3.5 px-4 text-right">Student Balance</th>
                         <th className="py-3.5 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                      {ledgerFees.map((fee) => (
-                        <tr key={fee.id} className="hover:bg-blue-50/30 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 w-fit mb-1 border border-blue-100">
-                                {fee.feetype_name}
-                              </span>
-                              <span className="font-semibold text-gray-900">
-                                {fee.billing_period ? formatBillingPeriod(fee.billing_period) : "Single Fee"}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-gray-600 text-xs whitespace-nowrap">
-                            {formatDisplayDate(fee.due_date)}
-                          </td>
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <StatusBadge status={fee.status as any} />
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-medium text-gray-900 whitespace-nowrap">
-                            ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-medium text-orange-600 whitespace-nowrap">
-                            {parseFloat(fee.fine_amount ?? "0") > 0 ? `+ ₹${parseFloat(fee.fine_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-medium text-green-600 whitespace-nowrap">
-                            {parseFloat(fee.discount_amount ?? "0") > 0 ? `- ₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-bold text-gray-900 whitespace-nowrap">
-                            ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-bold text-green-600 whitespace-nowrap">
-                            ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-bold text-red-600 whitespace-nowrap">
-                            ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {!fee.is_virtual && (
-                                <button
-                                  onClick={() => handleView(fee)}
-                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title="View Details"
-                                >
-                                  <Eye size={16} />
-                                </button>
+                      {ledgerFees.map((fee) => {
+                        const isPaid = fee.status === "paid";
+                        const isSelectable = !isPaid;
+                        const isSelected = selectedFeeKeys.includes(getFeeKey(fee));
+
+                        return (
+                          <tr
+                            key={fee.id}
+                            className={`transition-colors ${
+                              isSelected
+                                ? "bg-blue-50/80"
+                                : isPaid
+                                  ? "bg-emerald-50/70 hover:bg-emerald-100/60"
+                                  : "hover:bg-blue-50/30"
+                            }`}
+                          >
+                            <td className="py-3.5 px-3 text-center">
+                              {isSelectable ? (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectFee(fee)}
+                                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                                />
+                              ) : (
+                                <span className="w-4 h-4 inline-block text-emerald-500 font-bold">✓</span>
                               )}
-                              {fee.status !== "paid" && (
-                                <button
-                                  onClick={() => handleCollect(fee)}
-                                  className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                                  title="Collect Pay"
-                                >
-                                  <IndianRupee size={12} /> Collect
-                                </button>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 w-fit border border-blue-100">
+                                    {fee.feetype_name}
+                                  </span>
+                                  {fee.is_rte_govt_claim && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 w-fit border border-indigo-200">
+                                      🏛️ RTE Claim
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="font-semibold text-gray-900">
+                                  {fee.billing_period ? formatBillingPeriod(fee.billing_period) : "Single Fee"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-600 text-xs whitespace-nowrap">
+                              {formatDisplayDate(fee.due_date)}
+                            </td>
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <StatusBadge status={fee.status as any} />
+                              {fee.is_rte_govt_claim && (
+                                <div className="text-[10px] text-indigo-700 font-semibold mt-0.5">
+                                  Govt: {fee.rte_govt_status || 'pending'}
+                                </div>
                               )}
-                              {!fee.is_virtual && fee.status !== "paid" && (
-                                <button
-                                  onClick={() => handleDiscount(fee)}
-                                  className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                  title="Discount"
-                                >
-                                  <Percent size={16} />
-                                </button>
-                              )}
-                              {!fee.is_virtual && fee.status === "unpaid" && (
-                                <button
-                                  onClick={async () => {
-                                    if (confirm("Are you sure you want to delete this fee record?")) {
-                                      await deleteStudentFee(fee.id);
-                                      setLedgerFees((prev) => prev.filter((f) => f.id !== fee.id));
-                                    }
-                                  }}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Delete"
-                                >
-                                  <X size={16} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-medium text-gray-900 whitespace-nowrap">
+                              ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-medium text-orange-600 whitespace-nowrap">
+                              {parseFloat(fee.fine_amount ?? "0") > 0 ? `+ ₹${parseFloat(fee.fine_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-medium text-green-600 whitespace-nowrap">
+                              {parseFloat(fee.discount_amount ?? "0") > 0 ? `- ₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}` : "₹0.00"}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-gray-900 whitespace-nowrap">
+                              ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-green-600 whitespace-nowrap">
+                              ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-red-600 whitespace-nowrap">
+                              ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
+                            </td>
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 size={13} /> Paid
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleCollect(fee)}
+                                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                      title="Collect Pay"
+                                    >
+                                      <IndianRupee size={12} /> Collect
+                                    </button>
+                                    {!fee.is_virtual && (
+                                      <button
+                                        onClick={() => handleDiscount(fee)}
+                                        className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                        title="Discount"
+                                      >
+                                        <Percent size={16} />
+                                      </button>
+                                    )}
+                                    {!fee.is_virtual && fee.status === "unpaid" && (
+                                      <button
+                                        onClick={async () => {
+                                          if (confirm("Are you sure you want to delete this fee record?")) {
+                                            await deleteStudentFee(fee.id);
+                                            setLedgerFees((prev) => prev.filter((f) => f.id !== fee.id));
+                                          }
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Delete"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
              )}
            </div>
+
+           {/* Floating Bottom Action Bar for Multi-Fee Selection */}
+           {selectedFeeKeys.length > 0 && (
+             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-3xl bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-700 flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-6 duration-300">
+               <div className="flex items-center gap-4">
+                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
+                   {selectedFeeKeys.length}
+                 </div>
+                 <div>
+                   <p className="text-xs text-gray-400 uppercase font-medium">Selected Fees Total</p>
+                   <p className="text-lg font-bold text-white">
+                     ₹{selectedTotalAmount.toLocaleString("en-IN")}
+                   </p>
+                 </div>
+               </div>
+
+               <div className="flex items-center gap-2.5">
+                 <button
+                   onClick={() => setSelectedFeeKeys([])}
+                   className="px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                 >
+                   Clear Selection
+                 </button>
+                 <button
+                   onClick={() => setIsCollectMultipleModalOpen(true)}
+                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                 >
+                   <IndianRupee size={16} />
+                   Collect Selected Fees ({selectedFeeKeys.length})
+                 </button>
+               </div>
+             </div>
+           )}
          </div>
       )}
     </div>
@@ -1767,15 +2540,48 @@ export default function StudentLedgerPage() {
           setSelectedFee(null);
         }}
         fee={selectedFee}
-        onSuccess={() => { loadLedgerData(); }}
+        onSuccess={(receiptNo) => {
+          loadLedgerData();
+          if (receiptNo) {
+            setSearchedReceiptNumber(receiptNo);
+            setIsReceiptModalOpen(true);
+          }
+        }}
+      />
+      <CollectMultipleFeesModal
+        isOpen={isCollectMultipleModalOpen}
+        onClose={() => setIsCollectMultipleModalOpen(false)}
+        fees={selectedFeeObjects}
+        student={selectedLedgerStudent}
+        academicYearId={activeAcademicYearId}
+        onSuccess={(receiptNo) => {
+          setSelectedFeeKeys([]);
+          loadLedgerData();
+          if (receiptNo) {
+            setSearchedReceiptNumber(receiptNo);
+            setIsReceiptModalOpen(true);
+          }
+        }}
       />
       <ReceiptModal
         isOpen={isReceiptModalOpen}
         onClose={() => {
           setIsReceiptModalOpen(false);
           setSearchedReceiptNumber(null);
+          setSelectedReceiptPayments(null);
         }}
         receiptNumber={searchedReceiptNumber}
+        initialPayments={selectedReceiptPayments}
+      />
+      <ReceiptHistoryModal
+        isOpen={isReceiptHistoryModalOpen}
+        onClose={() => setIsReceiptHistoryModalOpen(false)}
+        student={selectedLedgerStudent}
+        onSelectReceipt={(receiptNo, items) => {
+          setSearchedReceiptNumber(receiptNo);
+          setSelectedReceiptPayments(items);
+          setIsReceiptModalOpen(true);
+        }}
       />
     </div>
   );

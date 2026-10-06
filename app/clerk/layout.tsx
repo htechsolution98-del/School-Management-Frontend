@@ -42,13 +42,14 @@ const sidebarLinks = [
     ]
   },
   {
-    title: "Class Management",
+    title: "School Management",
     href: "/clerk/class-mgmt",
     icon: School,
     subLinks: [
       { title: "Class Students", href: "/clerk/students", icon: Users },
       { title: "Categories", href: "/clerk/categories", icon: LayoutGrid },
       { title: "Classes", href: "/clerk/classes", icon: School },
+      { title: "Student Profiles", href: "/clerk/student-profiles", icon: Users },
       { title: "Divisions", href: "/clerk/divisions", icon: LayoutGrid },
       { title: "Assign Division", href: "/clerk/assign-division", icon: Layers },
       { title: "Assign Roll No.", href: "/clerk/assign-roll-no", icon: Hash },

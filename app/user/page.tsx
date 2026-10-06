@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Script from "next/script";
 import { toast } from "sonner";
+import { aadhaarSchema, isAadhaarField, AADHAAR_ERROR } from "@/lib/student-profile-validation";
 import {
   User,
   Loader2,
@@ -1037,6 +1038,7 @@ function MultiStepForm({
       const fields = section.fields || [];
       fields.forEach((field: any) => {
         const value = formValues[field.id];
+        if (isAadhaarField(field) && !aadhaarSchema.safeParse(String(value ?? "")).success) newErrors[field.id] = AADHAAR_ERROR;
         if (value === undefined || value === null || String(value).trim() === "") {
           newErrors[field.id] = `${field.label} is required`;
         }
@@ -1777,7 +1779,9 @@ function DynamicField({
       </label>
       <div className="relative">
         <input
-          type={field.field_type}
+          type={isAadhaarField(field) ? "text" : field.field_type}
+          maxLength={isAadhaarField(field) ? 12 : undefined}
+          inputMode={isAadhaarField(field) ? "numeric" : undefined}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
