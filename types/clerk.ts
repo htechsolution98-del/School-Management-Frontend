@@ -18,6 +18,8 @@ export interface Subject {
   id?: number;
   name: string;
   division: number | null;
+  school_class?: number | null;
+  SchoolClass?: number | null;
   school?: number;
   created_at?: string | null;
 }

@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/principal/helpers"
+import { getDocumentBlob, getDocumentBlobUrl, openAuthenticatedDocument } from "@/lib/document-viewer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -106,7 +107,33 @@ export function StudentProfileDrawer({
   const [previewDoc, setPreviewDoc] = useState<{
     url: string
     title: string
+    rawUrl?: string
+    isImage?: boolean
   } | null>(null)
+  const [loadingPreviewId, setLoadingPreviewId] = useState<string | number | null>(null)
+
+  const handlePreview = async (doc: any) => {
+    const docUrl = doc.url || doc.file_url
+    if (!docUrl) return
+    const title = doc.label || doc.title || "Document Preview"
+    const isImg = isImageFile(docUrl)
+
+    if (isImg) {
+      setPreviewDoc({ url: docUrl, title, rawUrl: docUrl, isImage: true })
+      return
+    }
+
+    setLoadingPreviewId(doc.id)
+    try {
+      const { objectUrl, isImage } = await getDocumentBlob(docUrl, docUrl)
+      setPreviewDoc({ url: objectUrl, title, rawUrl: docUrl, isImage })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load document"
+      toast.error(message)
+    } finally {
+      setLoadingPreviewId(null)
+    }
+  }
 
   // Editable Form State
   const [formData, setFormData] = useState({
@@ -675,25 +702,31 @@ export function StudentProfileDrawer({
                                 size="sm"
                                 variant="secondary"
                                 className="h-8 flex-1 text-xs gap-1.5"
-                                onClick={() =>
-                                  setPreviewDoc({
-                                    url: docUrl,
-                                    title: doc.label || doc.title,
-                                  })
-                                }
+                                disabled={loadingPreviewId === doc.id}
+                                onClick={() => handlePreview(doc)}
                               >
-                                <Eye className="w-3.5 h-3.5" /> Preview
+                                {loadingPreviewId === doc.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5" />
+                                )}
+                                Preview
                               </Button>
 
-                              <a
-                                href={docUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center justify-center h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-medium"
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openAuthenticatedDocument(
+                                    docUrl,
+                                    doc.label || doc.title,
+                                    docUrl
+                                  )
+                                }
+                                className="inline-flex items-center justify-center h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-medium cursor-pointer"
                                 title="Open in new window"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
+                              </button>
                             </>
                           ) : (
                             <span className="text-[11px] text-slate-400 italic">No file URL available</span>
@@ -776,19 +809,24 @@ export function StudentProfileDrawer({
               </DialogDescription>
             </div>
             {previewDoc && (
-              <a
-                href={previewDoc.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200"
+              <button
+                type="button"
+                onClick={() =>
+                  openAuthenticatedDocument(
+                    previewDoc.rawUrl || previewDoc.url,
+                    previewDoc.title,
+                    previewDoc.rawUrl || previewDoc.url
+                  )
+                }
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 cursor-pointer"
               >
                 <ExternalLink className="w-3.5 h-3.5" /> Direct Link
-              </a>
+              </button>
             )}
           </DialogHeader>
 
           <div className="p-4 flex items-center justify-center min-h-[400px] max-h-[75vh] overflow-auto bg-slate-950">
-            {previewDoc && isImageFile(previewDoc.url) ? (
+            {previewDoc && (previewDoc.isImage ?? isImageFile(previewDoc.rawUrl || previewDoc.url)) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewDoc.url}

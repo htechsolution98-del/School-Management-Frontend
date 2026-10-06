@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { getWebSocketUrl } from "@/lib/config";
 import { getAnnouncements, type AnnouncementResponse } from "@/lib/principal";
-import { forceLogout } from "@/lib/auth";
+import { forceLogout, getAccessToken } from "@/lib/auth";
 
 const LOCAL_STORAGE_KEY = "announcement_notifications";
 const READ_IDS_KEY = "read_announcement_ids";
@@ -174,7 +174,14 @@ export function useAnnouncementSocket() {
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = getWebSocketUrl("/ws/announcement/");
+    const token = getAccessToken();
+    if (!token) {
+      // Do not attempt to connect or spam the server when user is not logged in
+      setIsConnected(false);
+      return;
+    }
+
+    const wsUrl = getWebSocketUrl(`/ws/announcement/?token=${encodeURIComponent(token)}`);
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
 
@@ -265,13 +272,15 @@ export function useAnnouncementSocket() {
     };
 
     socket.onclose = (event) => {
-      console.log(`WebSocket closed (code: ${event.code}). Reconnecting...`);
+      console.log(`WebSocket closed (code: ${event.code}).`);
       setIsConnected(false);
-      
-      // Auto-reconnect after 5 seconds
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
-      }, 5000);
+
+      // Auto-reconnect after 5 seconds only if user is logged in
+      if (getAccessToken()) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      }
     };
 
     socket.onerror = (error) => {

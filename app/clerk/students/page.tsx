@@ -73,6 +73,7 @@ import {
   assignGrNumber,
   getClasses,
 } from "@/lib/clerk";
+import { openAuthenticatedDocument } from "@/lib/document-viewer";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import type { Admission } from "@/types/clerk";
 
@@ -339,10 +340,37 @@ function StudentDetailsModal({
 }: StudentDetailsModalProps) {
   const [selectedFileMap, setSelectedFileMap] = useState<Record<number, File | null>>({});
   const [uploadingDocId, setUploadingDocId] = useState<number | null>(null);
+  const [loadingViewDoc, setLoadingViewDoc] = useState<string | null>(null);
 
   if (!admission) return null;
 
+  const handleViewDoc = async (url: string, title?: string) => {
+    if (!url) return;
+    setLoadingViewDoc(url);
+    try {
+      await openAuthenticatedDocument(url, title || "Document", url);
+    } finally {
+      setLoadingViewDoc(null);
+    }
+  };
+
   const handleFileChange = (docFieldId: number, file: File | null) => {
+    if (file) {
+      const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+      const maxPhotoSize = 500 * 1024; // 500KB
+      const maxDocSize = 2 * 1024 * 1024; // 2MB
+      const limit = isImage ? maxPhotoSize : maxDocSize;
+
+      if (file.size > limit) {
+        if (isImage) {
+          toast.error(`Photo exceeds 500KB limit (${(file.size / 1024).toFixed(1)}KB). Please choose a smaller photo.`);
+        } else {
+          toast.error(`Document exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB). Please choose a smaller file.`);
+        }
+        return;
+      }
+    }
+
     setSelectedFileMap((prev) => ({
       ...prev,
       [docFieldId]: file,
@@ -352,6 +380,20 @@ function StudentDetailsModal({
   const handleSaveSingleDoc = async (docFieldId: number) => {
     const file = selectedFileMap[docFieldId];
     if (!file) return;
+
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    const maxPhotoSize = 500 * 1024; // 500KB
+    const maxDocSize = 2 * 1024 * 1024; // 2MB
+    const limit = isImage ? maxPhotoSize : maxDocSize;
+
+    if (file.size > limit) {
+      if (isImage) {
+        toast.error(`Photo exceeds 500KB limit (${(file.size / 1024).toFixed(1)}KB).`);
+      } else {
+        toast.error(`Document exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB).`);
+      }
+      return;
+    }
 
     setUploadingDocId(docFieldId);
     try {
@@ -659,16 +701,22 @@ function StudentDetailsModal({
                             <div className="flex items-center gap-1 shrink-0">
                               {/* View Document Link */}
                               {doc.file && (
-                                <a
-                                  href={doc.file}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1"
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewDoc(doc.file, doc.document_label)}
+                                  disabled={loadingViewDoc === doc.file}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1 cursor-pointer"
                                   title="View Document"
                                 >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">View</span>
-                                </a>
+                                  {loadingViewDoc === doc.file ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline">
+                                    {loadingViewDoc === doc.file ? "Loading..." : "View"}
+                                  </span>
+                                </button>
                               )}
 
                               {/* Direct Replace File Button */}
@@ -744,16 +792,22 @@ function StudentDetailsModal({
 
                             <div className="flex items-center gap-1 shrink-0">
                               {doc.document_file && (
-                                <a
-                                  href={doc.document_file}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1"
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewDoc(doc.document_file, doc.document_name)}
+                                  disabled={loadingViewDoc === doc.document_file}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1 cursor-pointer"
                                   title="View Document"
                                 >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">View</span>
-                                </a>
+                                  {loadingViewDoc === doc.document_file ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline">
+                                    {loadingViewDoc === doc.document_file ? "Loading..." : "View"}
+                                  </span>
+                                </button>
                               )}
                             </div>
                           </div>

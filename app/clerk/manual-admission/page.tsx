@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
 
 interface FormField {
   id: number;
@@ -144,15 +146,49 @@ export default function ManualAdmissionPage() {
     if (errorMsg) setErrorMsg("");
   };
 
-  const handleFileChange = (docFieldId: number, file: File | null) => {
+  const handleFileChange = (docFieldId: number, file: File | null): boolean => {
     if (file) {
+      const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
+      const maxSize = isImage ? 500 * 1024 : 2 * 1024 * 1024;
+      const maxLabel = isImage ? "500KB (Photos)" : "2MB (Documents/PDFs)";
+
+      if (file.size > maxSize) {
+        toast.error(`File "${file.name}" exceeds the maximum allowed size of ${maxLabel}.`);
+        setDocFiles((prev) => {
+          const copy = { ...prev };
+          delete copy[docFieldId];
+          return copy;
+        });
+        return false;
+      }
       setDocFiles((prev) => ({ ...prev, [docFieldId]: file }));
+      return true;
     } else {
       setDocFiles((prev) => {
         const copy = { ...prev };
         delete copy[docFieldId];
         return copy;
       });
+      return true;
+    }
+  };
+
+  const handleRteFileChange = (file: File | null): boolean => {
+    if (file) {
+      const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
+      const maxSize = isImage ? 500 * 1024 : 2 * 1024 * 1024;
+      const maxLabel = isImage ? "500KB (Photos)" : "2MB (Documents/PDFs)";
+
+      if (file.size > maxSize) {
+        toast.error(`File "${file.name}" exceeds the maximum allowed size of ${maxLabel}.`);
+        setRteDocument(null);
+        return false;
+      }
+      setRteDocument(file);
+      return true;
+    } else {
+      setRteDocument(null);
+      return true;
     }
   };
 
@@ -537,9 +573,18 @@ export default function ManualAdmissionPage() {
                     <input
                       type="file"
                       accept="image/*,application/pdf"
-                      onChange={(e) => handleFileChange(docField.id, e.target.files?.[0] || null)}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        const ok = handleFileChange(docField.id, file);
+                        if (!ok && e.target) {
+                          e.target.value = "";
+                        }
+                      }}
                       className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
                     />
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      PDF, DOC (Max 2MB) | PNG, JPG (Max 500KB)
+                    </p>
                   </div>
                 ))}
               </CardContent>
@@ -586,11 +631,17 @@ export default function ManualAdmissionPage() {
                     type="file"
                     accept="image/*,application/pdf"
                     required={isRte}
-                    onChange={(e) => setRteDocument(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      const ok = handleRteFileChange(file);
+                      if (!ok && e.target) {
+                        e.target.value = "";
+                      }
+                    }}
                     className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition-colors"
                   />
                   <p className="text-[10px] text-gray-500">
-                    Provide the official RTE approval letter or relevant document for this student.
+                    Provide the official RTE approval letter or relevant document. PDF, DOC (Max 2MB) | PNG, JPG (Max 500KB)
                   </p>
                 </div>
               )}
