@@ -250,12 +250,21 @@ function FeeCard({ fee, onEdit, onDelete }: FeeCardProps) {
         </p>
       </div>
 
-      {/* Status */}
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+      {/* Status & RTE Badges */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Active
         </span>
+        {fee.is_rte_applicable ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+            RTE: Student Pays
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+            RTE: Govt Claim (₹0 Student)
+          </span>
+        )}
       </div>
     </div>
   );
@@ -286,15 +295,20 @@ function FeeTypeModal({
     formState: { errors },
   } = useForm<FeeTypeFormData>({
     resolver: zodResolver(feeTypeSchema),
-    defaultValues: { name: "", billing_cycle: "monthly" },
+    defaultValues: { name: "", billing_cycle: "monthly", is_rte_applicable: false },
   });
   const billingCycleValue = watch("billing_cycle");
+  const isRteApplicableValue = watch("is_rte_applicable") ?? false;
 
   useEffect(() => {
     if (editingFee) {
-      reset({ name: editingFee.name, billing_cycle: editingFee.billing_cycle });
+      reset({
+        name: editingFee.name,
+        billing_cycle: editingFee.billing_cycle,
+        is_rte_applicable: editingFee.is_rte_applicable ?? false,
+      });
     } else {
-      reset({ name: "", billing_cycle: "monthly" });
+      reset({ name: "", billing_cycle: "monthly", is_rte_applicable: false });
     }
   }, [editingFee, reset, isOpen]);
 
@@ -306,7 +320,7 @@ function FeeTypeModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-scale-in">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-scale-in max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-7 pb-5 border-b border-gray-100">
           <div>
@@ -377,6 +391,65 @@ function FeeTypeModal({
                   {opt.label}
                 </span>
               ))}
+            </div>
+          </div>
+
+          {/* Applicable for RTE Students Field */}
+          <div className="p-4 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                Applicable for RTE Students
+              </label>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                RTE Fee Policy
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Select how fees are treated for Right to Education (RTE) enrolled students.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Option No (Govt Claim) */}
+              <button
+                type="button"
+                onClick={() => setValue("is_rte_applicable", false, { shouldValidate: true })}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  !isRteApplicableValue
+                    ? "border-amber-500 bg-amber-50 text-amber-900 shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold text-xs mb-1">
+                  <span>No (Govt Pays)</span>
+                  {!isRteApplicableValue && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  )}
+                </div>
+                <p className="text-[11px] leading-tight text-gray-500">
+                  Student pays ₹0; school claims ₹ from Government.
+                </p>
+              </button>
+
+              {/* Option Yes (Student Pays) */}
+              <button
+                type="button"
+                onClick={() => setValue("is_rte_applicable", true, { shouldValidate: true })}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  isRteApplicableValue
+                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold text-xs mb-1">
+                  <span>Yes (Student Pays)</span>
+                  {isRteApplicableValue && (
+                    <span className="w-2 h-2 rounded-full bg-blue-600" />
+                  )}
+                </div>
+                <p className="text-[11px] leading-tight text-gray-500">
+                  RTE student must pay this fee normally.
+                </p>
+              </button>
             </div>
           </div>
 

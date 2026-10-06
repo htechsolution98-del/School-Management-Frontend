@@ -21,30 +21,37 @@ export default function ReceiptModal({
   isOpen,
   onClose,
   receiptNumber,
+  initialPayments,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  receiptNumber: string | null;
+  receiptNumber?: string | null;
+  initialPayments?: Payment[] | null;
 }) {
   const [loading, setLoading] = useState(false);
-  const [payment, setPayment] = useState<Payment | null>(null);
+  const [payments, setPayments] = useState<Payment[]>(initialPayments || []);
   const [error, setError] = useState("");
 
   const loadReceipt = useCallback(async () => {
+    if (initialPayments && initialPayments.length > 0) {
+      setPayments(initialPayments);
+      setError("");
+      return;
+    }
     if (!receiptNumber) return;
 
     setLoading(true);
     setError("");
-    setPayment(null);
+    setPayments([]);
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL}/student-fee-payment/?receipt_number=${receiptNumber}`,
+        `${API_BASE_URL}/student-fee-payment/?receipt_number=${encodeURIComponent(receiptNumber)}`,
       );
       if (!res.ok) throw new Error("Failed to fetch receipt");
       const data = await res.json();
-      const results = Array.isArray(data) ? data : data.results;
+      const results: Payment[] = Array.isArray(data) ? data : (data.results || []);
       if (results && results.length > 0) {
-        setPayment(results[0]);
+        setPayments(results);
       } else {
         setError("Receipt not found");
       }
@@ -53,13 +60,18 @@ export default function ReceiptModal({
     } finally {
       setLoading(false);
     }
-  }, [receiptNumber]);
+  }, [receiptNumber, initialPayments]);
 
   useEffect(() => {
-    if (isOpen && receiptNumber) {
-      loadReceipt();
+    if (isOpen) {
+      if (initialPayments && initialPayments.length > 0) {
+        setPayments(initialPayments);
+        setError("");
+      } else if (receiptNumber) {
+        loadReceipt();
+      }
     }
-  }, [isOpen, receiptNumber, loadReceipt]);
+  }, [isOpen, receiptNumber, initialPayments, loadReceipt]);
 
   if (!isOpen) return null;
 
@@ -91,7 +103,9 @@ export default function ReceiptModal({
       />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto flex flex-col">
         <div className="receipt-print-hide flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10 shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Fee Receipt</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {payments.length > 1 ? `Combined Fee Receipt (${payments.length} Items)` : "Fee Receipt"}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -109,12 +123,12 @@ export default function ReceiptModal({
             <div className="text-center py-12 text-red-500 font-medium">
               {error}
             </div>
-          ) : payment ? (
-            <ReceiptContent payment={payment} />
+          ) : payments.length > 0 ? (
+            <ReceiptContent payments={payments} />
           ) : null}
         </div>
 
-        {payment && (
+        {payments.length > 0 && (
           <div className="receipt-print-hide p-5 border-t border-gray-100 bg-gray-50 rounded-b-2xl shrink-0 flex justify-end">
             <button
               onClick={() => window.print()}
@@ -129,23 +143,33 @@ export default function ReceiptModal({
   );
 }
 
-function ReceiptContent({ payment }: { payment: Payment }) {
-  const paymentStatus = getPaymentStatus(payment);
-  const feeStatus = getFeeStatusLabel(payment.fee_status);
+function ReceiptContent({ payments }: { payments: Payment[] }) {
+  const primaryPayment = payments[0];
+  const paymentStatus = getPaymentStatus(primaryPayment);
   const refValue =
-    payment.transaction_id ||
-    payment.razorpay_payment_id ||
-    payment.razorpay_order_id ||
+    primaryPayment.transaction_id ||
+    primaryPayment.razorpay_payment_id ||
+    primaryPayment.razorpay_order_id ||
     "-";
+
+  const isMultiItem = payments.length > 1;
+
+  // Calculate totals across all items in receipt
+  const totalBase = payments.reduce((sum, p) => sum + parseFloat(p.fee_amount || "0"), 0);
+  const totalPenalty = payments.reduce((sum, p) => sum + parseFloat(p.fee_penalty || "0"), 0);
+  const totalDiscount = payments.reduce((sum, p) => sum + parseFloat(p.fee_discount || "0"), 0);
+  const totalReceived = payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
   return (
     <div id="printable-receipt" className="space-y-5 text-gray-900">
       <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {payment.school_name || "School"}
+            {primaryPayment.school_name || "School"}
           </p>
-          <h3 className="text-2xl font-bold mt-1">Fee Receipt</h3>
+          <h3 className="text-2xl font-bold mt-1">
+            {isMultiItem ? "Consolidated Fee Receipt" : "Fee Receipt"}
+          </h3>
           <p className="text-sm text-gray-500 mt-1">
             Official student fee payment receipt
           </p>
@@ -153,7 +177,7 @@ function ReceiptContent({ payment }: { payment: Payment }) {
         <div className="text-right">
           <p className="text-xs text-gray-500">Receipt No.</p>
           <p className="font-mono font-bold text-gray-900">
-            {payment.receipt_number || "-"}
+            {primaryPayment.receipt_number || "-"}
           </p>
           <StatusPill label={paymentStatus.label} tone={paymentStatus.tone} />
         </div>
@@ -161,79 +185,147 @@ function ReceiptContent({ payment }: { payment: Payment }) {
 
       <SectionTitle icon={User} title="Student Details" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Info label="Full Name" value={payment.student_name || "-"} wide />
-        <Info label="Class" value={payment.student_class || "-"} />
-        <Info label="Division" value={payment.student_division || "-"} />
-        <Info label="GR No." value={payment.student_gr_no || "-"} />
+        <Info label="Full Name" value={primaryPayment.student_name || "-"} wide />
+        <Info label="Class" value={primaryPayment.student_class || "-"} />
+        <Info label="Division" value={primaryPayment.student_division || "-"} />
+        <Info label="GR No." value={primaryPayment.student_gr_no || "-"} />
       </div>
 
-      <SectionTitle icon={GraduationCap} title="Fee Details" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Info label="Fee Type" value={payment.feetype_name || "-"} />
-        <Info label="Billing Cycle" value={billingCycleLabel(payment.fee_billing_cycle)} />
-        <Info
-          label="Billing Period"
-          value={formatBillingPeriod(payment.fee_billing_period || "")}
-        />
-        <Info label="Academic Year" value={payment.academic_year_name || "-"} />
-        <Info label="Due Date" value={formatDate(payment.fee_due_date)} />
-        <Info label="Fee Status" value={feeStatus} />
-        <Info label="Student Fee ID" value={String(payment.student_fee || "-")} />
-        <Info label="Payment ID" value={String(payment.id)} />
-      </div>
+      {isMultiItem ? (
+        <>
+          <SectionTitle icon={GraduationCap} title={`Fee Items Breakdown (${payments.length} Items)`} />
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase font-semibold">
+                <tr>
+                  <th className="p-3">#</th>
+                  <th className="p-3">Fee / Period</th>
+                  <th className="p-3 text-right">Base Fee</th>
+                  <th className="p-3 text-right">Late Fee</th>
+                  <th className="p-3 text-right">Discount</th>
+                  <th className="p-3 text-right">Amount Paid</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {payments.map((p, idx) => (
+                  <tr key={p.id} className="hover:bg-gray-50/50">
+                    <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
+                    <td className="p-3">
+                      <p className="font-semibold text-gray-900">{p.feetype_name}</p>
+                      <p className="text-[11px] text-gray-500">
+                        {formatBillingPeriod(p.fee_billing_period || "")} {p.is_rte_govt_claim ? "• 🏛️ RTE Claim" : ""}
+                      </p>
+                    </td>
+                    <td className="p-3 text-right text-gray-700">{formatCurrency(p.fee_amount || 0)}</td>
+                    <td className="p-3 text-right text-red-600">
+                      {parseFloat(p.fee_penalty || "0") > 0 ? `+${formatCurrency(p.fee_penalty || "0")}` : "₹0"}
+                    </td>
+                    <td className="p-3 text-right text-green-600">
+                      {parseFloat(p.fee_discount || "0") > 0 ? `-${formatCurrency(p.fee_discount || "0")}` : "₹0"}
+                    </td>
+                    <td className="p-3 text-right font-bold text-gray-900">{formatCurrency(p.amount || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-50 font-bold border-t border-gray-200 text-gray-900">
+                <tr>
+                  <td colSpan={2} className="p-3 text-right">Total Summary:</td>
+                  <td className="p-3 text-right">{formatCurrency(totalBase)}</td>
+                  <td className="p-3 text-right text-red-600">{formatCurrency(totalPenalty)}</td>
+                  <td className="p-3 text-right text-green-600">-{formatCurrency(totalDiscount)}</td>
+                  <td className="p-3 text-right text-blue-700 text-sm font-extrabold">{formatCurrency(totalReceived)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          <SectionTitle icon={GraduationCap} title="Fee Details" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Info label="Fee Type" value={primaryPayment.feetype_name || "-"} />
+            <Info label="Billing Cycle" value={billingCycleLabel(primaryPayment.fee_billing_cycle)} />
+            <Info
+              label="Billing Period"
+              value={formatBillingPeriod(primaryPayment.fee_billing_period || "")}
+            />
+            <Info label="Academic Year" value={primaryPayment.academic_year_name || "-"} />
+            <Info label="Due Date" value={formatDate(primaryPayment.fee_due_date)} />
+            <Info label="Fee Status" value={getFeeStatusLabel(primaryPayment.fee_status)} />
+            <Info label="Student Fee ID" value={String(primaryPayment.student_fee || "-")} />
+            <Info label="Payment ID" value={String(primaryPayment.id)} />
+            {primaryPayment.is_rte_govt_claim && (
+              <Info label="Fee Classification" value="RTE Govt Reimbursement Claim" />
+            )}
+          </div>
 
-      <SectionTitle icon={BadgeIndianRupee} title="Amount Breakup" />
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
-        <AmountRow label="Base Fee Amount" value={payment.fee_amount} />
-        <AmountRow
-          label="Penalty / Late Fee"
-          value={payment.fee_penalty}
-          tone="red"
-          prefix="+"
-        />
-        <AmountRow
-          label="Discount"
-          value={payment.fee_discount}
-          tone="green"
-          prefix="-"
-        />
-        <AmountRow
-          label="Total Payable"
-          value={payment.fee_payable_amount}
-          strong
-        />
-        <AmountRow
-          label="Amount Received in This Receipt"
-          value={payment.amount}
-          strong
-          tone="blue"
-        />
-        <AmountRow label="Total Paid Till Now" value={payment.fee_paid_amount} />
-        <AmountRow
-          label="Remaining Balance"
-          value={payment.fee_balance_amount || payment.balance_after_payment}
-          tone="red"
-          strong
-        />
-      </div>
+          <SectionTitle icon={BadgeIndianRupee} title="Amount Breakup" />
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <AmountRow label="Base Fee Amount" value={primaryPayment.fee_amount} />
+            <AmountRow
+              label="Penalty / Late Fee"
+              value={primaryPayment.fee_penalty}
+              tone="red"
+              prefix="+"
+            />
+            <AmountRow
+              label="Discount"
+              value={primaryPayment.fee_discount}
+              tone="green"
+              prefix="-"
+            />
+            <AmountRow
+              label="Total Payable"
+              value={primaryPayment.fee_payable_amount}
+              strong
+            />
+            <AmountRow
+              label={primaryPayment.payer_type === "government" ? "Govt Claim Amount Received" : "Amount Received in This Receipt"}
+              value={primaryPayment.amount}
+              strong
+              tone="blue"
+            />
+            <AmountRow label="Total Paid Till Now" value={primaryPayment.fee_paid_amount} />
+            <AmountRow
+              label="Remaining Balance"
+              value={primaryPayment.fee_balance_amount || primaryPayment.balance_after_payment}
+              tone="red"
+              strong
+            />
+          </div>
+        </>
+      )}
+
+      {isMultiItem && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-blue-700 font-semibold uppercase tracking-wider">Grand Total Paid</p>
+            <p className="text-2xl font-black text-blue-900">{formatCurrency(totalReceived)}</p>
+          </div>
+          <div className="text-right text-xs text-blue-800">
+            <p>{payments.length} fee installments paid in full</p>
+            <p className="text-[11px] text-blue-600 mt-0.5">Receipt: {primaryPayment.receipt_number}</p>
+          </div>
+        </div>
+      )}
 
       <SectionTitle icon={CalendarDays} title="Payment Details" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Info label="Payment Date" value={formatDateTime(payment.payment_date)} />
-        <Info label="Payment Mode" value={capitalize(payment.payment_mode)} />
+        <Info label="Payment Date" value={formatDateTime(primaryPayment.payment_date)} />
+        <Info label="Payer Type" value={primaryPayment.payer_type === "government" ? "Government (RTE Claim)" : "Student / Guardian"} />
+        <Info label="Payment Mode" value={primaryPayment.payment_mode === "govt_rte" ? "Govt RTE Direct Credit" : capitalize(primaryPayment.payment_mode)} />
         <Info label="Reference / Transaction ID" value={refValue} wide />
-        <Info label="Collected By" value={payment.collected_by_username || "-"} />
-        <Info label="Verified By" value={payment.verified_by_username || "-"} />
-        <Info label="Verified At" value={formatDateTime(payment.verified_at)} />
-        <Info label="Created At" value={formatDateTime(payment.created_at)} />
+        <Info label="Collected By" value={primaryPayment.collected_by_username || "-"} />
+        <Info label="Verified By" value={primaryPayment.verified_by_username || "-"} />
+        <Info label="Verified At" value={formatDateTime(primaryPayment.verified_at)} />
         <Info label="Clearance Status" value={paymentStatus.label} />
       </div>
 
-      {payment.note && (
+      {primaryPayment.note && (
         <>
           <SectionTitle icon={FileText} title="Note" />
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-            {payment.note}
+            {primaryPayment.note}
           </div>
         </>
       )}

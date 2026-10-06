@@ -241,6 +241,67 @@ export async function collectStudentFeePayment(payload: CollectFeePayload): Prom
   }
 }
 
+export interface BulkCollectFeeItem {
+  student_fee_id?: number | string;
+  id?: number | string;
+  student?: number;
+  academic_year?: number;
+  fee_wise_class?: number;
+  billing_period?: string;
+  due_date?: string;
+  amount?: string | number;
+}
+
+export interface BulkCollectFeePayload {
+  items: BulkCollectFeeItem[];
+  payer_type?: "student" | "government";
+  payment_mode: string;
+  payment_date?: string;
+  transaction_id?: string;
+  note?: string;
+}
+
+export async function bulkCollectStudentFeePayments(payload: BulkCollectFeePayload): Promise<ApiResponse<{
+  success: boolean;
+  receipt_number: string;
+  total_amount: string;
+  payments_count: number;
+  payer_type: string;
+  payment_mode: string;
+  message: string;
+  payments: any[];
+}>> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/student-fee-payment/bulk-collect/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      let errorMessage = "Failed to collect fees";
+      if (errorData?.error) {
+        errorMessage = errorData.error;
+      } else if (errorData && typeof errorData === "object") {
+         const firstKey = Object.keys(errorData)[0];
+         if (firstKey) {
+            const val = errorData[firstKey];
+            errorMessage = Array.isArray(val) ? val[0] : (typeof val === "string" ? val : errorMessage);
+            if (firstKey !== "non_field_errors") {
+                errorMessage = `${firstKey}: ${errorMessage}`;
+            }
+         }
+      }
+      throw new Error(errorMessage);
+    }
+    const data = await response.json();
+    return { data, error: null, success: true };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : "Failed to collect fees", success: false };
+  }
+}
+
 export async function clearStudentFeePayment(paymentId: number): Promise<ApiResponse<any>> {
   try {
     const response = await fetchWithAuth(`${API_BASE_URL}/student-fee-payment/${paymentId}/`, {
