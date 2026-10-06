@@ -28,14 +28,16 @@ import { StatusBadge } from "@/components/superadmin/status-badge";
 import { formatDDMMYYYY } from "@/lib/table-utils";
 import { CreateStaffPayload, Staff, StaffCategory, Department } from "@/types";
 
-const STAFF_CATEGORIES: { label: string; value: StaffCategory }[] = [
+const STAFF_CATEGORIES: { label: string; value: string }[] = [
   { label: "Teacher", value: "TEACHER" },
   { label: "Clerk", value: "CLERK" },
+  { label: "Assistant Clerk", value: "ASSISTANT CLERK" },
   { label: "Librarian", value: "LIBRARIAN" },
-  { label: "Fee Management", value: "FEE MANAGEMENT" },
+  { label: "Fee Management", value: "FEES MANAGEMENT" },
   { label: "Principal", value: "PRINCIPAL" },
-  { label: "Transportation", value: "TRANSOPORTATION" },
-  { label: "INVENTORY", value: "INVENTORY" },
+  { label: "Vice Principal", value: "VICE PRINCIPAL" },
+  { label: "Transportation", value: "TRANSPORTATION" },
+  { label: "Inventory", value: "INVENTORY" },
 ];
 
 const EMPTY_FORM: CreateStaffPayload = {
@@ -50,7 +52,7 @@ const EMPTY_FORM: CreateStaffPayload = {
   is_active: true,
 };
 
-function staffColumnsFor(departments: Department[], categoryLabel: (category: StaffCategory) => string): DataTableColumn<Staff>[] {
+function staffColumnsFor(departments: Department[], categoryLabel: (category: any) => string): DataTableColumn<Staff>[] {
   const departmentName = (id: number | null) => departments.find(d => d.id === id)?.name || "-";
   return [
     {
@@ -167,11 +169,13 @@ export default function ClerkStaffDashboard() {
 
   const handleEditClick = (staff: Staff) => {
     setEditingStaff(staff);
-    // Find the feature_id for the staff's category string
+    // Find the feature_id for the staff's category string or ID
     const matchCat = staffCategories.find(c => 
-      c.feature_name.toUpperCase() === String(staff.category).toUpperCase()
+      String(c.feature_id) === String(staff.category) ||
+      String(c.id) === String(staff.category) ||
+      String(c.feature_name || "").toUpperCase().trim() === String(staff.category).toUpperCase().trim()
     );
-    const categoryId = matchCat ? matchCat.feature_id : staff.category;
+    const categoryId = matchCat ? (matchCat.feature_id || matchCat.id) : staff.category;
 
     setEditFormData({
       name: staff.name || "",
@@ -281,8 +285,12 @@ export default function ClerkStaffDashboard() {
       console.log("categories :", data);
 
       const allowedRoles = ["CLERK", "ASSISTANT CLERK", "PRINCIPAL", "VICE PRINCIPAL", "FEES MANAGEMENT", "TEACHER", "INVENTORY", "LIBRARIAN", "TRANSPORTATION"];
-      const filteredData = data.filter((c: any) => allowedRoles.includes(c.feature_name));
-      setStaffCategories(filteredData);
+      const rawList = Array.isArray(data) ? data : [];
+      const filteredData = rawList.filter((c: any) => {
+        const featName = String(c.feature_name || "").toUpperCase().trim();
+        return allowedRoles.includes(featName) || allowedRoles.some(r => featName.includes(r) || r.includes(featName));
+      });
+      setStaffCategories(filteredData.length > 0 ? filteredData : rawList);
     } catch (err) {
       console.log(err);
     }
@@ -381,12 +389,24 @@ export default function ClerkStaffDashboard() {
     }
   };
 
-  const categoryLabel = (category: StaffCategory) =>
-    STAFF_CATEGORIES.find((item) => item.value === category)?.label ?? category;
+  const categoryLabel = useCallback((category: any) => {
+    if (!category && category !== 0) return "-";
+    const strCat = String(category).trim().toUpperCase();
+    const match = STAFF_CATEGORIES.find((item) => item.value.toUpperCase() === strCat || item.label.toUpperCase() === strCat);
+    if (match) return match.label;
+    const featureMatch = staffCategories.find((c) => String(c.feature_id) === String(category) || String(c.id) === String(category) || String(c.feature_name || "").toUpperCase().trim() === strCat);
+    if (featureMatch?.feature_name) {
+      const fn = String(featureMatch.feature_name).trim();
+      const m2 = STAFF_CATEGORIES.find((item) => item.value.toUpperCase() === fn.toUpperCase() || item.label.toUpperCase() === fn.toUpperCase());
+      if (m2) return m2.label;
+      return fn.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+    return String(category);
+  }, [staffCategories]);
 
   const staffColumns = useMemo(
     () => staffColumnsFor(departments, categoryLabel),
-    [departments],
+    [departments, categoryLabel],
   );
 
   return (
@@ -396,14 +416,14 @@ export default function ClerkStaffDashboard() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <p className="text-sm font-medium text-white/80">
-                Trustee Staff Directory
+                Clerk Staff Directory
               </p>
               <h2 className="text-3xl font-bold tracking-tight">
-                Manage staff records
+                Manage Staff Records
               </h2>
               <p className="max-w-xl text-sm text-white/80">
                 Review all staff entries and create new records directly from
-                the trustee panel.
+                the clerk portal.
               </p>
             </div>
             <div className="rounded-2xl bg-white/15 p-3">
@@ -565,18 +585,22 @@ export default function ClerkStaffDashboard() {
                   <option value="">Select Role</option>
 
                   {staffCategories.map((category: any, index: number) => {
+                    const featName = String(category.feature_name || "").trim();
                     const match = STAFF_CATEGORIES.find(
-                      (s) => s.value === category.feature_name
-                    )
+                      (s) => s.value.toUpperCase() === featName.toUpperCase() || s.label.toUpperCase() === featName.toUpperCase()
+                    );
+                    const displayName = match
+                      ? match.label
+                      : featName.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+
                     return (
                       <option
-                        key={`${category.feature_id}-${index}`}
-                        value={category.feature_id}
+                        key={`${category.feature_id || category.id || index}-${index}`}
+                        value={category.feature_id || category.id}
                       >
-                        {match ? match.label : category.feature_name
-                          .charAt(0).toUpperCase() + category.feature_name.slice(1).toLowerCase()}
+                        {displayName}
                       </option>
-                    )
+                    );
                   })}
                 </select>
               </div>
@@ -732,10 +756,17 @@ export default function ClerkStaffDashboard() {
                 >
                   <option value="">Select Role</option>
                   {staffCategories.map((category: any, index: number) => {
-                    const match = STAFF_CATEGORIES.find((s) => s.value === category.feature_name);
+                    const featName = String(category.feature_name || "").trim();
+                    const match = STAFF_CATEGORIES.find(
+                      (s) => s.value.toUpperCase() === featName.toUpperCase() || s.label.toUpperCase() === featName.toUpperCase()
+                    );
+                    const displayName = match
+                      ? match.label
+                      : featName.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+
                     return (
-                      <option key={`${category.feature_id}-${index}`} value={category.feature_id}>
-                        {match ? match.label : category.feature_name}
+                      <option key={`${category.feature_id || category.id || index}-${index}`} value={category.feature_id || category.id}>
+                        {displayName}
                       </option>
                     );
                   })}
