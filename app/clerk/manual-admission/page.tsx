@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,42 +33,20 @@ import {
 
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { aadhaarSchema, isAadhaarField, AADHAAR_ERROR } from "@/lib/student-profile-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
-interface FormField {
-  id: number;
-  label: string;
-  field_type: "text" | "number" | "date" | "select" | "checkbox" | "radio";
-  is_required: boolean;
-  options?: any;
-  map_to_student_field?: string | null;
-}
+import { AdmissionFieldInput } from "@/components/clerk/admission-field";
+import { BulkAdmissionImport } from "@/components/clerk/bulk-admission-import";
+import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
+import { submitAdmission } from "@/lib/clerk/admission-submit";
+import "../clerk-workspace.css";
 
-interface FormSection {
-  id: number;
-  title: string;
-  order: number;
-  fields: FormField[];
-}
-
-interface DocumentField {
-  id: number;
-  label: string;
-  is_required: boolean;
-}
-
-interface AdmissionForm {
-  id: number;
-  form_title?: string;
-  is_active: boolean;
-  sections: FormSection[];
-  document_fields: DocumentField[];
-}
+type FormField = AdmissionField;
+type AdmissionForm = AdmissionConfig;
 
 interface SchoolClass {
   id: number;
@@ -148,29 +126,7 @@ function calculateAge(dobStr: string): {
   };
 }
 
-// Field Type Detectors
-function isMobileField(field: FormField): boolean {
-  const map = field.map_to_student_field?.toLowerCase() || "";
-  const lbl = field.label.toLowerCase();
-  return map === "mobile" || map === "phone" || /mobile|phone|contact|whatsapp/i.test(lbl);
-}
-
-function isEmailField(field: FormField): boolean {
-  const map = field.map_to_student_field?.toLowerCase() || "";
-  const lbl = field.label.toLowerCase();
-  return map === "email" || /email|mail/i.test(lbl);
-}
-
-function isDobField(field: FormField): boolean {
-  const map = field.map_to_student_field?.toLowerCase() || "";
-  const lbl = field.label.toLowerCase();
-  return field.field_type === "date" || map === "date_of_birth" || /birth|dob/i.test(lbl);
-}
-
-function isPincodeField(field: FormField): boolean {
-  const lbl = field.label.toLowerCase();
-  return /pin\s*code|pincode|postal/i.test(lbl);
-}
+const isDobField = isBirthField;
 
 function getSectionIcon(title: string) {
   const t = title.toLowerCase();
@@ -197,6 +153,11 @@ export default function ManualAdmissionPage() {
 
   // Dynamic Form Config from /api/forms/
   const [activeForm, setActiveForm] = useState<AdmissionForm | null>(null);
+  const [refreshingForms, setRefreshingForms] = useState(false);
+  const [availableForms, setAvailableForms] = useState<AdmissionForm[]>([]);
+  const [entryMode, setEntryMode] = useState<"manual" | "bulk">("manual");
+  const submissionLock = useRef(false);
+  const [submissionWarnings, setSubmissionWarnings] = useState<string[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>("");
@@ -237,7 +198,9 @@ export default function ManualAdmissionPage() {
         if (formsRes.ok) {
           const formsData = await formsRes.json();
           const list: AdmissionForm[] = Array.isArray(formsData) ? formsData : formsData.results || [];
-          const active = list.find((f) => f.is_active) || list[0] || null;
+          const enabled = list.filter(form => form.is_active);
+          setAvailableForms(enabled);
+          const active = enabled[0] || null;
           setActiveForm(active);
         }
 
@@ -265,76 +228,28 @@ export default function ManualAdmissionPage() {
     loadData();
   }, []);
 
+  const refreshForms = useCallback(async () => {
+    if (submitting) return;
+    setRefreshingForms(true);
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/forms/`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Could not refresh admission forms");
+      const data = await response.json();
+      const enabled: AdmissionForm[] = (Array.isArray(data) ? data : data.results || []).filter((form: AdmissionForm) => form.is_active);
+      setAvailableForms(enabled);
+      setActiveForm(previous => enabled.find(form => form.id === previous?.id) || enabled[0] || null);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not refresh forms"); }
+    finally { setRefreshingForms(false); }
+  }, [submitting]);
+  useEffect(() => { const refresh = () => { void refreshForms(); }; window.addEventListener("focus", refresh); return () => window.removeEventListener("focus", refresh); }, [refreshForms]);
+
   // Real-time Field Validator
   const validateSingleField = (field: FormField, value: any): string => {
-    const strVal = String(value ?? "").trim();
-
-    if (field.is_required && !strVal) {
-      return `${toTitleCase(field.label)} is required`;
-    }
-
-    if (!strVal) return "";
-
-    // Aadhaar Validation
-    if (isAadhaarField(field)) {
-      const clean = strVal.replace(/\s+/g, "");
-      if (!/^\d{12}$/.test(clean)) {
-        return "Must be exactly 12 numeric digits";
-      }
-    }
-
-    // Mobile Validation
-    if (isMobileField(field)) {
-      const clean = strVal.replace(/\D/g, "");
-      if (clean.length > 0 && !/^[6-9]\d{9}$/.test(clean)) {
-        return "Enter valid 10-digit Indian mobile number (6-9)";
-      }
-    }
-
-    // Email Validation
-    if (isEmailField(field)) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strVal)) {
-        return "Enter a valid email address (e.g. name@domain.com)";
-      }
-    }
-
-    // Pincode Validation
-    if (isPincodeField(field)) {
-      const clean = strVal.replace(/\D/g, "");
-      if (clean.length > 0 && !/^\d{6}$/.test(clean)) {
-        return "PIN Code must be exactly 6 digits";
-      }
-    }
-
-    // Date of Birth Validation
-    if (isDobField(field)) {
-      const ageRes = calculateAge(strVal);
-      if (!ageRes.valid && ageRes.error) {
-        return ageRes.error;
-      }
-      if (ageRes.years > 30) {
-        return "Please verify birth date (age exceeds 30 years)";
-      }
-    }
-
-    return "";
+    return validateAdmissionField(field, normalizeAdmissionValue(field, value));
   };
 
   const handleDynamicChange = (field: FormField, value: any) => {
-    let processedValue = value;
-
-    // Aadhaar: only digits, max 12
-    if (isAadhaarField(field) && typeof value === "string") {
-      processedValue = value.replace(/\D/g, "").slice(0, 12);
-    }
-    // Mobile: only digits, max 10
-    else if (isMobileField(field) && typeof value === "string") {
-      processedValue = value.replace(/\D/g, "").slice(0, 10);
-    }
-    // Pincode: only digits, max 6
-    else if (isPincodeField(field) && typeof value === "string") {
-      processedValue = value.replace(/\D/g, "").slice(0, 6);
-    }
+    const processedValue = value;
 
     setDynamicValues((prev) => ({ ...prev, [field.id]: processedValue }));
 
@@ -355,6 +270,8 @@ export default function ManualAdmissionPage() {
 
   const handleFileChange = (docFieldId: number, file: File | null): boolean => {
     if (file) {
+      const fileError = validateAdmissionFile(file);
+      if (fileError) { toast.error(fileError); setDocFiles(previous => { const next = { ...previous }; delete next[docFieldId]; return next; }); return false; }
       const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
       const maxSize = isImage ? 1 * 1024 * 1024 : 3 * 1024 * 1024;
       const maxLabel = isImage ? "1MB (Photos/Images)" : "3MB (Documents/PDFs)";
@@ -382,6 +299,8 @@ export default function ManualAdmissionPage() {
 
   const handleRteFileChange = (file: File | null): boolean => {
     if (file) {
+      const fileError = validateAdmissionFile(file);
+      if (fileError) { toast.error(fileError); setRteDocument(null); return false; }
       const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
       const maxSize = isImage ? 1 * 1024 * 1024 : 3 * 1024 * 1024;
       const maxLabel = isImage ? "1MB (Photos)" : "3MB (Documents/PDFs)";
@@ -401,13 +320,16 @@ export default function ManualAdmissionPage() {
 
   const handleSubmit = async (e: React.FormEvent, mode: "standard" | "add_another" = "standard") => {
     e.preventDefault();
+    if (submissionLock.current) return;
     setErrorMsg("");
     setSubmitMode(mode);
 
-    if (!activeForm) {
+    if (!activeForm || !activeForm.is_active) {
       setErrorMsg("No active admission form found for this school.");
       return;
     }
+
+    if (academicYears.length && !academicYears.some(year => String(year.id) === selectedAcademicYear)) { setErrorMsg("Select an available academic year."); return; }
 
     // Comprehensive validation pass
     const newErrors: Record<number, string> = {};
@@ -430,7 +352,7 @@ export default function ManualAdmissionPage() {
       setFieldErrors(newErrors);
       setErrorMsg("Please fix the highlighted errors before submitting.");
       // Scroll to first errored field
-      if (firstErrorFieldId) {
+      if (firstErrorFieldId !== null) {
         const el = document.getElementById(`field-input-${firstErrorFieldId}`);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -439,6 +361,9 @@ export default function ManualAdmissionPage() {
       }
       return;
     }
+
+    const classField = admissionFields(activeForm).find(field => field.map_to_student_field === "school_class");
+    if (classField && dynamicValues[classField.id] && !classes.some(item => String(item.id) === String(dynamicValues[classField.id]) || item.school_class === dynamicValues[classField.id])) { setFieldErrors({ [classField.id]: "Select an available school class" }); return; }
 
     // Validate required document fields
     for (const df of activeForm.document_fields || []) {
@@ -453,108 +378,18 @@ export default function ManualAdmissionPage() {
       return;
     }
 
+    submissionLock.current = true;
     setSubmitting(true);
 
     try {
-      // 1. Submit Form Fields
-      const field_values = Object.entries(dynamicValues).map(([fieldId, value]) => ({
-        field: parseInt(fieldId),
-        value: String(value).trim(),
-      }));
-
-      const payload: any = {
-        form: activeForm.id,
-        field_values,
-        is_rte: isRte,
-      };
-
-      if (selectedAcademicYear) {
-        payload.academic_year = parseInt(selectedAcademicYear);
-      }
-
-      const docEntries = Object.entries(docFiles);
-      let subRes: Response;
-
-      if (docEntries.length > 0) {
-        const formData = new FormData();
-        formData.append("form", String(activeForm.id));
-        formData.append("field_values", JSON.stringify(field_values));
-        if (selectedAcademicYear) {
-          formData.append("academic_year", String(selectedAcademicYear));
-        }
-        for (const [docFieldId, file] of docEntries) {
-          formData.append("document_field", docFieldId);
-          formData.append("file", file);
-          formData.append(`document_${docFieldId}`, file);
-        }
-
-        subRes = await fetchWithAuth(`${API_BASE_URL}/submissions/`, {
-          method: "POST",
-          body: formData,
-        });
-      } else {
-        subRes = await fetchWithAuth(`${API_BASE_URL}/submissions/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      const subData = await subRes.json();
-
-      if (!subRes.ok) {
-        let msg = "Failed to submit admission form.";
-        if (subData && typeof subData === "object") {
-          msg = subData.detail || subData.message || subData.error || JSON.stringify(subData);
-        }
-        throw new Error(msg);
-      }
-
-      const admissionNumber = subData.admission_number || subData.id;
-      const admissionId = subData.id;
-
-      // 2. Submit Documents via /documentsubmission/ if needed
-      if (admissionNumber && docEntries.length > 0 && (!subData.documents || subData.documents.length === 0)) {
-        for (const [docFieldId, file] of docEntries) {
-          const formData = new FormData();
-          formData.append("admission_number", String(admissionNumber));
-          formData.append("document_field", docFieldId);
-          formData.append("file", file);
-
-          await fetchWithAuth(`${API_BASE_URL}/documentsubmission/`, {
-            method: "POST",
-            body: formData,
-          });
-        }
-      }
-
-      // Submit RTE Document if attached
-      if (isRte && rteDocument && admissionId) {
-        const rteFormData = new FormData();
-        rteFormData.append("admission", String(admissionId));
-        rteFormData.append("document_name", "RTE Verification Document");
-        rteFormData.append("document_file", rteDocument);
-
-        await fetchWithAuth(`${API_BASE_URL}/rtedocument/`, {
-          method: "POST",
-          body: rteFormData,
-        });
-      }
+      const result = await submitAdmission({ form: activeForm, values: dynamicValues, academicYear: selectedAcademicYear, documents: docFiles, isRte, rteDocument });
+      const admissionNumber = result.admissionNumber;
+      setSubmissionWarnings(result.warnings);
+      result.warnings.forEach(warning => toast.warning(warning));
 
       // Identify student name for display
-      let studentName = "";
-      if (activeForm.sections) {
-        for (const sec of activeForm.sections) {
-          for (const f of sec.fields || []) {
-            const labelLower = f.label.toLowerCase();
-            if (labelLower.includes("name") || labelLower.includes("student")) {
-              if (dynamicValues[f.id]) {
-                studentName += (studentName ? " " : "") + dynamicValues[f.id];
-              }
-            }
-          }
-        }
-      }
+      const nameFields = admissionFields(activeForm).filter(field => ["name", "surname"].includes(field.map_to_student_field || "") || /^(student (full )?|full )?name$/i.test(field.label));
+      const studentName = nameFields.map(field => String(dynamicValues[field.id] || "").trim()).filter(Boolean).join(" ");
 
       const finalName = studentName.trim() || "New Student Application";
 
@@ -577,12 +412,14 @@ export default function ManualAdmissionPage() {
       setErrorMsg(err.message || "Something went wrong during submission.");
       toast.error(err.message || "Submission failed.");
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
 
   const resetForm = () => {
     setSuccessData(null);
+    setSubmissionWarnings([]);
     setErrorMsg("");
     setFieldErrors({});
     setDynamicValues({});
@@ -624,6 +461,7 @@ export default function ManualAdmissionPage() {
           </CardHeader>
 
           <CardContent className="p-6 sm:p-8 space-y-6">
+            {submissionWarnings.length > 0 && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Application saved. Some uploads need attention: {submissionWarnings.join("; ")}</div>}
             <div className="bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-5 border border-emerald-100 dark:border-emerald-900/50 shadow-xs space-y-3.5">
               <div className="flex justify-between items-center pb-3 border-b border-emerald-100 dark:border-emerald-900/40">
                 <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">Applicant Name</span>
@@ -658,30 +496,16 @@ export default function ManualAdmissionPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <Link href="/clerk/students" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
-              <UserPlus className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-zinc-100 tracking-tight">
-              Manual Student Admission Form
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 pl-11">
-            {activeForm?.form_title ? (
-              <span>Active Form: <strong className="text-gray-800 dark:text-zinc-200 font-semibold">{activeForm.form_title}</strong></span>
-            ) : (
-              "Direct student registration and manual admission intake."
-            )}
-          </p>
+    <div className="clerk-page admission-page mx-auto w-full min-w-0 space-y-6">
+      <div className="office-actions flex-wrap">
+        <div className="mr-auto flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
+          <button type="button" disabled={submitting} onClick={() => setEntryMode("manual")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${entryMode === "manual" ? "bg-teal-50 text-teal-700" : "text-slate-500"}`}>Single admission</button>
+          <button type="button" disabled={submitting} onClick={() => setEntryMode("bulk")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${entryMode === "bulk" ? "bg-teal-50 text-teal-700" : "text-slate-500"}`}>Excel bulk import</button>
         </div>
-
+        <label className="text-xs font-semibold text-slate-500">Admission form
+          <select aria-label="Admission form" disabled={submitting || entryMode === "bulk"} value={activeForm?.id ?? ""} onChange={event => { const form = availableForms.find(item => item.id === Number(event.target.value)); if (form) { setActiveForm(form); resetForm(); } }} className="ml-2 max-w-64 rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700">{availableForms.map(form => <option key={form.id} value={form.id}>{form.title || form.form_title || `Form ${form.id}`}</option>)}</select>
+        </label>
+        <button type="button" onClick={refreshForms} disabled={submitting || refreshingForms} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">{refreshingForms ? "Refreshing..." : "Refresh form fields"}</button>
         {/* Academic Year Selection & Actions */}
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-xs">
@@ -689,6 +513,7 @@ export default function ManualAdmissionPage() {
             <span className="text-xs font-semibold text-gray-500">Academic Year:</span>
             <select
               value={selectedAcademicYear}
+              disabled={submitting}
               onChange={(e) => setSelectedAcademicYear(e.target.value)}
               className="bg-transparent text-xs font-bold text-gray-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
             >
@@ -699,7 +524,7 @@ export default function ManualAdmissionPage() {
                   </option>
                 ))
               ) : (
-                <option value="">2026-2027</option>
+                <option value="">No academic years configured</option>
               )}
             </select>
           </div>
@@ -709,6 +534,7 @@ export default function ManualAdmissionPage() {
             variant="outline"
             size="sm"
             onClick={resetForm}
+            disabled={submitting}
             className="text-xs font-medium text-gray-600 hover:text-red-600 gap-1 rounded-xl"
             title="Clear all fields"
           >
@@ -729,9 +555,13 @@ export default function ManualAdmissionPage() {
           <Loader2 className="h-9 w-9 animate-spin text-blue-600 mb-3" />
           <span className="text-sm text-gray-500 font-medium">Loading admission form fields...</span>
         </div>
+      ) : entryMode === "bulk" && activeForm ? (
+        <BulkAdmissionImport key={activeForm.id} form={activeForm} academicYear={selectedAcademicYear} classes={classes} onBusyChange={setSubmitting} />
       ) : activeForm && activeForm.sections && activeForm.sections.length > 0 ? (
-        <form onSubmit={(e) => handleSubmit(e, "standard")} className="space-y-6">
+        <form noValidate onSubmit={(e) => handleSubmit(e, "standard")} className="space-y-6">
+          <fieldset disabled={submitting} className="space-y-6">
 
+          {dobValue && calculatedAge.valid && <p className="rounded-xl border border-teal-100 bg-teal-50/50 px-4 py-3 text-xs font-semibold text-teal-800">Student age: {calculatedAge.text}</p>}
           {/* DYNAMIC SECTIONS */}
           {activeForm.sections.map((section, sIdx) => (
             <Card key={section.id} className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs overflow-hidden bg-white dark:bg-zinc-900">
@@ -752,210 +582,7 @@ export default function ManualAdmissionPage() {
               </CardHeader>
               
               <CardContent className="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
-                {section.fields?.map((field, fIdx) => {
-                  const val = dynamicValues[field.id] ?? "";
-                  const fieldError = fieldErrors[field.id];
-                  const isAadhaar = isAadhaarField(field);
-                  const isMobile = isMobileField(field);
-                  const isEmail = isEmailField(field);
-                  const isDob = isDobField(field);
-                  const isPincode = isPincodeField(field);
-                  const isClass =
-                    field.map_to_student_field === "school_class" ||
-                    field.label.toLowerCase().includes("class") ||
-                    field.label.toLowerCase().includes("standard");
-
-                  return (
-                    <div key={field.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label
-                          htmlFor={`field-input-${field.id}`}
-                          className="text-xs font-semibold text-gray-700 dark:text-zinc-300 block tracking-tight"
-                        >
-                          {toTitleCase(field.label)} {field.is_required && <span className="text-red-500 font-bold">*</span>}
-                        </label>
-
-                        {/* Live Aadhaar character counter & valid indicator */}
-                        {isAadhaar && val && (
-                          <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded ${
-                            String(val).length === 12
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
-                          }`}>
-                            {String(val).length}/12 digits
-                          </span>
-                        )}
-
-                        {/* Live Mobile digit counter */}
-                        {isMobile && val && (
-                          <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded ${
-                            String(val).length === 10
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
-                          }`}>
-                            {String(val).length}/10 digits
-                          </span>
-                        )}
-                      </div>
-
-                      {field.field_type === "select" ? (
-                        <div className="relative">
-                          <select
-                            id={`field-input-${field.id}`}
-                            value={val}
-                            onChange={(e) => handleDynamicChange(field, e.target.value)}
-                            required={field.is_required}
-                            className={`w-full px-3 py-2 bg-white dark:bg-zinc-900 border ${
-                              fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                            } rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
-                          >
-                            <option value="">Select {toTitleCase(field.label)}...</option>
-                            {isClass && (!field.options || field.options.length === 0) ? (
-                              classes.map((c) => (
-                                <option key={c.id} value={c.school_class || c.name || String(c.id)}>
-                                  {c.school_class || c.name}
-                                </option>
-                              ))
-                            ) : (
-                              (field.options || []).map((opt: any, i: number) => {
-                                const optVal = typeof opt === "object" && opt !== null ? (opt.value ?? opt.label ?? String(i)) : String(opt);
-                                const optLbl = typeof opt === "object" && opt !== null ? (opt.label ?? opt.value ?? String(i)) : String(opt);
-                                return (
-                                  <option key={i} value={optVal}>
-                                    {toTitleCase(optLbl)}
-                                  </option>
-                                );
-                              })
-                            )}
-                          </select>
-                        </div>
-                      ) : isDob ? (
-                        <div className="space-y-1">
-                          <div className="relative">
-                            <Input
-                              id={`field-input-${field.id}`}
-                              type="date"
-                              value={val}
-                              max={new Date().toISOString().split("T")[0]}
-                              onChange={(e) => handleDynamicChange(field, e.target.value)}
-                              required={field.is_required}
-                              className={`rounded-xl text-xs sm:text-sm ${
-                                fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                              }`}
-                            />
-                          </div>
-
-                          {/* Dynamic Age Display Pill */}
-                          {val && calculatedAge.valid && calculatedAge.text && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[11px] font-semibold border border-blue-100 dark:border-blue-900/50">
-                              <Cake size={13} className="text-blue-600 shrink-0" />
-                              <span>Age: <strong>{calculatedAge.text}</strong></span>
-                            </div>
-                          )}
-                        </div>
-                      ) : isAadhaar ? (
-                        <div className="relative">
-                          <Input
-                            id={`field-input-${field.id}`}
-                            type="text"
-                            maxLength={12}
-                            inputMode="numeric"
-                            value={val}
-                            onChange={(e) => handleDynamicChange(field, e.target.value)}
-                            required={field.is_required}
-                            placeholder="12-digit Aadhaar No."
-                            className={`rounded-xl text-xs sm:text-sm font-mono tracking-wider ${
-                              fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                            }`}
-                          />
-                          {String(val).length === 12 && (
-                            <div className="absolute right-3 top-2.5 text-emerald-600">
-                              <ShieldCheck size={16} />
-                            </div>
-                          )}
-                        </div>
-                      ) : isMobile ? (
-                        <div className="relative flex rounded-xl shadow-xs">
-                          <span className="inline-flex items-center px-2.5 rounded-l-xl border border-r-0 border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-500 text-xs font-semibold select-none">
-                            +91
-                          </span>
-                          <Input
-                            id={`field-input-${field.id}`}
-                            type="tel"
-                            maxLength={10}
-                            inputMode="numeric"
-                            value={val}
-                            onChange={(e) => handleDynamicChange(field, e.target.value)}
-                            required={field.is_required}
-                            placeholder="10-digit Mobile"
-                            className={`rounded-l-none rounded-r-xl text-xs sm:text-sm font-mono ${
-                              fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                            }`}
-                          />
-                        </div>
-                      ) : isEmail ? (
-                        <div className="relative">
-                          <Input
-                            id={`field-input-${field.id}`}
-                            type="email"
-                            value={val}
-                            onChange={(e) => handleDynamicChange(field, e.target.value)}
-                            required={field.is_required}
-                            placeholder="e.g. parent@example.com"
-                            className={`rounded-xl text-xs sm:text-sm ${
-                              fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                            }`}
-                          />
-                        </div>
-                      ) : isPincode ? (
-                        <Input
-                          id={`field-input-${field.id}`}
-                          type="text"
-                          maxLength={6}
-                          inputMode="numeric"
-                          value={val}
-                          onChange={(e) => handleDynamicChange(field, e.target.value)}
-                          required={field.is_required}
-                          placeholder="6-digit PIN code"
-                          className={`rounded-xl text-xs sm:text-sm font-mono ${
-                            fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                          }`}
-                        />
-                      ) : field.field_type === "number" ? (
-                        <Input
-                          id={`field-input-${field.id}`}
-                          type="number"
-                          value={val}
-                          onChange={(e) => handleDynamicChange(field, e.target.value)}
-                          required={field.is_required}
-                          placeholder={`Enter ${toTitleCase(field.label)}...`}
-                          className={`rounded-xl text-xs sm:text-sm ${
-                            fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                          }`}
-                        />
-                      ) : (
-                        <Input
-                          id={`field-input-${field.id}`}
-                          type="text"
-                          value={val}
-                          onChange={(e) => handleDynamicChange(field, e.target.value)}
-                          required={field.is_required}
-                          placeholder={`Enter ${toTitleCase(field.label)}...`}
-                          className={`rounded-xl text-xs sm:text-sm ${
-                            fieldError ? "border-red-400 ring-1 ring-red-400" : "border-gray-200 dark:border-zinc-700"
-                          }`}
-                        />
-                      )}
-
-                      {/* Field-level error message */}
-                      {fieldError && (
-                        <p className="text-[11px] font-semibold text-red-500 flex items-center gap-1 mt-1">
-                          <AlertCircle size={12} className="shrink-0" /> {fieldError}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                {section.fields?.map(field => <AdmissionFieldInput key={field.id} field={field} value={dynamicValues[field.id]} onChange={value => handleDynamicChange(field, value)} error={fieldErrors[field.id]} disabled={submitting} classes={classes} />)}
               </CardContent>
             </Card>
           ))}
@@ -1012,7 +639,7 @@ export default function ManualAdmissionPage() {
                         <input
                           type="file"
                           id={`doc-input-${docField.id}`}
-                          accept="image/*,application/pdf"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp"
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
                             const ok = handleFileChange(docField.id, file);
@@ -1079,7 +706,7 @@ export default function ManualAdmissionPage() {
                   </div>
                   <input
                     type="file"
-                    accept="image/*,application/pdf"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
                     required={isRte}
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
@@ -1145,6 +772,7 @@ export default function ManualAdmissionPage() {
               </Button>
             </div>
           </div>
+          </fieldset>
         </form>
       ) : (
         <div className="p-10 text-center bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800">

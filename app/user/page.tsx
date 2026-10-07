@@ -19,6 +19,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AdmissionFieldInput } from "@/components/clerk/admission-field";
+import { normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, type AdmissionField } from "@/lib/admission-validation";
 import { useEffect } from "react";
 import {
   getTempUsers,
@@ -52,7 +54,7 @@ const STEPS = [
     label: "Documents",
     icon: Upload,
     title: "Upload Documents",
-    desc: "Upload scans (PDF/JPG, max 5 MB each).",
+    desc: "Upload PDF (3 MB max) or images (1 MB max).",
   },
   {
     id: 3,
@@ -205,7 +207,7 @@ export default function AdmissionPortal() {
             <ChildrenList
               key="list"
               onSelect={setSelectedChild}
-              children={children}
+              applicants={children}
               formData={formData}
             />
           )
@@ -381,11 +383,11 @@ const generateReceiptPDF = (data: any) => {
 // ─────────────────────────────────────────────
 function ChildrenList({
   onSelect,
-  children,
+  applicants,
   formData,
 }: {
   onSelect: (c: any) => void;
-  children: any[];
+  applicants: any[];
   formData?: any;
 }) {
   const [receiptChild, setReceiptChild] = useState<any>(null);
@@ -757,7 +759,7 @@ function ChildrenList({
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
-              {children.length}
+              {applicants.length}
             </motion.span>
             Active Applications
           </span>
@@ -766,7 +768,7 @@ function ChildrenList({
 
       {/* Cards */}
       <div className="w-full px-4 sm:px-6 md:px-10 py-4 sm:py-6 space-y-3">
-        {children.map((child, i) => {
+        {applicants.map((child, i) => {
           const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
           const badgeClass =
             STATUS_STYLES[child.status] ??
@@ -975,15 +977,17 @@ function MultiStepForm({
     const newErrors: any = {};
     const docs = formData?.documents ?? formData?.document_fields ?? [];
     docs.forEach((doc: any) => {
-      if (!docValues[doc.id]) {
+      if ((doc.is_required ?? doc.required) && !docValues[doc.id]) {
         newErrors[doc.id] = true;
       }
+      if (docValues[doc.id] instanceof File && validateAdmissionFile(docValues[doc.id] as File)) newErrors[doc.id] = true;
     });
     setDocErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleStepTwoSubmit = async () => {
+    if (docSubmitting) return;
     const isValid = validateDocuments();
     if (!isValid) return;
 
@@ -1033,15 +1037,11 @@ function MultiStepForm({
   }, [child.sections, child.savedFormValues]);
 
   const validateStepOne = () => {
-    const newErrors: any = {};
+    const newErrors: Record<number, string> = {};
     formData?.sections?.forEach((section: any) => {
-      const fields = section.fields || [];
-      fields.forEach((field: any) => {
-        const value = formValues[field.id];
-        if (isAadhaarField(field) && !aadhaarSchema.safeParse(String(value ?? "")).success) newErrors[field.id] = AADHAAR_ERROR;
-        if (value === undefined || value === null || String(value).trim() === "") {
-          newErrors[field.id] = `${field.label} is required`;
-        }
+      (section.fields || section.form_fields || []).forEach((field: AdmissionField) => {
+        const error = validateAdmissionField(field, normalizeAdmissionValue(field, formValues[field.id]));
+        if (error) newErrors[field.id] = error;
       });
     });
     setErrors(newErrors);
@@ -1066,7 +1066,7 @@ function MultiStepForm({
       fields.forEach((field: any) => {
         const value = formValues[field.id];
         if (value !== undefined && value !== null && value.toString().trim() !== "") {
-          fieldValues.push({ field: field.id, value });
+          fieldValues.push({ field: field.id, value: String(normalizeAdmissionValue(field, value)) });
         }
       });
     });
@@ -1166,6 +1166,7 @@ function MultiStepForm({
   }, []);
 
   const handleStepOneSubmit = async () => {
+    if (submitting) return;
     const isValid = validateStepOne();
     if (!isValid) return;
 
@@ -1497,15 +1498,6 @@ function StudentDetailsStep({
 }) {
   const [classOptions, setClassOptions] = useState<any[]>([]);
 
-  if (!formData) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-        <p className="text-slate-500 font-medium">Loading form fields…</p>
-      </div>
-    );
-  }
-
   const handleChange = (fieldId: number, value: string) => {
     setFormValues((prev: any) => ({ ...prev, [fieldId]: value }));
     if (errors[fieldId]) {
@@ -1532,6 +1524,15 @@ function StudentDetailsStep({
     };
     fetchClasses();
   }, []);
+
+  if (!formData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <p className="text-slate-500 font-medium">Loading form fields…</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -1641,178 +1642,10 @@ function SectionCompletionBar({
 // ─────────────────────────────────────────────
 // DynamicField
 // ─────────────────────────────────────────────
-function DynamicField({
-  field,
-  value,
-  onChange,
-  error,
-}: {
-  field: any;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  const [focused, setFocused] = useState(false);
-  const isFilled = !!value;
-
-  const inputBase = [
-    "w-full h-[48px] px-4 rounded-xl outline-none font-medium text-[14px] text-slate-800",
-    "transition-all duration-200 border-2",
-    error
-      ? "border-rose-400 bg-rose-50 shadow-[0_0_0_3px_rgba(244,63,94,0.10)]"
-      : focused
-        ? "border-indigo-400 bg-white shadow-[0_0_0_3px_rgba(99,102,241,0.10)]"
-        : isFilled
-          ? "border-emerald-300 bg-white"
-          : "border-slate-200 bg-white hover:border-indigo-200",
-    "placeholder:text-slate-300",
-  ].join(" ");
-
-  const labelClass = [
-    "flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest mb-1.5 transition-colors duration-200",
-    error ? "text-rose-500" : focused ? "text-indigo-600" : isFilled ? "text-emerald-600" : "text-slate-400",
-  ].join(" ");
-
-  if (field.field_type === "select") {
-    return (
-      <div className="relative">
-        <label className={labelClass}>
-          {isFilled && (
-            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-          )}
-          {field.label}
-          {field.is_required && <span className="text-rose-400 ml-0.5">*</span>}
-        </label>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setFocused(!focused)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
-            className={`${inputBase} cursor-pointer text-left flex items-center justify-between`}
-          >
-            <span className={value ? "text-slate-800" : "text-slate-300"}>
-              {field.options?.find((o: any) => String(o.value) === String(value))?.label || `Select ${field.label}`}
-            </span>
-            <motion.div animate={{ rotate: focused ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
-                <path stroke={focused ? "#6366f1" : isFilled ? "#34d399" : "#94a3b8"} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 8l4 4 4-4" />
-              </svg>
-            </motion.div>
-          </button>
-
-          <AnimatePresence>
-            {focused && (
-              <motion.ul
-                initial={{ opacity: 0, y: -6, scaleY: 0.95 }}
-                animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                exit={{ opacity: 0, y: -6, scaleY: 0.95 }}
-                transition={{ duration: 0.15 }}
-                style={{ transformOrigin: "top" }}
-                className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-52 overflow-y-auto"
-              >
-                <li
-                  onClick={() => { onChange(""); setFocused(false); }}
-                  className="px-4 py-2.5 text-sm text-slate-300 font-medium cursor-pointer hover:bg-slate-50"
-                >
-                  Select {field.label}
-                </li>
-                {field.options?.map((option: any) => (
-                  <li
-                    key={option.value}
-                    onClick={() => { onChange(String(option.value)); setFocused(false); }}
-                    className={`px-4 py-2.5 text-sm font-medium cursor-pointer transition-colors ${String(value) === String(option.value) ? "bg-indigo-50 text-indigo-600 font-bold" : "text-slate-700 hover:bg-slate-50"}`}
-                  >
-                    {option.label}
-                  </li>
-                ))}
-              </motion.ul>
-            )}
-          </AnimatePresence>
-        </div>
-        {error && <p className="mt-1 text-xs font-semibold text-rose-500">{error}</p>}
-      </div>
-    );
-  }
-
-  if (field.field_type === "textarea") {
-    return (
-      <div>
-        <label className={labelClass}>
-          {isFilled && (
-            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-          )}
-          {field.label}
-          {field.is_required && <span className="text-rose-400 ml-0.5">*</span>}
-        </label>
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={field.placeholder || `Enter ${(field.label || "").toLowerCase()}`}
-          rows={3}
-          className={[
-            "w-full px-4 py-3 rounded-xl outline-none font-medium text-[14px] text-slate-800 resize-none",
-            "transition-all duration-200 border-2",
-            error
-              ? "border-rose-400 bg-rose-50 shadow-[0_0_0_3px_rgba(244,63,94,0.10)]"
-              : focused
-                ? "border-indigo-400 bg-white shadow-[0_0_0_3px_rgba(99,102,241,0.10)]"
-                : isFilled
-                  ? "border-emerald-300 bg-white"
-                  : "border-slate-200 bg-white hover:border-indigo-200",
-          ].join(" ")}
-        />
-        {error && <p className="mt-1 text-xs font-semibold text-rose-500">{error}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <label className={labelClass}>
-        {isFilled && (
-          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-        )}
-        {field.label}
-        {field.is_required && <span className="text-rose-400 ml-0.5">*</span>}
-      </label>
-      <div className="relative">
-        <input
-          type={isAadhaarField(field) ? "text" : field.field_type}
-          maxLength={isAadhaarField(field) ? 12 : undefined}
-          inputMode={isAadhaarField(field) ? "numeric" : undefined}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={field.placeholder || `Enter ${(field.label || "").toLowerCase()}`}
-          className={inputBase}
-        />
-        <AnimatePresence>
-          {isFilled && !focused && (
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 20 }}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-400 flex items-center justify-center"
-            >
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                <path stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
-              </svg>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-      {error && <p className="mt-1 text-xs font-semibold text-rose-500">{error}</p>}
-    </div>
-  );
+function DynamicField({ field, value, onChange, error }: { field: AdmissionField; value: string; onChange: (value: string) => void; error?: string }) {
+  return <AdmissionFieldInput field={field} value={value} error={error} prefix="online-admission" onChange={value => onChange(String(value))} />;
 }
 
-// ─────────────────────────────────────────────
-// Step 2 — Documents
-// ─────────────────────────────────────────────
 function DocumentsStep({
   formData,
   docValues,
@@ -1851,7 +1684,7 @@ function DocumentsStep({
         <div>
           <p className="text-sm font-bold text-indigo-800 mb-1">Upload Guidelines</p>
           <p className="text-xs text-indigo-600/80 font-medium leading-relaxed">
-            Accepted formats: PDF, JPG, PNG. Maximum file size: 5 MB per document. Ensure documents are clear and legible.
+            Accepted formats: PDF (up to 3 MB), JPG, PNG or WebP (up to 1 MB). Ensure documents are clear and legible.
           </p>
         </div>
       </div>
@@ -1963,11 +1796,13 @@ function DocRow({
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
+          accept=".pdf,.jpg,.jpeg,.png,.webp"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) {
+              const error = validateAdmissionFile(f);
+              if (error) { toast.error(error); e.target.value = ""; return; }
               onFile(f);
               onClearError?.();
             }

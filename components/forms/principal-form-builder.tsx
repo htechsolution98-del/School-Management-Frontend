@@ -52,6 +52,7 @@ import type {
   ConfiguredField,
 } from "@/types/principal";
 import { cn } from "@/lib/utils";
+import { validateAdmissionBuilder } from "@/lib/admission-builder-validation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -195,7 +196,7 @@ function toPayloadFields(
   return fields
     .filter((field): field is ConfiguredField => field.selected)
     .map((field, index) => {
-      const isSelect = field.type === "select";
+      const isSelect = field.type === "select" || field.type === "radio";
       const validOptions = isSelect
         ? field.options.filter((option) => option.label && option.value)
         : [];
@@ -208,7 +209,7 @@ function toPayloadFields(
         map_to_student_field: STUDENT_FIELD_MAPPING[field.key] || null,
         ...(field.key === "applying_for_class"
           ? {}
-          : field.type === "select" && validOptions.length > 0
+          : isSelect && validOptions.length > 0
             ? { options: validOptions }
             : {}),
       };
@@ -395,20 +396,20 @@ function FieldCard({
                       <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</Label>
                       <select
                         className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-none outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50"
-                        value={field.key === "applying_for_class" ? "text" : field.type}
+                        value={field.type}
                         disabled={field.key === "applying_for_class"}
                         onChange={(e) =>
                           onChange({
                             ...field,
                             type: e.target.value as BuilderFieldType,
                             options:
-                              e.target.value === "select" && !field.options.length
+                              ["select", "radio"].includes(e.target.value) && !field.options.length
                                 ? [{ label: "", value: "" }]
                                 : field.options,
                           })
                         }
                       >
-                        {FIELD_TYPE_OPTIONS.map((option, index) => (
+                        {FIELD_TYPE_OPTIONS.filter(option => option.value !== "file").map((option, index) => (
                           <option key={option.value || `field-option-${index}`} value={option.value}>
                             {option.label}
                           </option>
@@ -433,7 +434,7 @@ function FieldCard({
                   )}
                 </div>
 
-                {field.type === "select" && field.key !== "applying_for_class" && (
+                {["select", "radio"].includes(field.type) && field.key !== "applying_for_class" && (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Options</Label>
@@ -567,6 +568,7 @@ export default function PrincipalFormBuilder({
 
 
     return {
+      is_active: true,
       fees_enable: feesEnabled,
       fees: feesEnabled && feeType === "general" ? Number(feesAmount) || 0 : null,
       title: formTitle,
@@ -581,6 +583,7 @@ export default function PrincipalFormBuilder({
         fields: toPayloadFields(section.fields),
       })),
       document_fields,
+      document_fields_config: documentFields.filter(field => field.selected).map(field => ({ label: field.label.trim(), is_required: field.required })),
       fee_structures_input: feesEnabled && feeType === "individual"
         ? Object.entries(individualFees)
           .filter(([_, amt]) => amt && Number(amt) > 0)
@@ -589,21 +592,9 @@ export default function PrincipalFormBuilder({
     };
   }, [academicYear, academicYearId, description, documentFields, feeType, feesAmount, feesEnabled, individualFees, paymentMode, sections, title]);
 
+  const getBuilderErrors = (step?: number) => validateAdmissionBuilder({ title, academicYearId, description, sections, documents: documentFields, feesEnabled, feeType, feesAmount, individualFees, classIds: classes.map(cls => cls.id) }, step);
   const validateStep = (step: number) => {
-    const nextErrors: ErrorMap = {};
-    if (step === 0) {
-      if (!title.trim()) nextErrors.title = "Form title is required";
-      const hasFields = payload.sections.some((section) => section.fields.length > 0);
-      if (!hasFields) nextErrors.personalFields = "At least one section field is required";
-    }
-    if (step === 2 && feesEnabled) {
-      if (feeType === "general" && !feesAmount.trim()) {
-        nextErrors.fees = "Application fee amount is required";
-      } else if (feeType === "individual") {
-        const hasAnyFee = Object.values(individualFees).some((amt) => amt && Number(amt) > 0);
-        if (!hasAnyFee) nextErrors.fees = "Please set at least one class fee";
-      }
-    }
+    const nextErrors = getBuilderErrors(step);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -619,7 +610,12 @@ export default function PrincipalFormBuilder({
   };
 
   const submitForm = async () => {
-    if (!validateStep(2)) return;
+    if (isSubmitting) return;
+    const allErrors = getBuilderErrors();
+    if (Object.keys(allErrors).length) {
+      const invalidStep = [0, 1, 2].find(step => Object.keys(getBuilderErrors(step)).length > 0) ?? 0;
+      setCurrentStep(invalidStep); setErrors(allErrors); return;
+    }
     setIsSubmitting(true);
     setSubmitError("");
     try {
@@ -773,6 +769,7 @@ export default function PrincipalFormBuilder({
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.22, ease: "easeInOut" }}
           >
+            {Object.keys(errors).length > 0 && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><p className="mb-2 font-bold">Please correct the following:</p><ul className="list-inside list-disc space-y-1">{Object.entries(errors).map(([key, message]) => <li key={key}>{message}</li>)}</ul></div>}
             {/* ──────────── STEP 0: Basic Info ──────────── */}
             {currentStep === 0 && (
               <div className="space-y-5">

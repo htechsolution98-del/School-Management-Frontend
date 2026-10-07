@@ -1,164 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Loader2, Plus, Users, LayoutGrid } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Building2, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { getDepartments, createDepartment } from "@/lib/staff";
-import { Department } from "@/types";
+import { parseDepartments } from "@/lib/clerk/hr-validation";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
+import type { Department } from "@/types";
+import "../clerk-workspace.css";
+
+const columns: DataTableColumn<Department>[] = [
+  { key: "id", header: "ID", search: row => String(row.id), render: row => <span className="font-mono text-slate-400">#{row.id}</span> },
+  { key: "name", header: "Department", sticky: true, search: row => row.name, camelCase: false, render: row => <span className="flex items-center gap-3 font-medium"><span className="hr-avatar"><Building2 size={16} /></span>{row.name}</span> },
+];
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    fetchDepartments();
+  const [progress, setProgress] = useState("");
+  const busy = useRef(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setDepartments(await getDepartments()); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not load departments."); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  const fetchDepartments = async () => {
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy.current || loading) return;
+    setError(""); setSuccess("");
+    const parsed = parseDepartments(input, departments);
+    if (parsed.error) { setError(parsed.error); return; }
+    busy.current = true; setSubmitting(true);
+    const created: Department[] = [];
+    const failed: string[] = [];
+    const messages: string[] = [];
     try {
-      setIsLoading(true);
-      const data = await getDepartments();
-      setDepartments(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load departments");
-    } finally {
-      setIsLoading(false);
-    }
+      for (const [index, name] of parsed.names.entries()) {
+        setProgress(`Creating ${index + 1} of ${parsed.names.length} departments`);
+        try { created.push(await createDepartment(name)); }
+        catch (err) { failed.push(name); messages.push(`${name}: ${err instanceof Error ? err.message : "Creation failed"}`); }
+      }
+      setDepartments(previous => [...previous, ...created]);
+      setInput(failed.join(", "));
+      if (created.length) setSuccess(`${created.length} department${created.length === 1 ? "" : "s"} created successfully.`);
+      if (failed.length) setError(`${messages.join("; ")}. Only unsuccessful names remain in the form for retry.`);
+    } finally { busy.current = false; setSubmitting(false); setProgress(""); }
   };
 
-  const handleCreateDepartment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDepartmentName.trim()) return;
-
-    try {
-      setIsSubmitting(true);
-      setError("");
-      setSuccess("");
-      await createDepartment(newDepartmentName.trim());
-      setSuccess("Department created successfully!");
-      setNewDepartmentName("");
-      fetchDepartments();
-    } catch (err: any) {
-      setError(err.message || "Failed to create department");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Departments</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage school departments and HR structures</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Create Form */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-indigo-600" />
-              Create Department
-            </h2>
-
-            {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-50 text-emerald-600 text-sm border border-emerald-100">
-                {success}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateDepartment} className="space-y-4">
-              <div className="space-y-1.5">
-                <label htmlFor="dept_name" className="text-sm font-medium text-gray-700">
-                  Department Name
-                </label>
-                <Input
-                  id="dept_name"
-                  value={newDepartmentName}
-                  onChange={(e) => setNewDepartmentName(e.target.value)}
-                  placeholder="e.g. Science, HR, Administration"
-                  required
-                  className="rounded-xl border-gray-200 focus:border-indigo-600 focus:ring-indigo-600/20"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isSubmitting || !newDepartmentName.trim()}
-                className="w-full bg-[#0D3759] hover:bg-[#0D3759]/90 text-white rounded-xl h-11"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                {isSubmitting ? "Creating..." : "Create Department"}
-              </Button>
-            </form>
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <LayoutGrid className="w-5 h-5 text-indigo-600" />
-              Existing Departments
-            </h2>
-
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                <Loader2 className="h-8 w-8 animate-spin mb-4 text-indigo-600" />
-                <p className="text-sm font-medium">Loading departments...</p>
-              </div>
-            ) : departments.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <Users className="h-10 w-10 mx-auto text-gray-300 mb-3" />
-                <h3 className="text-sm font-semibold text-gray-900">No departments found</h3>
-                <p className="text-sm text-gray-500 mt-1">Get started by creating a new department.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {departments.map((dept, index) => (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    key={dept.id}
-                    className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 flex items-center justify-between group hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
-                        {dept.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{dept.name}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Created {new Date(dept.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+  const preview = input.split(",").map(name => name.trim()).filter(Boolean);
+  return <div className="clerk-page hr-page space-y-6">
+    <div className="hr-department-layout">
+      <section className="hr-panel hr-create-panel">
+        <div className="hr-panel-heading"><span className="hr-avatar"><Plus size={18} /></span><div><h2>Create departments</h2><p>Add one or several in a single step.</p></div></div>
+        <form onSubmit={create} className="space-y-4">
+          <label htmlFor="department-names" className="hr-field-label">Department names</label>
+          <textarea id="department-names" rows={4} value={input} disabled={submitting} aria-invalid={!!error} aria-describedby="department-help department-error" onChange={event => { setInput(event.target.value); setError(""); setSuccess(""); }} placeholder="Science, Mathematics, Administration" className="hr-textarea" />
+          <p id="department-help" className="text-xs leading-5 text-slate-500">Separate each name with a comma. Maximum 100 characters per name.</p>
+          {!!preview.length && <div className="flex flex-wrap gap-2">{preview.map((name, index) => <span key={index} className="hr-chip">{name}</span>)}</div>}
+          <p id="department-error" role="alert" className="text-xs leading-5 text-rose-600">{error}</p>
+          {success && <p role="status" className="hr-success">{success}</p>}
+          <Button type="submit" disabled={loading || submitting || !input.trim()} className="office-primary w-full">{submitting ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{submitting ? progress : `Create ${preview.length > 1 ? `${preview.length} departments` : "department"}`}</Button>
+        </form>
+      </section>
+      <section className="hr-directory min-w-0"><div className="hr-directory-heading"><div><h2>Department directory</h2><p>{departments.length} departments in your school</p></div><Button variant="outline" disabled={loading || submitting} onClick={() => { setError(""); void load(); }}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh</Button></div><DataTable data={departments} columns={columns} getRowId={row => row.id} loading={loading} search searchPlaceholder="Search department names" createdDate createdDateRange minWidth={540} emptyTitle="No departments yet" emptyDescription="Add your first department using the form." caption="School departments" /></section>
     </div>
-  );
+  </div>;
 }
