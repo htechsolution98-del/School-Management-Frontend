@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import "./clerk-workspace.css";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -44,9 +45,11 @@ import {
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { formatDisplayDate } from "@/lib/fees";
+import { formatDDMMYYYY } from "@/lib/table-utils";
 import type { Admission } from "@/types/clerk";
 import { fetchAdmissions, assignGrNumber } from "@/lib/clerk/admissions";
+import { groupStudentDocuments, type PendingDocItem } from "@/lib/clerk/pending-documents";
+import { StudentDocumentRows } from "@/components/clerk/student-document-rows";
 
 interface StudentItem {
   id: number;
@@ -63,20 +66,6 @@ interface StudentItem {
   created_at?: string | null;
   status?: string | null;
   photo?: string | null;
-}
-
-interface PendingDocItem {
-  id: string;
-  studentId?: number;
-  studentName: string;
-  className: string;
-  divisionName?: string;
-  documentName: string;
-  fileUrl: string;
-  submittedAt?: string;
-  isVerified: boolean;
-  admissionNumber?: string;
-  docFieldId?: number;
 }
 
 interface CertRequestItem {
@@ -109,6 +98,8 @@ export default function ClerkDashboard() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [admissionFilter, setAdmissionFilter] = useState<"all" | "pending" | "approved">("all");
   const [docFilter, setDocFilter] = useState<"all" | "pending" | "verified">("pending");
+  const [expandedDocumentStudent, setExpandedDocumentStudent] = useState<number | null>(null);
+  const [documentPage, setDocumentPage] = useState(1);
 
   // Modal states
   const [selectedStudentForGr, setSelectedStudentForGr] = useState<Admission | null>(null);
@@ -218,6 +209,7 @@ export default function ClerkDashboard() {
         if (doc.file) {
           list.push({
             id: `adm-${adm.id}-doc-${doc.id}`,
+            admissionId: adm.id,
             studentName: studentNameField,
             className: classField,
             divisionName: adm.division || undefined,
@@ -236,6 +228,7 @@ export default function ClerkDashboard() {
         if (fileUrl) {
           list.push({
             id: `adm-${adm.id}-rte-${doc.id}`,
+            admissionId: adm.id,
             studentName: studentNameField,
             className: classField,
             divisionName: adm.division || undefined,
@@ -286,11 +279,12 @@ export default function ClerkDashboard() {
   }, [admissions, admissionFilter]);
 
   // Filtered Documents
-  const filteredDocuments = useMemo(() => {
-    if (docFilter === "pending") return pendingDocsList.filter((d) => !d.isVerified).slice(0, 8);
-    if (docFilter === "verified") return pendingDocsList.filter((d) => d.isVerified).slice(0, 8);
-    return pendingDocsList.slice(0, 8);
+  const documentStudents = useMemo(() => {
+    return groupStudentDocuments(pendingDocsList, docFilter);
   }, [pendingDocsList, docFilter]);
+  const documentPageCount = Math.max(1, Math.ceil(documentStudents.length / 8));
+  const activeDocumentPage = Math.min(documentPage, documentPageCount);
+  const visibleDocumentStudents = documentStudents.slice((activeDocumentPage - 1) * 8, activeDocumentPage * 8);
 
   // Handle Quick GR Number Assignment
   const handleAssignGrSubmit = async (e: React.FormEvent) => {
@@ -312,54 +306,20 @@ export default function ClerkDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
-      {/* ─── Top Header & School Greeting Banner ─────────────────────────── */}
-      <div className="relative overflow-hidden bg-white rounded-3xl p-6 sm:p-8 shadow-xs border border-slate-200/80">
-        <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-50/70 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 w-80 h-80 bg-blue-50/50 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100/80 text-xs font-semibold tracking-wide uppercase text-indigo-700">
-              <School size={14} className="text-indigo-600" />
-              <span>{schoolName} • Clerk Portal</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
-              Clerk Administration Hub
-            </h1>
-            <p className="text-sm sm:text-base text-slate-500 font-medium max-w-2xl">
-              Track admissions, document verification, student records, and daily administrative duties in real-time.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200/80 text-xs font-semibold text-slate-600 flex items-center gap-2 shadow-2xs">
-              <Calendar size={14} className="text-indigo-600" />
-              <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
-            </div>
-
-            <button
-              onClick={() => loadDashboardData(true)}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 active:scale-95 text-slate-700 hover:text-indigo-600 text-xs font-bold transition-all border border-slate-200 shadow-2xs hover:border-indigo-200"
-              title="Refresh Dashboard Data"
-            >
-              <RefreshCw size={14} className={`text-indigo-600 ${refreshing ? "animate-spin" : ""}`} />
-              <span>{refreshing ? "Updating..." : "Refresh"}</span>
-            </button>
-          </div>
-        </div>
+    <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-6">
+      <div className="office-actions justify-end">
+        <span className="mr-auto text-xs text-slate-500">{formatDDMMYYYY(new Date())}</span>
+        <Link href="/clerk/manual-admission" className="office-primary inline-flex items-center gap-2"><UserPlus size={15} /> New admission</Link>
+        <button onClick={() => loadDashboardData(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold"><RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />{refreshing ? "Updating" : "Refresh"}</button>
       </div>
-
-      {/* ─── Prominent Student Search Bar (Interactive Dropdown) ─────────── */}
       <div className="relative z-30">
-        <div className="bg-white rounded-2xl p-2 sm:p-2.5 shadow-md shadow-slate-200/60 border border-slate-200/80 flex items-center gap-3 transition-all focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 ml-1">
+        <div className="dashboard-search bg-white flex items-center gap-3 transition-all focus-within:ring-2 focus-within:ring-teal-600/20">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 ml-1">
             <Search size={20} />
           </div>
           <input
             type="text"
-            placeholder="Quick Search: Search by Student Name, GR No., Roll No., or Class..."
+            placeholder="Find a student by name, GR number, roll number or class..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -394,7 +354,7 @@ export default function ClerkDashboard() {
               >
                 <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
                   <span>Search Results ({searchResults.length})</span>
-                  <span className="text-indigo-600">Showing top matches</span>
+                  <span className="text-teal-600">Showing top matches</span>
                 </div>
                 {searchResults.length === 0 ? (
                   <div className="p-8 text-center text-slate-400">
@@ -408,19 +368,19 @@ export default function ClerkDashboard() {
                         key={s.id}
                         href={`/clerk/students?search=${encodeURIComponent(s.gr_no || s.name)}`}
                         onClick={() => setIsSearchFocused(false)}
-                        className="flex items-center justify-between p-3.5 hover:bg-indigo-50/50 transition-colors group"
+                        className="flex items-center justify-between p-3.5 hover:bg-teal-50/50 transition-colors group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-500 text-white font-bold text-sm flex items-center justify-center shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-600 to-teal-500 text-white font-bold text-sm flex items-center justify-center shadow-sm">
                             {(s.name?.[0] || "S").toUpperCase()}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              <span className="font-bold text-slate-900 group-hover:text-teal-600 transition-colors">
                                 {s.name} {s.surname || ""}
                               </span>
                               {s.is_rte && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 border border-teal-200">
                                   RTE
                                 </span>
                               )}
@@ -435,7 +395,7 @@ export default function ClerkDashboard() {
                           <span className="font-mono text-xs font-bold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
                             GR: {s.gr_no || "Pending"}
                           </span>
-                          <ChevronRight size={16} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                          <ChevronRight size={16} className="text-slate-400 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all" />
                         </div>
                       </Link>
                     ))}
@@ -448,20 +408,20 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── 5 Key Metrics Cards ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
+      <div className="dashboard-metrics grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {/* 1. Total Students */}
         <Link
           href="/clerk/students"
-          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all group flex flex-col justify-between"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-teal-300 transition-all group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Students</span>
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Users size={20} />
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+            <div className="text-2xl sm:text-3xl font-bold text-slate-900">
               {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : totalStudentsCount.toLocaleString("en-IN")}
             </div>
             <p className="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-1">
@@ -473,19 +433,19 @@ export default function ClerkDashboard() {
         {/* 2. New Admissions */}
         <Link
           href="/clerk/admission-form"
-          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-blue-300 transition-all group flex flex-col justify-between"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-teal-300 transition-all group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">New Admissions</span>
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-110 transition-transform">
               <UserPlus size={20} />
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+            <div className="text-2xl sm:text-3xl font-bold text-slate-900">
               {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : newAdmissionsCount.toLocaleString("en-IN")}
             </div>
-            <p className="text-xs font-medium text-blue-600 mt-1 flex items-center gap-1">
+            <p className="text-xs font-medium text-teal-600 mt-1 flex items-center gap-1">
               <Sparkles size={12} /> Total Applications
             </p>
           </div>
@@ -498,7 +458,7 @@ export default function ClerkDashboard() {
             el?.scrollIntoView({ behavior: "smooth" });
             setAdmissionFilter("pending");
           }}
-          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-amber-300 transition-all group flex flex-col justify-between cursor-pointer"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-amber-300 transition-all group flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Review</span>
@@ -507,7 +467,7 @@ export default function ClerkDashboard() {
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
+            <div className="text-2xl sm:text-3xl font-bold text-amber-700">
               {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : pendingAdmissionsCount.toLocaleString("en-IN")}
             </div>
             <p className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
@@ -523,7 +483,7 @@ export default function ClerkDashboard() {
             el?.scrollIntoView({ behavior: "smooth" });
             setDocFilter("pending");
           }}
-          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all group flex flex-col justify-between cursor-pointer"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all group flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Docs</span>
@@ -532,7 +492,7 @@ export default function ClerkDashboard() {
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-rose-700">
+            <div className="text-2xl sm:text-3xl font-bold text-rose-700">
               {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : pendingDocumentsCount.toLocaleString("en-IN")}
             </div>
             <p className="text-xs font-medium text-rose-600 mt-1 flex items-center gap-1">
@@ -544,7 +504,7 @@ export default function ClerkDashboard() {
         {/* 5. Today's Attendance */}
         <Link
           href="/clerk/location-settings"
-          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all group flex flex-col justify-between col-span-2 sm:col-span-1"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all group flex flex-col justify-between col-span-2 sm:col-span-1"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Today&apos;s Attendance</span>
@@ -553,7 +513,7 @@ export default function ClerkDashboard() {
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700">
+            <div className="text-2xl sm:text-3xl font-bold text-emerald-700">
               {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : `${attendanceRate}%`}
             </div>
             <p className="text-xs font-medium text-slate-500 mt-1">
@@ -564,21 +524,12 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── Quick Actions Shortcuts Bar ─────────────────────────────────── */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-            ⚡
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Quick Operations</h3>
-            <p className="text-xs text-slate-500">Instant shortcuts for frequent administrative tasks</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
+      <div className="dashboard-shortcuts">
+        <h3>Everyday essentials <span className="ml-2 text-xs font-normal text-slate-400">A little less searching. A lot more doing.</span></h3>
+        <div>
           <Link
             href="/clerk/manual-admission"
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-sm shadow-indigo-600/30 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-sm shadow-teal-600/30 transition-all"
           >
             <UserPlus size={15} />
             <span>+ New Admission</span>
@@ -608,7 +559,7 @@ export default function ClerkDashboard() {
             href="/clerk/certificates"
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
           >
-            <Award size={15} className="text-blue-600" />
+            <Award size={15} className="text-teal-600" />
             <span>Certificates (LC/TC)</span>
           </Link>
 
@@ -624,7 +575,7 @@ export default function ClerkDashboard() {
             href="/clerk/student-promotion"
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
           >
-            <Rocket size={15} className="text-purple-600" />
+            <Rocket size={15} className="text-teal-600" />
             <span>Student Promotion</span>
           </Link>
 
@@ -648,7 +599,7 @@ export default function ClerkDashboard() {
             href="/clerk/assign-division"
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
           >
-            <Layers size={15} className="text-purple-600" />
+            <Layers size={15} className="text-teal-600" />
             <span>Assign Division</span>
           </Link>
 
@@ -656,7 +607,7 @@ export default function ClerkDashboard() {
             href="/clerk/assign-roll-no"
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
           >
-            <Hash size={15} className="text-blue-600" />
+            <Hash size={15} className="text-teal-600" />
             <span>Assign Roll No</span>
           </Link>
         </div>
@@ -665,7 +616,7 @@ export default function ClerkDashboard() {
       {/* ─── Grid: Today's Tasks & Today's Attendance Breakdown ──────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Tasks (2 Columns on Large Screens) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-4">
+        <div className="office-section lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
@@ -676,7 +627,7 @@ export default function ClerkDashboard() {
                 <p className="text-xs text-slate-500">Action items needing clerk attention</p>
               </div>
             </div>
-            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
               {pendingAdmissionsCount + pendingDocumentsCount + pendingCertCount} Pending
             </span>
           </div>
@@ -745,10 +696,10 @@ export default function ClerkDashboard() {
             </div>
 
             {/* Task 3: TC / Leaving Certificate Requests */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all flex flex-col justify-between gap-3">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/30 transition-all flex flex-col justify-between gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
                     <GraduationCap size={16} />
                   </div>
                   <div>
@@ -758,13 +709,13 @@ export default function ClerkDashboard() {
                     </p>
                   </div>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-200 text-indigo-900">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-200 text-teal-900">
                   {pendingCertCount}
                 </span>
               </div>
               <Link
                 href="/clerk/leave-requests"
-                className="flex items-center justify-between w-full px-3 py-1.5 bg-white hover:bg-indigo-100/60 rounded-xl text-xs font-bold text-indigo-800 border border-slate-200 transition-colors"
+                className="flex items-center justify-between w-full px-3 py-1.5 bg-white hover:bg-teal-100/60 rounded-xl text-xs font-bold text-teal-800 border border-slate-200 transition-colors"
               >
                 <span>Process Certificates</span>
                 <ChevronRight size={14} />
@@ -772,10 +723,10 @@ export default function ClerkDashboard() {
             </div>
 
             {/* Task 4: Roll No & Division Allocation */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-purple-300 hover:bg-purple-50/30 transition-all flex flex-col justify-between gap-3">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/30 transition-all flex flex-col justify-between gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
                     <Layers size={16} />
                   </div>
                   <div>
@@ -789,13 +740,13 @@ export default function ClerkDashboard() {
               <div className="grid grid-cols-2 gap-2">
                 <Link
                   href="/clerk/assign-division"
-                  className="text-center px-2 py-1.5 bg-white hover:bg-purple-50 rounded-xl text-[11px] font-bold text-purple-700 border border-slate-200 transition-colors"
+                  className="text-center px-2 py-1.5 bg-white hover:bg-teal-50 rounded-xl text-[11px] font-bold text-teal-700 border border-slate-200 transition-colors"
                 >
                   Divisions
                 </Link>
                 <Link
                   href="/clerk/assign-roll-no"
-                  className="text-center px-2 py-1.5 bg-white hover:bg-purple-50 rounded-xl text-[11px] font-bold text-purple-700 border border-slate-200 transition-colors"
+                  className="text-center px-2 py-1.5 bg-white hover:bg-teal-50 rounded-xl text-[11px] font-bold text-teal-700 border border-slate-200 transition-colors"
                 >
                   Roll Numbers
                 </Link>
@@ -805,7 +756,7 @@ export default function ClerkDashboard() {
         </div>
 
         {/* Today's Attendance Summary Card */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-5 flex flex-col justify-between">
+        <div className="office-section bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
@@ -817,7 +768,7 @@ export default function ClerkDashboard() {
                   <p className="text-xs text-slate-500">Real-time attendance overview</p>
                 </div>
               </div>
-              <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
                 {attendanceRate}% Present
               </span>
             </div>
@@ -902,10 +853,10 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── Recent Admissions Section ───────────────────────────────────── */}
-      <div id="recent-admissions-section" className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div id="recent-admissions-section" className="office-section bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
               <UserPlus size={20} />
             </div>
             <div>
@@ -919,7 +870,7 @@ export default function ClerkDashboard() {
               onClick={() => setAdmissionFilter("all")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 admissionFilter === "all"
-                  ? "bg-white text-indigo-700 shadow-xs"
+                  ? "bg-white text-teal-700 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -982,7 +933,7 @@ export default function ClerkDashboard() {
                     <tr key={adm.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
+                          <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center text-xs">
                             {(studentName[0] || "A").toUpperCase()}
                           </div>
                           <div>
@@ -1009,7 +960,7 @@ export default function ClerkDashboard() {
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-500 font-medium">
-                        {formatDisplayDate(adm.submitted_at || adm.created_at || "")}
+                        {formatDDMMYYYY(adm.submitted_at || adm.created_at || "")}
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
@@ -1032,7 +983,7 @@ export default function ClerkDashboard() {
                                 setSelectedStudentForGr(adm);
                                 setGrInput("");
                               }}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
                             >
                               Assign GR
                             </button>
@@ -1056,7 +1007,7 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── Pending Document Verification Section ───────────────────────── */}
-      <div id="pending-docs-section" className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div id="pending-docs-section" className="office-section bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
@@ -1064,13 +1015,13 @@ export default function ClerkDashboard() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900">Pending Document Verification</h3>
-              <p className="text-xs text-slate-500">Certificates, Aadhaar cards, and student proofs submitted for approval</p>
+              <p className="text-xs text-slate-500">Select a student to view their documents and verification status</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl">
             <button
-              onClick={() => setDocFilter("pending")}
+              onClick={() => { setDocFilter("pending"); setDocumentPage(1); setExpandedDocumentStudent(null); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 docFilter === "pending"
                   ? "bg-white text-rose-700 shadow-xs"
@@ -1080,7 +1031,7 @@ export default function ClerkDashboard() {
               Pending ({pendingDocumentsCount})
             </button>
             <button
-              onClick={() => setDocFilter("verified")}
+              onClick={() => { setDocFilter("verified"); setDocumentPage(1); setExpandedDocumentStudent(null); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 docFilter === "verified"
                   ? "bg-white text-emerald-700 shadow-xs"
@@ -1090,10 +1041,10 @@ export default function ClerkDashboard() {
               Verified
             </button>
             <button
-              onClick={() => setDocFilter("all")}
+              onClick={() => { setDocFilter("all"); setDocumentPage(1); setExpandedDocumentStudent(null); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 docFilter === "all"
-                  ? "bg-white text-indigo-700 shadow-xs"
+                  ? "bg-white text-teal-700 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -1103,90 +1054,31 @@ export default function ClerkDashboard() {
         </div>
 
         <div className="overflow-x-auto">
-          {filteredDocuments.length === 0 ? (
+          {documentStudents.length === 0 ? (
             <div className="p-12 text-center text-slate-400">
               <FileCheck2 size={40} className="mx-auto mb-2 opacity-30" />
               <p className="text-sm font-semibold">No documents pending in this queue.</p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-5">Student Name</th>
-                  <th className="py-3.5 px-4">Class / Div</th>
-                  <th className="py-3.5 px-4">Document Title</th>
-                  <th className="py-3.5 px-4 text-center">Status</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredDocuments.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-5 font-bold text-slate-900 text-sm">
-                      {doc.studentName}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-600 font-semibold">
-                      {doc.className} {doc.divisionName ? `• Div ${doc.divisionName}` : ""}
-                    </td>
-
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <FileText size={14} className="text-indigo-600 shrink-0" />
-                        <span className="font-semibold text-slate-800">{doc.documentName}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center">
-                      {doc.isVerified ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          <CheckCircle2 size={12} /> Verified
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                          <Clock size={12} /> Pending Verification
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {doc.fileUrl && (
-                          <button
-                            onClick={() =>
-                              setPreviewDoc({
-                                name: `${doc.studentName} - ${doc.documentName}`,
-                                url: doc.fileUrl,
-                              })
-                            }
-                            className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors"
-                          >
-                            <Eye size={13} /> View File
-                          </button>
-                        )}
-                        <Link
-                          href="/clerk/students"
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-                        >
-                          Verify in Profile
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <StudentDocumentRows students={visibleDocumentStudents} expanded={expandedDocumentStudent} onExpand={setExpandedDocumentStudent} onPreview={setPreviewDoc} />
           )}
         </div>
+        {documentStudents.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+          <span>{documentStudents.length} students / Page {activeDocumentPage} of {documentPageCount}</span>
+          <div className="flex gap-2">
+            <button type="button" disabled={activeDocumentPage === 1} onClick={() => { setDocumentPage(activeDocumentPage - 1); setExpandedDocumentStudent(null); }} className="rounded-lg border border-slate-200 px-3 py-2 font-semibold disabled:opacity-40">Previous</button>
+            <button type="button" disabled={activeDocumentPage === documentPageCount} onClick={() => { setDocumentPage(activeDocumentPage + 1); setExpandedDocumentStudent(null); }} className="rounded-lg border border-slate-200 px-3 py-2 font-semibold disabled:opacity-40">Next</button>
+          </div>
+        </div>}
       </div>
 
       {/* ─── Modal: Assign GR Number ────────────────────────────────────── */}
       {selectedStudentForGr && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100 p-6 space-y-5">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
                   <Hash size={20} />
                 </div>
                 <div>
@@ -1223,7 +1115,7 @@ export default function ClerkDashboard() {
                   placeholder="e.g. GR-2026-0042"
                   value={grInput}
                   onChange={(e) => setGrInput(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-mono"
                   autoFocus
                 />
               </div>
@@ -1239,7 +1131,7 @@ export default function ClerkDashboard() {
                 <button
                   type="submit"
                   disabled={assigningGr || !grInput.trim()}
-                  className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all"
+                  className="flex items-center gap-2 px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all"
                 >
                   {assigningGr ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                   <span>Assign & Approve</span>
@@ -1253,7 +1145,7 @@ export default function ClerkDashboard() {
       {/* ─── Modal: Document Preview ────────────────────────────────────── */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <h3 className="text-sm font-bold text-slate-900 truncate pr-4">{previewDoc.name}</h3>
               <div className="flex items-center gap-2">

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import Link from "next/link";
+import { formatDDMMYYYY, parseApiDate } from "@/lib/table-utils";
+import { InlineCertificate } from "@/components/clerk/inline-certificate";
+import "../clerk-workspace.css";
 import {
   FileText,
   Printer,
@@ -26,6 +28,8 @@ import {
   Copy,
   Edit2,
   School,
+  Settings2,
+  ChevronDown,
 } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/auth";
@@ -33,6 +37,7 @@ import { API_BASE_URL } from "@/lib/config";
 import { fetchAdmissions } from "@/lib/clerk/admissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -86,7 +91,8 @@ function numberToWords(num: number): string {
 function formatDateToWords(dateStr: string): string {
   if (!dateStr) return "";
   try {
-    const d = new Date(dateStr);
+    const d = parseApiDate(dateStr);
+    if (!d) return "";
     if (isNaN(d.getTime())) return "";
     const day = d.getDate();
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -116,6 +122,10 @@ export default function CertificateIssuancePage() {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [classFilter, setClassFilter] = useState("all");
+  const [divisionFilter, setDivisionFilter] = useState("all");
+  const drafts = useRef<Record<string, string>>({});
+  const [canvasRevision, setCanvasRevision] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<StudentItem | null>(null);
 
   // Active School Name
@@ -142,7 +152,9 @@ export default function CertificateIssuancePage() {
     remarks: "Passed and Promoted",
   });
 
-  const printRef = useRef<HTMLDivElement>(null);
+  const draftKey = `${selectedStudent?.id ?? "preview"}:${activeCertType}`;
+  const classOptions = useMemo(() => [...new Set(students.map(s => String(s.school_class_name || "")))].filter(Boolean).sort(), [students]);
+  const divisionOptions = useMemo(() => [...new Set(students.filter(s => classFilter === "all" || String(s.school_class_name) === classFilter).map(s => String(s.division_name || "")))].filter(Boolean).sort(), [students, classFilter]);
 
   // Load School Details from localStorage / user profile
   useEffect(() => {
@@ -302,15 +314,15 @@ export default function CertificateIssuancePage() {
 
   // Filtered Students
   const filteredStudents = useMemo(() => {
-    if (!searchTerm.trim()) return students;
-    const q = searchTerm.toLowerCase();
+    const q = searchTerm.trim().toLowerCase();
     return students.filter((s) => {
       const name = `${s.first_name || ""} ${s.last_name || ""} ${s.student_name || ""} ${s.name || ""}`.toLowerCase();
       const gr = String(s.gr_number || "").toLowerCase();
       const cls = String(s.school_class_name || (typeof s.school_class === "object" ? s.school_class?.school_class : s.school_class) || "").toLowerCase();
-      return name.includes(q) || gr.includes(q) || cls.includes(q);
+      const matchesSearch = name.includes(q) || gr.includes(q) || cls.includes(q) || String(s.roll_number || "").toLowerCase().includes(q) || String(s.mobile || "").includes(q);
+      return matchesSearch && (classFilter === "all" || String(s.school_class_name) === classFilter) && (divisionFilter === "all" || String(s.division_name) === divisionFilter);
     });
-  }, [students, searchTerm]);
+  }, [students, searchTerm, classFilter, divisionFilter]);
 
   // Derived student attributes
   const currentStudentName = useMemo(() => {
@@ -353,10 +365,13 @@ export default function CertificateIssuancePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="clerk-page certificate-page w-full min-w-0 space-y-6">
       {/* Print Stylesheet */}
       <style jsx global>{`
         @media print {
+          @page { size: A4; margin: 12mm; }
+          html, body, .app-workspace, .app-workspace main { height: auto !important; overflow: visible !important; display: block !important; }
+          #printable-certificate { border-radius: 0 !important; min-height: 0 !important; }
           body * {
             visibility: hidden;
           }
@@ -382,125 +397,41 @@ export default function CertificateIssuancePage() {
         }
       `}</style>
 
-      {/* Page Header (No Print) */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <Link href="/clerk" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
-              <FileText className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-zinc-100 tracking-tight">
-              Certificate Issuance Desk
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 pl-11">
-            School: <strong className="text-gray-800 dark:text-zinc-200">{certData.schoolName}</strong> · Generate and print Bonafide, School Leaving (TC), Character, & No-Dues Certificates.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={handlePrint}
-            disabled={!selectedStudent}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-5 py-2.5 shadow-md flex items-center gap-2"
-          >
-            <Printer size={15} /> Print Certificate
-          </Button>
-        </div>
-      </div>
-
       {/* Certificate Type Selector Tabs (No Print) */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setActiveCertType("bonafide");
-            setCertData((p) => ({ ...p, certNumber: `BON-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` }));
-          }}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            activeCertType === "bonafide"
-              ? "border-blue-600 bg-blue-50/70 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 shadow-sm"
-              : "border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:border-gray-300"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <Award className="h-4 w-4 text-blue-600" />
-            <span className="font-bold text-sm">Bonafide Certificate</span>
-          </div>
-          <p className="text-[11px] text-gray-500 dark:text-zinc-400">Passport, Bank Account, Scholarships</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveCertType("leaving_certificate");
-            setCertData((p) => ({ ...p, certNumber: `TC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` }));
-          }}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            activeCertType === "leaving_certificate"
-              ? "border-amber-600 bg-amber-50/70 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 shadow-sm"
-              : "border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:border-gray-300"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <Building2 className="h-4 w-4 text-amber-600" />
-            <span className="font-bold text-sm">Leaving / TC Certificate</span>
-          </div>
-          <p className="text-[11px] text-gray-500 dark:text-zinc-400">Standard Government 16-field format</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveCertType("character");
-            setCertData((p) => ({ ...p, certNumber: `CHAR-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` }));
-          }}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            activeCertType === "character"
-              ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 shadow-sm"
-              : "border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:border-gray-300"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <UserCheck className="h-4 w-4 text-emerald-600" />
-            <span className="font-bold text-sm">Character Certificate</span>
-          </div>
-          <p className="text-[11px] text-gray-500 dark:text-zinc-400">Conduct, Attendance & Ethics testimonial</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveCertType("no_dues");
-            setCertData((p) => ({ ...p, certNumber: `NODUES-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` }));
-          }}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            activeCertType === "no_dues"
-              ? "border-purple-600 bg-purple-50/70 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 shadow-sm"
-              : "border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:border-gray-300"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <CreditCard className="h-4 w-4 text-purple-600" />
-            <span className="font-bold text-sm">Fee No-Dues / Clearance</span>
-          </div>
-          <p className="text-[11px] text-gray-500 dark:text-zinc-400">Fees, Library & Sports clearance</p>
-        </button>
+      <div className="no-print flex items-center justify-between gap-3">
+        <div><h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Start with a template</h2><p className="mt-1 text-xs text-slate-500">Designed for your everyday school paperwork.</p></div>
+        <Badge variant="outline">4 templates</Badge>
+      </div>
+      <div className="template-gallery no-print">
+        {([
+          { type: "bonafide", title: "Bonafide Certificate", description: "Identity, scholarships and bank applications", icon: Award, prefix: "BON" },
+          { type: "leaving_certificate", title: "School Leaving / TC", description: "Transfer and school leaving records", icon: GraduationCap, prefix: "TC" },
+          { type: "character", title: "Character & Conduct", description: "Student conduct and character reference", icon: UserCheck, prefix: "CHAR" },
+          { type: "no_dues", title: "No-Dues / Clearance", description: "School fees and other dues clearance", icon: CreditCard, prefix: "ND" },
+        ] as const).map(template => {
+          const selected = activeCertType === template.type;
+          const Icon = template.icon;
+          return <button key={template.type} type="button" aria-pressed={selected} onClick={() => {
+            setActiveCertType(template.type);
+            setCertData(prev => ({ ...prev, certNumber: `${template.prefix}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` }));
+          }} className={`template-choice ${selected ? "border-teal-300 bg-teal-50 ring-1 ring-teal-200 dark:border-teal-700 dark:bg-teal-950/30 dark:ring-teal-800" : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900"}`}>
+            <div aria-hidden="true" className="template-thumbnail flex shrink-0 flex-col items-center gap-1.5 rounded border border-slate-200 bg-white p-2 shadow-sm">
+              <Icon className="mb-1 h-4 w-4 text-teal-700" /><span className="h-0.5 w-full bg-slate-300" /><span className="h-0.5 w-full bg-slate-200" /><span className="h-0.5 w-3/4 bg-slate-200" /><span className="mt-auto h-0.5 w-1/2 self-end bg-slate-400" />
+            </div>
+            <div className="min-w-0"><p className="pr-3 text-sm font-semibold text-slate-900 dark:text-zinc-100">{template.title}</p><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">{template.description}</p><span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-teal-700 dark:text-teal-300">{selected ? <><CheckCircle2 size={12} /> Selected template</> : "Use template"}</span></div>
+          </button>;
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="certificate-workbench">
         {/* LEFT COLUMN: Student Selector & Editable Controls (No Print) */}
-        <div className="no-print lg:col-span-4 space-y-4">
+        <div className="certificate-sidebar no-print space-y-4">
           {/* Student Search & Picker */}
           <Card className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-zinc-900">
             <CardHeader className="p-4 pb-3 border-b border-gray-100 dark:border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-zinc-300">
-                  Select Student
+                  Find your student
                 </CardTitle>
                 <Badge variant="outline" className="text-[10px] font-mono">
                   {filteredStudents.length} Students
@@ -510,17 +441,32 @@ export default function CertificateIssuancePage() {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search by Name, GR No, Class..."
+                  aria-label="Search students by name, GR number, roll number or phone"
+                  placeholder="Name, GR number, roll or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 text-xs rounded-xl h-8"
                 />
               </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <label className="space-y-1 text-xs text-slate-500">Class
+                  <select aria-label="Filter students by class" value={classFilter} onChange={e => { setClassFilter(e.target.value); setDivisionFilter("all"); }} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                    <option value="all">All classes</option>{classOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs text-slate-500">Division
+                  <select aria-label="Filter students by division" value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                    <option value="all">All divisions</option>{divisionOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              </div>
+              <button type="button" onClick={() => { setSearchTerm(""); setClassFilter("all"); setDivisionFilter("all"); }} className="mt-2 text-left text-xs font-medium text-teal-700 hover:underline">Clear filters</button>
+              {selectedStudent && <p className="mt-2 rounded-lg bg-teal-50 p-2 text-xs text-teal-800 dark:bg-teal-950 dark:text-teal-200">Selected: {currentStudentName} · GR {selectedStudent.gr_number}</p>}
             </CardHeader>
             <CardContent className="p-2 max-h-56 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800">
               {loading ? (
                 <div className="p-4 text-center text-xs text-gray-400">
-                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1 text-blue-600" /> Loading students...
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1 text-teal-600" /> Loading students...
                 </div>
               ) : filteredStudents.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-400">No students found.</div>
@@ -532,10 +478,11 @@ export default function CertificateIssuancePage() {
                     <button
                       key={stu.id}
                       type="button"
+                      aria-pressed={isSel}
                       onClick={() => handleSelectStudent(stu)}
                       className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
                         isSel
-                          ? "bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-100 font-semibold"
+                          ? "bg-teal-50 dark:bg-teal-950/50 text-teal-900 dark:text-teal-100 font-semibold"
                           : "hover:bg-gray-50 dark:hover:bg-zinc-800 text-gray-700 dark:text-zinc-300"
                       }`}
                     >
@@ -545,7 +492,7 @@ export default function CertificateIssuancePage() {
                           GR: {stu.gr_number || "Pending GR"} | Class: {stu.school_class_name || (typeof stu.school_class === "object" ? stu.school_class?.school_class : stu.school_class) || "-"}
                         </p>
                       </div>
-                      {isSel && <CheckCircle2 size={14} className="text-blue-600 shrink-0" />}
+                      {isSel && <CheckCircle2 size={14} className="text-teal-600 shrink-0" />}
                     </button>
                   );
                 })
@@ -553,11 +500,12 @@ export default function CertificateIssuancePage() {
             </CardContent>
           </Card>
 
-          {/* Certificate Parameters Config */}
+          {/* Optional document settings */}
+          <details className="document-settings"><summary><Settings2 size={16} /> Document settings <ChevronDown size={14} /></summary>
           <Card className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-zinc-900">
             <CardHeader className="p-4 pb-2 border-b border-gray-100 dark:border-zinc-800">
               <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-zinc-300">
-                School Header & Certificate Parameters
+                Header & document details
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-3">
@@ -588,14 +536,20 @@ export default function CertificateIssuancePage() {
                   className="text-xs font-mono h-8 rounded-lg"
                 />
               </div>
+              <label className="block space-y-1 text-xs text-slate-500">School address / contact
+                <Input value={certData.schoolAddress} onChange={e => setCertData(prev => ({ ...prev, schoolAddress: e.target.value }))} className="text-xs" />
+              </label>
+              {activeCertType === "leaving_certificate" && <label className="block space-y-1 text-xs text-slate-500">General remarks
+                <Input value={certData.remarks} onChange={e => setCertData(prev => ({ ...prev, remarks: e.target.value }))} className="text-xs" />
+              </label>}
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-gray-600 dark:text-zinc-400">Date of Issue</label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={certData.issueDate}
-                    onChange={(e) => setCertData({ ...certData, issueDate: e.target.value })}
+                    required
+                    onChange={value => setCertData({ ...certData, issueDate: value })}
                     className="text-xs h-8 rounded-lg"
                   />
                 </div>
@@ -634,10 +588,10 @@ export default function CertificateIssuancePage() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-gray-600 dark:text-zinc-400">Date of Leaving</label>
-                      <Input
-                        type="date"
+                      <DatePicker
                         value={certData.dateOfLeaving}
-                        onChange={(e) => setCertData({ ...certData, dateOfLeaving: e.target.value })}
+                        required
+                        onChange={value => setCertData({ ...certData, dateOfLeaving: value })}
                         className="text-xs h-8 rounded-lg"
                       />
                     </div>
@@ -687,7 +641,7 @@ export default function CertificateIssuancePage() {
                   id="chk-duplicate"
                   checked={isDuplicate}
                   onChange={(e) => setIsDuplicate(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 rounded cursor-pointer"
+                  className="h-4 w-4 text-teal-600 rounded cursor-pointer"
                 />
                 <label htmlFor="chk-duplicate" className="text-xs font-semibold text-gray-700 dark:text-zinc-300 cursor-pointer">
                   Mark as &quot;DUPLICATE COPY&quot;
@@ -695,26 +649,22 @@ export default function CertificateIssuancePage() {
               </div>
             </CardContent>
           </Card>
+          </details>
         </div>
 
         {/* RIGHT COLUMN: Real-time Certificate Paper Preview & Print Canvas */}
-        <div className="lg:col-span-8">
-          <Card className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-md bg-white dark:bg-zinc-900 overflow-hidden">
-            <div className="no-print bg-slate-50 dark:bg-zinc-800/40 p-3 px-5 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between text-xs text-gray-500">
-              <span className="font-semibold flex items-center gap-1.5 text-gray-700 dark:text-zinc-300">
-                <Eye size={14} className="text-blue-600" /> Live Print Preview (A4 Standard)
-              </span>
-              <span className="font-mono text-[11px] bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
-                Ref: {certData.certNumber}
-              </span>
+        <div className="certificate-preview">
+          <Card className="certificate-preview-card">
+            <div className="certificate-toolbar no-print">
+              <div><span className="editor-status" /><span className="font-semibold">Live document</span><span className="editor-paper-label">A4 / Click text to edit</span></div>
+              <div>
+                <Button type="button" variant="ghost" size="sm" disabled={!selectedStudent} onClick={() => document.getElementById("printable-certificate")?.focus()}><Edit2 size={14} /> Edit text</Button>
+                <Button type="button" variant="ghost" size="sm" disabled={!selectedStudent} onClick={() => { delete drafts.current[draftKey]; setCanvasRevision(value => value + 1); }}><RefreshCw size={14} /> Reset</Button>
+                <Button type="button" className="office-primary" disabled={!selectedStudent} onClick={handlePrint}><Printer size={15} /> Print</Button>
+              </div>
             </div>
-
-            {/* PRINTABLE CANVAS */}
-            <div
-              id="printable-certificate"
-              ref={printRef}
-              className="p-8 sm:p-12 bg-white text-black relative font-serif text-sm leading-relaxed border-8 border-double border-slate-700 m-4 rounded-xl min-h-[700px] flex flex-col justify-between"
-            >
+            <div className="certificate-paper-stage">
+            <InlineCertificate documentKey={draftKey} revision={canvasRevision} readDraft={() => drafts.current[draftKey]} onSave={html => { drafts.current[draftKey] = html; }} editable={!!selectedStudent && !loading}>
               {/* Optional Duplicate Watermark */}
               {isDuplicate && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 select-none z-0">
@@ -742,10 +692,10 @@ export default function CertificateIssuancePage() {
 
               {/* CERTIFICATE TITLE & REF */}
               <div className="py-4 text-center relative z-10">
-                <div className="flex justify-between items-center text-xs font-sans text-slate-600 mb-2">
+                <div className="flex flex-wrap justify-between items-center gap-2 text-xs font-sans text-slate-600 mb-2">
                   <span><strong>Serial / Reg No:</strong> {certData.certNumber}</span>
                   <span><strong>G.R. No:</strong> {selectedStudent?.gr_number || "_______"}</span>
-                  <span><strong>Date:</strong> {new Date(certData.issueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span>
+                  <span><strong>Date:</strong> {formatDDMMYYYY(certData.issueDate)}</span>
                 </div>
 
                 <div className="inline-block px-6 py-1.5 border-b-2 border-t-2 border-slate-800 my-2">
@@ -787,7 +737,7 @@ export default function CertificateIssuancePage() {
                       As per the School General Register (G.R. No. <strong>{selectedStudent?.gr_number || "______"}</strong>),
                       his/her Date of Birth recorded in our register is{" "}
                       <strong className="underline underline-offset-4 px-1">
-                        {selectedStudent?.date_of_birth || "__________"}
+                        {selectedStudent?.date_of_birth ? formatDDMMYYYY(selectedStudent.date_of_birth) : "__________"}
                       </strong>{" "}
                       {selectedStudent?.date_of_birth && (
                         <span>
@@ -824,14 +774,14 @@ export default function CertificateIssuancePage() {
                       <div>6. Nationality: <strong>{selectedStudent?.nationality || "Indian"}</strong></div>
                       <div>7. Religion & Caste: <strong>{selectedStudent?.religion || "-"} / {selectedStudent?.caste || "-"}</strong></div>
                       <div>8. Place of Birth: <strong>{selectedStudent?.place_of_birth || "N/A"}</strong></div>
-                      <div>9. Date of Birth (in figures): <strong>{selectedStudent?.date_of_birth || "N/A"}</strong></div>
+                      <div>9. Date of Birth (in figures): <strong>{formatDDMMYYYY(selectedStudent?.date_of_birth)}</strong></div>
                       <div className="col-span-2">10. Date of Birth (in words): <strong>{formatDateToWords(selectedStudent?.date_of_birth || "") || "N/A"}</strong></div>
                       <div className="col-span-2">11. Last School Attended: <strong>{selectedStudent?.previous_school || "Admitted Directly"}</strong></div>
-                      <div>12. Date of Admission: <strong>{selectedStudent?.admission_date || "N/A"}</strong></div>
+                      <div>12. Date of Admission: <strong>{formatDDMMYYYY(selectedStudent?.admission_date)}</strong></div>
                       <div>13. Class Admitted: <strong>Class {studentClassName}</strong></div>
                       <div>14. Progress in Studies: <strong>{certData.progress}</strong></div>
                       <div>15. Conduct & Behavior: <strong>{certData.conduct}</strong></div>
-                      <div>16. Date of Leaving School: <strong>{certData.dateOfLeaving}</strong></div>
+                      <div>16. Date of Leaving School: <strong>{formatDDMMYYYY(certData.dateOfLeaving)}</strong></div>
                       <div className="col-span-2">17. Reason for Leaving School: <strong>{certData.reasonForLeaving}</strong></div>
                       <div className="col-span-2">18. General Remarks: <strong>{certData.remarks}</strong></div>
                     </div>
@@ -885,16 +835,17 @@ export default function CertificateIssuancePage() {
               {/* FOOTER SIGNATURES */}
               <div className="pt-12 grid grid-cols-3 text-center text-xs font-sans relative z-10">
                 <div>
-                  <div className="border-t border-slate-700 pt-1.5 mx-6 font-semibold">Prepared By (Clerk)</div>
+                  <div className="border-t border-slate-700 pt-1.5 mx-2 sm:mx-6 font-semibold">Prepared By (Clerk)</div>
                 </div>
                 <div>
-                  <div className="border-t border-slate-700 pt-1.5 mx-6 font-semibold">Verified By / Head Clerk</div>
+                  <div className="border-t border-slate-700 pt-1.5 mx-2 sm:mx-6 font-semibold">Verified By / Head Clerk</div>
                 </div>
                 <div>
-                  <div className="border-t border-slate-700 pt-1.5 mx-6 font-semibold">Principal / Headmaster</div>
+                  <div className="border-t border-slate-700 pt-1.5 mx-2 sm:mx-6 font-semibold">Principal / Headmaster</div>
                   <p className="text-[10px] text-slate-400 mt-1">(With Official Seal)</p>
                 </div>
               </div>
+            </InlineCertificate>
             </div>
           </Card>
         </div>

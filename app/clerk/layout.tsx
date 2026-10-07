@@ -21,6 +21,7 @@ import {
   PhoneCall,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import "./clerk-workspace.css";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
@@ -96,7 +97,7 @@ const sidebarLinks = [
 export default function ClerkLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardLayout roleTitle="Clerk" sidebarLinks={sidebarLinks}>
-      {children}
+      <div className="clerk-area min-w-0">{children}</div>
     </DashboardLayout>
   );
 }

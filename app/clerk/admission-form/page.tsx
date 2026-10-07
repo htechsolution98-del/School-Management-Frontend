@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { camelCaseText } from "@/lib/table-utils";
+import "../clerk-workspace.css";
 
 // ─── Modal Backdrop ──────────────────────────────────────────────────────────
 function ModalBackdrop({ onClick }: { onClick: () => void }) {
@@ -567,17 +568,18 @@ function CreateFormModal({
 
       <motion.div
         key="create-form-modal"
-        initial={{ opacity: 0, scale: 0.97, y: 20 }}
+        initial={{ opacity: 0, scale: 0.97, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.97, y: 20 }}
+        exit={{ opacity: 0, scale: 0.97, y: 16 }}
         transition={{ type: "spring", stiffness: 340, damping: 30 }}
-        className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-5 overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full max-w-5xl my-6">
+        <div className="relative w-full max-w-5xl my-4 sm:my-8 shadow-2xl rounded-2xl">
           <button
             onClick={onClose}
-            className="absolute -top-3 -right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 shadow-lg transition-colors"
+            aria-label="Close modal"
+            className="absolute top-3.5 right-3.5 z-20 flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/20 backdrop-blur-xs transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -597,8 +599,8 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       transition={{ duration: 0.4 }}
       className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-50 to-blue-100 border border-indigo-100 mb-4 shadow-sm">
-        <FileText className="h-8 w-8 text-indigo-600" />
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 border border-teal-100 mb-4 shadow-xs">
+        <FileText className="h-8 w-8 text-[#147d73]" />
       </div>
       <h3 className="text-base font-bold text-slate-800 mb-1">
         No admission forms created yet
@@ -606,7 +608,7 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       <p className="text-xs text-slate-500 max-w-xs mb-6">
         Create an online admission form to start accepting student applications with custom fields and document uploads.
       </p>
-      <Button onClick={onCreateClick} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs text-xs font-bold">
+      <Button onClick={onCreateClick} className="gap-2 bg-[#173044] hover:bg-[#25495e] text-white rounded-xl shadow-xs text-xs font-bold px-4 py-2">
         <Plus className="h-4 w-4" />
         Create Admission Form
       </Button>
@@ -706,7 +708,7 @@ function FormTableRow({
           />
           <span
             className={`text-xs font-bold ${
-              form.is_active ? "text-indigo-600" : "text-slate-400"
+              form.is_active ? "text-teal-700" : "text-slate-400"
             }`}
           >
             {form.is_active ? "Active" : "Inactive"}
@@ -719,7 +721,7 @@ function FormTableRow({
             variant="ghost"
             size="sm"
             onClick={onShare}
-            className="h-8 px-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg gap-1"
+            className="h-8 px-2 text-xs font-bold text-teal-700 hover:bg-teal-50 hover:text-teal-800 rounded-lg gap-1"
             title="Share Link & QR"
           >
             <Share2 className="h-3.5 w-3.5" />
@@ -730,7 +732,7 @@ function FormTableRow({
             variant="ghost"
             size="sm"
             onClick={onView}
-            className="h-8 w-8 p-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+            className="h-8 w-8 p-0 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
             title="View Details"
           >
             <Eye className="h-4 w-4" />
@@ -794,13 +796,13 @@ function PublishedLinkBanner({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative overflow-hidden rounded-2xl border border-indigo-100/90 bg-white p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all"
+      className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all"
     >
-      <div className="absolute top-0 right-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-gradient-to-br from-indigo-100/40 to-blue-100/30 blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-teal-500/5 blur-3xl pointer-events-none" />
 
       <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200 shrink-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#173044] text-white shadow-md shrink-0">
             <ExternalLink className="h-5 w-5" />
           </div>
           <div>
@@ -827,7 +829,7 @@ function PublishedLinkBanner({
             </div>
             <button
               onClick={handleCopy}
-              className="absolute right-1 top-1 h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-white transition-all shadow-2xs"
+              className="absolute right-1 top-1 h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-700 hover:bg-white transition-all shadow-2xs"
               title="Copy link"
             >
               {copied ? (
@@ -846,7 +848,7 @@ function PublishedLinkBanner({
             className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold gap-1.5 shadow-2xs"
             title="Generate QR Code"
           >
-            <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+            <QrCode className="h-3.5 w-3.5 text-teal-700" />
             <span>QR & Share</span>
           </Button>
 
@@ -866,7 +868,7 @@ function PublishedLinkBanner({
           <Button
             size="sm"
             onClick={() => window.open(frontendLink, "_blank")}
-            className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+            className="h-9 px-3.5 rounded-xl office-primary text-white text-xs font-bold gap-1.5 shadow-xs"
           >
             Preview Form
             <ChevronRight className="h-3.5 w-3.5" />
@@ -984,12 +986,17 @@ export default function AdmissionFormPage() {
 
   return (
     <>
-      <div className="space-y-5 max-w-7xl mx-auto">
+      <div className="clerk-page admission-page space-y-6 max-w-7xl mx-auto">
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
+            <div className="office-eyebrow">
+              <span>Admission Desk</span>
+              <span>/</span>
+              <span>Online Forms</span>
+            </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Admission Forms
+              Admission Forms<span className="heading-dot">.</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Create, customize, and share online admission forms for prospective students.
@@ -1001,7 +1008,7 @@ export default function AdmissionFormPage() {
               size="sm"
               onClick={fetchForms}
               disabled={loading}
-              className="h-8.5 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 shadow-2xs"
+              className="h-9 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 shadow-2xs"
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
@@ -1010,7 +1017,7 @@ export default function AdmissionFormPage() {
             </Button>
             <Button
               onClick={() => setCreateOpen(true)}
-              className="h-8.5 text-xs font-bold gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs"
+              className="h-9 text-xs font-bold gap-1.5 office-primary text-white rounded-xl shadow-xs"
             >
               <Plus className="h-4 w-4" />
               Create Form
@@ -1025,10 +1032,12 @@ export default function AdmissionFormPage() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800 shadow-2xs"
+              className="hr-success"
             >
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              {successBanner}
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{successBanner}</span>
+              </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -1040,13 +1049,15 @@ export default function AdmissionFormPage() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700 shadow-2xs"
+              className="hr-error flex items-center justify-between"
             >
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-              {error}
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                <span>{error}</span>
+              </div>
               <button
                 onClick={fetchForms}
-                className="ml-auto text-xs underline underline-offset-2 hover:no-underline font-bold"
+                className="text-xs underline underline-offset-2 hover:no-underline font-bold"
               >
                 Retry
               </button>
@@ -1063,56 +1074,42 @@ export default function AdmissionFormPage() {
                 value: forms.length,
                 subtext: "Configured templates",
                 icon: FileText,
-                color: "text-indigo-600",
-                bg: "bg-indigo-50",
               },
               {
                 label: "Published & Live",
                 value: forms.filter((f) => f.is_active).length,
                 subtext: "Open for applications",
                 icon: CheckCircle2,
-                color: "text-emerald-600",
-                bg: "bg-emerald-50",
               },
               {
-                label: "With Application Fees",
+                label: "With Fees",
                 value: forms.filter((f) => f.fees_enable).length,
                 subtext: "Fee collected online",
                 icon: IndianRupee,
-                color: "text-amber-600",
-                bg: "bg-amber-50",
               },
               {
-                label: "Total Form Sections",
+                label: "Form Sections",
                 value: forms.reduce(
                   (sum, f) => sum + (f.sections?.length || 0),
                   0
                 ),
                 subtext: "Modular field blocks",
                 icon: Layers,
-                color: "text-purple-600",
-                bg: "bg-purple-50",
               },
-            ].map(({ label, value, subtext, icon: Icon, color, bg }) => (
-              <motion.div
+            ].map(({ label, value, subtext, icon: Icon }) => (
+              <div
                 key={label}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs"
+                className="register-stat"
               >
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg} ${color} shrink-0`}
-                >
+                <div className="stat-label">
+                  <span>{label}</span>
                   <Icon className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
-                    {value}
-                  </p>
-                  <p className="text-[11px] font-bold text-slate-600">{label}</p>
-                  <p className="text-[10px] text-slate-400">{subtext}</p>
-                </div>
-              </motion.div>
+                <p className="stat-value text-2xl font-bold mt-2">
+                  {value}
+                </p>
+                <p className="stat-caption text-[11px] text-slate-400 mt-1">{subtext}</p>
+              </div>
             ))}
           </div>
         ) : null}
@@ -1149,7 +1146,7 @@ export default function AdmissionFormPage() {
                     onClick={() => setStatusFilter(filter)}
                     className={`px-3 py-1 text-xs font-bold rounded-lg transition-all capitalize ${
                       statusFilter === filter
-                        ? "bg-indigo-600 text-white shadow-2xs"
+                        ? "bg-[#173044] text-white shadow-2xs"
                         : "text-slate-600 hover:bg-slate-100"
                     }`}
                   >

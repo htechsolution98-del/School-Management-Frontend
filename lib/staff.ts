@@ -137,7 +137,13 @@ export async function createDepartment(name: string) {
   );
 
   if (!response.ok) {
-    throw new Error("Failed to create department.");
+    let message = "Failed to create department.";
+    try {
+      const error = await response.json();
+      const details = Object.values(error || {}).flat().filter((value): value is string => typeof value === "string");
+      message = error?.detail || error?.message || details.join(" ") || message;
+    } catch { /* Keep the fallback for non-JSON responses. */ }
+    throw new Error(message);
   }
 
   return response.json();

@@ -52,6 +52,7 @@ import type {
   ConfiguredField,
 } from "@/types/principal";
 import { cn } from "@/lib/utils";
+import { validateAdmissionBuilder } from "@/lib/admission-builder-validation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -84,28 +85,28 @@ const STEP_TITLES = [
     title: "Basic Info",
     description: "Form title & student fields",
     icon: School,
-    color: "from-violet-500 to-purple-600",
-    bg: "bg-violet-50",
-    text: "text-violet-600",
-    border: "border-violet-200",
+    color: "from-[#173044] to-[#25495e]",
+    bg: "bg-slate-100",
+    text: "text-slate-800",
+    border: "border-slate-300",
   },
   {
     title: "Documents",
     description: "Required document uploads",
     icon: FileStack,
-    color: "from-blue-500 to-cyan-600",
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-    border: "border-blue-200",
+    color: "from-teal-600 to-teal-800",
+    bg: "bg-teal-50",
+    text: "text-teal-700",
+    border: "border-teal-200",
   },
   {
     title: "Publish",
     description: "Set fees & go live",
     icon: Sparkles,
-    color: "from-emerald-500 to-teal-600",
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-200",
+    color: "from-[#173044] to-teal-700",
+    bg: "bg-[#eff8f5]",
+    text: "text-[#147d73]",
+    border: "border-[#4b9e91]",
   },
 ];
 
@@ -195,7 +196,7 @@ function toPayloadFields(
   return fields
     .filter((field): field is ConfiguredField => field.selected)
     .map((field, index) => {
-      const isSelect = field.type === "select";
+      const isSelect = field.type === "select" || field.type === "radio";
       const validOptions = isSelect
         ? field.options.filter((option) => option.label && option.value)
         : [];
@@ -208,7 +209,7 @@ function toPayloadFields(
         map_to_student_field: STUDENT_FIELD_MAPPING[field.key] || null,
         ...(field.key === "applying_for_class"
           ? {}
-          : field.type === "select" && validOptions.length > 0
+          : isSelect && validOptions.length > 0
             ? { options: validOptions }
             : {}),
       };
@@ -275,14 +276,13 @@ function FieldCard({
         className={cn(
           "group relative rounded-xl border transition-all duration-200",
           field.selected
-            ? "border-slate-200 bg-white shadow-sm shadow-slate-100"
-            : "border-slate-300 bg-slate-50",
-
+            ? "border-teal-200/80 bg-white shadow-xs"
+            : "border-slate-200 bg-slate-50/70",
         )}
       >
         {/* Left accent bar when selected */}
         {field.selected && (
-          <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-gradient-to-b from-violet-400 to-purple-500" />
+          <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-[#147d73] to-[#173044]" />
         )}
 
         <div className="flex items-center gap-2.5 px-3 py-3 pl-4">
@@ -295,7 +295,7 @@ function FieldCard({
                     checked={field.selected}
                     disabled={field.key === "applying_for_class" || field.lockedType}
                     onCheckedChange={(checked) => onToggle(Boolean(checked))}
-                    className="h-4 w-4 rounded data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+                    className="h-4 w-4 rounded data-[state=checked]:bg-[#173044] data-[state=checked]:border-[#173044]"
                   />
                 </div>
               </TooltipTrigger>
@@ -311,7 +311,6 @@ function FieldCard({
           <div className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
             field.selected ? typeColor : "bg-slate-200 text-slate-600",
-
           )}>
             <IconComponent className="h-3.5 w-3.5" />
           </div>
@@ -338,7 +337,7 @@ function FieldCard({
             </div>
             <p className={cn(
               "text-[11px] mt-0.5 font-mono truncate",
-              field.selected ? "text-slate-700" : "text-slate-600",
+              field.selected ? "text-slate-500" : "text-slate-400",
             )}>
               {field.key} · {field.key === "applying_for_class" ? "text" : field.type}
             </p>
@@ -351,8 +350,8 @@ function FieldCard({
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
                 isExpanded
-                  ? "bg-violet-100 text-violet-600"
-                  : "text-slate-400 hover:bg-violet-50 hover:text-violet-500",
+                  ? "bg-teal-50 text-[#147d73]"
+                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
               )}
             >
               <Settings2 className="h-3.5 w-3.5" />
@@ -386,7 +385,7 @@ function FieldCard({
                       value={field.label}
                       onChange={(e) => onChange({ ...field, label: e.target.value })}
                       placeholder="Field Name"
-                      className="h-9 rounded-lg border-slate-200 bg-white text-sm focus-visible:ring-violet-400"
+                      className="h-9 rounded-lg border-slate-200 bg-white text-sm focus-visible:ring-teal-500"
                     />
                   </div>
 
@@ -394,21 +393,21 @@ function FieldCard({
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</Label>
                       <select
-                        className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-none outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50"
-                        value={field.key === "applying_for_class" ? "text" : field.type}
+                        className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-none outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50"
+                        value={field.type}
                         disabled={field.key === "applying_for_class"}
                         onChange={(e) =>
                           onChange({
                             ...field,
                             type: e.target.value as BuilderFieldType,
                             options:
-                              e.target.value === "select" && !field.options.length
+                              ["select", "radio"].includes(e.target.value) && !field.options.length
                                 ? [{ label: "", value: "" }]
                                 : field.options,
                           })
                         }
                       >
-                        {FIELD_TYPE_OPTIONS.map((option, index) => (
+                        {FIELD_TYPE_OPTIONS.filter(option => option.value !== "file").map((option, index) => (
                           <option key={option.value || `field-option-${index}`} value={option.value}>
                             {option.label}
                           </option>
@@ -419,7 +418,6 @@ function FieldCard({
 
                   {!field.lockedRequired && !isDocumentField && (
                     <div className="col-span-full flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-
                       <div>
                         <p className="text-sm font-medium text-slate-700">Required field</p>
                         <p className="text-xs text-slate-400">Applicant must complete this</p>
@@ -427,24 +425,24 @@ function FieldCard({
                       <Switch
                         checked={field.required}
                         onCheckedChange={(checked) => onChange({ ...field, required: Boolean(checked) })}
-                        className="data-[state=checked]:bg-violet-600"
+                        className="data-[state=checked]:bg-[#147d73]"
                       />
                     </div>
                   )}
                 </div>
 
-                {field.type === "select" && field.key !== "applying_for_class" && (
+                {["select", "radio"].includes(field.type) && field.key !== "applying_for_class" && (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Options</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={addOption} className="h-7 text-xs text-violet-600 hover:bg-violet-50">
+                      <Button type="button" variant="ghost" size="sm" onClick={addOption} className="h-7 text-xs text-[#147d73] hover:bg-teal-50">
                         <Plus className="mr-1 h-3 w-3" /> Add
                       </Button>
                     </div>
                     {field.options.map((option, index) => (
                       <div key={`${option.value || "option"}-${index}`} className="flex gap-2">
-                        <Input value={option.label} placeholder="Label" onChange={(e) => setOptionValue(index, "label", e.target.value)} className="h-8 rounded-lg text-sm" />
-                        <Input value={option.value} placeholder="Value" onChange={(e) => setOptionValue(index, "value", e.target.value)} className="h-8 rounded-lg text-sm" />
+                        <Input value={option.label} placeholder="Label" onChange={(e) => setOptionValue(index, "label", e.target.value)} className="h-8 rounded-lg text-sm focus-visible:ring-teal-500" />
+                        <Input value={option.value} placeholder="Value" onChange={(e) => setOptionValue(index, "value", e.target.value)} className="h-8 rounded-lg text-sm focus-visible:ring-teal-500" />
                         <button onClick={() => removeOption(index)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -567,6 +565,7 @@ export default function PrincipalFormBuilder({
 
 
     return {
+      is_active: true,
       fees_enable: feesEnabled,
       fees: feesEnabled && feeType === "general" ? Number(feesAmount) || 0 : null,
       title: formTitle,
@@ -581,6 +580,7 @@ export default function PrincipalFormBuilder({
         fields: toPayloadFields(section.fields),
       })),
       document_fields,
+      document_fields_config: documentFields.filter(field => field.selected).map(field => ({ label: field.label.trim(), is_required: field.required })),
       fee_structures_input: feesEnabled && feeType === "individual"
         ? Object.entries(individualFees)
           .filter(([_, amt]) => amt && Number(amt) > 0)
@@ -589,21 +589,9 @@ export default function PrincipalFormBuilder({
     };
   }, [academicYear, academicYearId, description, documentFields, feeType, feesAmount, feesEnabled, individualFees, paymentMode, sections, title]);
 
+  const getBuilderErrors = (step?: number) => validateAdmissionBuilder({ title, academicYearId, description, sections, documents: documentFields, feesEnabled, feeType, feesAmount, individualFees, classIds: classes.map(cls => cls.id) }, step);
   const validateStep = (step: number) => {
-    const nextErrors: ErrorMap = {};
-    if (step === 0) {
-      if (!title.trim()) nextErrors.title = "Form title is required";
-      const hasFields = payload.sections.some((section) => section.fields.length > 0);
-      if (!hasFields) nextErrors.personalFields = "At least one section field is required";
-    }
-    if (step === 2 && feesEnabled) {
-      if (feeType === "general" && !feesAmount.trim()) {
-        nextErrors.fees = "Application fee amount is required";
-      } else if (feeType === "individual") {
-        const hasAnyFee = Object.values(individualFees).some((amt) => amt && Number(amt) > 0);
-        if (!hasAnyFee) nextErrors.fees = "Please set at least one class fee";
-      }
-    }
+    const nextErrors = getBuilderErrors(step);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -619,7 +607,12 @@ export default function PrincipalFormBuilder({
   };
 
   const submitForm = async () => {
-    if (!validateStep(2)) return;
+    if (isSubmitting) return;
+    const allErrors = getBuilderErrors();
+    if (Object.keys(allErrors).length) {
+      const invalidStep = [0, 1, 2].find(step => Object.keys(getBuilderErrors(step)).length > 0) ?? 0;
+      setCurrentStep(invalidStep); setErrors(allErrors); return;
+    }
     setIsSubmitting(true);
     setSubmitError("");
     try {
@@ -659,27 +652,27 @@ export default function PrincipalFormBuilder({
   const totalDocFields = getSelectedCount(documentFields);
 
   return (
-    <div className="min-h-screen bg-[#F7F7FA]">
+    <div className="w-full rounded-2xl border border-slate-200/90 bg-[#f8fafc] shadow-2xl overflow-hidden">
       {/* ── Top Header ── */}
-      <div className="border-b border-slate-200 bg-white px-3 py-3 sm:px-6 sm:py-4">
+      <div className="border-b border-slate-800 bg-[#173044] px-4 py-3.5 sm:px-6 sm:py-4 text-white">
         <div className="mx-auto max-w-5xl">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 shadow-sm shadow-violet-200">
-                <School className="h-4.5 w-4.5 text-white" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-500/20 border border-teal-400/30 text-teal-300 shadow-xs">
+                <School className="h-5 w-5" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <div className="flex items-center gap-1.5 text-xs text-slate-300">
                   <span>Admission Management</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="text-slate-600 font-medium">Form Builder</span>
+                  <ChevronRight className="h-3 w-3 text-slate-400" />
+                  <span className="text-teal-300 font-medium">Form Builder</span>
                 </div>
-                <h1 className="text-base font-bold text-slate-900 leading-tight">Create Admission Form</h1>
+                <h1 className="text-base font-bold text-white leading-tight">Create Admission Form</h1>
               </div>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide whitespace-nowrap">
                 Academic Year
               </span>
               <select
@@ -695,13 +688,13 @@ export default function PrincipalFormBuilder({
                     });
                   }
                 }}
-                className="h-9 flex-1 sm:flex-none sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-violet-400"
+                className="h-9 flex-1 sm:flex-none sm:w-auto rounded-lg border border-slate-600 bg-[#0f2333] px-3 text-xs sm:text-sm text-slate-100 shadow-sm outline-none focus:ring-2 focus:ring-teal-400"
               >
                 {academicYearOptions.length === 0 ? (
                   <option>Loading...</option>
                 ) : (
                   academicYearOptions.map((y) => (
-                    <option key={y.id} value={y.id}>
+                    <option key={y.id} value={y.id} className="bg-[#173044] text-white">
                       {y.name.replace("-", " – ")}
                     </option>
                   ))
@@ -712,10 +705,9 @@ export default function PrincipalFormBuilder({
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-3 py-4 sm:px-4 sm:py-8">
+      <div className="mx-auto max-w-5xl px-3 py-4 sm:px-6 sm:py-6">
         {/* ── Step Indicator ── */}
-        <div className="mb-8 flex items-center gap-2 overflow-x-auto pb-1">
-
+        <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1">
           {STEP_TITLES.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === index;
@@ -725,39 +717,38 @@ export default function PrincipalFormBuilder({
               <div key={step.title} className="flex items-center gap-2">
                 <motion.div
                   animate={{
-                    scale: isActive ? 1 : 0.95,
+                    scale: isActive ? 1 : 0.96,
                     opacity: isDone || isActive ? 1 : 0.7,
                   }}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-2xl px-4 py-2.5 transition-colors shrink-0",
-
-                    isActive && "bg-white border border-slate-200 shadow-sm",
-                    isDone && "bg-emerald-50 border border-emerald-100",
+                    "flex items-center gap-2.5 rounded-xl px-3.5 py-2 transition-colors shrink-0",
+                    isActive && "bg-white border border-teal-200/90 shadow-xs",
+                    isDone && "bg-teal-50/80 border border-teal-100",
                     !isActive && !isDone && "bg-transparent",
                   )}
                 >
                   <div
                     className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-xl",
-                      isActive && `bg-gradient-to-br ${step.color} text-white shadow-sm`,
-                      isDone && "bg-emerald-500 text-white",
+                      "flex h-7 w-7 items-center justify-center rounded-lg",
+                      isActive && "bg-[#173044] text-white shadow-xs",
+                      isDone && "bg-teal-700 text-white",
                       !isActive && !isDone && "bg-slate-200 text-slate-400",
                     )}
                   >
                     {isDone ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                   </div>
                   <div className="hidden sm:block">
-                    <p className={cn("text-sm font-semibold leading-none", isActive ? "text-slate-900" : isDone ? "text-emerald-700" : "text-slate-400")}>
+                    <p className={cn("text-xs font-bold leading-none", isActive ? "text-[#173044]" : isDone ? "text-teal-800" : "text-slate-400")}>
                       {step.title}
                     </p>
-                    <p className={cn("text-[11px] mt-0.5", isActive ? "text-slate-400" : isDone ? "text-emerald-500" : "text-slate-300")}>
+                    <p className={cn("text-[11px] mt-0.5", isActive ? "text-slate-500" : isDone ? "text-teal-600" : "text-slate-400")}>
                       {step.description}
                     </p>
                   </div>
                 </motion.div>
 
                 {index < STEP_TITLES.length - 1 && (
-                  <div className={cn("h-px flex-1 min-w-[24px] mx-1 rounded-full transition-colors", currentStep > index ? "bg-emerald-300" : "bg-slate-200")} />
+                  <div className={cn("h-0.5 flex-1 min-w-[20px] mx-1 rounded-full transition-colors", currentStep > index ? "bg-teal-600" : "bg-slate-200")} />
                 )}
               </div>
             );
@@ -768,19 +759,25 @@ export default function PrincipalFormBuilder({
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.22, ease: "easeInOut" }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
           >
+            {Object.keys(errors).length > 0 && (
+              <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-xs sm:text-sm text-red-700 shadow-xs">
+                <p className="mb-2 font-bold flex items-center gap-1.5"><AlertCircle className="h-4 w-4 text-red-600" /> Please correct the following:</p>
+                <ul className="list-inside list-disc space-y-1">{Object.entries(errors).map(([key, message]) => <li key={key}>{message}</li>)}</ul>
+              </div>
+            )}
             {/* ──────────── STEP 0: Basic Info ──────────── */}
             {currentStep === 0 && (
               <div className="space-y-5">
                 {/* Metadata card */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="mb-5">
-                    <h2 className="text-base font-bold text-slate-900">Form Details</h2>
-                    <p className="text-sm text-slate-400 mt-0.5">Set the form's identity before configuring fields</p>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
+                  <div className="mb-4 pb-3 border-b border-slate-100">
+                    <h2 className="text-sm sm:text-base font-bold text-[#173044]">Form Details</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Set the form's identity before configuring fields</p>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -790,9 +787,8 @@ export default function PrincipalFormBuilder({
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Student Admission Form"
-
                         className={cn(
-                          "h-10 rounded-xl border-slate-200 bg-slate-50 text-sm focus-visible:ring-violet-400 focus-visible:bg-white transition-colors",
+                          "h-10 rounded-xl border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-teal-500 focus-visible:bg-white transition-colors",
                           errors.title && "border-red-300 bg-red-50",
                         )}
                       />
@@ -809,7 +805,7 @@ export default function PrincipalFormBuilder({
                           setSections(updated);
                         }}
                         placeholder="e.g., Student Information"
-                        className="h-10 rounded-xl border-slate-200 bg-slate-50 text-sm focus-visible:ring-violet-400 focus-visible:bg-white transition-colors"
+                        className="h-10 rounded-xl border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-teal-500 focus-visible:bg-white transition-colors"
                       />
                     </div>
 
@@ -819,7 +815,7 @@ export default function PrincipalFormBuilder({
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Brief description about this admission form..."
-                        className="resize-none rounded-xl border-slate-200 bg-slate-50 text-sm focus-visible:ring-violet-400 focus-visible:bg-white transition-colors"
+                        className="resize-none rounded-xl border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-teal-500 focus-visible:bg-white transition-colors"
                         rows={2}
                       />
                     </div>
@@ -828,16 +824,16 @@ export default function PrincipalFormBuilder({
 
                 {/* Sections */}
                 {sections.map((section, sectionIndex) => (
-                  <div key={section.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div key={section.id} className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
                     {/* Section header */}
-                    <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
+                    <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
                       {/* Row 1: icon + title + badge + delete */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                          <LayoutGrid className="h-3.5 w-3.5 text-violet-600" />
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-[#147d73]">
+                          <LayoutGrid className="h-3.5 w-3.5" />
                         </div>
                         {sectionIndex === 0 ? (
-                          <span className="text-sm font-semibold text-slate-700 truncate">{section.title || "Section 1"}</span>
+                          <span className="text-sm font-semibold text-[#173044] truncate">{section.title || "Section 1"}</span>
                         ) : (
                           <Input
                             value={section.title}
@@ -847,14 +843,13 @@ export default function PrincipalFormBuilder({
                               setSections(updated);
                             }}
                             placeholder="Section Title"
-                            className="h-7 w-32 sm:w-40 rounded-lg border-slate-200 bg-white text-sm font-semibold focus-visible:ring-violet-400"
+                            className="h-7 w-32 sm:w-40 rounded-lg border-slate-200 bg-white text-sm font-semibold focus-visible:ring-teal-500"
                           />
                         )}
-                        <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 whitespace-nowrap">
+                        <span className="shrink-0 rounded-full bg-teal-50 border border-teal-200/60 px-2 py-0.5 text-[11px] font-semibold text-teal-800 whitespace-nowrap">
                           {getSelectedCount(section.fields)}/{section.fields.length} selected
                         </span>
 
-                        {/* ← ADD THIS: delete button only for sections after the first */}
                         {sectionIndex > 0 && (
                           <button
                             onClick={() => setSections((prev) => prev.filter((s) => s.id !== section.id))}
@@ -870,7 +865,7 @@ export default function PrincipalFormBuilder({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-fit gap-1.5 rounded-lg text-xs font-semibold text-violet-600 hover:bg-violet-50 sm:w-auto"
+                        className="h-8 w-fit gap-1.5 rounded-lg text-xs font-semibold text-[#147d73] hover:bg-teal-50 sm:w-auto"
                         onClick={() =>
                           updateSectionFields(section.id, (fields) => [
                             ...fields,
@@ -881,7 +876,7 @@ export default function PrincipalFormBuilder({
                         <Plus className="h-3.5 w-3.5" /> Add Field
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 sm:p-4">
                       <AnimatePresence initial={false}>
                         {sortFields(section.fields).map((field, fIndex) => (
                           <FieldCard
@@ -927,9 +922,9 @@ export default function PrincipalFormBuilder({
                       { id: Date.now(), title: `Section ${prev.length + 1}`, order: prev.length + 1, fields: [] },
                     ]);
                   }}
-                  className="group flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white py-4 text-sm font-semibold text-slate-400 transition-all hover:border-violet-300 hover:bg-violet-50/50 hover:text-violet-600"
+                  className="group flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white py-3.5 text-sm font-semibold text-slate-500 transition-all hover:border-teal-300 hover:bg-teal-50/40 hover:text-[#147d73]"
                 >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 transition-colors group-hover:bg-violet-100 group-hover:text-violet-600">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 transition-colors group-hover:bg-teal-100 group-hover:text-[#147d73]">
                     <Plus className="h-3.5 w-3.5" />
                   </div>
                   Add New Section
@@ -940,18 +935,18 @@ export default function PrincipalFormBuilder({
             {/* ──────────── STEP 1: Documents ──────────── */}
             {currentStep === 1 && (
               <div className="space-y-5">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
                     {/* Row 1 on mobile: icon + title + badge */}
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                        <FileStack className="h-3.5 w-3.5 text-blue-600" />
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-[#147d73]">
+                        <FileStack className="h-3.5 w-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-700 truncate">Document Requirements</p>
-                        <p className="hidden sm:block text-xs text-slate-400">Toggle which documents applicants must upload</p>
+                        <p className="text-sm font-bold text-[#173044] truncate">Document Requirements</p>
+                        <p className="hidden sm:block text-xs text-slate-500">Toggle which documents applicants must upload</p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 whitespace-nowrap">
+                      <span className="shrink-0 rounded-full bg-teal-50 border border-teal-200/60 px-2 py-0.5 text-[11px] font-semibold text-teal-800 whitespace-nowrap">
                         {getSelectedCount(documentFields)} selected
                       </span>
                     </div>
@@ -960,7 +955,7 @@ export default function PrincipalFormBuilder({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-fit gap-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 sm:w-auto"
+                      className="h-8 w-fit gap-1.5 rounded-lg text-xs font-semibold text-[#147d73] hover:bg-teal-50 sm:w-auto"
                       onClick={() =>
                         updateFieldList((fields) => [
                           ...fields,
@@ -972,20 +967,20 @@ export default function PrincipalFormBuilder({
                     </Button>
                   </div>
 
-                  <div className="p-3">
+                  <div className="p-3 sm:p-4">
                     <div className="mb-3 flex items-center gap-3">
                       <div className="space-y-1 flex-1 max-w-xs">
-                        <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Section Title</Label>
+                        <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Section Title</Label>
                         <Input
                           value={documentSectionTitle}
                           onChange={(e) => setDocumentSectionTitle(e.target.value)}
-                          className="h-8 rounded-lg border-slate-200 bg-slate-50 text-sm focus-visible:ring-blue-400 focus-visible:bg-white"
+                          className="h-8 rounded-lg border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-teal-500 focus-visible:bg-white"
                         />
                       </div>
                     </div>
 
                     <ScrollArea className="h-[360px] sm:h-[480px] pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <AnimatePresence initial={false}>
                           {sortFields(documentFields).map((field, fIndex) => (
                             <FieldCard
@@ -1027,21 +1022,21 @@ export default function PrincipalFormBuilder({
                 {/* Left: Fee config */}
                 <div className="lg:col-span-3 space-y-4 min-w-0">
                   {/* Fee toggle */}
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
-                          <IndianRupee className="h-4.5 w-4.5 text-emerald-600" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-[#147d73]">
+                          <IndianRupee className="h-4.5 w-4.5" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800">Application Fee</p>
-                          <p className="text-xs text-slate-400">Charge applicants before submitting</p>
+                          <p className="text-sm font-bold text-[#173044]">Application Fee</p>
+                          <p className="text-xs text-slate-500">Charge applicants before submitting</p>
                         </div>
                       </div>
                       <Switch
                         checked={feesEnabled}
                         onCheckedChange={setFeesEnabled}
-                        className="data-[state=checked]:bg-emerald-600"
+                        className="data-[state=checked]:bg-[#147d73]"
                       />
                     </div>
 
@@ -1065,7 +1060,7 @@ export default function PrincipalFormBuilder({
                                   className={cn(
                                     "flex-1 rounded-xl py-2.5 text-xs sm:text-sm font-semibold transition-all border",
                                     feeType === t
-                                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                                      ? "bg-[#173044] text-white border-[#173044] shadow-xs"
                                       : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100",
                                   )}
                                 >
@@ -1086,7 +1081,7 @@ export default function PrincipalFormBuilder({
                                     onChange={(e) => setFeesAmount(e.target.value)}
                                     placeholder="500"
                                     className={cn(
-                                      "h-11 pl-8 rounded-xl border-slate-200 bg-slate-50 text-sm focus-visible:ring-emerald-400 focus-visible:bg-white",
+                                      "h-11 pl-8 rounded-xl border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-teal-500 focus-visible:bg-white",
                                       errors.fees && "border-red-300 bg-red-50",
                                     )}
                                   />
@@ -1106,7 +1101,7 @@ export default function PrincipalFormBuilder({
                                       classes.forEach((c) => (next[c.id] = firstAmt));
                                       setIndividualFees(next);
                                     }}
-                                    className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
+                                    className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition-colors"
                                   >
                                     <Copy className="h-3 w-3" /> Apply first to all
                                   </button>
@@ -1123,7 +1118,7 @@ export default function PrincipalFormBuilder({
                                             min="0"
                                             value={individualFees[cls.id] || ""}
                                             onChange={(e) => setIndividualFees((prev) => ({ ...prev, [cls.id]: e.target.value }))}
-                                            className="h-8 pl-5 rounded-lg text-sm border-slate-200"
+                                            className="h-8 pl-5 rounded-lg text-sm border-slate-200 focus-visible:ring-teal-500"
                                             placeholder="0"
                                           />
                                         </div>
@@ -1153,14 +1148,14 @@ export default function PrincipalFormBuilder({
 
                     {createdForm && (
                       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                        <div className="rounded-2xl border border-teal-200 bg-teal-50/70 p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            <p className="text-sm font-bold text-emerald-800">Form Published Successfully!</p>
+                            <CheckCircle2 className="h-5 w-5 text-teal-700" />
+                            <p className="text-sm font-bold text-teal-900">Form Published Successfully!</p>
                           </div>
-                          <p className="text-xs text-emerald-700 mb-1">Form ID: <span className="font-mono font-semibold">{createdForm.id}</span></p>
-                          <div className="flex items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2">
-                            <span className="text-xs text-emerald-600 font-mono break-all">{createdForm.unique_link}</span>
+                          <p className="text-xs text-teal-800 mb-1">Form ID: <span className="font-mono font-semibold">{createdForm.id}</span></p>
+                          <div className="flex items-center gap-2 rounded-lg bg-teal-100/70 px-3 py-2">
+                            <span className="text-xs text-teal-800 font-mono break-all">{createdForm.unique_link}</span>
                           </div>
                         </div>
                       </motion.div>
@@ -1170,10 +1165,10 @@ export default function PrincipalFormBuilder({
 
                 {/* Right: Summary */}
                 <div className="lg:col-span-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:sticky sm:top-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:sticky sm:top-4">
                     <div className="flex items-center gap-2 mb-4">
-                      <BookOpen className="h-4 w-4 text-slate-400" />
-                      <h3 className="text-sm font-bold text-slate-700">Form Summary</h3>
+                      <BookOpen className="h-4 w-4 text-slate-500" />
+                      <h3 className="text-sm font-bold text-[#173044]">Form Summary</h3>
                     </div>
 
                     <div className="space-y-3">
@@ -1189,17 +1184,17 @@ export default function PrincipalFormBuilder({
                         },
                       ].map(({ label, value, bold }) => (
                         <div key={label} className={cn("flex items-center justify-between", bold && "pt-2 border-t border-slate-100")}>
-                          <span className="text-xs text-slate-400">{label}</span>
-                          <span className={cn("text-sm font-semibold", bold ? "text-slate-900" : "text-slate-600")}>
+                          <span className="text-xs text-slate-500">{label}</span>
+                          <span className={cn("text-sm font-semibold", bold ? "text-slate-900" : "text-slate-700")}>
                             {value}
                           </span>
                         </div>
                       ))}
                     </div>
 
-                    <div className="mt-5 rounded-xl bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 p-4">
-                      <p className="text-[11px] font-semibold text-violet-700 uppercase tracking-wide mb-1">Form Link</p>
-                      <p className="text-xs text-violet-500 font-mono break-all">
+                    <div className="mt-5 rounded-xl bg-slate-50 border border-teal-100 p-4">
+                      <p className="text-[11px] font-semibold text-[#147d73] uppercase tracking-wide mb-1">Form Link</p>
+                      <p className="text-xs text-slate-600 font-mono break-all">
                         {slugify(`${title} ${shortYear(academicYear)}`) || "student-admission-form"}
                       </p>
                     </div>
@@ -1229,7 +1224,7 @@ export default function PrincipalFormBuilder({
                 key={i}
                 className={cn(
                   "rounded-full transition-all duration-300",
-                  i === currentStep ? "h-2 w-6 bg-violet-600" : i < currentStep ? "h-2 w-2 bg-emerald-400" : "h-2 w-2 bg-slate-200",
+                  i === currentStep ? "h-2 w-6 bg-[#173044]" : i < currentStep ? "h-2 w-2 bg-teal-500" : "h-2 w-2 bg-slate-200",
                 )}
               />
             ))}
@@ -1238,7 +1233,7 @@ export default function PrincipalFormBuilder({
           {currentStep < STEP_TITLES.length - 1 ? (
             <Button
               onClick={nextStep}
-              className="h-10 gap-1.5 rounded-xl bg-violet-600 px-4 sm:px-6 font-semibold text-white shadow-sm shadow-violet-200 hover:bg-violet-700 transition-all min-w-[110px]"
+              className="h-10 gap-1.5 rounded-xl bg-[#173044] px-4 sm:px-6 font-semibold text-white shadow-sm hover:bg-[#25495e] transition-all min-w-[110px]"
             >
               Continue
               <ArrowRight className="h-4 w-4" />
@@ -1247,7 +1242,7 @@ export default function PrincipalFormBuilder({
             <Button
               onClick={submitForm}
               disabled={isSubmitting || !!createdForm}
-              className="h-10 gap-1.5 rounded-xl bg-emerald-600 px-4 sm:px-6 font-semibold text-white shadow-sm shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-60 transition-all min-w-[110px]"
+              className="h-10 gap-1.5 rounded-xl bg-teal-700 px-4 sm:px-6 font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60 transition-all min-w-[110px]"
             >
               {isSubmitting ? (
                 <>

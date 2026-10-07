@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDDMMYYYY } from "@/lib/table-utils";
+
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -239,11 +241,7 @@ export default function ClerkLeaveRequestsPage() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+      return formatDDMMYYYY(d);
     } catch {
       return dateStr;
     }
@@ -257,13 +255,8 @@ export default function ClerkLeaveRequestsPage() {
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return `${startDateStr} – ${endDateStr}`;
       }
-      const startFormatted = start.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const endFormatted = start.getFullYear() === end.getFullYear() 
-        ? end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-        : end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const startFormatted = formatDDMMYYYY(start);
+      const endFormatted = formatDDMMYYYY(end);
       return `${startFormatted} – ${endFormatted}`;
     } catch {
       return `${startDateStr} – ${endDateStr}`;
@@ -598,7 +591,7 @@ export default function ClerkLeaveRequestsPage() {
                   <FileText className="h-14 w-14 text-muted-foreground/30 mb-4" />
                   <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">No leave requests</h3>
                   <p className="text-muted-foreground text-sm max-w-xs text-center mt-1.5">
-                    There are no leave requests under the "{activeTab}" status.
+                    There are no leave requests under the &quot;{activeTab}&quot; status.
                   </p>
                 </motion.div>
               ) : viewMode === "table" ? (
@@ -668,7 +661,7 @@ export default function ClerkLeaveRequestsPage() {
                               </td>
 
                               <td className="px-4 py-3.5 max-w-xs truncate text-slate-600 dark:text-zinc-300 italic">
-                                "{reason}"
+                                &quot;{reason}&quot;
                               </td>
 
                               <td className="px-4 py-3.5 text-center">
@@ -826,7 +819,7 @@ export default function ClerkLeaveRequestsPage() {
                             {/* Reason for Leave */}
                             <div className="text-zinc-650 dark:text-zinc-300 text-xs">
                               <span className="font-semibold text-zinc-500 mr-2 text-[10px] uppercase tracking-wider">Reason:</span>
-                              <span className="italic">"{reason}"</span>
+                              <span className="italic">&quot;{reason}&quot;</span>
                             </div>
 
                             {/* Direct Actions (Bulk) */}

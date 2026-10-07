@@ -5,6 +5,10 @@ export type BuilderFieldType =
   | "select"
   | "file"
   | "number"
+  | "tel"
+  | "textarea"
+  | "checkbox"
+  | "radio"
 
 export interface BuilderOption {
   label: string
@@ -54,6 +58,7 @@ export interface AdmissionFormSectionPayload {
 }
 
 export interface AdmissionFormCreatePayload {
+  is_active?: boolean
   fees_enable: boolean
   fees: number | null
   title: string
@@ -62,6 +67,7 @@ export interface AdmissionFormCreatePayload {
   fee_type: string
   sections: AdmissionFormSectionPayload[]
   document_fields: string[]
+  document_fields_config?: { label: string; is_required: boolean }[]
   payment_mode: "online" | "offline" | null;
   fee_structures_input: { class_name: number; fee_amount: string }[]
 }
@@ -112,6 +118,10 @@ export const FIELD_TYPE_OPTIONS: BuilderOption[] = [
   { label: "Select", value: "select" },
   { label: "File", value: "file" },
   { label: "Number", value: "number" },
+  { label: "Mobile number", value: "tel" },
+  { label: "Long text", value: "textarea" },
+  { label: "Checkbox", value: "checkbox" },
+  { label: "Radio options", value: "radio" },
 ]
 
 export const PERSONAL_FIELD_TEMPLATES: FieldTemplate[] = [
