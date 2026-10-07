@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDDMMYYYY } from "@/lib/table-utils";
+
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -27,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -362,11 +365,7 @@ export default function ClerkMyLeavesPage() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+      return formatDDMMYYYY(d);
     } catch {
       return dateStr;
     }
@@ -593,7 +592,7 @@ export default function ClerkMyLeavesPage() {
                   <FileText className="h-14 w-14 text-muted-foreground/30 mb-4" />
                   <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">No leave requests</h3>
                   <p className="text-muted-foreground text-sm max-w-xs text-center mt-1.5">
-                    There are no leave requests under the "{activeTab}" status.
+                    There are no leave requests under the &quot;{activeTab}&quot; status.
                   </p>
                 </motion.div>
               ) : (
@@ -684,7 +683,7 @@ export default function ClerkMyLeavesPage() {
 
                             <div className="text-zinc-650 dark:text-zinc-300 text-xs">
                               <span className="font-semibold text-zinc-500 mr-2 text-[10px] uppercase tracking-wider">Reason:</span>
-                              <span className="italic">"{request.reason || "No reason specified"}"</span>
+                              <span className="italic">&quot;{request.reason || "No reason specified"}&quot;</span>
                             </div>
 
                             {/* Accordion for individual days breakdown */}
@@ -771,11 +770,10 @@ export default function ClerkMyLeavesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="start-date" className="text-xs font-semibold">Start Date</Label>
-                <Input
+                <DatePicker
                   id="start-date"
-                  type="date"
                   value={toHTMLDate(startDate)}
-                  onChange={(e) => setStartDate(toApiDate(e.target.value))}
+                  onChange={date => setStartDate(toApiDate(date))}
                   required
                   min={getTomorrowDateString()}
                   className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
@@ -784,11 +782,10 @@ export default function ClerkMyLeavesPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="end-date" className="text-xs font-semibold">End Date</Label>
-                <Input
+                <DatePicker
                   id="end-date"
-                  type="date"
                   value={toHTMLDate(endDate)}
-                  onChange={(e) => setEndDate(toApiDate(e.target.value))}
+                  onChange={date => setEndDate(toApiDate(date))}
                   required
                   min={toHTMLDate(startDate) || getTomorrowDateString()}
                   className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"

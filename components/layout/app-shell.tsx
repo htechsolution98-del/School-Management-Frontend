@@ -182,18 +182,18 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   const activeLink = findActive(links, pathname);
 
   const navItem = (link: SidebarLink, compact: boolean, onNavigate?: () => void) => {
-    const selected = link === activeLink || !!link.subLinks?.includes(activeLink!);
+    const selected = link === activeLink;
     const Icon = link.icon;
     const base = `flex h-11 w-full items-center rounded-lg text-sm font-medium transition-colors ${compact ? "justify-center px-0" : "gap-3 px-3"}`;
     const tone = selected
-      ? "bg-[#1D496C]/10 text-[#1D496C] ring-1 ring-[#1D496C]/10 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/15"
+      ? "bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-200 dark:bg-sky-400/15 dark:text-sky-200 dark:ring-sky-400/25"
       : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
 
     if (link.subLinks?.length) {
       const groupOpen = !compact && openGroup === link.title;
       const childClasses = (active: boolean) =>
-        `flex h-10 items-center rounded-lg text-sm transition-colors ${active
-          ? "bg-[#1D496C]/10 font-semibold text-[#1D496C] dark:bg-sky-400/10 dark:text-sky-300"
+        `flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-sm leading-5 transition-colors ${active
+          ? "bg-sky-50 font-semibold text-sky-800 ring-1 ring-inset ring-sky-200 dark:bg-sky-400/15 dark:text-sky-200 dark:ring-sky-400/25"
           : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"}`;
 
       return (
@@ -222,9 +222,10 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                   transition={{ duration: 0.18 }}
                   className="overflow-hidden"
                 >
-                  <div className="space-y-1 pb-1 pl-6 pr-1">
+                  <div className="ml-5 space-y-1 border-l border-slate-200 py-1 pl-3 pr-1 dark:border-zinc-700">
                     {link.subLinks.map((sub) => {
                       const subActive = sub === activeLink;
+                      const SubIcon = sub.icon;
                       return (
                         <Link
                           key={`${sub.href}-${sub.title}`}
@@ -233,7 +234,8 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                           aria-current={subActive ? "page" : undefined}
                           className={childClasses(subActive)}
                         >
-                          {sub.title}
+                          <SubIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                          <span className="min-w-0">{sub.title}</span>
                         </Link>
                       );
                     })}

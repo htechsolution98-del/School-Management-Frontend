@@ -30,6 +30,8 @@ import Link from "next/link"
 import { aadhaarSchema, AADHAAR_ERROR } from "@/lib/student-profile-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/ui/date-picker"
+import { formatDDMMYYYY } from "@/lib/table-utils"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -335,7 +337,7 @@ export function StudentProfileDrawer({
                   <CheckCircle2 className="w-3 h-3" />
                   Verified by {student.verified_by_name}
                   {student.verified_at &&
-                    ` on ${new Date(student.verified_at).toLocaleDateString()}`}
+                    ` on ${formatDDMMYYYY(student.verified_at)}`}
                 </p>
               )}
             </div>
@@ -508,11 +510,10 @@ export function StudentProfileDrawer({
 
                   <div className="space-y-1.5">
                     <Label htmlFor="date_of_birth" className="text-xs font-medium">Date of Birth</Label>
-                    <Input
+                    <DatePicker
                       id="date_of_birth"
-                      type="date"
                       value={formData.date_of_birth}
-                      onChange={(e) => handleInputChange("date_of_birth", e.target.value)}
+                      onChange={date => handleInputChange("date_of_birth", date)}
                     />
                   </div>
 
@@ -649,7 +650,7 @@ export function StudentProfileDrawer({
                             </p>
                             {doc.uploaded_at && (
                               <p className="text-[10px] text-slate-400">
-                                {new Date(doc.uploaded_at).toLocaleDateString()}
+                                {formatDDMMYYYY(doc.uploaded_at)}
                               </p>
                             )}
                           </div>

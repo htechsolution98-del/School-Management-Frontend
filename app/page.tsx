@@ -1747,7 +1747,7 @@ const fallbackTestimonials = [
     role: "Administration Trustee",
     content: "The geo-attendance feature made staff management much easier, and the financial audit logs are completely transparent.",
     rating: 5,
-    image: "/testimonial-3.jpg"
+    image: "/testimonial-3.svg"
   }
 ];
 

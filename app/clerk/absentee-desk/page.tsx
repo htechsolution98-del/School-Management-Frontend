@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDDMMYYYY } from "@/lib/table-utils";
+
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -29,6 +31,7 @@ import { API_BASE_URL } from "@/lib/config";
 import { fetchAdmissions } from "@/lib/clerk/admissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -221,7 +224,7 @@ export default function AbsenteeDeskPage() {
     const cleanPhone = item.phone.replace(/\D/g, "");
     const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const message = encodeURIComponent(
-      `Namaskar ${item.fatherName},\nThis is an automated notification from School Office regarding your ward *${item.name}* (Class ${item.className}-${item.divisionName}, Roll No. ${item.rollNumber}).\nHe/She is marked *ABSENT* today (${new Date(selectedDate).toLocaleDateString("en-IN")}).\nIf this was uninformed, please contact the school office or submit a formal leave request.\nThank you.`
+      `Namaskar ${item.fatherName},\nThis is an automated notification from School Office regarding your ward *${item.name}* (Class ${item.className}-${item.divisionName}, Roll No. ${item.rollNumber}).\nHe/She is marked *ABSENT* today (${formatDDMMYYYY(selectedDate)}).\nIf this was uninformed, please contact the school office or submit a formal leave request.\nThank you.`
     );
     window.open(`https://wa.me/${formattedPhone}?text=${message}`, "_blank");
 
@@ -290,10 +293,9 @@ export default function AbsenteeDeskPage() {
         <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-xs">
           <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
           <span className="text-xs font-semibold text-gray-500">Attendance Date:</span>
-          <Input
-            type="date"
+          <DatePicker
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={date => setSelectedDate(date)}
             className="w-auto h-7 text-xs border-0 p-0 focus-visible:ring-0 font-bold text-gray-800 dark:text-zinc-200 cursor-pointer"
           />
         </div>

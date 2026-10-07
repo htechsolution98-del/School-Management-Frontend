@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
 import {
   camelCaseText,
@@ -14,6 +15,7 @@ import {
   matchesQuery,
   safePage,
   startOfDay,
+  toInputDate,
 } from "@/lib/table-utils";
 
 export type DataTableAlign = "left" | "center" | "right";
@@ -170,6 +172,7 @@ export function DataTable<T>({
   const [query, setQuery] = useState("");
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [dateFrom, setDateFrom] = useState("");
+  const today = toInputDate(new Date());
   const [dateTo, setDateTo] = useState("");
   const [pageSize, setPageSize] = useState(pageSizeProp);
   const [internalPage, setInternalPage] = useState(1);
@@ -313,29 +316,30 @@ export function DataTable<T>({
 
           <div className="flex flex-wrap items-center gap-2">
             {createdDateRange && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="text-xs text-slate-500" htmlFor={`${createdDateHeader}-from`}>
                   From
                 </label>
-                <input
+                <DatePicker
                   id={`${createdDateHeader}-from`}
-                  type="date"
                   aria-label="Created date from"
                   value={dateFrom}
-                  onChange={event => {
-                    setDateFrom(event.target.value);
+                  max={dateTo && dateTo < today ? dateTo : today}
+                  onChange={value => {
+                    setDateFrom(value);
                     setPage(1);
                   }}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
                 />
-                <span className="text-slate-400">–</span>
-                <input
+                <label className="text-xs text-slate-500" htmlFor={`${createdDateHeader}-to`}>To</label>
+                <DatePicker
                   id={`${createdDateHeader}-to`}
-                  type="date"
                   aria-label="Created date to"
                   value={dateTo}
-                  onChange={event => {
-                    setDateTo(event.target.value);
+                  min={dateFrom || undefined}
+                  max={today}
+                  onChange={value => {
+                    setDateTo(value);
                     setPage(1);
                   }}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"

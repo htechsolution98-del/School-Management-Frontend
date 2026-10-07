@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { formatDDMMYYYY } from "@/lib/table-utils";
+import "../clerk-workspace.css";
 import {
   BookOpen,
   Search,
@@ -87,6 +89,9 @@ export default function GeneralRegisterPage() {
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedGender, setSelectedGender] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [detailedView, setDetailedView] = useState(true);
+  const [sortBy, setSortBy] = useState("gr-asc");
+  const resetFilters = () => { setSearchTerm(""); setSelectedClass("all"); setSelectedGender("all"); setSelectedStatus("all"); };
 
   useEffect(() => {
     try {
@@ -101,13 +106,13 @@ export default function GeneralRegisterPage() {
       try {
         const [admissionsData, stuData, clsData, profileData] = await Promise.all([
           fetchAdmissions().catch(() => []),
-          fetchWithAuth(`${API_BASE_URL}/student/`)
+          fetchWithAuth(`${API_BASE_URL}/students/`)
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
           fetchWithAuth(`${API_BASE_URL}/getclass/`)
             .then((r) => (r.ok ? r.json() : fetchWithAuth(`${API_BASE_URL}/schoolclass/`).then((r2) => r2.ok ? r2.json() : [])))
             .catch(() => []),
-          fetchWithAuth(`${API_BASE_URL}/profile/`)
+          fetchWithAuth(`${API_BASE_URL}/me/`)
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null),
         ]);
@@ -271,6 +276,12 @@ export default function GeneralRegisterPage() {
     });
   }, [students, searchTerm, selectedClass, selectedGender, selectedStatus]);
 
+  const sortedList = useMemo(() => [...filteredList].sort((a, b) => {
+    if (sortBy === "name") return String(a.student_name || a.name || `${a.first_name || ""} ${a.last_name || ""}`).localeCompare(String(b.student_name || b.name || `${b.first_name || ""} ${b.last_name || ""}`));
+    const order = String(a.gr_number || "").localeCompare(String(b.gr_number || ""), undefined, { numeric: true });
+    return sortBy === "gr-desc" ? -order : order;
+  }), [filteredList, sortBy]);
+
   // Statistics
   const stats = useMemo(() => {
     const total = students.length;
@@ -310,7 +321,7 @@ export default function GeneralRegisterPage() {
       "Status",
     ];
 
-    const rows = filteredList.map((s) => {
+    const rows = sortedList.map((s) => {
       const name = `${s.first_name || ""} ${s.last_name || ""} ${s.student_name || s.name || ""}`.trim();
       const cls = s.school_class_name || (typeof s.school_class === "object" ? s.school_class?.school_class : s.school_class) || "-";
       const div = s.division_name || (typeof s.division === "object" ? s.division?.division_name : s.division) || "-";
@@ -318,12 +329,12 @@ export default function GeneralRegisterPage() {
 
       return [
         `"${s.gr_number || ""}"`,
-        `"${s.admission_date || ""}"`,
+        `"${s.admission_date ? formatDDMMYYYY(s.admission_date) : ""}"`,
         `"${name}"`,
         `"${s.father_name || ""}"`,
         `"${s.mother_name || ""}"`,
         `"${s.gender || ""}"`,
-        `"${s.date_of_birth || ""}"`,
+        `"${s.date_of_birth ? formatDDMMYYYY(s.date_of_birth) : ""}"`,
         `"${s.place_of_birth || ""}"`,
         `"${s.religion || ""}"`,
         `"${s.caste || ""}"`,
@@ -333,7 +344,7 @@ export default function GeneralRegisterPage() {
         `"${cls}"`,
         `"${div}"`,
         `"${s.previous_school || ""}"`,
-        `"${s.date_of_leaving || ""}"`,
+        `"${s.date_of_leaving ? formatDDMMYYYY(s.date_of_leaving) : ""}"`,
         `"${s.reason_for_leaving || ""}"`,
         `"${status}"`,
       ].join(",");
@@ -348,6 +359,7 @@ export default function GeneralRegisterPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     toast.success("General Register exported to CSV successfully.");
   };
 
@@ -356,10 +368,23 @@ export default function GeneralRegisterPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="clerk-page register-page w-full min-w-0 space-y-6">
       {/* Print stylesheet */}
       <style jsx global>{`
+        @media screen {
+          .gr-compact :is(th, td):nth-child(4), .gr-compact :is(th, td):nth-child(5),
+          .gr-compact :is(th, td):nth-child(7), .gr-compact :is(th, td):nth-child(9),
+          .gr-compact :is(th, td):nth-child(11), .gr-compact :is(th, td):nth-child(12),
+          .gr-compact :is(th, td):nth-child(13) { display: none; }
+        }
         @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          html, body, .app-workspace, .app-workspace main { height: auto !important; overflow: visible !important; display: block !important; }
+          #printable-gr-book, #printable-gr-book > div { overflow: visible !important; }
+          #printable-gr-book table { font-size: 8px !important; }
+          #printable-gr-book :is(th, td) { min-width: 0 !important; padding: 4px !important; white-space: normal !important; }
+          #printable-gr-book thead { display: table-header-group; }
+          #printable-gr-book tr { break-inside: avoid; }
           body * {
             visibility: hidden;
           }
@@ -382,85 +407,41 @@ export default function GeneralRegisterPage() {
         }
       `}</style>
 
-      {/* Header */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <Link href="/clerk" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
-              <BookOpen className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-zinc-100 tracking-tight">
-              General Register (G.R. Book / दाखला रजिस्टर)
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 pl-11">
-            School: <strong className="text-gray-800 dark:text-zinc-200">{schoolName}</strong> · Official legal ledger of student admissions, birth records, caste, and school leaving history.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleExportCSV}
-            className="text-xs font-semibold rounded-xl border-gray-200 dark:border-zinc-800 gap-1.5"
-          >
-            <FileSpreadsheet size={14} className="text-emerald-600" /> Export Excel/CSV
-          </Button>
-
-          <Button
-            type="button"
-            onClick={handlePrint}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 shadow-md flex items-center gap-1.5"
-          >
-            <Printer size={14} /> Print Register
-          </Button>
-        </div>
+      <div className="office-actions justify-end no-print">
+        <Button type="button" variant="outline" onClick={handleExportCSV} disabled={loading || filteredList.length === 0}><Download size={14} /> Export CSV</Button>
+        <Button type="button" onClick={handlePrint} disabled={loading || filteredList.length === 0} className="office-primary"><Printer size={14} /> Print register</Button>
       </div>
-
-      {/* Statistics Cards */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs">
-          <span className="text-[11px] font-semibold text-gray-500">Total Registered</span>
-          <p className="text-xl font-bold text-gray-900 dark:text-zinc-100 mt-1">{stats.total}</p>
-        </div>
-        <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-xs">
-          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Currently On Roll</span>
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300 mt-1">{stats.active}</p>
-        </div>
-        <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs">
-          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Left / TC Issued</span>
-          <p className="text-xl font-bold text-amber-700 dark:text-amber-300 mt-1">{stats.left}</p>
-        </div>
-        <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
-          <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400">Boys</span>
-          <p className="text-xl font-bold text-blue-700 dark:text-blue-300 mt-1">{stats.boys}</p>
-        </div>
-        <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-950/20 shadow-xs">
-          <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400">Girls</span>
-          <p className="text-xl font-bold text-purple-700 dark:text-purple-300 mt-1">{stats.girls}</p>
-        </div>
-      </div>
+      <section className="register-stats no-print">
+        {[
+          { label: "Total registered", value: stats.total, caption: "Student records", icon: BookOpen },
+          { label: "On roll", value: stats.active, caption: "Currently studying", icon: CheckCircle2 },
+          { label: "Left / TC issued", value: stats.left, caption: "Former students", icon: GraduationCap },
+          { label: "Boys", value: stats.boys, caption: "Registered students", icon: Users },
+          { label: "Girls", value: stats.girls, caption: "Registered students", icon: Users },
+        ].map(stat => <div className="register-stat" key={stat.label}><div className="stat-label">{stat.label}<stat.icon size={17} /></div><p className="stat-value">{loading ? <Loader2 className="animate-spin" size={24} /> : stat.value.toLocaleString("en-IN")}</p><p className="stat-caption">{stat.caption}</p></div>)}
+      </section>
 
       {/* Filter Bar */}
-      <Card className="no-print rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-zinc-900">
+      <Card className="register-filter-card no-print rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-zinc-900">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-zinc-800"><h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-zinc-100"><Filter size={15} className="text-teal-600" /> Find a record</h2><button type="button" onClick={resetFilters} className="text-xs font-medium text-teal-700 hover:underline">Clear filters</button></div>
         <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="relative sm:col-span-1">
+          <div><label htmlFor="gr-search">Search students</label><div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <Input
+              id="gr-search"
               type="text"
+              aria-label="Search register by GR number, name, caste or Aadhaar"
               placeholder="Search GR, Name, Caste, UID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 text-xs rounded-xl h-9"
             />
-          </div>
+          </div></div>
 
           <div>
-            <select
+            <label htmlFor="gr-class">Class</label>
+            <select id="gr-class"
+              aria-label="Filter register by class"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
@@ -475,7 +456,9 @@ export default function GeneralRegisterPage() {
           </div>
 
           <div>
-            <select
+            <label htmlFor="gr-gender">Gender</label>
+            <select id="gr-gender"
+              aria-label="Filter register by gender"
               value={selectedGender}
               onChange={(e) => setSelectedGender(e.target.value)}
               className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
@@ -488,7 +471,9 @@ export default function GeneralRegisterPage() {
           </div>
 
           <div>
-            <select
+            <label htmlFor="gr-status">Enrollment status</label>
+            <select id="gr-status"
+              aria-label="Filter register by status"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
@@ -502,9 +487,16 @@ export default function GeneralRegisterPage() {
       </Card>
 
       {/* G.R. BOOK LEDGER TABLE (Standard 16-Column Legal Format) */}
-      <Card id="printable-gr-book" className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="register-toolbar no-print flex flex-wrap items-center justify-between gap-3">
+        <p role="status" className="text-sm text-slate-500"><strong className="text-slate-800 dark:text-zinc-100">{filteredList.length}</strong> of {students.length} records <span className="hidden sm:inline">· Scroll horizontally to see all details</span></p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select aria-label="Sort register entries" value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs dark:border-zinc-700 dark:bg-zinc-900"><option value="gr-asc">GR number: ascending</option><option value="gr-desc">GR number: descending</option><option value="name">Student name: A–Z</option></select>
+          <div className="flex rounded-lg border border-slate-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">{[{ label: "Overview", value: false }, { label: "Full register", value: true }].map(item => <button type="button" key={item.label} aria-pressed={detailedView === item.value} onClick={() => setDetailedView(item.value)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${detailedView === item.value ? "bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-200" : "text-slate-500"}`}>{item.label}</button>)}</div>
+        </div>
+      </div>
+      <Card id="printable-gr-book" className={`register-ledger rounded-2xl border-gray-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900 overflow-hidden ${detailedView ? "" : "gr-compact"}`}>
         {/* Printable School Register Header */}
-        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 border-b border-gray-100 dark:border-zinc-800 text-center">
+        <div className="ledger-heading">
           <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
             {schoolName} — GENERAL REGISTER OF PUPILS (G.R. BOOK)
           </h2>
@@ -513,13 +505,13 @@ export default function GeneralRegisterPage() {
           </p>
           <div className="flex justify-between items-center text-[11px] text-gray-400 mt-2 px-2">
             <span>Showing: <strong>{filteredList.length}</strong> Records</span>
-            <span>Generated Date: <strong>{new Date().toLocaleDateString("en-IN")}</strong></span>
+            <span>Generated Date: <strong>{formatDDMMYYYY(new Date())}</strong></span>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[65vh] overflow-auto print:max-h-none print:overflow-visible">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-slate-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold border-b border-gray-200 dark:border-zinc-700 text-[11px] uppercase tracking-wider">
                 <th className="p-3 border-r border-gray-200 dark:border-zinc-700 text-center w-14">G.R. No</th>
                 <th className="p-3 border-r border-gray-200 dark:border-zinc-700 w-24">Adm. Date</th>
@@ -541,7 +533,7 @@ export default function GeneralRegisterPage() {
               {loading ? (
                 <tr>
                   <td colSpan={14} className="p-12 text-center text-gray-500">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-teal-600" />
                     Loading General Register data...
                   </td>
                 </tr>
@@ -549,10 +541,11 @@ export default function GeneralRegisterPage() {
                 <tr>
                   <td colSpan={14} className="p-10 text-center text-gray-400">
                     No G.R. records found.
+                    <button type="button" onClick={resetFilters} className="no-print mx-auto mt-3 block text-sm font-medium text-teal-700 hover:underline">Clear filters and show all records</button>
                   </td>
                 </tr>
               ) : (
-                filteredList.map((stu, idx) => {
+                sortedList.map((stu, idx) => {
                   const name = `${stu.first_name || ""} ${stu.last_name || ""} ${stu.student_name || stu.name || ""}`.trim();
                   const cls = stu.school_class_name || (typeof stu.school_class === "object" ? stu.school_class?.school_class : stu.school_class) || "-";
                   const isLeft = !!stu.date_of_leaving || stu.is_active === false;
@@ -560,18 +553,18 @@ export default function GeneralRegisterPage() {
                   return (
                     <tr
                       key={stu.id || idx}
-                      className={`hover:bg-blue-50/40 dark:hover:bg-zinc-800/50 transition-colors ${
+                      className={`hover:bg-teal-50/40 dark:hover:bg-zinc-800/50 transition-colors ${
                         isLeft ? "bg-amber-50/20 dark:bg-amber-950/10" : ""
                       }`}
                     >
-                      <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-mono font-bold text-center text-blue-700 dark:text-blue-400">
+                      <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-mono font-bold text-center text-teal-700 dark:text-teal-400">
                         {stu.gr_number || "—"}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-mono text-[11px] text-gray-600 dark:text-zinc-400">
-                        {stu.admission_date || "—"}
+                        {formatDDMMYYYY(stu.admission_date)}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-semibold text-gray-900 dark:text-zinc-100">
-                        <Link href={`/clerk/students`} className="hover:underline hover:text-blue-600">
+                        <Link href={`/clerk/students`} className="hover:underline hover:text-teal-600">
                           {name || "Student"}
                         </Link>
                       </td>
@@ -588,7 +581,7 @@ export default function GeneralRegisterPage() {
                         {stu.religion || stu.caste ? `${stu.religion || ""}${stu.caste ? " / " + stu.caste : ""}` : "—"}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-mono text-[11px] text-gray-600 dark:text-zinc-400">
-                        {stu.date_of_birth || "—"}
+                        {formatDDMMYYYY(stu.date_of_birth)}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 text-gray-600 dark:text-zinc-400">
                         {stu.place_of_birth || "—"}
@@ -600,7 +593,7 @@ export default function GeneralRegisterPage() {
                         {stu.previous_school || "Direct Adm."}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 font-mono text-[11px] text-gray-500">
-                        {stu.date_of_leaving || "—"}
+                        {formatDDMMYYYY(stu.date_of_leaving)}
                       </td>
                       <td className="p-2.5 border-r border-gray-100 dark:border-zinc-800 text-gray-500 truncate max-w-[130px]">
                         {stu.reason_for_leaving || "—"}
