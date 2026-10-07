@@ -23,6 +23,8 @@ export const isClassField = (field: AdmissionField) => field.map_to_student_fiel
 export const isPhoneField = (field: AdmissionField) => field.field_type === "tel" || /mobile|phone|contact.number|whatsapp/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isEmailField = (field: AdmissionField) => field.field_type === "email" || /email|e-mail/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isAadhaarAdmissionField = (field: AdmissionField) => /aadh?aar|aadhar/i.test(`${field.label} ${field.map_to_student_field || ""}`);
+export const isUdiseAdmissionField = (field: AdmissionField) => /udise|udisecode|udise_code/i.test(`${field.label} ${field.map_to_student_field || ""}`);
+export const isAbcAdmissionField = (field: AdmissionField) => /\b(abc|abc_id|apaar|apaar_id)\b/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isPinField = (field: AdmissionField) => /pin\s*code|pincode|postal/i.test(field.label);
 
 export function fieldOptions(field: AdmissionField): { value: string; label: string }[] {
@@ -49,6 +51,8 @@ export function normalizeAdmissionValue(field: AdmissionField, value: unknown): 
   let text = String(value ?? "").trim();
   if (isPhoneField(field)) { text = text.replace(/[\s()-]/g, ""); if (/^\+91\d{10}$/.test(text)) text = text.slice(3); }
   if (isAadhaarAdmissionField(field)) text = text.replace(/[\s-]/g, "");
+  if (isUdiseAdmissionField(field)) text = text.replace(/[\s-]/g, "");
+  if (isAbcAdmissionField(field)) text = text.replace(/[\s-]/g, "");
   if (isEmailField(field)) text = text.toLowerCase();
   if (field.field_type === "date" || isBirthField(field)) text = normalizeAdmissionDate(text) ?? text;
   const option = fieldOptions(field).find(option => option.value.toLowerCase() === text.toLowerCase() || option.label.toLowerCase() === text.toLowerCase());
@@ -60,11 +64,13 @@ export function validateAdmissionField(field: AdmissionField, value: unknown, to
   if (field.field_type === "checkbox") return required && ![true, "true", "yes", "1"].includes(value as string | boolean) ? `${field.label} must be checked` : "";
   if (!text) return required ? `${field.label} is required` : "";
   if (text.length > (field.field_type === "textarea" ? 2000 : 255)) return `${field.label} is too long`;
-  if (isAadhaarAdmissionField(field) && !/^\d{12}$/.test(text)) return "Aadhaar must contain exactly 12 digits";
+  if (isAadhaarAdmissionField(field) && !/^\d{12}$/.test(text)) return "Aadhaar number must contain exactly 12 digits";
+  if (isUdiseAdmissionField(field) && !/^\d{11}$/.test(text)) return "UDISE number must contain exactly 11 digits";
+  if (isAbcAdmissionField(field) && !/^\d{12}$/.test(text)) return "ABC ID / APAAR ID must contain exactly 12 digits";
   if (isPhoneField(field) && !/^[6-9]\d{9}$/.test(text)) return "Enter a valid 10-digit mobile number starting with 6–9";
   if (isEmailField(field) && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text)) return "Enter a valid email address";
   if (isPinField(field) && !/^[1-9]\d{5}$/.test(text)) return "Enter a valid 6-digit PIN code";
-  if (field.field_type === "number" && !isPhoneField(field) && !isAadhaarAdmissionField(field) && !isPinField(field) && (!/^\d+(\.\d+)?$/.test(text) || !Number.isFinite(Number(text)))) return "Enter a valid non-negative number";
+  if (field.field_type === "number" && !isPhoneField(field) && !isAadhaarAdmissionField(field) && !isUdiseAdmissionField(field) && !isAbcAdmissionField(field) && !isPinField(field) && (!/^\d+(\.\d+)?$/.test(text) || !Number.isFinite(Number(text)))) return "Enter a valid non-negative number";
   if (field.field_type === "date" || isBirthField(field)) {
     const date = normalizeAdmissionDate(text);
     if (!date) return "Enter a real date in DD/MM/YYYY format";

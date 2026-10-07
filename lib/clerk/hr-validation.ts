@@ -20,12 +20,34 @@ export function parseDepartments(input: string, existing: Pick<Department, "name
 
 export function validateStaffRecord(data: CreateStaffPayload, staff: Staff[], departments: Department[], roleIds: string[], editingId?: number, today = new Date()): StaffErrors {
   const errors: StaffErrors = {};
-  if (!data.name.trim() || data.name.trim().length > 100) errors.name = "Enter a name between 1 and 100 characters.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim()) || data.email.trim().length > 254) errors.email = "Enter a valid email address.";
-  if (!/^\d{10}$/.test(normalizePhone(data.mobile))) errors.mobile = "Enter a valid 10-digit mobile number.";
+  const trimmedName = (data.name || "").trim();
+  if (!trimmedName || trimmedName.length < 2) {
+    errors.name = "Enter at least 2 characters for the name.";
+  } else if (trimmedName.length > 100) {
+    errors.name = "Name must not exceed 100 characters.";
+  } else if (!/^[A-Za-z\s.'-]+$/.test(trimmedName)) {
+    errors.name = "Name can only contain letters, spaces, dots, and hyphens.";
+  }
+
+  const trimmedEmail = (data.email || "").trim().toLowerCase();
+  if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) || trimmedEmail.length > 254) {
+    errors.email = "Enter a valid email address (e.g. name@school.edu).";
+  }
+
+  const normMobile = normalizePhone(data.mobile || "");
+  if (!normMobile) {
+    errors.mobile = "Mobile number is required.";
+  } else if (normMobile.length !== 10 || !/^\d{10}$/.test(normMobile)) {
+    errors.mobile = "Mobile number must be exactly 10 digits.";
+  }
+
   const others = staff.filter(member => member.id !== editingId);
-  if (others.some(member => member.email?.trim().toLowerCase() === data.email.trim().toLowerCase())) errors.email = "This email is already assigned to a staff member.";
-  if (others.some(member => normalizePhone(member.mobile || "") === normalizePhone(data.mobile) && data.mobile.trim())) errors.mobile = "This mobile number is already assigned to a staff member.";
+  if (trimmedEmail && others.some(member => member.email?.trim().toLowerCase() === trimmedEmail)) {
+    errors.email = "This email is already assigned to a staff member.";
+  }
+  if (normMobile && others.some(member => normalizePhone(member.mobile || "") === normMobile)) {
+    errors.mobile = "This mobile number is already assigned to a staff member.";
+  }
   if (!departments.some(item => item.id === data.department)) errors.department = "Select an available department.";
   if (!roleIds.includes(String(data.category))) errors.category = "Select an available role.";
   if (!data.address.trim()) errors.address = "Enter the staff member's address.";

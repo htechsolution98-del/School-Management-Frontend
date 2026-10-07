@@ -3,17 +3,26 @@ import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { Teacher } from "@/types/clerk";
 
 export async function getTeachers(): Promise<Teacher[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.GET_TEACHER}`);
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.GET_TEACHER}`);
+    if (response.ok) {
+      const data = await response.json();
+      const list = Array.isArray(data) ? data : data.data ?? data.results ?? [];
+      if (list.length > 0) {
+        return list;
+      }
+    }
+  } catch {}
 
-  if (!response.ok) {
-    let message = "Failed to fetch teachers.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
-  }
+  // Fallback to general staff list if specialized teacher endpoint returned empty
+  try {
+    const fallbackRes = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STAFF}`);
+    if (fallbackRes.ok) {
+      const fbData = await fallbackRes.json();
+      const fbList = Array.isArray(fbData) ? fbData : fbData.data ?? fbData.results ?? [];
+      return fbList;
+    }
+  } catch {}
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.data ?? data.results ?? [];
+  return [];
 }
