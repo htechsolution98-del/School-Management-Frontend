@@ -30,7 +30,7 @@ jobs:
             cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
 
             # npm install in the running container can modify the tracked lockfile.
-            # Preserve that version before restoring only this generated file.
+            # Preserve that version before resetting to the target branch version.
             if git ls-files --error-unmatch -- package-lock.json >/dev/null 2>&1; then
               if ! git diff --quiet -- package-lock.json || ! git diff --cached --quiet -- package-lock.json; then
                 backup_root="${DEPLOY_BACKUP_ROOT:-$HOME/.local/state/school-management-deploy/frontend}"
@@ -39,15 +39,19 @@ jobs:
                 if [ -e package-lock.json ]; then
                   cp -p -- package-lock.json "$backup_dir/package-lock.json"
                 fi
-                git diff --cached --binary -- package-lock.json > "$backup_dir/package-lock-staged.patch"
-                git diff --binary -- package-lock.json > "$backup_dir/package-lock-unstaged.patch"
-                git restore --source=HEAD --staged --worktree -- package-lock.json
+                git diff --cached --binary -- package-lock.json > "$backup_dir/package-lock-staged.patch" 2>/dev/null || true
+                git diff --binary -- package-lock.json > "$backup_dir/package-lock-unstaged.patch" 2>/dev/null || true
                 echo "Saved server lockfile changes in $backup_dir"
               fi
             fi
 
-            echo "=== Git Pull ==="
-            git pull --ff-only origin "${{ secrets.FRONTEND_BRANCH }}"
+            echo "=== Resetting Working Tree ==="
+            git checkout -f -- package-lock.json 2>/dev/null || true
+            git reset --hard HEAD
+
+            echo "=== Sync Remote Branch ==="
+            git fetch origin "${{ secrets.FRONTEND_BRANCH }}"
+            git reset --hard "origin/${{ secrets.FRONTEND_BRANCH }}"
 
             echo "=== Restart Container (triggers dependency install, build and start) ==="
             docker restart ${{ secrets.FRONTEND_CONT_NAME }}
