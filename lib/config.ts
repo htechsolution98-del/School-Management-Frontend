@@ -20,6 +20,7 @@ export const API_ENDPOINTS = {
   SET_SUBJECT: "/setSubject/",
   SYLLABUS: "/syllabus/",
   GET_TEACHER: "/getteacher/",
+  TEACHER_WORKLOAD: "/teacher-workload/",
   ASSIGN_CLASS: "/assignClass/",
   SEND_OTP: "/send-otp/",
   VERIFY_OTP: "/verify-otp/",

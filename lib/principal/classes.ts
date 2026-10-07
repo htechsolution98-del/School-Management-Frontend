@@ -32,6 +32,18 @@ export async function deleteClassCategory(id: number): Promise<void> {
   }
 }
 
+export async function updateClassCategory(id: number, name: string): Promise<ClassCategory> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.CLASS_CATEGORY}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Failed to update category."));
+  }
+  return response.json();
+}
+
 export async function getSchoolClasses(): Promise<SchoolClass[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SCHOOL_CLASS}`);
 

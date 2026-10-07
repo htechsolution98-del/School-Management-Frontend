@@ -43,9 +43,9 @@ export function ProfileSection({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 ${className}`}>
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-zinc-800">
-        <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100">
+    <section className={`rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${className}`}>
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100 dark:border-zinc-800/80">
+        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
           {camelCaseText(title)}
         </h2>
         {action && <div>{action}</div>}
@@ -61,9 +61,11 @@ export const dateText = (value?: string | null) => value ? formatDDMMYYYY(value)
 export function DetailGrid({
   values,
   cols = 2,
+  className = "",
 }: {
   values: { label: string; value: unknown }[];
   cols?: 2 | 3 | 4;
+  className?: string;
 }) {
   const display = (value: unknown) =>
     value === null || value === undefined || value === ""
@@ -78,22 +80,22 @@ export function DetailGrid({
 
   const colClass =
     cols === 4
-      ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5"
       : cols === 3
-      ? "grid-cols-2 sm:grid-cols-3"
-      : "grid-cols-2";
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6"
+      : "grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5";
 
   return (
-    <div className={`grid ${colClass} gap-2.5`}>
+    <div className={`grid ${colClass} ${className}`}>
       {values.map((item, index) => (
         <div
           key={`${item.label}-${index}`}
-          className="min-w-0 bg-slate-50/70 border border-slate-100 rounded-xl px-3 py-2 dark:bg-zinc-800/40 dark:border-zinc-800 flex flex-col justify-center"
+          className="min-w-0 flex flex-col justify-start"
         >
-          <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">
+          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider leading-relaxed">
             {item.label}
           </span>
-          <span className="mt-0.5 break-words text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+          <span className="mt-1 break-words text-sm sm:text-base font-semibold text-slate-900 dark:text-zinc-100">
             {display(item.value)}
           </span>
         </div>

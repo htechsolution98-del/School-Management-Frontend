@@ -116,22 +116,22 @@ export function StudentProfile360({ studentId }: { studentId: number }) {
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-7xl mx-auto" aria-label="Loading student profile">
+      <div className="space-y-6 max-w-6xl mx-auto" aria-label="Loading student profile">
         <Skeleton className="h-6 w-36" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <div className="grid gap-3 grid-cols-3">
-          {[1, 2, 3].map((v) => (
-            <Skeleton key={v} className="h-16 rounded-xl" />
-          ))}
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
         </div>
-        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
 
   if (error || !student) {
     return (
-      <div className="space-y-4 max-w-7xl mx-auto">
+      <div className="space-y-4 max-w-6xl mx-auto">
         <Link
           href="/clerk/student-profiles"
           className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-indigo-600"
@@ -207,68 +207,86 @@ export function StudentProfile360({ studentId }: { studentId: number }) {
     .filter((section) => section.fields.length > 0);
 
   return (
-    <div className="mx-auto w-full max-w-7xl min-w-0 space-y-3.5 text-slate-900 dark:text-zinc-100">
-      {/* ─── Top Bar ────────────────────────────────────────── */}
+    <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 text-slate-900 dark:text-zinc-100">
+      {/* ─── Top Breadcrumb / Action Bar ───────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/clerk/student-profiles"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 transition-colors"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          All Student Profiles
+          <ArrowLeft className="h-4 w-4" />
+          Back to Student Profiles
         </Link>
         <Button
           variant="outline"
           size="sm"
           onClick={() => void load()}
-          className="h-8 text-xs font-semibold text-slate-700 hover:text-indigo-600 border-slate-200 shadow-2xs"
+          className="h-8 text-xs font-semibold text-slate-700 hover:text-slate-900 border-slate-200/80 bg-white shadow-2xs hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
         >
-          <RefreshCw className="h-3.5 w-3.5 mr-1" />
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
           Refresh
         </Button>
       </div>
 
-      {/* ─── Compact Header Card ────────────────────────────── */}
-      <header className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <StudentPhoto src={student.photo_url} name={student.full_name} large={false} />
+      {/* ─── Top Summary Banner (Hero Section) ──────────────── */}
+      <header className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+            <StudentPhoto src={student.photo_url} name={student.full_name} large={true} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="truncate text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                   {camelCaseText(student.full_name)}
                 </h1>
                 <StatusPill verified={student.is_verified} />
                 {student.is_rte && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900">
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900">
                     RTE
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400 font-medium truncate">
-                GR: <strong className="text-slate-800 dark:text-zinc-200">{student.gr_no || "Pending"}</strong> · Class: <strong className="text-slate-800 dark:text-zinc-200">{student.class_name || "N/A"}{student.division ? ` (${student.division})` : ""}</strong> · Roll: <strong className="text-slate-800 dark:text-zinc-200">{student.roll_no || "—"}</strong> · Adm No: {student.admission_number || "—"}
-              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400 dark:text-zinc-500">GR No:</span>
+                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{student.gr_no || "Pending"}</span>
+                </div>
+                <span className="text-slate-300 dark:text-zinc-700 hidden sm:inline">·</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400 dark:text-zinc-500">Class:</span>
+                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{student.class_name || "N/A"}{student.division ? ` (${student.division})` : ""}</span>
+                </div>
+                <span className="text-slate-300 dark:text-zinc-700 hidden sm:inline">·</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400 dark:text-zinc-500">Roll No:</span>
+                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{student.roll_no || "—"}</span>
+                </div>
+                <span className="text-slate-300 dark:text-zinc-700 hidden sm:inline">·</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400 dark:text-zinc-500">Adm No:</span>
+                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{student.admission_number || "—"}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
             <Button
-              size="sm"
+              size="default"
               variant={student.is_verified ? "outline" : "default"}
               disabled={verifying}
               onClick={() => void toggleVerification()}
               className={
                 student.is_verified
-                  ? "h-8 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
-                  : "h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                  ? "h-9 px-4 text-xs sm:text-sm font-semibold border-slate-200/80 text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 hover:text-rose-600 shadow-2xs"
+                  : "h-9 px-4 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
               }
             >
               {verifying ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : student.is_verified ? (
-                <ShieldX className="h-3.5 w-3.5 mr-1.5 text-rose-500" />
+                <ShieldX className="h-4 w-4 mr-2 text-rose-500" />
               ) : (
-                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+                <ShieldCheck className="h-4 w-4 mr-2" />
               )}
               {student.is_verified ? "Revoke Verification" : "Verify Student"}
             </Button>
@@ -276,194 +294,269 @@ export function StudentProfile360({ studentId }: { studentId: number }) {
         </div>
       </header>
 
-      {/* ─── Compact 3-Stat Strip ───────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-            <FileText className="h-3.5 w-3.5" />
+      {/* ─── Unified KPI Metric Strip ────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-zinc-800 rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+        <div className="flex items-center gap-3.5 p-4 sm:px-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+            <FileText className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Uploaded Docs</p>
-            <p className="text-sm sm:text-base font-bold text-slate-800 dark:text-white leading-tight">{student.completion.document_count}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Uploaded Docs</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">{student.completion.document_count}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className={`rounded-lg p-1.5 ${student.completion.missing_documents.length ? "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400" : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"}`}>
-            <CheckCircle2 className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-3.5 p-4 sm:px-6">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${student.completion.missing_documents.length ? "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400" : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"}`}>
+            <CheckCircle2 className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Missing Docs</p>
-            <p className="text-sm sm:text-base font-bold text-slate-800 dark:text-white leading-tight">{student.completion.missing_documents.length}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Missing Docs</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">{student.completion.missing_documents.length}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="rounded-lg bg-sky-50 p-1.5 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
-            <CreditCard className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-3.5 p-4 sm:px-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
+            <CreditCard className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Govt IDs Added</p>
-            <p className="text-sm sm:text-base font-bold text-slate-800 dark:text-white leading-tight">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Govt IDs Added</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
               {3 + (student.custom_ids || []).length - student.completion.missing_ids.length} / {3 + (student.custom_ids || []).length}
             </p>
           </div>
         </div>
       </div>
 
-      {/* ─── Compact Navigation Tabs ────────────────────────── */}
+      {/* ─── Integrated Navigation Tabs ─────────────────────── */}
       <nav
         aria-label="Student profile sections"
-        className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+        className="flex gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 scrollbar-none"
       >
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={tab === item.id ? "page" : undefined}
-            onClick={() => setTab(item.id)}
-            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-              tab === item.id
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <item.icon className="h-3.5 w-3.5" />
-            <span>{item.name}</span>
-            {item.id === "documents" && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  tab === item.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {student.completion.document_count}
-              </span>
-            )}
-          </button>
-        ))}
+        {tabs.map((item) => {
+          const isActive = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => setTab(item.id)}
+              className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all ${
+                isActive
+                  ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
+                  : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              }`}
+            >
+              <item.icon className="h-4 w-4" />
+              <span>{item.name}</span>
+              {item.id === "documents" && (
+                <span
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                    isActive
+                      ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900"
+                      : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300"
+                  }`}
+                >
+                  {student.completion.document_count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      {/* ─── Content Panels ─────────────────────────────────── */}
-      <div className={tab === "overview" ? "grid items-start gap-3.5 xl:grid-cols-2" : "space-y-3.5"}>
-        {/* Personal Details */}
-        {(tab === "overview" || tab === "personal") && (
-          <ProfileSection title="Personal Details">
-            <DetailGrid values={personal} cols={2} />
-          </ProfileSection>
-        )}
+      {/* ─── Unified Content Panels ─────────────────────────── */}
+      <div className="w-full max-w-6xl mx-auto">
+        {tab === "overview" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left Column */}
+            <div className="space-y-6">
+              <ProfileSection title="Personal Details">
+                <DetailGrid values={personal} cols={2} />
+              </ProfileSection>
 
-        {/* Academic Details */}
-        {(tab === "overview" || tab === "academic") && (
-          <ProfileSection title="Academic & Class Details">
-            <DetailGrid values={academic} cols={2} />
-          </ProfileSection>
-        )}
-
-        {/* Parent & Guardian Details */}
-        {(tab === "overview" || tab === "family") && (
-          <ProfileSection title="Parent & Guardian Details">
-            <DetailGrid
-              values={[
-                { label: "Father's name", value: student.father_name },
-                { label: "Mother's name", value: student.mother_name },
-              ]}
-              cols={2}
-            />
-            {student.guardians.length > 0 && (
-              <div className="mt-3 border-t border-slate-100 pt-3 dark:border-zinc-800">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Linked Parent Account</p>
+              <ProfileSection title="Parent & Guardian Details">
                 <DetailGrid
-                  values={student.guardians.map((g) => ({
-                    label: "Account",
-                    value: g.name,
-                  }))}
+                  values={[
+                    { label: "Father's name", value: student.father_name },
+                    { label: "Mother's name", value: student.mother_name },
+                  ]}
                   cols={2}
                 />
-              </div>
+                {student.guardians.length > 0 && (
+                  <div className="mt-5 border-t border-slate-100 pt-5 dark:border-zinc-800">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Linked Parent Accounts</p>
+                    <DetailGrid
+                      values={student.guardians.map((g) => ({
+                        label: "Account Name",
+                        value: g.name,
+                      }))}
+                      cols={2}
+                    />
+                  </div>
+                )}
+              </ProfileSection>
+
+              <GovernmentIDs key={student.id} student={student} onUpdated={setStudent} onRefresh={() => load()} />
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              <ProfileSection title="Academic & Class Details">
+                <DetailGrid values={academic} cols={2} />
+              </ProfileSection>
+
+              <ProfileSection title="Contact & Address">
+                <DetailGrid
+                  values={[
+                    { label: "Mobile number", value: student.mobile },
+                    { label: "Email address", value: student.email },
+                    { label: "Address line", value: addressLine },
+                    { label: "City / District", value: [city, district].filter(Boolean).join(" · ") || city || district },
+                    { label: "State", value: state },
+                    { label: "Pincode", value: pincode },
+                  ].filter((item) => item.value !== null && item.value !== undefined && item.value !== "")}
+                  cols={2}
+                />
+              </ProfileSection>
+
+              <ProfileSection title="Verification Details">
+                <DetailGrid
+                  values={[
+                    { label: "Status", value: student.is_verified ? "Verified" : "Pending verification" },
+                    { label: "Verified by", value: student.verified_by_name },
+                    { label: "Verified date", value: dateText(student.verified_at) },
+                    { label: "Missing IDs", value: student.completion.missing_ids.join(", ") || "None" },
+                    {
+                      label: "Missing required documents",
+                      value: student.completion.missing_documents.map((d) => d.label).join(", ") || "None",
+                    },
+                    {
+                      label: "Document requirements",
+                      value: student.completion.document_requirements_known
+                        ? "From admission form"
+                        : "Standard",
+                    },
+                  ]}
+                  cols={2}
+                />
+              </ProfileSection>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {tab === "personal" && (
+              <ProfileSection title="Personal Details">
+                <DetailGrid values={personal} cols={3} />
+              </ProfileSection>
             )}
-          </ProfileSection>
+
+            {tab === "academic" && (
+              <ProfileSection title="Academic & Class Details">
+                <DetailGrid values={academic} cols={3} />
+              </ProfileSection>
+            )}
+
+            {tab === "family" && (
+              <ProfileSection title="Parent & Guardian Details">
+                <DetailGrid
+                  values={[
+                    { label: "Father's name", value: student.father_name },
+                    { label: "Mother's name", value: student.mother_name },
+                  ]}
+                  cols={2}
+                />
+                {student.guardians.length > 0 && (
+                  <div className="mt-5 border-t border-slate-100 pt-5 dark:border-zinc-800">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Linked Parent Accounts</p>
+                    <DetailGrid
+                      values={student.guardians.map((g) => ({
+                        label: "Account Name",
+                        value: g.name,
+                      }))}
+                      cols={3}
+                    />
+                  </div>
+                )}
+              </ProfileSection>
+            )}
+
+            {tab === "contact" && (
+              <ProfileSection title="Contact & Address">
+                <DetailGrid
+                  values={[
+                    { label: "Mobile number", value: student.mobile },
+                    { label: "Email address", value: student.email },
+                    { label: "Address line", value: addressLine },
+                    { label: "City / District", value: [city, district].filter(Boolean).join(" · ") || city || district },
+                    { label: "State", value: state },
+                    { label: "Pincode", value: pincode },
+                  ].filter((item) => item.value !== null && item.value !== undefined && item.value !== "")}
+                  cols={3}
+                />
+              </ProfileSection>
+            )}
+
+            {tab === "ids" && (
+              <GovernmentIDs key={student.id} student={student} onUpdated={setStudent} onRefresh={() => load()} />
+            )}
+
+            {tab === "verification" && (
+              <ProfileSection title="Verification Details">
+                <DetailGrid
+                  values={[
+                    { label: "Status", value: student.is_verified ? "Verified" : "Pending verification" },
+                    { label: "Verified by", value: student.verified_by_name },
+                    { label: "Verified date", value: dateText(student.verified_at) },
+                    { label: "Missing IDs", value: student.completion.missing_ids.join(", ") || "None" },
+                    {
+                      label: "Missing required documents",
+                      value: student.completion.missing_documents.map((d) => d.label).join(", ") || "None",
+                    },
+                    {
+                      label: "Document requirements",
+                      value: student.completion.document_requirements_known
+                        ? "From admission form"
+                        : "Standard",
+                    },
+                  ]}
+                  cols={3}
+                />
+              </ProfileSection>
+            )}
+
+            {tab === "documents" && (
+              <StudentDocuments student={student} onUpdated={setStudent} onRefresh={() => load()} />
+            )}
+
+            {dynamicSections.map((section) => (
+              <ProfileSection key={section.title} title={section.title}>
+                <DetailGrid
+                  values={section.fields.map((field) => ({
+                    label: field.label,
+                    value: field.sensitive
+                      ? maskAadhaar(field.value == null ? null : String(field.value))
+                      : field.value,
+                  }))}
+                  cols={3}
+                />
+              </ProfileSection>
+            ))}
+
+            {student.extra_details.map((extra, index) => (
+              <ProfileSection key={index} title="Additional Details">
+                <DetailGrid
+                  values={Object.entries(extra).map(([key, value]) => ({
+                    label: fieldLabel(key),
+                    value,
+                  }))}
+                  cols={3}
+                />
+              </ProfileSection>
+            ))}
+          </div>
         )}
-
-        {/* Contact & Address Information */}
-        {(tab === "overview" || tab === "contact") && (
-          <ProfileSection title="Contact & Address">
-            <DetailGrid
-              values={[
-                { label: "Mobile number", value: student.mobile },
-                { label: "Email address", value: student.email },
-                { label: "Address line", value: addressLine },
-                { label: "City / District", value: [city, district].filter(Boolean).join(" · ") || city || district },
-                { label: "State", value: state },
-                { label: "Pincode", value: pincode },
-              ].filter((item) => item.value !== null && item.value !== undefined && item.value !== "")}
-              cols={2}
-            />
-          </ProfileSection>
-        )}
-
-        {/* Government IDs */}
-        {(tab === "overview" || tab === "ids") && (
-          <GovernmentIDs key={student.id} student={student} onUpdated={setStudent} onRefresh={() => load()} />
-        )}
-
-        {/* Verification Details */}
-        {(tab === "overview" || tab === "verification") && (
-          <ProfileSection title="Verification Details">
-            <DetailGrid
-              values={[
-                { label: "Status", value: student.is_verified ? "Verified" : "Pending verification" },
-                { label: "Verified by", value: student.verified_by_name },
-                { label: "Verified date", value: dateText(student.verified_at) },
-                { label: "Missing IDs", value: student.completion.missing_ids.join(", ") || "None" },
-                {
-                  label: "Missing required documents",
-                  value: student.completion.missing_documents.map((d) => d.label).join(", ") || "None",
-                },
-                {
-                  label: "Document requirements",
-                  value: student.completion.document_requirements_known
-                    ? "From admission form"
-                    : "Standard",
-                },
-              ]}
-              cols={2}
-            />
-          </ProfileSection>
-        )}
-
-        {/* Documents Tab */}
-        {tab === "documents" && (
-          <StudentDocuments student={student} onUpdated={setStudent} onRefresh={() => load()} />
-        )}
-
-        {/* Specific Dynamic Custom Form Fields (Only on non-overview filtered tabs) */}
-        {tab !== "overview" &&
-          dynamicSections.map((section) => (
-            <ProfileSection key={section.title} title={section.title}>
-              <DetailGrid
-                values={section.fields.map((field) => ({
-                  label: field.label,
-                  value: field.sensitive
-                    ? maskAadhaar(field.value == null ? null : String(field.value))
-                    : field.value,
-                }))}
-                cols={3}
-              />
-            </ProfileSection>
-          ))}
-
-        {tab !== "overview" &&
-          student.extra_details.map((extra, index) => (
-            <ProfileSection key={index} title="Additional Details">
-              <DetailGrid
-                values={Object.entries(extra).map(([key, value]) => ({
-                  label: fieldLabel(key),
-                  value,
-                }))}
-                cols={3}
-              />
-            </ProfileSection>
-          ))}
       </div>
     </div>
   );
@@ -557,7 +650,7 @@ function GovernmentIDs({
     >
       {editing ? (
         <form onSubmit={save} className="space-y-3">
-          <div className="grid gap-2.5 sm:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             {fields.map((field) => (
               <div key={field.key}>
                 <Label htmlFor={field.key} className="text-xs font-semibold">
@@ -626,44 +719,38 @@ function GovernmentIDs({
           </div>
         </form>
       ) : (
-        <div className="space-y-2">
-          <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
             {fields.map((field) => (
-              <div
-                key={field.key}
-                className="min-w-0 rounded-xl bg-slate-50/70 border border-slate-100 p-2.5 dark:bg-zinc-800/40 dark:border-zinc-800 flex flex-col justify-between"
-              >
-                <div>
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider truncate">
+              <div key={field.key} className="min-w-0 flex flex-col justify-start">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 leading-relaxed">
                     {camelCaseText(field.label)}
-                  </p>
-                  <p className="my-1 break-all font-mono text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-200">
-                    {field.key === "aadhar_number"
-                      ? maskAadhaar(student.aadhar_number)
-                      : student[field.key] || "—"}
-                  </p>
+                  </span>
+                  <StatusPill verified={!!student[field.key]} label={student[field.key] ? "Added" : "Missing"} />
                 </div>
-                <StatusPill verified={!!student[field.key]} label={student[field.key] ? "Added" : "Missing"} />
+                <span className="mt-1 break-all font-mono text-sm sm:text-base font-semibold text-slate-900 dark:text-zinc-100">
+                  {field.key === "aadhar_number"
+                    ? maskAadhaar(student.aadhar_number)
+                    : student[field.key] || "—"}
+                </span>
               </div>
             ))}
             {(student.custom_ids || []).map((field) => (
-              <div
-                key={field.id}
-                className="min-w-0 rounded-xl bg-slate-50/70 border border-slate-100 p-2.5 dark:bg-zinc-800/40 dark:border-zinc-800 flex flex-col justify-between"
-              >
-                <div>
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider truncate">
+              <div key={field.id} className="min-w-0 flex flex-col justify-start">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 leading-relaxed">
                     {camelCaseText(field.label)}
-                  </p>
-                  <p className="my-1 break-all font-mono text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-200">
-                    {field.value || "—"}
-                  </p>
+                  </span>
+                  <StatusPill verified={!!field.value} label={field.value ? "Added" : "Missing"} />
                 </div>
-                <StatusPill verified={!!field.value} label={field.value ? "Added" : "Missing"} />
+                <span className="mt-1 break-all font-mono text-sm sm:text-base font-semibold text-slate-900 dark:text-zinc-100">
+                  {field.value || "—"}
+                </span>
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-slate-400">Aadhaar is masked in normal display.</p>
+          <p className="text-xs text-slate-400 dark:text-zinc-500 italic">Aadhaar is masked in normal display.</p>
         </div>
       )}
     </ProfileSection>

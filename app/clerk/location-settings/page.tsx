@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
   MapPin,
   Loader2,
@@ -11,19 +11,40 @@ import {
   Shield,
   Save,
   LocateFixed,
-  Radar,
   Sunrise,
   Sunset,
   AlarmClock,
   MousePointer2,
-  Info,
   Trash2,
+  RefreshCw,
+  Edit3,
+  CalendarCheck,
+  Check,
+  Sparkles,
+  Layers,
+  ArrowRight,
+  Info,
 } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+
 import {
   deleteLocationSettings,
   getLocationSettings,
   saveLocationSettings,
 } from "@/lib/clerk";
+import type { LocationSettingsRecord } from "@/types/clerk";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,86 +52,7 @@ function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-function Input({
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  className?: string;
-}) {
-  return (
-    <input
-      className={cn(
-        "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition-all",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function Field({
-  label,
-  icon: Icon,
-  hint,
-  children,
-}: {
-  label: string;
-  icon?: any;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-        {Icon && <Icon className="h-3.5 w-3.5 text-teal-500" />}
-        {label}
-      </label>
-      {children}
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  description,
-  icon: Icon,
-  children,
-  accent = "teal",
-}: {
-  title: string;
-  description: string;
-  icon: any;
-  children: React.ReactNode;
-  accent?: string;
-}) {
-  const accents: Record<string, string> = {
-    teal: "bg-teal-500",
-    slate: "bg-slate-600",
-    amber: "bg-amber-500",
-    violet: "bg-violet-500",
-    rose: "bg-rose-500",
-  };
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start gap-4">
-        <div
-          className={cn(
-            "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-            accents[accent],
-          )}
-        >
-          <Icon className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-        </div>
-      </div>
-      <div className="px-6 py-5">{children}</div>
-    </div>
-  );
-}
+const RADIUS_PRESETS = [50, 100, 200, 500, 1000];
 
 // ─── Delete Confirm Dialog ────────────────────────────────────────────────────
 
@@ -124,52 +66,53 @@ function DeleteConfirmDialog({
   isDeleting: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-rose-400 to-red-500" />
-        <div className="p-6 space-y-5">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 w-full max-w-sm mx-4 overflow-hidden">
+        <div className="h-1.5 w-full bg-red-600" />
+        <div className="p-6 space-y-4">
           <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
-              <Trash2 className="h-8 w-8 text-rose-500" />
+            <div className="h-14 w-14 rounded-2xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600">
+              <Trash2 className="h-7 w-7" />
             </div>
           </div>
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-bold text-slate-900">
-              Delete Location Settings?
+          <div className="text-center space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100">
+              Delete Attendance Zone?
             </h3>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              This will permanently remove the attendance zone configuration.
-              Teachers will not be able to mark attendance until new settings
-              are added.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              This will remove the current geofence perimeter and shift schedule.
+              Teachers will be unable to verify their attendance location until a new zone is created.
             </p>
           </div>
-          <div className="flex gap-3 pt-1">
-            <button
+          <div className="flex gap-2.5 pt-2">
+            <Button
               type="button"
+              variant="outline"
               onClick={onCancel}
               disabled={isDeleting}
-              className="flex-1 h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
+              className="flex-1 rounded-xl text-xs h-10"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={onConfirm}
               disabled={isDeleting}
-              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white text-sm font-semibold shadow-lg shadow-rose-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 rounded-xl text-xs font-bold h-10 gap-1.5"
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Deleting...
                 </>
               ) : (
                 <>
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                   Yes, Delete
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -187,56 +130,54 @@ function LocationPermissionDialog({
   onDeny: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-teal-400 to-emerald-500" />
-        <div className="p-6 space-y-5">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 w-full max-w-sm mx-4 overflow-hidden">
+        <div className="h-1.5 w-full bg-indigo-600" />
+        <div className="p-6 space-y-4">
           <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center">
-              <LocateFixed className="h-8 w-8 text-teal-600" />
+            <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <LocateFixed className="h-7 w-7" />
             </div>
           </div>
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-bold text-slate-900">
+          <div className="text-center space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100">
               Allow Location Access
             </h3>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              This app needs your device's GPS location to set the school
-              attendance zone accurately.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We request your device's GPS position to configure the school's central attendance geofence coordinate.
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 text-xs text-slate-600 dark:text-zinc-400">
             {[
-              "Used only to set the geofence center",
-              "Not stored or shared anywhere",
-              "You can change it manually anytime",
+              "Used only to position the geofence center",
+              "You can fine-tune or click the map manually anytime",
+              "High precision coordinates for geofence reliability",
             ].map((text) => (
               <div
                 key={text}
-                className="flex items-center gap-2.5 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2"
+                className="flex items-center gap-2 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 px-3 py-2 text-[11px]"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-teal-500 shrink-0" />
-                <span className="text-xs text-slate-600 font-medium">
-                  {text}
-                </span>
+                <Check className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                <span>{text}</span>
               </div>
             ))}
           </div>
-          <div className="flex gap-3 pt-1">
-            <button
+          <div className="flex gap-2.5 pt-2">
+            <Button
               type="button"
+              variant="outline"
               onClick={onDeny}
-              className="flex-1 h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+              className="flex-1 rounded-xl text-xs h-10"
             >
               Not Now
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onAllow}
-              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white text-sm font-semibold shadow-lg shadow-teal-500/20 transition-all active:scale-95"
+              className="flex-1 rounded-xl text-xs font-bold h-10 bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               Allow Access
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -245,11 +186,13 @@ function LocationPermissionDialog({
 }
 
 // ─── Interactive Map ──────────────────────────────────────────────────────────
+
 declare global {
   interface Window {
     L: any;
   }
 }
+
 function InteractiveMap({
   lat,
   lng,
@@ -389,22 +332,20 @@ function InteractiveMap({
     const pos = markerRef.current.getLatLng();
     if (!pos) return;
 
-    // Remove old circle safely
     if (circleRef.current) {
       try {
         circleRef.current.remove();
-      } catch { }
+      } catch {}
       circleRef.current = null;
     }
 
-    // ✅ Defer so Leaflet SVG renderer is ready before projecting coordinates
     setTimeout(() => {
       if (!mapInstanceRef.current || !window.L) return;
       try {
         circleRef.current = window.L.circle([pos.lat, pos.lng], {
           radius: parseInt(radius || "100"),
-          color: "#0d9488",
-          fillColor: "#0d9488",
+          color: "#4f46e5",
+          fillColor: "#4f46e5",
           fillOpacity: 0.15,
           weight: 2,
           dashArray: "6 4",
@@ -417,18 +358,15 @@ function InteractiveMap({
 
   function placeMarker(map: any, latVal: number, lngVal: number, r: number) {
     const L = window.L;
-
-    if (!L || !map) return;
-
-    if (!L || !mapRef.current) return;
+    if (!L || !map || !mapRef.current) return;
     if (markerRef.current) markerRef.current.remove();
     if (circleRef.current) circleRef.current.remove();
 
     const icon = L.divIcon({
       className: "",
       html: `<div style="position:relative;width:32px;height:40px;">
-        <div style="width:32px;height:32px;background:linear-gradient(135deg,#0d9488,#0f766e);border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 12px rgba(13,148,136,0.5);"></div>
-        <div style="position:absolute;top:8px;left:8px;width:12px;height:12px;background:white;border-radius:50%;transform:rotate(45deg);"></div>
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,#4f46e5,#4338ca);border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 14px rgba(79,70,229,0.45);"></div>
+        <div style="position:absolute;top:9px;left:9px;width:11px;height:11px;background:white;border-radius:50%;transform:rotate(45deg);"></div>
       </div>`,
       iconSize: [32, 40],
       iconAnchor: [16, 40],
@@ -446,9 +384,8 @@ function InteractiveMap({
     markerRef.current = L.marker([latVal, lngVal], { icon })
       .addTo(map)
       .bindPopup(
-        `<div style="font-family:monospace;font-size:11px;font-weight:700;padding:2px 4px;">📍 ${Number(latVal).toFixed(6)}, ${Number(lngVal).toFixed(6)}</div>`,
-      )
-      .openPopup();
+        `<div style="font-family:monospace;font-size:11px;font-weight:700;padding:2px 4px;color:#1e293b;">📍 ${Number(latVal).toFixed(6)}, ${Number(lngVal).toFixed(6)}</div>`
+      );
 
     setTimeout(() => {
       if (!map || !mapInstanceRef.current) return;
@@ -458,14 +395,14 @@ function InteractiveMap({
       }
       circleRef.current = L.circle([latVal, lngVal], {
         radius: r,
-        color: "#0d9488",
-        fillColor: "#0d9488",
+        color: "#4f46e5",
+        fillColor: "#4f46e5",
         fillOpacity: 0.15,
         weight: 2,
         dashArray: "6 4",
       }).addTo(map);
-      // ✅ Auto-fit map to show the full circle
-      map.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] });
+
+      map.fitBounds(circleRef.current.getBounds(), { padding: [25, 25] });
     }, 50);
   }
 
@@ -473,11 +410,11 @@ function InteractiveMap({
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latVal}&lon=${lngVal}&zoom=18&addressdetails=1`,
-        { headers: { "Accept-Language": "en" } },
+        { headers: { "Accept-Language": "en" } }
       );
       const data = await res.json();
       if (data?.display_name) setAddress(data.display_name);
-    } catch { }
+    } catch {}
   };
 
   const doGetLocation = () => {
@@ -495,12 +432,12 @@ function InteractiveMap({
         const msgs: Record<number, string> = {
           [err.PERMISSION_DENIED]: "Location permission denied.",
           [err.POSITION_UNAVAILABLE]:
-            "Location unavailable. Set manually on the map.",
+            "Location unavailable. Please select coordinate manually on map.",
         };
-        setLocationError(msgs[err.code] || "Could not get location.");
+        setLocationError(msgs[err.code] || "Could not detect GPS location.");
         setLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
@@ -515,9 +452,12 @@ function InteractiveMap({
           if (result.state === "granted") doGetLocation();
           else if (result.state === "denied")
             setLocationError(
-              "Location blocked. Enable it in browser settings.",
+              "Location blocked by browser. Please enable location permissions."
             );
           else setShowPermissionDialog(true);
+        })
+        .catch(() => {
+          setShowPermissionDialog(true);
         });
     } else {
       setShowPermissionDialog(true);
@@ -535,7 +475,7 @@ function InteractiveMap({
           onDeny={() => {
             setShowPermissionDialog(false);
             setLocationError(
-              "Location access not granted. Click on the map to set manually.",
+              "Location access denied. Click on the map to set coordinate manually."
             );
           }}
         />
@@ -543,60 +483,51 @@ function InteractiveMap({
 
       <div className="space-y-3">
         {!readOnly && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={handleCurrentLocationClick}
             disabled={locating}
-            className="w-full h-12 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-semibold text-sm shadow-lg shadow-teal-500/25 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
+            className="w-full h-10 rounded-xl bg-indigo-50/60 hover:bg-indigo-100/80 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 border border-indigo-200/80 font-semibold text-xs gap-2 transition-all active:scale-[0.99] disabled:opacity-50 shadow-2xs"
           >
             {locating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Detecting your location...
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                Detecting GPS Location...
               </>
             ) : (
               <>
-                <LocateFixed className="h-4 w-4" />
-                Use Current Location
+                <LocateFixed className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                Use Current GPS Location
               </>
             )}
-          </button>
+          </Button>
         )}
 
         {locationError && (
-          <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
-            <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-600 font-medium leading-relaxed">
+          <div className="flex items-start gap-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 p-3">
+            <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-700 dark:text-red-300 font-medium leading-relaxed">
               {locationError}
             </p>
           </div>
         )}
 
         {address && (
-          <div className="flex items-start gap-2 rounded-xl bg-teal-50 border border-teal-100 px-3 py-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-teal-700 font-medium leading-relaxed">
+          <div className="flex items-start gap-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 p-2.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium leading-relaxed line-clamp-2">
               {address}
             </p>
           </div>
         )}
 
-        {!readOnly && (
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              or click map
-            </span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
-        )}
-
-        <div className="relative z-0 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+        <div className="relative rounded-2xl overflow-hidden border border-zinc-200/90 dark:border-zinc-800 shadow-2xs bg-slate-100 dark:bg-zinc-800">
           {!readOnly && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-              <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap">
+              <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-semibold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                 <MousePointer2 className="h-3 w-3" />
-                Click on the map to set location
+                Click anywhere on map to set center
               </div>
             </div>
           )}
@@ -605,20 +536,19 @@ function InteractiveMap({
 
           {lat && lng && !isNaN(parseFloat(lat)) && (
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none z-[999]">
-              <div className="bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-mono border border-slate-200 shadow-sm">
+              <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-xl px-2.5 py-1 text-xs text-slate-800 dark:text-zinc-200 font-mono font-bold border border-slate-200 dark:border-zinc-700 shadow-xs">
                 {parseFloat(lat).toFixed(6)}, {parseFloat(lng).toFixed(6)}
               </div>
-              <div className="bg-teal-600/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs text-white font-medium shadow-sm">
-                r = {radius}m
+              <div className="bg-indigo-600/95 text-white backdrop-blur-md rounded-xl px-2.5 py-1 text-xs font-bold font-mono shadow-xs">
+                Radius: {radius}m
               </div>
             </div>
           )}
         </div>
 
         {!readOnly && (
-          <p className="text-[11px] text-slate-400 text-center font-medium">
-            📍 Tap "Use Current Location" or click anywhere on the map to set
-            the geofence center
+          <p className="text-[11px] text-muted-foreground text-center">
+            Tap &quot;Use Current GPS Location&quot; or click on the map to set the geofence center.
           </p>
         )}
       </div>
@@ -626,9 +556,9 @@ function InteractiveMap({
   );
 }
 
-// ─── Time Display ─────────────────────────────────────────────────────────────
+// ─── Schedule Timeline Preview ────────────────────────────────────────────────
 
-function TimeRange({
+function ScheduleTimeline({
   start,
   end,
   halfDay,
@@ -640,94 +570,76 @@ function TimeRange({
   const toMinutes = (t?: string) => {
     if (!t) return 0;
     const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
+    return (h || 0) * 60 + (m || 0);
   };
-  const base = toMinutes("09:00");
-  const total = toMinutes("17:00") - base;
-  const pct = (v: number) =>
-    Math.max(0, Math.min(100, (v / total) * 100)).toFixed(1) + "%";
-  const startMin = toMinutes(start || "09:00") - base;
-  const endMin = toMinutes(end || "17:00") - base;
-  const halfMin = toMinutes(halfDay || "13:00") - base;
+
+  const startMin = toMinutes(start || "09:00");
+  const endMin = toMinutes(end || "17:00");
+  const halfMin = toMinutes(halfDay || "13:00");
+
+  const totalDurationMin = Math.max(0, endMin - startMin);
+  const totalHours = (totalDurationMin / 60).toFixed(1);
+
+  // Proportional progress calculation
+  const halfDayPct =
+    totalDurationMin > 0
+      ? Math.max(0, Math.min(100, ((halfMin - startMin) / totalDurationMin) * 100))
+      : 50;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-        Schedule Preview
-      </p>
-      <div className="relative h-8 bg-slate-200 rounded-full overflow-hidden">
+    <div className="rounded-xl border border-slate-200/90 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-800/40 p-4 space-y-3.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+          <CalendarCheck className="h-3.5 w-3.5 text-indigo-600" /> Schedule Visualizer
+        </span>
+        <Badge variant="outline" className="font-mono text-[11px] bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
+          {totalHours}h Shift Duration
+        </Badge>
+      </div>
+
+      {/* Visual Timeline Bar */}
+      <div className="relative h-4 bg-slate-200 dark:bg-zinc-700 rounded-full overflow-hidden shadow-inner">
         <div
-          className="absolute top-0 bottom-0 bg-teal-500/30 border-x-2 border-teal-500"
-          style={{
-            left: pct(startMin),
-            right: `${100 - parseFloat(pct(endMin))}%`,
-          }}
+          className="absolute inset-y-0 left-0 bg-indigo-500/30 dark:bg-indigo-500/40 rounded-full"
+          style={{ width: "100%" }}
         />
+        {/* Half day threshold line */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-amber-500"
-          style={{ left: pct(halfMin) }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-teal-600 border-2 border-white shadow-md"
-          style={{ left: `calc(${pct(startMin)} - 10px)` }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-teal-600 border-2 border-white shadow-md"
-          style={{ left: `calc(${pct(endMin)} - 10px)` }}
+          className="absolute inset-y-0 w-1 bg-amber-500 shadow-xs z-10 -ml-0.5"
+          style={{ left: `${halfDayPct}%` }}
         />
       </div>
-      <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-teal-500" />
-          Start: {start || "—"}
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
-          Half-day: {halfDay || "—"}
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-teal-500" />
-          End: {end || "—"}
-        </span>
+
+      {/* Legend & Milestone Labels */}
+      <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-zinc-300">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
+          <span>Start: <strong className="font-mono">{start || "09:00"}</strong></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+          <span>Half-Day: <strong className="font-mono text-amber-700 dark:text-amber-400">{halfDay || "13:00"}</strong></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-slate-800 dark:bg-zinc-200 shrink-0" />
+          <span>End: <strong className="font-mono">{end || "17:00"}</strong></span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Info Row (N/A aware) ─────────────────────────────────────────────────────
+// ─── Data View (Read-only view when settings exist) ───────────────────────────
 
-function InfoRow({
-  label,
-  value,
-  icon: Icon,
+function DataView({
+  data,
+  onDelete,
+  onEdit,
 }: {
-  label: string;
-  value?: string | null;
-  icon: any;
+  data: LocationSettingsRecord;
+  onDelete: () => void;
+  onEdit: () => void;
 }) {
-  const displayValue = value && String(value).trim() !== "" ? value : "N/A";
-  const isNA = displayValue === "N/A";
-  return (
-    <div className="flex items-center justify-between rounded-xl px-4 py-3 bg-slate-50 border border-slate-100">
-      <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
-        <Icon className="h-3.5 w-3.5 text-slate-400" />
-        {label}
-      </span>
-      <span
-        className={cn(
-          "text-xs font-semibold font-mono",
-          isNA ? "text-slate-400 italic" : "text-slate-800",
-        )}
-      >
-        {displayValue}
-      </span>
-    </div>
-  );
-}
-
-// ─── Data View (data exists — read-only with delete) ──────────────────────────
-
-function DataView({ data, onDelete }: { data: any; onDelete: () => void }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -738,11 +650,16 @@ function DataView({ data, onDelete }: { data: any; onDelete: () => void }) {
   };
 
   const handleDeleteConfirm = async () => {
+    if (!data.id) {
+      setDeleteError("Missing record ID to delete.");
+      return;
+    }
     setIsDeleting(true);
     setDeleteError(null);
     try {
       await deleteLocationSettings(data.id);
       setShowDeleteDialog(false);
+      toast.success("Attendance zone configuration removed.");
       onDelete();
     } catch (err: any) {
       setDeleteError(err.message || "Failed to delete.");
@@ -764,556 +681,520 @@ function DataView({ data, onDelete }: { data: any; onDelete: () => void }) {
       )}
 
       {deleteError && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5">
-          <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-red-800">Delete Failed</p>
-            <p className="text-xs text-red-700 opacity-80 mt-0.5">
-              {deleteError}
-            </p>
+            <p className="font-bold text-xs text-red-900">Delete Action Failed</p>
+            <p className="text-xs text-red-700 mt-0.5">{deleteError}</p>
           </div>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2 items-start">
-        {/* ── Left: Location + Map ── */}
-        <div className="space-y-5">
-          <Section
-            title="School Location"
-            description="Active geofence center and radius for teacher attendance."
-            icon={MapPin}
-            accent="teal"
-          >
-            <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left: Location & Geofence Card */}
+        <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardHeader className="pb-3 border-b dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-indigo-600" /> Active School Geofence
+              </CardTitle>
+              <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 font-semibold text-[11px] gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Live Enforcing
+              </Badge>
+            </div>
+            <CardDescription className="text-xs">
+              Registered GPS center and allowed radius used for teacher attendance validation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                  <Navigation className="h-3 w-3 text-indigo-600" /> Latitude
+                </span>
+                <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                  {data.latitude || "N/A"}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                  <Navigation className="h-3 w-3 text-indigo-600" /> Longitude
+                </span>
+                <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                  {data.longitude || "N/A"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between text-xs">
+              <span className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                <Shield className="h-4 w-4 text-indigo-600" /> Allowed Radius
+              </span>
+              <span className="font-mono font-extrabold text-sm text-indigo-700 dark:text-indigo-300">
+                {data.radius ? `${data.radius} meters` : "N/A"}
+              </span>
+            </div>
+
+            {/* Read-Only Map */}
+            {data.latitude && data.longitude && !isNaN(parseFloat(String(data.latitude))) ? (
+              <InteractiveMap
+                lat={String(data.latitude)}
+                lng={String(data.longitude)}
+                radius={String(data.radius || "100")}
+                onLocationSelect={() => {}}
+                readOnly
+              />
+            ) : (
+              <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/40 h-44 flex flex-col items-center justify-center gap-2 text-slate-400">
+                <MapPin className="h-8 w-8 text-slate-300" />
+                <p className="text-xs font-medium">No coordinates set</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: Working Hours & Management */}
+        <div className="space-y-6">
+          <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+            <CardHeader className="pb-3 border-b dark:border-zinc-800">
+              <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-indigo-600" /> Operating Schedule
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Attendance timestamps falling beyond these boundaries determine late arrivals and half-day penalties.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Latitude", value: data.latitude, icon: Navigation },
-                  {
-                    label: "Longitude",
-                    value: data.longitude,
-                    icon: Navigation,
-                  },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div
-                    key={label}
-                    className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1"
-                  >
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      <Icon className="h-3 w-3" />
-                      {label}
-                    </span>
-                    <p
-                      className={cn(
-                        "text-sm font-bold font-mono",
-                        !value || String(value).trim() === ""
-                          ? "text-slate-400 italic"
-                          : "text-slate-800",
-                      )}
-                    >
-                      {value && String(value).trim() !== "" ? value : "N/A"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-xl bg-teal-50 border border-teal-100 px-4 py-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-semibold text-teal-700">
-                  <Shield className="h-4 w-4 text-teal-500" />
-                  Allowed Radius
-                </span>
-                <span
-                  className={cn(
-                    "text-sm font-bold font-mono",
-                    !data.radius || String(data.radius).trim() === ""
-                      ? "text-slate-400 italic"
-                      : "text-teal-800",
-                  )}
-                >
-                  {data.radius && String(data.radius).trim() !== ""
-                    ? `${data.radius} meters`
-                    : "N/A"}
-                </span>
-              </div>
-
-              {/* Map — only render if valid coords */}
-              {data.latitude &&
-                data.longitude &&
-                !isNaN(parseFloat(data.latitude)) ? (
-                <InteractiveMap
-                  lat={data.latitude}
-                  lng={data.longitude}
-                  radius={data.radius || "100"}
-                  onLocationSelect={() => { }}
-                  readOnly
-                />
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 h-40 flex flex-col items-center justify-center gap-2 text-slate-400">
-                  <MapPin className="h-8 w-8" />
-                  <p className="text-xs font-medium">
-                    No coordinates — map unavailable
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <Sunrise className="h-3 w-3 text-indigo-600" /> Start Time
+                  </span>
+                  <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                    {fmt(data.start_time)}
                   </p>
                 </div>
-              )}
-            </div>
-          </Section>
-        </div>
 
-        {/* ── Right: Schedule + Full Record + Actions ── */}
-        <div className="space-y-5">
-          <Section
-            title="Working Hours"
-            description="Schedule applied to teacher attendance calculation."
-            icon={Clock}
-            accent="slate"
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    label: "Start Time",
-                    value: fmt(data.start_time),
-                    icon: Sunrise,
-                  },
-                  {
-                    label: "End Time",
-                    value: fmt(data.end_time),
-                    icon: Sunset,
-                  },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div
-                    key={label}
-                    className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1"
-                  >
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      <Icon className="h-3 w-3" />
-                      {label}
-                    </span>
-                    <p
-                      className={cn(
-                        "text-sm font-bold font-mono",
-                        value === "N/A"
-                          ? "text-slate-400 italic"
-                          : "text-slate-800",
-                      )}
-                    >
-                      {value}
-                    </p>
-                  </div>
-                ))}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <Sunset className="h-3 w-3 text-indigo-600" /> End Time
+                  </span>
+                  <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                    {fmt(data.end_time)}
+                  </p>
+                </div>
               </div>
 
-              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-semibold text-amber-700">
-                  <AlarmClock className="h-4 w-4 text-amber-500" />
-                  Half-Day Cutoff
+              <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <AlarmClock className="h-4 w-4 text-amber-600" /> Half-Day Cutoff
                 </span>
-                <span
-                  className={cn(
-                    "text-sm font-bold font-mono",
-                    fmt(data.half_day_time) === "N/A"
-                      ? "text-slate-400 italic"
-                      : "text-amber-800",
-                  )}
-                >
+                <span className="font-mono font-extrabold text-sm text-amber-800 dark:text-amber-300">
                   {fmt(data.half_day_time)}
                 </span>
               </div>
 
               {data.start_time && data.end_time && (
-                <TimeRange
-                  start={
-                    fmt(data.start_time) !== "N/A"
-                      ? fmt(data.start_time)
-                      : undefined
-                  }
-                  end={
-                    fmt(data.end_time) !== "N/A"
-                      ? fmt(data.end_time)
-                      : undefined
-                  }
-                  halfDay={
-                    fmt(data.half_day_time) !== "N/A"
-                      ? fmt(data.half_day_time)
-                      : undefined
-                  }
+                <ScheduleTimeline
+                  start={fmt(data.start_time)}
+                  end={fmt(data.end_time)}
+                  halfDay={fmt(data.half_day_time)}
                 />
               )}
-            </div>
-          </Section>
+            </CardContent>
+          </Card>
 
-          {/* Complete record */}
-          <Section
-            title="Complete Record"
-            description="All stored fields for this configuration."
-            icon={Info}
-            accent="violet"
-          >
-            <div className="space-y-2">
-              <InfoRow
-                label="Latitude"
-                value={data.latitude}
-                icon={Navigation}
-              />
-              <InfoRow
-                label="Longitude"
-                value={data.longitude}
-                icon={Navigation}
-              />
-              <InfoRow
-                label="Radius"
-                value={data.radius ? `${data.radius} meters` : null}
-                icon={Shield}
-              />
-              <InfoRow
-                label="Start Time"
-                value={data.start_time?.slice(0, 5)}
-                icon={Sunrise}
-              />
-              <InfoRow
-                label="End Time"
-                value={data.end_time?.slice(0, 5)}
-                icon={Sunset}
-              />
-              <InfoRow
-                label="Half-Day Cutoff"
-                value={data.half_day_time?.slice(0, 5)}
-                icon={AlarmClock}
-              />
-            </div>
-          </Section>
+          {/* Action Footer Card */}
+          <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">
+                  Manage Attendance Policy
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Update geofence radius or adjust shift cutoffs anytime.
+                </p>
+              </div>
 
-          {/* Action buttons */}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowDeleteDialog(true)}
-              className="flex-1 h-14 text-base rounded-2xl font-semibold border-2 border-rose-400 text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center gap-3"
-            >
-              <Trash2 className="h-5 w-5" />
-              Delete Record
-            </button>
-          </div>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <Button
+                  onClick={onEdit}
+                  className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold h-9 px-4 gap-1.5 shadow-sm"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Edit Configuration
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="flex-1 sm:flex-initial rounded-xl text-xs font-semibold h-9 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 dark:border-red-900/50 gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </>
   );
 }
 
-// ─── Insert / Edit Form ───────────────────────────────────────────────────────
+// ─── Location Settings Form ───────────────────────────────────────────────────
 
 function LocationForm({
   initialData,
   onSaved,
+  onCancel,
 }: {
-  initialData?: any;
+  initialData?: LocationSettingsRecord | null;
   onSaved: (data: any) => void;
+  onCancel?: () => void;
 }) {
   const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    latitude: initialData?.latitude || "",
-    longitude: initialData?.longitude || "",
-    radius: initialData?.radius || "100",
+    latitude: initialData?.latitude ? String(initialData.latitude) : "23.022505",
+    longitude: initialData?.longitude ? String(initialData.longitude) : "72.571362",
+    radius: initialData?.radius ? String(initialData.radius) : "100",
     start_time: initialData?.start_time || "09:00:00",
     end_time: initialData?.end_time || "17:00:00",
     half_day_time: initialData?.half_day_time || "13:00:00",
   });
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const setVal = (key: string, val: string) =>
+    setForm((f) => ({ ...f, [key]: val }));
+
   const toTimeInput = (t?: string) => t?.slice(0, 5) || "";
-  const toTimeVal = (t?: string) => (t?.length === 5 ? t + ":00" : t);
+  const toTimeVal = (t?: string) => (t?.length === 5 ? t + ":00" : t || "");
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!form.latitude || !form.longitude) {
+      toast.error("Please set valid GPS latitude and longitude coordinates.");
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
-    setSaved(false);
     try {
       await saveLocationSettings(form);
-      setSaved(true);
-      setTimeout(() => {
-        setSaved(false);
-        onSaved(form);
-      }, 1500);
+      toast.success("Attendance zone settings saved successfully!");
+      onSaved(form);
     } catch (err: any) {
-      setError(err.message || "Failed to save settings");
+      const msg = err.message || "Failed to save location settings.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSave}>
-      {/* Cancel bar when editing */}
-
+    <form onSubmit={handleSave} className="space-y-6">
       {error && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5">
-          <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/40 dark:border-red-900/60 p-4">
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-red-800">Error</p>
-            <p className="text-xs text-red-700 opacity-80 mt-0.5">{error}</p>
-          </div>
-        </div>
-      )}
-      {saved && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-sm text-emerald-800">Settings Saved</p>
-            <p className="text-xs text-emerald-700 opacity-80 mt-0.5">
-              Location zone and schedule are now active for all teachers.
-            </p>
+            <p className="font-bold text-xs text-red-900 dark:text-red-200">Save Failed</p>
+            <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2 items-start">
-        {/* Left column */}
-        <div className="space-y-5">
-          <Section
-            title="School Location"
-            description="Use your current GPS location or click the map to set the attendance zone center."
-            icon={MapPin}
-            accent="teal"
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Latitude" icon={Navigation} hint="e.g. 23.022505">
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    placeholder="23.022505"
-                    value={form.latitude}
-                    onChange={set("latitude")}
-                    required
-                  />
-                </Field>
-                <Field
-                  label="Longitude"
-                  icon={Navigation}
-                  hint="e.g. 72.571362"
-                >
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    placeholder="72.571362"
-                    value={form.longitude}
-                    onChange={set("longitude")}
-                    required
-                  />
-                </Field>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left Column: Location & Geofence Coordinates */}
+        <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardHeader className="pb-3 border-b dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-indigo-600" /> Step 1: School Geofence Center
+              </CardTitle>
+              <Badge variant="outline" className="font-mono text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200">
+                GPS Center
+              </Badge>
+            </div>
+            <CardDescription className="text-xs">
+              Position the attendance zone center by clicking on the map or using your device GPS.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-4">
+            {/* Coordinate Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <Navigation className="h-3.5 w-3.5 text-indigo-600" /> Latitude:
+                </label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  placeholder="23.022505"
+                  value={form.latitude}
+                  onChange={(e) => setVal("latitude", e.target.value)}
+                  className="h-10 text-xs font-mono font-bold rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">e.g. 23.022505</p>
               </div>
 
-              <Field
-                label="Allowed Radius"
-                icon={Shield}
-                hint="Teachers must be within this radius (in meters) to mark attendance"
-              >
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min="10"
-                    max="5000"
-                    step="10"
-                    placeholder="100"
-                    value={form.radius}
-                    onChange={set("radius")}
-                    className="flex-1"
-                    required
-                  />
-                  <span className="text-sm font-semibold text-slate-500 shrink-0">
-                    meters
-                  </span>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <Navigation className="h-3.5 w-3.5 text-indigo-600" /> Longitude:
+                </label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  placeholder="72.571362"
+                  value={form.longitude}
+                  onChange={(e) => setVal("longitude", e.target.value)}
+                  className="h-10 text-xs font-mono font-bold rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">e.g. 72.571362</p>
+              </div>
+            </div>
+
+            {/* Allowed Radius */}
+            <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5 text-indigo-600" /> Allowed Radius (Meters):
+                </label>
+                <span className="font-mono text-xs font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded-md border border-indigo-200/60 dark:border-indigo-900">
+                  {form.radius} meters
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min="10"
+                  max="5000"
+                  step="10"
+                  value={form.radius}
+                  onChange={(e) => setVal("radius", e.target.value)}
+                  className="h-9 w-28 text-xs font-mono font-bold rounded-lg text-center bg-white dark:bg-zinc-900"
+                  required
+                />
                 <input
                   type="range"
                   min="10"
                   max="1000"
                   step="10"
                   value={form.radius}
-                  onChange={set("radius")}
-                  className="w-full mt-2 accent-teal-500"
+                  onChange={(e) => setVal("radius", e.target.value)}
+                  className="flex-1 accent-indigo-600 cursor-pointer h-2 bg-slate-200 dark:bg-zinc-700 rounded-lg"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                  <span>10m</span>
-                  <span>500m</span>
-                  <span>1000m</span>
-                </div>
-              </Field>
+              </div>
 
-              <InteractiveMap
-                lat={form.latitude}
-                lng={form.longitude}
-                radius={form.radius}
-                onLocationSelect={(latVal, lngVal) =>
-                  setForm((f) => ({
-                    ...f,
-                    latitude: latVal,
-                    longitude: lngVal,
-                  }))
-                }
-              />
+              {/* Quick Preset Chips */}
+              <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                <span className="text-[10px] font-semibold text-muted-foreground mr-1">Presets:</span>
+                {RADIUS_PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setVal("radius", String(m))}
+                    className={cn(
+                      "text-[11px] font-mono px-2 py-0.5 rounded-md border transition-all cursor-pointer",
+                      String(form.radius) === String(m)
+                        ? "bg-indigo-600 text-white border-indigo-600 font-bold shadow-2xs"
+                        : "bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:border-indigo-300"
+                    )}
+                  >
+                    {m}m
+                  </button>
+                ))}
+              </div>
             </div>
-          </Section>
-        </div>
 
-        {/* Right column */}
-        <div className="space-y-5">
-          <Section
-            title="Working Hours"
-            description="Define the daily schedule used for attendance calculation."
-            icon={Clock}
-            accent="slate"
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field
-                  label="Start Time"
-                  icon={Sunrise}
-                  hint="School opening time"
-                >
+            {/* Interactive Map */}
+            <InteractiveMap
+              lat={form.latitude}
+              lng={form.longitude}
+              radius={form.radius}
+              onLocationSelect={(latVal, lngVal) => {
+                setVal("latitude", latVal);
+                setVal("longitude", lngVal);
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Right Column: Working Hours & Summary */}
+        <div className="space-y-6">
+          {/* Card: Working Hours */}
+          <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+            <CardHeader className="pb-3 border-b dark:border-zinc-800">
+              <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-indigo-600" /> Step 2: Working Hours & Schedule
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Configure official school shift hours and cutoff threshold for half-day status.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <Sunrise className="h-3.5 w-3.5 text-indigo-600" /> Start Time:
+                  </label>
                   <Input
                     type="time"
                     value={toTimeInput(form.start_time)}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        start_time: toTimeVal(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => setVal("start_time", toTimeVal(e.target.value))}
+                    className="h-10 text-xs font-mono font-medium rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
                     required
                   />
-                </Field>
-                <Field
-                  label="End Time"
-                  icon={Sunset}
-                  hint="School closing time"
-                >
+                  <p className="text-[11px] text-muted-foreground">School opening hour</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <Sunset className="h-3.5 w-3.5 text-indigo-600" /> End Time:
+                  </label>
                   <Input
                     type="time"
                     value={toTimeInput(form.end_time)}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        end_time: toTimeVal(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => setVal("end_time", toTimeVal(e.target.value))}
+                    className="h-10 text-xs font-mono font-medium rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
                     required
                   />
-                </Field>
+                  <p className="text-[11px] text-muted-foreground">School closing hour</p>
+                </div>
               </div>
-              <Field
-                label="Half-Day Cutoff"
-                icon={AlarmClock}
-                hint="Teachers arriving after this time are marked as half-day"
-              >
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <AlarmClock className="h-3.5 w-3.5 text-amber-600" /> Half-Day Cutoff Threshold:
+                </label>
                 <Input
                   type="time"
                   value={toTimeInput(form.half_day_time)}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      half_day_time: toTimeVal(e.target.value),
-                    }))
-                  }
+                  onChange={(e) => setVal("half_day_time", toTimeVal(e.target.value))}
+                  className="h-10 text-xs font-mono font-medium rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
                   required
                 />
-              </Field>
-              <TimeRange
+                <p className="text-[11px] text-muted-foreground">
+                  Teachers punching in after this cutoff are logged as half-day.
+                </p>
+              </div>
+
+              <ScheduleTimeline
                 start={toTimeInput(form.start_time)}
                 end={toTimeInput(form.end_time)}
                 halfDay={toTimeInput(form.half_day_time)}
               />
-            </div>
-          </Section>
+            </CardContent>
+          </Card>
 
-          <Section
-            title="Configuration Preview"
-            description="Settings to be saved."
-            icon={CheckCircle2}
-            accent="violet"
-          >
-            <div className="space-y-2">
-              {[
-                {
-                  label: "Latitude",
-                  value: form.latitude || "—",
-                  icon: Navigation,
-                },
-                {
-                  label: "Longitude",
-                  value: form.longitude || "—",
-                  icon: Navigation,
-                },
-                {
-                  label: "Radius",
-                  value: form.radius ? `${form.radius} meters` : "—",
-                  icon: Shield,
-                },
-                {
-                  label: "Work Hours",
-                  value:
-                    form.start_time && form.end_time
-                      ? `${toTimeInput(form.start_time)} – ${toTimeInput(form.end_time)}`
-                      : "—",
-                  icon: Clock,
-                },
-                {
-                  label: "Half-Day After",
-                  value: toTimeInput(form.half_day_time) || "—",
-                  icon: AlarmClock,
-                },
-              ].map(({ label, value, icon: Icon }) => (
-                <div
-                  key={label}
-                  className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-slate-50 border border-slate-100"
+          {/* Card: Configuration Overview & Submission */}
+          <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+            <CardHeader className="pb-3 border-b dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-indigo-600" /> Configuration Preview
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200">
+                  Ready to Apply
+                </Badge>
+              </div>
+              <CardDescription className="text-xs">
+                Summary of active values that will be committed to the backend.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                {[
+                  {
+                    label: "Coordinates",
+                    value: `${form.latitude || "—"}, ${form.longitude || "—"}`,
+                    icon: Navigation,
+                  },
+                  {
+                    label: "Allowed Radius",
+                    value: form.radius ? `${form.radius} meters` : "—",
+                    icon: Shield,
+                  },
+                  {
+                    label: "Operating Shift",
+                    value:
+                      form.start_time && form.end_time
+                        ? `${toTimeInput(form.start_time)} – ${toTimeInput(form.end_time)}`
+                        : "—",
+                    icon: Clock,
+                  },
+                  {
+                    label: "Half-Day After",
+                    value: toTimeInput(form.half_day_time) || "—",
+                    icon: AlarmClock,
+                  },
+                ].map(({ label, value, icon: Icon }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 text-xs"
+                  >
+                    <span className="flex items-center gap-2 font-medium text-slate-500 dark:text-zinc-400">
+                      <Icon className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                      {label}
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-zinc-100">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center gap-2.5">
+                {onCancel && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isSaving}
+                    className="rounded-xl text-xs font-semibold h-10 px-4"
+                  >
+                    Cancel
+                  </Button>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm gap-2 transition-all active:scale-[0.99] disabled:opacity-50"
                 >
-                  <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                    <Icon className="h-3.5 w-3.5 text-slate-400" />
-                    {label}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-800 font-mono">
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="w-full h-14 text-base rounded-2xl font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xl shadow-teal-500/20 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Saving Settings...
-              </>
-            ) : (
-              <>
-                <Save className="h-5 w-5" />
-                {"Save Attendance Zone"}
-              </>
-            )}
-          </button>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving Attendance Zone...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Attendance Zone
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </form>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function LocationSettingsPage() {
-  // "loading" | "view" | "empty" | "form"
-  const [pageState, setPageState] = useState<
-    "loading" | "view" | "empty" | "form"
-  >("loading");
-  const [existingData, setExistingData] = useState<any>(null);
+  const [pageState, setPageState] = useState<"loading" | "view" | "empty" | "form">("loading");
+  const [existingData, setExistingData] = useState<LocationSettingsRecord | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -1339,7 +1220,7 @@ export default function LocationSettingsPage() {
         setExistingData(null);
         setPageState("empty");
       } else {
-        setFetchError(err.message || "Failed to load settings.");
+        setFetchError(err.message || "Failed to load location settings.");
         setExistingData(null);
         setPageState("empty");
       }
@@ -1351,53 +1232,84 @@ export default function LocationSettingsPage() {
   }, []);
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6 bg-white min-h-screen">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-teal-500/10 flex items-center justify-center text-teal-600 shadow-sm border border-teal-500/20">
-          <Radar className="h-6 w-6" />
-        </div>
+    <div className="space-y-6 pb-12">
+      {/* Top Header Card */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-            Attendance Zone Settings
-          </h2>
-          <p className="text-sm font-medium text-slate-500 mt-1">
-            Configure geofence boundaries and working hours for teacher
-            attendance.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <LocateFixed className="h-6 w-6 text-indigo-600" />
+              Attendance Zone Settings
+            </h1>
+            <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200">
+              Clerk Portal
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Configure geofence boundaries and working hours for automated teacher attendance verification.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          {pageState === "view" && (
+            <Button
+              size="sm"
+              onClick={() => setPageState("form")}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold gap-1.5 h-9 px-4 shadow-sm"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              Edit Settings
+            </Button>
+          )}
+
+          {pageState === "form" && existingData && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPageState("view")}
+              className="rounded-xl text-xs gap-1.5 h-9"
+            >
+              Cancel Edit
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadData}
+            disabled={pageState === "loading"}
+            className="rounded-xl text-xs gap-1.5 h-9"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${pageState === "loading" ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      <div className="h-px bg-slate-100" />
-
-      {/* Fetch error banner */}
+      {/* Fetch Error Warning */}
       {fetchError && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
-          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-sm text-amber-800">
-              Could not load existing settings
-            </p>
-            <p className="text-xs text-amber-700 opacity-80 mt-0.5">
-              {fetchError} — You can still configure and save below.
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900/60 p-4">
+          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold text-xs text-amber-900 dark:text-amber-200">Notice</p>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              {fetchError} — You can still configure and save new settings below.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Loading ── */}
+      {/* ── State 1: Loading ── */}
       {pageState === "loading" && (
-        <div className="flex items-center justify-center py-24">
-          <div className="flex flex-col items-center gap-4 text-slate-500">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
-            <p className="text-sm font-medium">
-              Loading attendance zone settings...
-            </p>
+        <div className="flex items-center justify-center py-24 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+          <div className="flex flex-col items-center gap-3 text-slate-500">
+            <Loader2 className="h-7 w-7 animate-spin text-indigo-600" />
+            <p className="text-xs font-medium">Loading attendance zone settings...</p>
           </div>
         </div>
       )}
 
-      {/* ── Data exists ── */}
+      {/* ── State 2: Active Config Exists (View Mode) ── */}
       {pageState === "view" && existingData && (
         <DataView
           data={existingData}
@@ -1405,62 +1317,36 @@ export default function LocationSettingsPage() {
             setExistingData(null);
             setPageState("empty");
           }}
+          onEdit={() => setPageState("form")}
         />
       )}
 
-      {/* ── No data: empty state ── */}
+      {/* ── State 3: Empty State ── */}
       {pageState === "empty" && (
-        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-16 flex flex-col items-center gap-6 text-center px-6">
-          <div className="h-20 w-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center">
-            <MapPin className="h-10 w-10 text-slate-400" />
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-16 flex flex-col items-center gap-5 text-center px-6 shadow-2xs">
+          <div className="h-16 w-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600">
+            <MapPin className="h-8 w-8" />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold text-slate-700">
+          <div className="space-y-1.5 max-w-md">
+            <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100">
               No Attendance Zone Configured
             </h3>
-            <p className="text-sm text-slate-500 max-w-md leading-relaxed">
-              No location settings found. Configure the geofence center, allowed
-              radius, and working hours so teachers can mark attendance.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Define the school GPS coordinates, allowed geofence perimeter radius, and daily working hours so teachers can verify attendance.
             </p>
           </div>
 
-          {/* N/A summary grid */}
-          <div className="w-full max-w-md grid grid-cols-2 gap-2 text-left">
-            {[
-              { label: "Latitude", icon: Navigation },
-              { label: "Longitude", icon: Navigation },
-              { label: "Radius", icon: Shield },
-              { label: "Start Time", icon: Sunrise },
-              { label: "End Time", icon: Sunset },
-              { label: "Half-Day Cutoff", icon: AlarmClock },
-            ].map(({ label, icon: Icon }) => (
-              <div
-                key={label}
-                className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-white border border-slate-200"
-              >
-                <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                  <Icon className="h-3 w-3 text-slate-400" />
-                  {label}
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400 italic font-mono">
-                  N/A
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
+          <Button
             onClick={() => setPageState("form")}
-            className="h-12 px-8 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-semibold text-sm shadow-lg shadow-teal-500/25 transition-all active:scale-[0.98] flex items-center gap-2.5"
+            className="h-10 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm gap-2 mt-2"
           >
-            <Save className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
             Configure Attendance Zone
-          </button>
+          </Button>
         </div>
       )}
 
-      {/* ── Form (insert or edit) ── */}
+      {/* ── State 4: Form (Create or Edit) ── */}
       {pageState === "form" && (
         <LocationForm
           initialData={existingData}
@@ -1468,6 +1354,7 @@ export default function LocationSettingsPage() {
             setExistingData(savedData);
             setPageState("view");
           }}
+          onCancel={existingData ? () => setPageState("view") : undefined}
         />
       )}
     </div>

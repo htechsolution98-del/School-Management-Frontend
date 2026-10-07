@@ -7,6 +7,11 @@ import {
   RefreshCw,
   AlertCircle,
   Trash2,
+  Pencil,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,12 +19,14 @@ import {
   getClasses,
   getDivisions,
   saveDivision,
+  updateDivision,
   deleteDivision,
 } from "@/lib/clerk";
 import type { Division, SchoolClass } from "@/types/clerk";
 import { SCHOOL_CLASS_OPTIONS } from "@/lib/form-builder-config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -38,6 +45,14 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,7 +60,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 
 export default function DivisionsPage() {
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -54,12 +68,71 @@ export default function DivisionsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Division | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editTarget, setEditTarget] = useState<Division | null>(null);
+  const [editCapacity, setEditCapacity] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [divisionName, setDivisionName] = useState("");
   const [capacity, setCapacity] = useState("");
+
+  // Table Filter & Pagination State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterClassId, setFilterClassId] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const getClassLabel = (
+    classId: number | null | undefined,
+    classes: SchoolClass[] = schoolClasses
+  ) => {
+    if (classId === null || classId === undefined) return "Unknown";
+    const cls = classes.find((c) => c.id === classId);
+    if (!cls) return `Class #${classId}`;
+    return (
+      SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label ||
+      cls.school_class
+    );
+  };
+
+  const getDivisionClassName = (
+    div: Division,
+    classes: SchoolClass[] = schoolClasses
+  ) => {
+    if (div.class_name) return div.class_name;
+    return getClassLabel(div.SchoolClass, classes);
+  };
+
+  // Two-Level Table Sorting logic
+  // Primary Sort: Group by Class Name (alphabetical / alphanumeric)
+  // Secondary Sort: Within the same Class, sort alphabetically by Division Name (A, B, C, etc.)
+  const sortDivisionsList = (
+    items: Division[],
+    classes: SchoolClass[] = schoolClasses
+  ) => {
+    return [...items].sort((a, b) => {
+      const classA = getDivisionClassName(a, classes);
+      const classB = getDivisionClassName(b, classes);
+
+      const classComp = classA.localeCompare(classB, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+
+      if (classComp !== 0) {
+        return classComp;
+      }
+
+      const divA = (a.division ?? "").trim();
+      const divB = (b.division ?? "").trim();
+      return divA.localeCompare(divB, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -69,40 +142,23 @@ export default function DivisionsPage() {
         getClasses(),
         getDivisions(),
       ]);
-      const sortedClasses = classesData.sort((a, b) => {
+
+      const sortedClasses = [...classesData].sort((a, b) => {
         const indexA = SCHOOL_CLASS_OPTIONS.findIndex(
-          (opt) => opt.value === a.school_class,
+          (opt) => opt.value === a.school_class
         );
         const indexB = SCHOOL_CLASS_OPTIONS.findIndex(
-          (opt) => opt.value === b.school_class,
+          (opt) => opt.value === b.school_class
         );
-        return indexA - indexB;
-      });
-      setSchoolClasses(sortedClasses);
-
-      const sortedDivisions = divisionsData.sort((a, b) => {
-        const classA = classesData.find((c) => c.id === a.SchoolClass);
-        const classB = classesData.find((c) => c.id === b.SchoolClass);
-
-        const indexA = classA
-          ? SCHOOL_CLASS_OPTIONS.findIndex(
-              (opt) => opt.value === classA.school_class,
-            )
-          : 999;
-        const indexB = classB
-          ? SCHOOL_CLASS_OPTIONS.findIndex(
-              (opt) => opt.value === classB.school_class,
-            )
-          : 999;
-
-        if (indexA !== indexB) return indexA - indexB;
-
-        // Same class, sort by division name (A, B, C or 1, 2, 3)
-        return a.division.localeCompare(b.division, undefined, {
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        return a.school_class.localeCompare(b.school_class, undefined, {
           numeric: true,
         });
       });
+      setSchoolClasses(sortedClasses);
 
+      // Pre-sort divisions state before setting
+      const sortedDivisions = sortDivisionsList(divisionsData, sortedClasses);
       setDivisions(sortedDivisions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -124,17 +180,14 @@ export default function DivisionsPage() {
       return;
     }
 
-    const isPositiveInteger = (val: string) => {
-      const num = parseInt(val);
-      return !isNaN(num) && num > 0 && Number.isInteger(parseFloat(val));
-    };
-
-    if (!isPositiveInteger(divisionName)) {
-      toast.error("Division must be a positive integer");
+    const trimmedDivision = divisionName.trim();
+    if (!trimmedDivision) {
+      toast.error("Please enter a division name");
       return;
     }
 
-    if (!isPositiveInteger(capacity)) {
+    const numCapacity = parseInt(capacity, 10);
+    if (isNaN(numCapacity) || numCapacity <= 0 || !Number.isInteger(parseFloat(capacity))) {
       toast.error("Capacity must be a positive integer");
       return;
     }
@@ -143,8 +196,8 @@ export default function DivisionsPage() {
     try {
       const payload: Division = {
         SchoolClass: parseInt(selectedClassId),
-        division: divisionName,
-        capacity: parseInt(capacity),
+        division: trimmedDivision,
+        capacity: numCapacity,
       };
 
       await saveDivision(payload);
@@ -158,7 +211,7 @@ export default function DivisionsPage() {
       await fetchData();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create division",
+        err instanceof Error ? err.message : "Failed to create division"
       );
     } finally {
       setIsSaving(false);
@@ -176,68 +229,106 @@ export default function DivisionsPage() {
       await fetchData();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to delete division",
+        err instanceof Error ? err.message : "Failed to delete division"
       );
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const getClassLabel = (classId: number | null) => {
-    if (classId === null) return "Unknown";
-    const cls = schoolClasses.find((c) => c.id === classId);
-    if (!cls) return `Class #${classId}`;
-    return (
-      SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label ||
-      cls.school_class
+  const handleOpenEdit = (div: Division) => {
+    setEditTarget(div);
+    setEditCapacity(
+      div.capacity !== undefined && div.capacity !== null
+        ? String(div.capacity)
+        : ""
     );
   };
 
-  const divisionColumns = useMemo<DataTableColumn<Division>[]>(
-    () => [
-      {
-        key: "class",
-        header: "School Class",
-        sticky: true,
-        headClassName: "bg-slate-50",
-        cellClassName: "whitespace-nowrap font-medium text-slate-700",
-        search: div => [getClassLabel(div.SchoolClass)],
-        render: div => getClassLabel(div.SchoolClass),
-      },
-      {
-        key: "division",
-        header: "Division",
-        search: div => [div.division],
-        render: div => (
-          <span className="font-semibold text-slate-900">{div.division}</span>
-        ),
-      },
-      {
-        key: "capacity",
-        header: "Student Capacity",
-        align: "right",
-        numeric: true,
-        search: div => [div.capacity],
-        render: div => (
-          <span className="text-slate-600">{div.capacity ?? "—"}</span>
-        ),
-      },
-    ],
-    [schoolClasses],
-  );
+  const handleUpdateCapacity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTarget?.id) return;
+
+    const num = parseInt(editCapacity, 10);
+    if (isNaN(num) || num <= 0 || !Number.isInteger(parseFloat(editCapacity))) {
+      toast.error("Capacity must be a positive integer");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await updateDivision(editTarget.id, {
+        capacity: num,
+        SchoolClass: editTarget.SchoolClass,
+        division: editTarget.division,
+      });
+      toast.success(
+        `Capacity for Division ${editTarget.division} updated successfully`
+      );
+      setEditTarget(null);
+      await fetchData();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update division capacity"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Ensure divisions are sorted before rendering
+  const sortedDivisions = useMemo(() => {
+    return sortDivisionsList(divisions, schoolClasses);
+  }, [divisions, schoolClasses]);
+
+  // Filtered divisions by search and class selection
+  const filteredDivisions = useMemo(() => {
+    return sortedDivisions.filter((div) => {
+      const className = getDivisionClassName(div);
+      const matchesClass =
+        filterClassId === "all" || String(div.SchoolClass) === filterClassId;
+      if (!matchesClass) return false;
+
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase().trim();
+      const divLabel = (div.division ?? "").toLowerCase();
+      const classLabel = className.toLowerCase();
+      const capLabel = String(div.capacity ?? "");
+
+      return (
+        classLabel.includes(query) ||
+        divLabel.includes(query) ||
+        capLabel.includes(query)
+      );
+    });
+  }, [sortedDivisions, filterClassId, searchQuery, schoolClasses]);
+
+  // Pagination calculation
+  const totalItems = filteredDivisions.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedDivisions = filteredDivisions.slice(startIndex, endIndex);
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-white min-h-screen overflow-x-hidden">
+    <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-slate-50/50 min-h-screen overflow-x-hidden">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 leading-tight">
             Division Management
           </h2>
-          <p className="text-muted-foreground mt-1">
-            Define and manage divisions for each school class.
+          <p className="text-sm text-muted-foreground mt-1">
+            Define, group, and manage section capacities across school classes.
           </p>
         </div>
-        <Button variant="outline" onClick={fetchData} disabled={isLoading}>
+        <Button
+          variant="outline"
+          onClick={fetchData}
+          disabled={isLoading}
+          className="rounded-xl shadow-xs"
+        >
           <RefreshCw
             className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")}
           />
@@ -248,7 +339,7 @@ export default function DivisionsPage() {
       <Separator />
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="rounded-xl">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -256,41 +347,43 @@ export default function DivisionsPage() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6 items-start">
-        {/* Creation Form */}
+        {/* Left Form Panel: Add New Division */}
         <div className="xl:col-span-4">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Plus className="h-5 w-5 text-primary" />
+          <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="p-5 sm:p-6 pb-4">
+              <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-900">
+                <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Plus className="h-4 w-4" />
+                </div>
                 Add New Division
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs text-slate-500 mt-1">
                 Create a new section for an existing class.
               </CardDescription>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-              <form onSubmit={handleAddDivision} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Class
+            <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0">
+              <form onSubmit={handleAddDivision} className="space-y-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    School Class
                   </label>
                   <Select
                     value={selectedClassId}
                     onValueChange={(val) => setSelectedClassId(val || "")}
                     disabled={isLoading || schoolClasses.length === 0}
                   >
-                    <SelectTrigger className="w-full bg-slate-50 border-slate-200">
+                    <SelectTrigger className="w-full h-10 bg-slate-50/70 border-slate-200 text-sm rounded-xl focus:bg-white transition-colors">
                       <SelectValue placeholder="Select a class">
                         {selectedClassId
                           ? getClassLabel(parseInt(selectedClassId))
                           : undefined}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-xl">
                       {schoolClasses.map((cls) => (
                         <SelectItem key={cls.id} value={cls.id.toString()}>
                           {SCHOOL_CLASS_OPTIONS.find(
-                            (o) => o.value === cls.school_class,
+                            (o) => o.value === cls.school_class
                           )?.label || cls.school_class}
                         </SelectItem>
                       ))}
@@ -298,39 +391,37 @@ export default function DivisionsPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    No. of Division
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Division Name / Section
                   </label>
                   <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="e.g. 1, 2, 3..."
+                    type="text"
+                    placeholder="e.g. A, B, C or 1, 2, 3"
                     value={divisionName}
                     onChange={(e) => setDivisionName(e.target.value)}
-                    className="bg-slate-50 border-slate-200"
+                    className="h-10 bg-slate-50/70 border-slate-200 text-sm rounded-xl focus:bg-white transition-colors"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
                     Student Capacity
                   </label>
                   <Input
                     type="number"
                     min="1"
                     step="1"
-                    placeholder="Max students"
+                    placeholder="e.g. 40"
                     value={capacity}
                     onChange={(e) => setCapacity(e.target.value)}
-                    className="bg-slate-50 border-slate-200"
+                    className="h-10 bg-slate-50/70 border-slate-200 text-sm rounded-xl focus:bg-white transition-colors"
                   />
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full mt-2"
+                  className="w-full h-10 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={
                     isSaving || !selectedClassId || !divisionName || !capacity
                   }
@@ -338,10 +429,13 @@ export default function DivisionsPage() {
                   {isSaving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
+                      Creating Division...
                     </>
                   ) : (
-                    "Create Division"
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Division
+                    </>
                   )}
                 </Button>
               </form>
@@ -349,68 +443,267 @@ export default function DivisionsPage() {
           </Card>
         </div>
 
-        {/* Divisions List */}
+        {/* Right Panel: Existing Divisions Table */}
         <div className="xl:col-span-8">
-          <Card className="shadow-sm border-slate-200 overflow-hidden">
-            <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
-              <div>
-                <CardTitle className="text-lg">Existing Divisions</CardTitle>
-                <CardDescription>
-                  All active divisions across classes
-                </CardDescription>
+          <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="p-5 sm:p-6 pb-4 border-b border-slate-100 bg-white">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <CardTitle className="text-lg font-bold text-slate-900">
+                      Existing Divisions
+                    </CardTitle>
+                    <Badge
+                      variant="secondary"
+                      className="font-semibold text-xs bg-slate-100 text-slate-700"
+                    >
+                      {sortedDivisions.length} Total
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">
+                    Grouped by class and sorted alphabetically by division
+                  </CardDescription>
+                </div>
+
+                {/* Filter and Search Controls */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="relative w-full sm:w-56">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Search class or division..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="pl-8 h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus:bg-white"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setCurrentPage(1);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        title="Clear search"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <Select
+                    value={filterClassId}
+                    onValueChange={(val) => {
+                      setFilterClassId(val || "all");
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50 border-slate-200 rounded-xl">
+                      <SelectValue placeholder="All Classes" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="all">All Classes</SelectItem>
+                      {schoolClasses.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id.toString()}>
+                          {SCHOOL_CLASS_OPTIONS.find(
+                            (o) => o.value === cls.school_class
+                          )?.label || cls.school_class}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="px-0 pb-0">
-              <DataTable
-                data={divisions}
-                columns={divisionColumns}
-                getRowId={(div, index) => div.id ?? index}
-                createdDate
-                createdDateRange
-                search
-                searchPlaceholder="Search classes or divisions..."
-                searchAriaLabel="Search divisions"
-                searchExtra={div => [getClassLabel(div.SchoolClass)]}
-                loading={isLoading}
-                loadingLabel="Loading divisions..."
-                emptyTitle="No divisions created yet"
-                emptyDescription="Create a division to get started."
-                noResultsTitle="No divisions match your search"
-                caption="Existing divisions"
-                minWidth={700}
-                filters={[
-                  {
-                    key: "class",
-                    label: "School Class",
-                    optionsFrom: rows => dynamicOptions(rows, div => getClassLabel(div.SchoolClass)),
-                    match: (div, value) => getClassLabel(div.SchoolClass) === value,
-                  },
-                  {
-                    key: "division",
-                    label: "Division",
-                    optionsFrom: rows => dynamicOptions(rows, div => div.division),
-                    match: (div, value) => div.division === value,
-                  },
-                ]}
-                renderActions={div => (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteTarget(div)}
-                    title={`Delete Division ${div.division}`}
-                    aria-label={`Delete Division ${div.division} for ${getClassLabel(div.SchoolClass)}`}
-                    disabled={isDeleting}
-                    className="h-10 w-10 cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              />
+
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-gray-50 border-b border-gray-200">
+                    <TableRow className="border-b border-gray-200 hover:bg-transparent">
+                      <TableHead className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                        School Class
+                      </TableHead>
+                      <TableHead className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                        Division
+                      </TableHead>
+                      <TableHead className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                        Student Capacity
+                      </TableHead>
+                      <TableHead className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="py-14 text-center text-slate-500 align-middle"
+                        >
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                            <span className="text-xs font-medium">
+                              Loading divisions...
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : paginatedDivisions.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="py-14 text-center text-slate-500 align-middle"
+                        >
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <p className="font-semibold text-slate-700 text-sm">
+                              {divisions.length === 0
+                                ? "No divisions created yet"
+                                : "No divisions match your search"}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {divisions.length === 0
+                                ? "Use the form on the left to add a division."
+                                : "Try clearing your filters or search query."}
+                            </p>
+                            {searchQuery || filterClassId !== "all" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSearchQuery("");
+                                  setFilterClassId("all");
+                                  setCurrentPage(1);
+                                }}
+                                className="mt-2 h-8 text-xs rounded-lg"
+                              >
+                                Clear Filters
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedDivisions.map((div) => (
+                        <TableRow
+                          key={div.id ?? `${div.SchoolClass}-${div.division}`}
+                          className="border-b border-gray-100 hover:bg-slate-50/70 transition-colors"
+                        >
+                          <TableCell className="py-4 px-6 border-b border-gray-100 align-middle font-medium text-slate-900">
+                            <div className="flex items-center gap-2.5">
+                              <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
+                              <span className="font-semibold">
+                                {getDivisionClassName(div)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-6 border-b border-gray-100 align-middle">
+                            <span className="inline-flex items-center justify-center font-semibold text-slate-800 bg-slate-100 border border-slate-200/60 rounded-md px-2.5 py-1 text-xs">
+                              Division {div.division}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-4 px-6 border-b border-gray-100 align-middle text-slate-600 font-medium">
+                            {div.capacity ?? "—"} students
+                          </TableCell>
+                          <TableCell className="py-4 px-6 border-b border-gray-100 align-middle text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenEdit(div)}
+                                title={`Edit Capacity for Division ${div.division}`}
+                                aria-label={`Edit Capacity for Division ${div.division} for ${getDivisionClassName(div)}`}
+                                disabled={isDeleting || isUpdating}
+                                className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer transition-colors"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteTarget(div)}
+                                title={`Delete Division ${div.division}`}
+                                aria-label={`Delete Division ${div.division} for ${getDivisionClassName(div)}`}
+                                disabled={isDeleting || isUpdating}
+                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Table Footer with Pagination & Count */}
+              {totalItems > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-3.5 border-t border-slate-100 text-xs text-slate-500 bg-white">
+                  <div className="flex items-center gap-3">
+                    <span>
+                      Showing {startIndex + 1}–{endIndex} of {totalItems} divisions
+                    </span>
+                    {totalItems > 10 && (
+                      <label className="flex items-center gap-1.5 ml-2">
+                        <span>Per page:</span>
+                        <select
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setCurrentPage(1);
+                          }}
+                          className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={safeCurrentPage <= 1}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        className="h-7 w-7 p-0 rounded-md cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="px-2">
+                        Page {safeCurrentPage} of {totalPages}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={safeCurrentPage >= totalPages}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        className="h-7 w-7 p-0 rounded-md cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -423,7 +716,8 @@ export default function DivisionsPage() {
               <span className="font-semibold text-slate-900">
                 {deleteTarget?.division}
               </span>{" "}
-              for {deleteTarget ? getClassLabel(deleteTarget.SchoolClass) : ""}?
+              for{" "}
+              {deleteTarget ? getDivisionClassName(deleteTarget) : ""}?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-3 mt-4 flex flex-col sm:flex-row">
@@ -431,6 +725,7 @@ export default function DivisionsPage() {
               variant="outline"
               onClick={() => setDeleteTarget(null)}
               disabled={isDeleting}
+              className="rounded-xl"
             >
               Cancel
             </Button>
@@ -438,6 +733,7 @@ export default function DivisionsPage() {
               variant="destructive"
               onClick={confirmDelete}
               disabled={isDeleting}
+              className="rounded-xl"
             >
               {isDeleting ? (
                 <>
@@ -449,6 +745,68 @@ export default function DivisionsPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Capacity Dialog */}
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => !open && !isUpdating && setEditTarget(null)}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-[400px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Division Capacity</DialogTitle>
+            <DialogDescription>
+              Update student capacity for Division{" "}
+              <span className="font-semibold text-slate-900">
+                {editTarget?.division}
+              </span>{" "}
+              ({editTarget ? getDivisionClassName(editTarget) : ""}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateCapacity} className="space-y-4 pt-1">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Student Capacity
+              </label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Enter new capacity"
+                value={editCapacity}
+                onChange={(e) => setEditCapacity(e.target.value)}
+                autoFocus
+                className="h-10 bg-slate-50 border-slate-200 rounded-xl"
+                disabled={isUpdating}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0 mt-4 flex flex-col sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditTarget(null)}
+                disabled={isUpdating}
+                className="rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isUpdating || !editCapacity}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Capacity"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
