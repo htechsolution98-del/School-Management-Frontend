@@ -172,9 +172,7 @@ export default function CertificateIssuancePage() {
 
     async function loadSchoolProfile() {
       try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/profile/`).then((r) =>
-          r.ok ? r : fetchWithAuth(`${API_BASE_URL}/user-profile/`)
-        );
+        const res = await fetchWithAuth(`${API_BASE_URL}/me/`);
         if (res.ok) {
           const profile = await res.json();
           const sName = profile?.school?.name || profile?.school_name || profile?.school;
@@ -201,7 +199,7 @@ export default function CertificateIssuancePage() {
       try {
         const [admissionsRes, studentsRes] = await Promise.all([
           fetchAdmissions().catch(() => []),
-          fetchWithAuth(`${API_BASE_URL}/student/`)
+          fetchWithAuth(`${API_BASE_URL}/students/`)
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
         ]);

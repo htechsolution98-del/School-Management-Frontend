@@ -106,13 +106,13 @@ export default function GeneralRegisterPage() {
       try {
         const [admissionsData, stuData, clsData, profileData] = await Promise.all([
           fetchAdmissions().catch(() => []),
-          fetchWithAuth(`${API_BASE_URL}/student/`)
+          fetchWithAuth(`${API_BASE_URL}/students/`)
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
           fetchWithAuth(`${API_BASE_URL}/getclass/`)
             .then((r) => (r.ok ? r.json() : fetchWithAuth(`${API_BASE_URL}/schoolclass/`).then((r2) => r2.ok ? r2.json() : [])))
             .catch(() => []),
-          fetchWithAuth(`${API_BASE_URL}/profile/`)
+          fetchWithAuth(`${API_BASE_URL}/me/`)
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null),
         ]);
