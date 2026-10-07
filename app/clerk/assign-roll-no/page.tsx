@@ -345,36 +345,16 @@ export default function AssignRollNoPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={loadStudents}
-            disabled={isLoading || !selectedClassId}
-            className="rounded-xl text-xs gap-1.5"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving || modifiedCount === 0 || hasDuplicates}
-            className={`rounded-xl text-xs gap-1.5 font-bold shadow-xs ${
-              hasDuplicates
-                ? "bg-zinc-300 text-zinc-600 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
-            }`}
-          >
-            {isSaving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            Save Changes {modifiedCount > 0 ? `(${modifiedCount})` : ""}
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={loadStudents}
+          disabled={isLoading || !selectedClassId}
+          className="rounded-xl text-xs gap-1.5"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh Records
+        </Button>
       </div>
 
       {/* Duplicate Warning Banner */}
@@ -398,201 +378,261 @@ export default function AssignRollNoPage() {
         </div>
       )}
 
-      {/* Control Card: Filters & Auto-Generation Options */}
-      <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Filter className="h-4 w-4 text-indigo-600" /> Selection & Roll Number Generator
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Select Class & Division, then auto-number students sequentially or customize manually.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Step 1: Select Class */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                <School className="h-3.5 w-3.5 text-indigo-600" /> Class:
-              </label>
-              <Select
-                value={selectedClassId}
-                onValueChange={(val) => {
-                  if (val) setSelectedClassId(val);
-                }}
-              >
-                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
-                  <SelectValue placeholder="Select Class...">
-                    {currentClassObj ? currentClassObj.school_class : "Select Class..."}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={String(cls.id)}>
-                      {cls.school_class}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Step 1 & 2: Selection & Roll Number Generator */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Step 1: Select Class Card */}
+        <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+              <School className="h-4 w-4 text-indigo-600" /> Step 1: Select Class
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Choose class to view students & divisions
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Select
+              value={selectedClassId}
+              onValueChange={(val) => {
+                if (val) setSelectedClassId(val);
+              }}
+            >
+              <SelectTrigger className="w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-bold text-xs">
+                <SelectValue placeholder="Select Class...">
+                  {currentClassObj ? currentClassObj.school_class : "Select Class..."}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {classes.map((cls) => (
+                  <SelectItem key={cls.id} value={String(cls.id)}>
+                    {cls.school_class}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <Users className="h-3.5 w-3.5" /> Total Class Enrolled:
+              </p>
+              <p className="text-lg font-extrabold">
+                {students.length} {students.length === 1 ? "Student" : "Students"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 2: Roll Number Generator & Filters Card */}
+        <Card className="lg:col-span-2 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs flex flex-col justify-between">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-indigo-600" /> Step 2: Auto-Generate & Filters
+              </CardTitle>
+              <Badge variant="outline" className="font-mono text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200">
+                {divNames.length} Division(s) Available
+              </Badge>
+            </div>
+            <CardDescription className="text-xs">
+              Filter by division and auto-sequence unique roll numbers sequentially.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Select Division */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <Layers className="h-3.5 w-3.5 text-indigo-600" /> Division:
+                </label>
+                <Select value={selectedDivFilter} onValueChange={(val) => setSelectedDivFilter(val || "ALL")}>
+                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
+                    <SelectValue placeholder="All Divisions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Divisions</SelectItem>
+                    {divNames.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        Division {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sort Order */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-indigo-600" /> Auto-Sequence Order:
+                </label>
+                <Select value={sortMode} onValueChange={(val) => { if (val) setSortMode(val as SortMode); }}>
+                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NAME_ASC">Alphabetical (Student Name A-Z)</SelectItem>
+                    <SelectItem value="GR_ASC">GR Number Order (Ascending)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Step 2: Select Division */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                <Layers className="h-3.5 w-3.5 text-purple-600" /> Division:
-              </label>
-              <Select value={selectedDivFilter} onValueChange={(val) => setSelectedDivFilter(val || "ALL")}>
-                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
-                  <SelectValue placeholder="All Divisions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Divisions</SelectItem>
-                  {divNames.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      Division {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Action Bar (Standardized placement with Assign Division) */}
+            <div className="pt-2 border-t dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-zinc-400 font-medium">
+                <span>Total: <strong className="text-slate-900 dark:text-zinc-100">{students.length}</strong></span>
+                <span>Assigned: <strong className="text-emerald-600">{assignedCount}</strong></span>
+                <span>Unassigned: <strong className="text-amber-600">{students.length - assignedCount}</strong></span>
+                {modifiedCount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleReset}
+                    className="rounded-xl text-xs gap-1 text-slate-500 hover:text-slate-900 h-7 px-2"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Reset Edits
+                  </Button>
+                )}
+              </div>
 
-            {/* Step 3: Sort Order */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                <ArrowUpDown className="h-3.5 w-3.5 text-amber-600" /> Auto-Sequence Order:
-              </label>
-              <Select value={sortMode} onValueChange={(val) => { if (val) setSortMode(val as SortMode); }}>
-                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NAME_ASC">Alphabetical (Student Name A-Z)</SelectItem>
-                  <SelectItem value="GR_ASC">GR Number Order (Ascending)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <Button
+                  onClick={handleAutoGenerate}
+                  disabled={isLoading || students.length === 0}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl gap-2 h-9 px-4 shadow-sm"
+                >
+                  <Sparkles className="h-4 w-4 text-amber-300" />
+                  Auto-Generate Roll Nos
+                </Button>
 
-            {/* Action: Auto Generate */}
-            <div className="flex items-end gap-2">
-              <Button
-                onClick={handleAutoGenerate}
-                disabled={isLoading || students.length === 0}
-                className="w-full h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold gap-1.5 shadow-xs"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                Auto-Generate Roll Nos
-              </Button>
-            </div>
-          </div>
-
-          {/* Quick Stats Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
-            <div className="flex items-center gap-4 text-slate-600 dark:text-zinc-400 font-medium">
-              <span>Total Students: <strong className="text-slate-900 dark:text-zinc-100">{students.length}</strong></span>
-              <span>Assigned Roll Nos: <strong className="text-emerald-600">{assignedCount}</strong></span>
-              <span>Unassigned: <strong className="text-amber-600">{students.length - assignedCount}</strong></span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {modifiedCount > 0 && (
                 <Button
                   size="sm"
-                  variant="ghost"
-                  onClick={handleReset}
-                  className="rounded-xl text-xs gap-1 text-slate-500 hover:text-slate-900 h-8"
+                  onClick={handleSave}
+                  disabled={isSaving || modifiedCount === 0 || hasDuplicates}
+                  className={`rounded-xl text-xs gap-1.5 font-bold h-9 px-4 shadow-sm ${
+                    hasDuplicates
+                      ? "bg-zinc-300 text-zinc-600 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500"
+                      : modifiedCount > 0
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-slate-200 text-slate-500 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed"
+                  }`}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" /> Reset Edits
+                  {isSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  Save Changes {modifiedCount > 0 ? `(${modifiedCount})` : ""}
                 </Button>
-              )}
-
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleExportCSV}
-                disabled={processedStudents.length === 0}
-                className="rounded-xl text-xs gap-1.5 text-emerald-700 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900 h-8"
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" /> Export Roster CSV
-              </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Main Student Roster & Roll Number Table */}
-      <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-        <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden">
+        <CardHeader className="pb-3 border-b dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-indigo-600" />
-              Student Roster — {currentClassObj?.school_class || "Class"}{" "}
-              {selectedDivFilter !== "ALL" ? `(Div ${selectedDivFilter})` : "(All Divisions)"}
+            <CardTitle className="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Users className="h-4 w-4 text-indigo-600" />
+              Class Roster & Roll Number Allocations
             </CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Type directly in the Roll No box or click Auto-Generate above.
+            <CardDescription className="text-xs">
+              Showing students for {currentClassObj?.school_class || "selected class"}{" "}
+              {selectedDivFilter !== "ALL" ? `(Division ${selectedDivFilter})` : "(All Divisions)"}
             </CardDescription>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search name, GR no, roll..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search student or GR..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+              />
+            </div>
+
+            {/* Export CSV Button */}
+            <Button
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={processedStudents.length === 0}
+              className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold gap-1.5 shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-0 overflow-hidden">
           {isLoading ? (
-            <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
-              Loading student roster...
+            <div className="py-16 text-center">
+              <Loader2 className="h-7 w-7 text-indigo-600 animate-spin mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground font-medium">Loading student roster...</p>
             </div>
           ) : processedStudents.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-              <AlertCircle className="h-6 w-6 text-amber-500" />
-              No students found for the selected Class/Division filter.
+            <div className="py-14 text-center space-y-2 p-4">
+              <Users className="h-10 w-10 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">No students found for the selected Class/Division filter</p>
+              <p className="text-[11px] text-slate-400">
+                Please select another class or adjust your search filter.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-slate-50 dark:bg-zinc-800/50">
+                <TableHeader className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800">
                   <TableRow>
-                    <TableHead className="w-12 text-center font-bold text-xs">#</TableHead>
-                    <TableHead className="w-36 font-bold text-xs">Roll No.</TableHead>
-                    <TableHead className="w-32 font-bold text-xs">GR Number</TableHead>
-                    <TableHead className="font-bold text-xs">Student Name</TableHead>
-                    <TableHead className="w-32 font-bold text-xs">Division</TableHead>
-                    <TableHead className="w-36 font-bold text-xs">Mobile</TableHead>
-                    <TableHead className="w-24 text-center font-bold text-xs">Status</TableHead>
+                    <TableHead className="w-12 text-center text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      #
+                    </TableHead>
+                    <TableHead className="w-36 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      Roll No.
+                    </TableHead>
+                    <TableHead className="w-32 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      GR Number
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      Student Name
+                    </TableHead>
+                    <TableHead className="w-32 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      Division
+                    </TableHead>
+                    <TableHead className="w-36 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      Mobile
+                    </TableHead>
+                    <TableHead className="w-24 text-center text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
+                      Status
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
 
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100 dark:divide-zinc-800/60 font-medium">
                   {processedStudents.map((st, idx) => {
                     const fullName = getFullName(st);
                     const dupKey = `${st.division || "ALL"}_${st.tempRollNo.trim()}`;
                     const isDup = Boolean(st.tempRollNo.trim() && duplicateRollNos.has(dupKey));
 
                     return (
-                      <TableRow
+                      <tr
                         key={st.id}
-                        className={
+                        className={`hover:bg-slate-50/80 dark:hover:bg-zinc-900/50 transition-colors ${
                           isDup
                             ? "bg-red-50/50 dark:bg-red-950/30"
                             : st.isModified
                             ? "bg-amber-50/40 dark:bg-amber-950/20"
                             : ""
-                        }
+                        }`}
                       >
-                        <TableCell className="text-center text-xs font-medium text-slate-500 font-mono">
+                        <td className="px-4 py-3 text-center text-xs font-medium text-slate-400 font-mono align-middle">
                           {idx + 1}
-                        </TableCell>
+                        </td>
 
                         {/* Roll Number Input */}
-                        <TableCell>
+                        <td className="px-4 py-3 align-middle">
                           <div className="flex items-center gap-1.5">
                             <Input
                               type="text"
@@ -613,27 +653,35 @@ export default function AssignRollNoPage() {
                               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                             ) : null}
                           </div>
-                        </TableCell>
+                        </td>
 
-                        <TableCell className="text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
-                          {st.gr_no || <span className="text-slate-400 italic">Unassigned</span>}
-                        </TableCell>
+                        <td className="px-4 py-3 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300 whitespace-nowrap align-middle">
+                          {st.gr_no ? (
+                            <Badge className="font-mono bg-emerald-500 text-white font-bold text-[11px] px-2 py-0.5">
+                              GR: {st.gr_no}
+                            </Badge>
+                          ) : (
+                            <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200 font-semibold">
+                              No GR
+                            </span>
+                          )}
+                        </td>
 
-                        <TableCell className="text-xs font-bold text-slate-900 dark:text-zinc-100">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-900 dark:text-zinc-100 align-middle">
                           {fullName}
-                        </TableCell>
+                        </td>
 
-                        <TableCell className="text-xs">
-                          <Badge variant="outline" className="font-mono bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border-purple-200">
+                        <td className="px-4 py-3 text-xs whitespace-nowrap align-middle">
+                          <Badge variant="outline" className="font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200 text-xs px-2.5 py-0.5">
                             Div {st.division || "N/A"}
                           </Badge>
-                        </TableCell>
+                        </td>
 
-                        <TableCell className="text-xs text-slate-600 dark:text-zinc-400">
+                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-zinc-400 align-middle">
                           {st.mobile || "—"}
-                        </TableCell>
+                        </td>
 
-                        <TableCell className="text-center">
+                        <td className="px-4 py-3 text-center align-middle">
                           {isDup ? (
                             <Badge className="bg-red-100 text-red-800 border-red-300 text-[10px] uppercase font-bold">
                               Duplicate
@@ -651,8 +699,8 @@ export default function AssignRollNoPage() {
                               Empty
                             </Badge>
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
                 </TableBody>

@@ -55,6 +55,39 @@ export interface Teacher {
   created_at?: string | null;
 }
 
+export interface TeacherWorkload {
+  id: number;
+  name: string;
+  email?: string | null;
+  mobile?: string | null;
+  category?: string;
+  department?: number | null;
+  department_name?: string | null;
+  max_periods_mon: number;
+  max_periods_tue: number;
+  max_periods_wed: number;
+  max_periods_thu: number;
+  max_periods_fri: number;
+  max_periods_sat: number;
+  max_weekly_periods: number;
+  max_consecutive_periods: number;
+  assigned_classes_count: number;
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface UpdateTeacherWorkloadPayload {
+  max_periods_mon?: number;
+  max_periods_tue?: number;
+  max_periods_wed?: number;
+  max_periods_thu?: number;
+  max_periods_fri?: number;
+  max_periods_sat?: number;
+  max_weekly_periods?: number;
+  max_consecutive_periods?: number;
+}
+
 export interface AssignClassPayload {
   is_class_teacher: boolean;
   teacher: number;

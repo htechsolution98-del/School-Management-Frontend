@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import Link from "next/link"
 import {
   School,
   Plus,
@@ -17,10 +18,14 @@ import {
   ShieldAlert,
   Eye,
   ArrowLeft,
+  ArrowUpRight,
   Sparkles,
   CreditCard,
   FileCheck2,
-  FileText
+  FileText,
+  LayoutGrid,
+  Table as TableIcon,
+  X
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -59,7 +64,46 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { backendMediaUrl } from "@/lib/media"
 import { StudentProfileDrawer, type StudentProfileData } from "./StudentProfileDrawer"
+
+function getStudentInitials(name?: string | null): string {
+  if (!name || !name.trim()) return "ST"
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 1) {
+    return parts[0].slice(0, Math.min(2, parts[0].length)).toUpperCase()
+  }
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+function StudentTableAvatar({
+  photoUrl,
+  name,
+}: {
+  photoUrl?: string | null
+  name?: string | null
+}) {
+  const [imageError, setImageError] = useState(false)
+  const resolvedUrl = backendMediaUrl(photoUrl) || photoUrl || ""
+  const initials = getStudentInitials(name)
+
+  return (
+    <Avatar className="w-9 h-9 border border-slate-200 dark:border-zinc-700 shadow-2xs">
+      {!imageError && resolvedUrl ? (
+        <AvatarImage
+          src={resolvedUrl}
+          alt={name || "Student"}
+          onError={() => setImageError(true)}
+          className="object-cover"
+        />
+      ) : null}
+      <AvatarFallback className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold text-xs select-none">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  )
+}
 
 export default function ClassesPage() {
   const [categories, setCategories] = useState<ClassCategory[]>([])
@@ -72,6 +116,7 @@ export default function ClassesPage() {
   const [selectedClass, setSelectedClass] = useState<SchoolClass | null>(null)
   const [students, setStudents] = useState<StudentProfileData[]>([])
   const [isStudentsLoading, setIsStudentsLoading] = useState(false)
+  const [viewingClassId, setViewingClassId] = useState<number | null>(null)
   const [studentSearch, setStudentSearch] = useState("")
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending">("all")
 
@@ -79,15 +124,19 @@ export default function ClassesPage() {
   const [inspectedStudentId, setInspectedStudentId] = useState<number | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
+  // View mode (grid | table)
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
+
   // New Category dialog
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
 
-  // New Class dialog
+  // New Class dialog (Bulk creation)
   const [isClassDialogOpen, setIsClassDialogOpen] = useState(false)
-  const [newClassName, setNewClassName] = useState("")
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
-  const [isRteApplicable, setIsRteApplicable] = useState(false)
+  const [classInputs, setClassInputs] = useState<{ name: string; rte_applicable: boolean }[]>([
+    { name: "", rte_applicable: false }
+  ])
 
   // Assign category dialog (for legacy classes)
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
@@ -120,27 +169,65 @@ export default function ClassesPage() {
   const loadClassStudents = async (classId: number) => {
     setIsStudentsLoading(true)
     try {
-      const data = await apiFetch<StudentProfileData[]>(
+      const response = await apiFetch<any>(
         `/students/?class_id=${classId}`,
         {},
         "Failed to load students for this class."
       )
-      setStudents(Array.isArray(data) ? data : [])
+      // Safely extract students from raw array, paginated results, or data wrapper
+      const studentList: StudentProfileData[] = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.results)
+        ? response.results
+        : Array.isArray(response?.data)
+        ? response.data
+        : []
+      setStudents(studentList)
     } catch (err: unknown) {
+      console.error("Error loading students for class ID", classId, err)
       const message = err instanceof Error ? err.message : "Could not load class students"
       toast.error(message)
       setStudents([])
+      throw err
     } finally {
       setIsStudentsLoading(false)
     }
   }
 
-  const handleSelectClass = (cls: SchoolClass) => {
-    setSelectedClass(cls)
-    setStudentSearch("")
-    setVerificationFilter("all")
-    loadClassStudents(cls.id)
+  const handleViewStudents = async (cls: SchoolClass) => {
+    setViewingClassId(cls.id)
+    try {
+      // Toggle off if clicking the already selected class
+      if (selectedClass?.id === cls.id) {
+        setSelectedClass(null)
+        setStudents([])
+        return
+      }
+
+      setSelectedClass(cls)
+      setStudentSearch("")
+      setVerificationFilter("all")
+      await loadClassStudents(cls.id)
+
+      // Smooth scroll to the student roster panel
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          const el = document.getElementById("class-roster-section")
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        }, 80)
+      }
+    } catch (err: unknown) {
+      console.error("Failed to view students for class:", cls, err)
+      const message = err instanceof Error ? err.message : "Failed to load students for this class"
+      toast.error(message)
+    } finally {
+      setViewingClassId(null)
+    }
   }
+
+  const handleSelectClass = handleViewStudents
 
   const handleStudentUpdated = (updated: StudentProfileData) => {
     setStudents((prev) =>
@@ -169,25 +256,68 @@ export default function ClassesPage() {
     }
   }
 
-  const handleAddClass = async () => {
-    if (!newClassName.trim() || !selectedCategoryId) {
-      toast.error("Please enter a class name and select a category")
+  const handleOpenClassDialog = () => {
+    setSelectedCategoryId("")
+    setClassInputs([{ name: "", rte_applicable: false }])
+    setIsClassDialogOpen(true)
+  }
+
+  const handleAddClassInputRow = () => {
+    setClassInputs((prev) => [...prev, { name: "", rte_applicable: false }])
+  }
+
+  const handleRemoveClassInputRow = (index: number) => {
+    if (classInputs.length <= 1) return
+    setClassInputs((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleClassInputChange = (
+    index: number,
+    field: "name" | "rte_applicable",
+    value: string | boolean
+  ) => {
+    setClassInputs((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const handleBulkCreateClasses = async () => {
+    if (!selectedCategoryId) {
+      toast.error("Please select a category")
       return
     }
+
+    const validRows = classInputs.filter((row) => row.name.trim().length > 0)
+    if (validRows.length === 0) {
+      toast.error("Please enter at least one class name")
+      return
+    }
+
     setIsSaving(true)
     try {
-      await saveSchoolClasses([{
-        school_class: newClassName.trim(),
-        category: parseInt(selectedCategoryId),
-        is_rte_applicable: isRteApplicable
-      }])
-      toast.success("Class created successfully")
-      setNewClassName("")
-      setIsRteApplicable(false)
+      const catId = parseInt(selectedCategoryId)
+      await Promise.all(
+        validRows.map((row) =>
+          saveSchoolClasses([
+            {
+              school_class: row.name.trim(),
+              category: catId,
+              is_rte_applicable: row.rte_applicable,
+            },
+          ])
+        )
+      )
+      toast.success(
+        `${validRows.length} ${
+          validRows.length === 1 ? "class" : "classes"
+        } created successfully`
+      )
+      setClassInputs([{ name: "", rte_applicable: false }])
+      setSelectedCategoryId("")
       setIsClassDialogOpen(false)
       await fetchData()
     } catch {
-      toast.error("Failed to create class")
+      toast.error("Failed to create classes")
     } finally {
       setIsSaving(false)
     }
@@ -247,7 +377,9 @@ export default function ClassesPage() {
 
   // Filter students based on search and verification status
   const filteredStudents = useMemo(() => {
+    if (!Array.isArray(students)) return []
     return students.filter((s) => {
+      if (!s) return false
       // Verification status filter
       if (verificationFilter === "verified" && !s.is_verified) return false
       if (verificationFilter === "pending" && s.is_verified) return false
@@ -267,9 +399,9 @@ export default function ClassesPage() {
   }, [students, studentSearch, verificationFilter])
 
   // Counts for selected class
-  const verifiedCount = useMemo(() => students.filter((s) => s.is_verified).length, [students])
-  const pendingCount = useMemo(() => students.filter((s) => !s.is_verified).length, [students])
-  const missingGovIdsCount = useMemo(() => students.filter((s) => !s.abc_id || !s.udise_no).length, [students])
+  const verifiedCount = useMemo(() => (Array.isArray(students) ? students.filter((s) => Boolean(s?.is_verified)).length : 0), [students])
+  const pendingCount = useMemo(() => (Array.isArray(students) ? students.filter((s) => !s?.is_verified).length : 0), [students])
+  const missingGovIdsCount = useMemo(() => (Array.isArray(students) ? students.filter((s) => !s?.abc_id || !s?.udise_no).length : 0), [students])
 
   return (
     <div className="flex-1 space-y-6 p-4 sm:p-8 sm:pt-6 bg-slate-50/50 dark:bg-zinc-950 min-h-screen">
@@ -288,6 +420,28 @@ export default function ClassesPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Grid / Table View Toggle */}
+          <div className="flex items-center rounded-lg border bg-slate-50 dark:bg-zinc-800 p-1">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 px-3 text-xs font-semibold gap-1.5"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Grid
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 px-3 text-xs font-semibold gap-1.5"
+              onClick={() => setViewMode("table")}
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+              Table
+            </Button>
+          </div>
+
           <Button variant="outline" onClick={fetchData} disabled={isLoading} size="sm">
             <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
             Refresh
@@ -296,7 +450,7 @@ export default function ClassesPage() {
             <FolderOpen className="mr-2 h-4 w-4" />
             New Category
           </Button>
-          <Button onClick={() => setIsClassDialogOpen(true)} size="sm">
+          <Button onClick={handleOpenClassDialog} size="sm">
             <Plus className="mr-2 h-4 w-4" />
             New Class
           </Button>
@@ -311,7 +465,7 @@ export default function ClassesPage() {
 
       {/* SELECTED CLASS: STUDENT ROSTER & VERIFICATION PANEL */}
       {selectedClass && (
-        <Card className="border-indigo-200 dark:border-indigo-900 shadow-sm bg-white dark:bg-zinc-900 overflow-hidden animate-in fade-in duration-150">
+        <Card id="class-roster-section" className="border-indigo-200 dark:border-indigo-900 shadow-sm bg-white dark:bg-zinc-900 overflow-hidden animate-in fade-in duration-150 scroll-mt-6">
           <CardHeader className="bg-gradient-to-r from-indigo-50/80 via-white to-slate-50 dark:from-indigo-950/40 dark:via-zinc-900 dark:to-zinc-900 border-b border-indigo-100 dark:border-indigo-950 p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-start sm:items-center gap-3">
@@ -336,7 +490,7 @@ export default function ClassesPage() {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs mt-0.5">
-                    Click &apos;Inspect &amp; Verify&apos; on any student to review Cloudinary documents, edit government IDs, or grant approval.
+                    Click &apos;View Profile&apos; on any student to review documents, academic records, or manage verification.
                   </CardDescription>
                 </div>
               </div>
@@ -496,31 +650,25 @@ export default function ClassesPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredStudents.map((student) => {
+                      const displayName = student.full_name || student.name || "Student"
+
                       return (
                         <TableRow
                           key={student.id}
                           className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors"
                         >
                           {/* Photo Avatar */}
-                          <TableCell className="py-3">
-                            {student.photo_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={student.photo_url}
-                                alt={student.full_name || "Student"}
-                                className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-2xs"
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold text-xs flex items-center justify-center">
-                                {student.name?.charAt(0)?.toUpperCase() || "S"}
-                              </div>
-                            )}
+                          <TableCell className="py-4">
+                            <StudentTableAvatar
+                              photoUrl={student.photo_url}
+                              name={displayName}
+                            />
                           </TableCell>
 
                           {/* Name & GR */}
-                          <TableCell className="py-3">
+                          <TableCell className="py-4">
                             <div className="font-semibold text-slate-900 dark:text-zinc-100 text-sm">
-                              {student.full_name || student.name}
+                              {displayName}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
                               {student.gr_no ? (
@@ -539,7 +687,7 @@ export default function ClassesPage() {
                           </TableCell>
 
                           {/* Roll & Division */}
-                          <TableCell className="py-3 text-xs">
+                          <TableCell className="py-4 text-xs">
                             <div className="font-medium text-slate-700 dark:text-zinc-300">
                               Roll: {student.roll_no || <span className="text-slate-400 italic">None</span>}
                             </div>
@@ -549,15 +697,15 @@ export default function ClassesPage() {
                           </TableCell>
 
                           {/* Government IDs */}
-                          <TableCell className="py-3 text-xs space-y-1">
+                          <TableCell className="py-4 text-xs space-y-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-bold text-slate-400 uppercase w-12">APAAR:</span>
                               {student.abc_id ? (
-                                <span className="font-mono text-[11px] font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-[11px] font-medium text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 border border-gray-200/80 dark:border-zinc-700 px-1.5 py-0.5 rounded">
                                   {student.abc_id}
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                                <span className="text-[11px] text-slate-400 dark:text-zinc-500 italic">
                                   Not Added
                                 </span>
                               )}
@@ -566,11 +714,11 @@ export default function ClassesPage() {
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-bold text-slate-400 uppercase w-12">UDISE:</span>
                               {student.udise_no ? (
-                                <span className="font-mono text-[11px] font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-[11px] font-medium text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 border border-gray-200/80 dark:border-zinc-700 px-1.5 py-0.5 rounded">
                                   {student.udise_no}
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                                <span className="text-[11px] text-slate-400 dark:text-zinc-500 italic">
                                   Not Added
                                 </span>
                               )}
@@ -578,7 +726,7 @@ export default function ClassesPage() {
                           </TableCell>
 
                           {/* Documents Count */}
-                          <TableCell className="py-3 text-xs">
+                          <TableCell className="py-4 text-xs">
                             <div className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
                               <FileText className="w-3.5 h-3.5 text-slate-400" />
                               <span>{student.documents?.length || 0} Docs</span>
@@ -586,7 +734,7 @@ export default function ClassesPage() {
                           </TableCell>
 
                           {/* Verification Status */}
-                          <TableCell className="py-3">
+                          <TableCell className="py-4">
                             {student.is_verified ? (
                               <div className="space-y-0.5">
                                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 gap-1 font-semibold text-xs py-0.5">
@@ -609,18 +757,17 @@ export default function ClassesPage() {
                           </TableCell>
 
                           {/* Actions */}
-                          <TableCell className="py-3 text-right">
+                          <TableCell className="py-4 text-right">
                             <Button
+                              asChild
                               size="sm"
-                              variant={student.is_verified ? "outline" : "default"}
-                              onClick={() => handleOpenStudentDrawer(student.id)}
-                              className={cn(
-                                "gap-1.5 text-xs font-semibold h-8 rounded-lg",
-                                !student.is_verified && "bg-indigo-600 hover:bg-indigo-700 text-white"
-                              )}
+                              variant="outline"
+                              className="gap-1.5 text-xs font-semibold h-8 rounded-lg border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors shadow-2xs"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              Inspect &amp; Verify
+                              <Link href={`/clerk/student-profiles/${student.id}`}>
+                                View Profile
+                                <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
+                              </Link>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -636,10 +783,31 @@ export default function ClassesPage() {
 
       {/* CATEGORIES & CLASSES LISTING */}
       {isLoading ? (
-        <div className="flex justify-center p-12">
+        <div className="flex flex-col items-center justify-center p-16 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading classes & categories...</p>
         </div>
-      ) : (
+      ) : classes.length === 0 ? (
+        /* Empty State: No classes created */
+        <div className="text-center p-14 border-2 border-dashed rounded-2xl bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 shadow-2xs">
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-4 shadow-2xs">
+            <School className="h-7 w-7" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">No classes created yet</h3>
+          <p className="text-slate-500 mt-1 text-sm max-w-sm mx-auto">
+            Get started by organizing your school structure into categories and adding classes.
+          </p>
+          <div className="flex items-center justify-center gap-3 mt-5">
+            <Button variant="outline" size="sm" onClick={() => setIsCategoryDialogOpen(true)}>
+              <FolderOpen className="mr-2 h-4 w-4" /> Create Category
+            </Button>
+            <Button size="sm" onClick={handleOpenClassDialog}>
+              <Plus className="mr-2 h-4 w-4" /> Create Class
+            </Button>
+          </div>
+        </div>
+      ) : viewMode === "grid" ? (
+        /* GRID VIEW */
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
@@ -700,13 +868,29 @@ export default function ClassesPage() {
                                 size="sm"
                                 variant={isSelected ? "default" : "secondary"}
                                 className={cn(
-                                  "h-7 text-xs px-2.5 font-semibold gap-1 rounded-lg",
-                                  !isSelected && "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
+                                  "h-7 text-xs px-2.5 font-semibold gap-1 rounded-lg transition-colors",
+                                  !isSelected && "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100",
+                                  isSelected && "bg-indigo-600 hover:bg-indigo-700 text-white"
                                 )}
-                                onClick={() => handleSelectClass(cls)}
+                                onClick={() => handleViewStudents(cls)}
+                                disabled={viewingClassId === cls.id}
                               >
-                                <Users className="h-3 w-3" />
-                                {isSelected ? "Viewing" : "Students"}
+                                {viewingClassId === cls.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Viewing...
+                                  </>
+                                ) : isSelected ? (
+                                  <>
+                                    <Users className="h-3 w-3" />
+                                    Viewing
+                                  </>
+                                ) : (
+                                  <>
+                                    <Users className="h-3 w-3" />
+                                    Students
+                                  </>
+                                )}
                               </Button>
 
                               <Button
@@ -732,17 +916,6 @@ export default function ClassesPage() {
               </Card>
             ))}
 
-            {categories.length === 0 && uncategorizedClasses.length === 0 && (
-              <div className="text-center p-12 border-2 border-dashed rounded-xl bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800">
-                <School className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">No classes found</h3>
-                <p className="text-slate-500 mt-1 text-xs">Get started by creating a class category.</p>
-                <Button className="mt-4" onClick={() => setIsCategoryDialogOpen(true)} size="sm">
-                  <FolderOpen className="mr-2 h-4 w-4" /> Create Category
-                </Button>
-              </div>
-            )}
-
             {uncategorizedClasses.length > 0 && (
               <Card className="border-orange-200 dark:border-orange-950">
                 <CardHeader className="bg-orange-50/80 dark:bg-orange-950/30 border-b border-orange-100 dark:border-orange-900/40 py-3.5 px-5">
@@ -755,48 +928,206 @@ export default function ClassesPage() {
                 </CardHeader>
                 <CardContent className="p-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {uncategorizedClasses.map((cls) => (
-                      <div
-                        key={cls.id}
-                        className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-orange-100 dark:border-orange-950 rounded-xl shadow-2xs hover:border-orange-300 transition-colors"
-                      >
-                        <span className="font-bold text-slate-800 dark:text-zinc-200 text-sm">
-                          {cls.school_class}
-                        </span>
-                        <div className="flex items-center gap-1">
+                    {uncategorizedClasses.map((cls) => {
+                      const isSelected = selectedClass?.id === cls.id
+                      return (
+                        <div
+                          key={cls.id}
+                          className={cn(
+                            "flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border rounded-xl shadow-2xs transition-colors",
+                            isSelected
+                              ? "border-primary ring-2 ring-primary/20 bg-indigo-50/20 dark:bg-indigo-950/20"
+                              : "border-orange-100 dark:border-orange-950 hover:border-orange-300"
+                          )}
+                        >
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-sm">
+                            {cls.school_class}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant={isSelected ? "default" : "secondary"}
+                              className={cn(
+                                "h-7 text-xs px-2 font-semibold gap-1 rounded-lg transition-colors",
+                                !isSelected && "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100",
+                                isSelected && "bg-indigo-600 hover:bg-indigo-700 text-white"
+                              )}
+                              onClick={() => handleViewStudents(cls)}
+                              disabled={viewingClassId === cls.id}
+                            >
+                              {viewingClassId === cls.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Viewing...
+                                </>
+                              ) : isSelected ? (
+                                <>
+                                  <Users className="h-3 w-3" />
+                                  Viewing
+                                </>
+                              ) : (
+                                <>
+                                  <Users className="h-3 w-3" />
+                                  Students
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                              title="Assign to category"
+                              onClick={() => openAssignDialog(cls)}
+                            >
+                              <MoveRight className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteClass(cls.id)}
+                              title="Delete class"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* TABLE VIEW (Clean table with No raw database IDs displayed) */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <School className="h-5 w-5 text-primary" />
+              All Classes
+            </h3>
+            <span className="text-xs text-slate-500">
+              Total {classes.length} {classes.length === 1 ? "class" : "classes"} registered
+            </span>
+          </div>
+
+          <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-zinc-900">
+            <Table>
+              <TableHeader className="bg-slate-50 dark:bg-zinc-800/60">
+                <TableRow>
+                  <TableHead className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Class Name</TableHead>
+                  <TableHead className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Category</TableHead>
+                  <TableHead className="text-xs font-semibold text-slate-700 dark:text-zinc-300">RTE Status</TableHead>
+                  <TableHead className="text-xs font-semibold text-slate-700 dark:text-zinc-300 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {classes.map((cls) => {
+                  const isSelected = selectedClass?.id === cls.id
+                  const categoryObj = categories.find((c) => c.id === cls.category)
+
+                  return (
+                    <TableRow
+                      key={cls.id}
+                      className={cn(
+                        "hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors",
+                        isSelected && "bg-indigo-50/40 dark:bg-indigo-950/20"
+                      )}
+                    >
+                      <TableCell className="py-3 font-semibold text-slate-900 dark:text-zinc-100 text-sm">
+                        <div className="flex items-center gap-2">
+                          <School className="w-4 h-4 text-primary shrink-0" />
+                          <span>{cls.school_class}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-xs">
+                        {categoryObj ? (
+                          <Badge
+                            variant="secondary"
+                            className="font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 gap-1"
+                          >
+                            <FolderOpen className="w-3 h-3 text-blue-500" />
+                            {categoryObj.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-orange-600 dark:text-orange-400 font-medium text-xs">
+                            Uncategorized
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-xs">
+                        {cls.is_rte_applicable ? (
+                          <Badge
+                            variant="outline"
+                            className="text-orange-600 border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20 text-[11px] font-semibold"
+                          >
+                            RTE Eligible
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-400 text-xs">Not Applicable</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
-                            variant="secondary"
-                            className="h-7 text-xs px-2 font-semibold gap-1 rounded-lg"
-                            onClick={() => handleSelectClass(cls)}
+                            variant={isSelected ? "default" : "secondary"}
+                            className={cn(
+                              "h-7 text-xs px-2.5 font-semibold gap-1 rounded-lg transition-colors",
+                              !isSelected && "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100",
+                              isSelected && "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            )}
+                            onClick={() => handleViewStudents(cls)}
+                            disabled={viewingClassId === cls.id}
                           >
-                            <Users className="h-3 w-3" /> Students
+                            {viewingClassId === cls.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Viewing...
+                              </>
+                            ) : isSelected ? (
+                              <>
+                                <Users className="h-3 w-3" />
+                                Viewing
+                              </>
+                            ) : (
+                              <>
+                                <Users className="h-3 w-3" />
+                                Students
+                              </>
+                            )}
                           </Button>
+
+                          {!cls.category && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg"
+                              title="Assign to category"
+                              onClick={() => openAssignDialog(cls)}
+                            >
+                              <MoveRight className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
-                            title="Assign to category"
-                            onClick={() => openAssignDialog(cls)}
-                          >
-                            <MoveRight className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg"
                             onClick={() => handleDeleteClass(cls.id)}
                             title="Delete class"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
@@ -842,21 +1173,34 @@ export default function ClassesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Class Dialog */}
+      {/* New Class Dialog (Supports Bulk Creation) */}
       <Dialog open={isClassDialogOpen} onOpenChange={setIsClassDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create Class</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <School className="h-5 w-5 text-primary" />
+              Create Classes
+            </DialogTitle>
             <DialogDescription>
-              Add a new class to an existing category.
+              Select a category and add one or multiple classes to it at once.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={selectedCategoryId} onValueChange={(val) => setSelectedCategoryId(val || "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+
+          <div className="space-y-4 py-2">
+            {/* Category Dropdown (displays category.name while binding category.id) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                Category
+              </label>
+              <Select
+                value={selectedCategoryId}
+                onValueChange={(val) => setSelectedCategoryId(val || "")}
+                disabled={isSaving}
+              >
+                <SelectTrigger className="w-full h-9 text-sm">
+                  <SelectValue placeholder="Select a category">
+                    {categories.find((cat) => cat.id.toString() === selectedCategoryId)?.name}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((cat) => (
@@ -867,35 +1211,101 @@ export default function ClassesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <Separator />
+
+            {/* Dynamic Class Input Rows */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Class Name</label>
-              <Input
-                placeholder="e.g. Grade 1, Class 10"
-                value={newClassName}
-                onChange={(e) => setNewClassName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddClass()}
-              />
-            </div>
-            <div className="flex items-center space-x-2 pt-2">
-              <input
-                type="checkbox"
-                id="rteApplicable"
-                checked={isRteApplicable}
-                onChange={(e) => setIsRteApplicable(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="rteApplicable" className="text-sm font-medium text-slate-700 dark:text-zinc-300 cursor-pointer">
-                RTE (Right to Education) Applicable for this Class
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                Class List
               </label>
+
+              <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                {classInputs.map((input, index) => (
+                  <div
+                    key={index}
+                    className="p-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder={`Class name (e.g. Class ${index + 1})`}
+                        value={input.name}
+                        disabled={isSaving}
+                        onChange={(e) => handleClassInputChange(index, "name", e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (index === classInputs.length - 1) {
+                              handleAddClassInputRow()
+                            } else {
+                              handleBulkCreateClasses()
+                            }
+                          }
+                        }}
+                        autoFocus={index === classInputs.length - 1}
+                        className="h-9 text-sm bg-white dark:bg-zinc-900"
+                      />
+
+                      {classInputs.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={isSaving}
+                          className="h-9 w-9 text-slate-400 hover:text-red-600 shrink-0"
+                          onClick={() => handleRemoveClassInputRow(index)}
+                          title="Remove row"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-2 pl-1">
+                      <input
+                        type="checkbox"
+                        id={`rteApplicable-${index}`}
+                        checked={input.rte_applicable}
+                        disabled={isSaving}
+                        onChange={(e) =>
+                          handleClassInputChange(index, "rte_applicable", e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <label
+                        htmlFor={`rteApplicable-${index}`}
+                        className="text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer select-none"
+                      >
+                        RTE (Right to Education) Eligible
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSaving}
+                onClick={handleAddClassInputRow}
+                className="w-full border-dashed text-primary hover:bg-primary/5 text-xs font-semibold h-9 mt-2"
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Add Another Class
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsClassDialogOpen(false)}>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsClassDialogOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleAddClass} disabled={isSaving || !newClassName.trim() || !selectedCategoryId}>
+            <Button
+              onClick={handleBulkCreateClasses}
+              disabled={isSaving || !selectedCategoryId}
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create
+              Create Classes
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -914,7 +1324,9 @@ export default function ClassesPage() {
             <label className="text-sm font-medium">Category</label>
             <Select value={assignCategoryId} onValueChange={(val) => setAssignCategoryId(val || "")}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
+                <SelectValue placeholder="Select a category">
+                  {categories.find((cat) => cat.id.toString() === assignCategoryId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (

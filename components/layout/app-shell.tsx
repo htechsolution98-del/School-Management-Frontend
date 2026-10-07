@@ -227,7 +227,7 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                       const subActive = sub === activeLink;
                       return (
                         <Link
-                          key={sub.href}
+                          key={`${sub.href}-${sub.title}`}
                           href={sub.href}
                           onClick={onNavigate}
                           aria-current={subActive ? "page" : undefined}

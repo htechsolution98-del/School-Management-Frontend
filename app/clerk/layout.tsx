@@ -19,6 +19,7 @@ import {
   Award,
   Rocket,
   PhoneCall,
+  SlidersHorizontal,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -58,7 +59,6 @@ const sidebarLinks = [
     href: "/clerk/class-mgmt",
     icon: School,
     subLinks: [
-      { title: "Class Students", href: "/clerk/students", icon: Users },
       { title: "Categories", href: "/clerk/categories", icon: LayoutGrid },
       { title: "Classes", href: "/clerk/classes", icon: School },
       { title: "Student Profiles", href: "/clerk/student-profiles", icon: Users },
@@ -87,6 +87,7 @@ const sidebarLinks = [
     ],
   },
   { title: "Assign Teacher", href: "/clerk/assign-teacher", icon: Plus },
+  { title: "Teacher Workload", href: "/clerk/teacher-workload", icon: SlidersHorizontal },
   { title: "Timetable", href: "/clerk/timetable", icon: Calendar },
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
