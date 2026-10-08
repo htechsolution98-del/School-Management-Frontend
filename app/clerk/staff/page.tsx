@@ -83,7 +83,6 @@ export default function ClerkStaffDashboard() {
     const feature = member && features.find(item => String(item.feature_id || item.id) === String(member.category) || String(item.feature_name || "").toUpperCase().trim() === String(member.category).toUpperCase().trim());
     setForm(member ? { name: member.name || "", email: member.email || "", mobile: member.mobile || "", category: feature ? String(feature.feature_id || feature.id) : String(member.category), department: member.department ?? undefined, address: member.address || "", date_of_birth: toHTMLDate(member.date_of_birth), salary: member.salary || "", is_active: !!member.is_active } : { ...EMPTY_FORM });
     setFormOpen(true);
-    requestAnimationFrame(() => document.getElementById("staff-record-editor")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   const save = async (event: React.FormEvent) => {
@@ -116,28 +115,92 @@ export default function ClerkStaffDashboard() {
     finally { busy.current = false; setActionId(null); }
   };
 
+  const statCards = [
+    {
+      label: "Total staff",
+      value: staff.length,
+      icon: Users,
+      gradient: "from-[#f3eeff] via-[#f7f3ff] to-[#ffffff]",
+      border: "border-purple-200/80",
+      badgeBg: "bg-[#5826df]",
+      textColor: "text-[#2e1065]",
+      iconColor: "text-white",
+    },
+    {
+      label: "Active members",
+      value: active,
+      icon: UserCheck,
+      gradient: "from-[#e8faf4] via-[#f0fdf9] to-[#ffffff]",
+      border: "border-emerald-200/80",
+      badgeBg: "bg-emerald-500",
+      textColor: "text-emerald-950",
+      iconColor: "text-white",
+    },
+    {
+      label: "Inactive members",
+      value: staff.length - active,
+      icon: Power,
+      gradient: "from-[#fff0f3] via-[#fff5f7] to-[#ffffff]",
+      border: "border-rose-200/80",
+      badgeBg: "bg-rose-500",
+      textColor: "text-rose-950",
+      iconColor: "text-white",
+    },
+    {
+      label: "Departments",
+      value: departments.length,
+      icon: Building2,
+      gradient: "from-[#eff6ff] via-[#f5f9ff] to-[#ffffff]",
+      border: "border-blue-200/80",
+      badgeBg: "bg-blue-500",
+      textColor: "text-blue-950",
+      iconColor: "text-white",
+    },
+  ];
+
   return <div className="clerk-page hr-page staff-page space-y-6">
-    <section className="hr-stats">{[{ label: "Total staff", value: staff.length, icon: Users }, { label: "Active members", value: active, icon: UserCheck }, { label: "Inactive members", value: staff.length - active, icon: Power }, { label: "Departments", value: departments.length, icon: Building2 }].map(stat => <div className="register-stat" key={stat.label}><div className="stat-label">{stat.label}<stat.icon size={18} /></div><p className="stat-value">{loading ? <Loader2 size={22} className="animate-spin" /> : stat.value}</p></div>)}</section>
+    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {statCards.map(stat => (
+        <div
+          key={stat.label}
+          className={`relative overflow-hidden rounded-2xl p-5 border bg-gradient-to-br ${stat.gradient} ${stat.border} shadow-sm hover:shadow-md transition-all`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {stat.label}
+            </span>
+            <div className={`w-9 h-9 rounded-xl ${stat.badgeBg} flex items-center justify-center shadow-sm`}>
+              <stat.icon className={`w-4 h-4 ${stat.iconColor}`} />
+            </div>
+          </div>
+          <p className={`text-3xl font-black tracking-tight mt-3 ${stat.textColor}`}>
+            {loading ? <Loader2 size={24} className="animate-spin text-[#5826df]" /> : stat.value}
+          </p>
+        </div>
+      ))}
+    </section>
+
     {error && <p role="alert" className="hr-error">{error}</p>}
     {success && <p role="status" className="hr-success">{success}</p>}
     {!loading && (!roles.length || !departments.length) && <p className="hr-notice">{!departments.length ? <><Link href="/clerk/departments" className="underline">Create a department</Link> before adding staff. </> : null}{!roles.length ? "Staff roles are unavailable. Refresh or configure staff roles before saving." : ""}</p>}
-    {formOpen && <div id="staff-record-editor"><StaffRecordForm value={form} errors={errors} departments={departments} roles={roles} editing={!!editing} saving={saving} onClose={closeForm} onSubmit={save} onChange={(field, value) => { setForm(previous => ({ ...previous, [field]: value })); setErrors(previous => ({ ...previous, [field]: undefined })); }} /></div>}
+    {formOpen && <div id="staff-record-editor" className="animate-in fade-in slide-in-from-top-4 duration-300"><StaffRecordForm value={form} errors={errors} departments={departments} roles={roles} editing={!!editing} saving={saving} onClose={closeForm} onSubmit={save} onChange={(field, value) => { setForm(previous => ({ ...previous, [field]: value })); setErrors(previous => ({ ...previous, [field]: undefined })); }} /></div>}
+    
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">School Staff Directory</h2>
+          <h2 className="text-base font-bold text-slate-900">School Staff Directory</h2>
           <p className="text-xs text-slate-500">Search, filter and manage employment records.</p>
         </div>
         <div className="office-actions">
-          <Button variant="outline" size="sm" disabled={loading || saving || actionId !== null} onClick={() => void load()}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh</Button>
-          <Button size="sm" className="office-primary" disabled={loading || saving || actionId !== null} onClick={() => openForm()}><UserPlus size={15} /> Add staff</Button>
+          <Button variant="outline" size="sm" className="rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-indigo-50 hover:text-[#5826df] hover:border-indigo-200 font-semibold px-3.5 shadow-2xs" disabled={loading || saving || actionId !== null} onClick={() => void load()}><RefreshCw size={14} className={loading ? "animate-spin text-[#5826df]" : "text-slate-500"} /> Refresh</Button>
+          <Button size="sm" className="bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl shadow-md shadow-indigo-500/20 active:scale-95 font-semibold px-4" disabled={loading || saving || actionId !== null} onClick={() => openForm()}><UserPlus size={15} /> Add staff</Button>
         </div>
       </div>
       <DataTable data={staff} columns={columns} getRowId={member => member.id} createdDate createdDateRange search searchPlaceholder="Search name, email, mobile or department" loading={loading} emptyTitle="No staff records yet" emptyDescription="Add a staff member to start your directory." caption="Staff directory" minWidth={1050} filters={[
         { key: "status", label: "Status", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }], match: (member, value) => (value === "active") === !!member.is_active },
         { key: "role", label: "Role", optionsFrom: rows => Array.from(new Set(rows.map(member => roleLabel(member.category)))).map(label => ({ value: label, label })), match: (member, value) => roleLabel(member.category) === value },
         { key: "department", label: "Department", optionsFrom: () => departments.map(item => ({ value: String(item.id), label: item.name })), match: (member, value) => String(member.department ?? "") === value },
-      ]} renderActions={member => <div className="flex items-center gap-1">{[{ label: "Edit", icon: Edit2, onClick: () => openForm(member), color: "text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30" }, { label: member.is_active ? "Deactivate" : "Activate", icon: Power, onClick: () => void act(member), color: "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30" }, { label: "Delete", icon: Trash2, onClick: () => void act(member, true), color: "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30" }].map(action => <button type="button" key={action.label} title={action.label} aria-label={`${action.label} ${member.name || "staff member"}`} disabled={loading || saving || actionId !== null} onClick={action.onClick} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${action.color}`}>{actionId === member.id ? <Loader2 size={14} className="animate-spin" /> : <action.icon size={14} />}</button>)}</div>} />
+      ]} renderActions={member => <div className="flex items-center gap-1">{[{ label: "Edit", icon: Edit2, onClick: () => openForm(member), color: "text-[#5826df] hover:bg-indigo-50 hover:text-[#4a1ec2]" }, { label: member.is_active ? "Deactivate" : "Activate", icon: Power, onClick: () => void act(member), color: "text-amber-600 hover:bg-amber-50" }, { label: "Delete", icon: Trash2, onClick: () => void act(member, true), color: "text-rose-600 hover:bg-rose-50" }].map(action => <button type="button" key={action.label} title={action.label} aria-label={`${action.label} ${member.name || "staff member"}`} disabled={loading || saving || actionId !== null} onClick={action.onClick} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-90 disabled:opacity-40 ${action.color}`}>{actionId === member.id ? <Loader2 size={14} className="animate-spin" /> : <action.icon size={14} />}</button>)}</div>} />
     </div>
   </div>;
 }

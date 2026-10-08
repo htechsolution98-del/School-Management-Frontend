@@ -58,30 +58,34 @@ function AnimatedNumber({
 }
 
 /* ─── Stat card ──────────────────────────────────────────────────────────── */
-const STAT_STYLES = {
+const STAT_CONFIG = {
   total: {
-    from: "#111827",
-    to: "#1f2937",
-    accent: "#60a5fa",
-    label: "text-slate-300",
+    iconBg: "bg-blue-50 text-blue-600 ring-1 ring-blue-500/15",
+    accent: "bg-gradient-to-r from-blue-500 to-indigo-500",
+    glow: "group-hover:shadow-blue-500/10",
+    badge: "All Requests",
+    badgeColor: "bg-blue-50 text-blue-700",
   },
   pending: {
-    from: "#78350f",
-    to: "#b45309",
-    accent: "#fbbf24",
-    label: "text-amber-100",
+    iconBg: "bg-amber-50 text-amber-600 ring-1 ring-amber-500/15",
+    accent: "bg-gradient-to-r from-amber-500 to-orange-500",
+    glow: "group-hover:shadow-amber-500/10",
+    badge: "Needs Action",
+    badgeColor: "bg-amber-50 text-amber-700",
   },
   verified: {
-    from: "#064e3b",
-    to: "#047857",
-    accent: "#34d399",
-    label: "text-emerald-100",
+    iconBg: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/15",
+    accent: "bg-gradient-to-r from-emerald-500 to-teal-500",
+    glow: "group-hover:shadow-emerald-500/10",
+    badge: "Confirmed",
+    badgeColor: "bg-emerald-50 text-emerald-700",
   },
   amount: {
-    from: "#312e81",
-    to: "#4338ca",
-    accent: "#818cf8",
-    label: "text-indigo-100",
+    iconBg: "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/15",
+    accent: "bg-gradient-to-r from-indigo-500 to-purple-600",
+    glow: "group-hover:shadow-indigo-500/10",
+    badge: "Verified Revenue",
+    badgeColor: "bg-indigo-50 text-indigo-700",
   },
 };
 
@@ -97,44 +101,42 @@ function StatCard({
   value: number;
   prefix?: string;
   icon: React.ElementType;
-  variant: keyof typeof STAT_STYLES;
+  variant: keyof typeof STAT_CONFIG;
   delay: number;
 }) {
-  const s = STAT_STYLES[variant];
+  const cfg = STAT_CONFIG[variant];
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24, scale: 0.94 }}
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -4, scale: 1.02, transition: { duration: 0.18 } }}
-      style={{
-        background: `linear-gradient(140deg, ${s.from} 0%, ${s.to} 100%)`,
-      }}
-      className="relative rounded-2xl p-4 md:p-5 overflow-hidden cursor-default shadow-xl"
+      transition={{ delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -3, transition: { duration: 0.18 } }}
+      className={cn(
+        "group relative rounded-2xl bg-white border border-slate-150/80 p-5 shadow-xs transition-all duration-200 hover:shadow-lg hover:border-slate-200 overflow-hidden cursor-default",
+        cfg.glow
+      )}
     >
-      <div
-        className="pointer-events-none absolute -right-5 -top-5 h-28 w-28 rounded-full opacity-20"
-        style={{ background: s.accent }}
-      />
-      <div
-        className="pointer-events-none absolute -left-3 -bottom-6 h-20 w-20 rounded-full opacity-10"
-        style={{ background: s.accent }}
-      />
-      <div className="relative">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", s.label)}>
-            {label}
-          </p>
-          <div
-            className="rounded-xl p-2 shrink-0"
-            style={{ background: "rgba(255,255,255,0.15)" }}
-          >
-            <Icon className="h-4 w-4 text-white" />
-          </div>
+      {/* Top subtle accent line */}
+      <div className={cn("absolute top-0 inset-x-0 h-1 opacity-80", cfg.accent)} />
+
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          {label}
+        </span>
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-110 duration-200", cfg.iconBg)}>
+          <Icon className="h-5 w-5" />
         </div>
-        <p className="text-3xl font-black text-white tabular-nums leading-none tracking-tight">
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-2xl md:text-3xl font-extrabold text-slate-900 tabular-nums tracking-tight">
           <AnimatedNumber value={value} prefix={prefix} />
         </p>
+        <div className="flex items-center gap-1.5 pt-1">
+          <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold", cfg.badgeColor)}>
+            {cfg.badge}
+          </span>
+        </div>
       </div>
     </motion.div>
   );
@@ -701,8 +703,7 @@ export default function ClerkDashboard() {
   }, [records, searchQuery, filterStatus]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-      <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 xl:px-8 py-5 space-y-5">
+    <div className="w-full space-y-6">
 
         {/* ── Header ── */}
         <motion.div
@@ -839,14 +840,14 @@ export default function ClerkDashboard() {
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-32 text-center"
+            className="flex flex-col items-center justify-center py-20 px-4 text-center rounded-3xl bg-white border border-slate-100 shadow-xs"
           >
-            <div className="rounded-2xl bg-slate-100 p-8 mb-4">
-              <BadgeCheck className="h-12 w-12 text-slate-300" />
+            <div className="rounded-2xl bg-indigo-50/80 ring-8 ring-indigo-50/40 p-6 mb-4">
+              <BadgeCheck className="h-10 w-10 text-indigo-500" />
             </div>
-            <p className="font-black text-lg text-slate-700">No records found</p>
-            <p className="text-slate-400 mt-1.5 font-semibold text-sm">
-              There are no fee verification requests yet
+            <p className="font-extrabold text-lg text-slate-800 tracking-tight">No Pending Verifications</p>
+            <p className="text-slate-400 mt-1.5 font-medium text-xs max-w-sm">
+              All student admission fee payments are up to date. New verification requests will show up here automatically.
             </p>
           </motion.div>
         )}
@@ -856,20 +857,20 @@ export default function ClerkDashboard() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-20 text-center"
+            className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-3xl bg-white border border-slate-100 shadow-xs"
           >
-            <div className="rounded-2xl bg-slate-100 p-6 mb-3">
-              <Search className="h-10 w-10 text-slate-300" />
+            <div className="rounded-2xl bg-slate-100/80 p-5 mb-3">
+              <Search className="h-8 w-8 text-slate-400" />
             </div>
-            <p className="font-black text-base text-slate-700">No matches found</p>
-            <p className="text-slate-400 mt-1 text-sm font-medium">
+            <p className="font-extrabold text-base text-slate-800">No matching records found</p>
+            <p className="text-slate-400 mt-1 text-xs font-medium">
               Try a different name, admission number, or payment ID
             </p>
             <button
               onClick={() => { setSearchQuery(""); setFilterStatus("all"); }}
-              className="mt-4 text-xs font-bold text-indigo-600 hover:underline"
+              className="mt-4 px-3.5 py-1.5 rounded-lg bg-indigo-50 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-colors"
             >
-              Clear search
+              Clear filter & search
             </button>
           </motion.div>
         )}
@@ -889,9 +890,8 @@ export default function ClerkDashboard() {
             ))}
           </div>
         )}
-      </div>
 
-      {/* ── Modal ── */}
+        {/* ── Modal ── */}
       <AnimatePresence>
         {selectedRecord && (
           <VerifyModal

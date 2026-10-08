@@ -1220,7 +1220,7 @@ export default function StudentRecordsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 px-3 sm:px-6 lg:px-8 py-6 bg-slate-50/50 min-h-screen overflow-x-hidden">
+    <div className="flex-1 space-y-6 overflow-x-hidden">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -1234,7 +1234,7 @@ export default function StudentRecordsPage() {
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <Link href="/clerk/manual-admission">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-xs rounded-xl flex items-center gap-1.5 font-semibold text-xs py-2 px-3">
+            <Button className="bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-md shadow-indigo-500/20 rounded-xl flex items-center gap-1.5 font-semibold text-xs py-2 px-3.5">
               <UserPlus className="h-4 w-4" />
               Direct Admission
             </Button>
@@ -1553,7 +1553,7 @@ export default function StudentRecordsPage() {
               size="xs"
               variant="outline"
               onClick={() => openFieldEdit(adm)}
-              className="h-10 w-10 cursor-pointer rounded-lg p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+              className="h-10 w-10 cursor-pointer rounded-lg p-0 text-[#5826df] hover:bg-indigo-50 hover:text-[#4d20cb]"
               title="Edit Information"
               aria-label={`Edit Information: ${getStudentName(adm)}`}
             >

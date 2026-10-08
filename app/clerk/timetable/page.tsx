@@ -2870,7 +2870,7 @@ function TimetableListPage({
   }, [selectedDivision, allTimetables]);
 
   return (
-    <div className="min-h-screen bg-[#f8f7ff]" style={{ fontFamily: "'DM Sans', 'Nunito', sans-serif" }}>
+    <div className="space-y-6 max-w-7xl mx-auto" style={{ fontFamily: "'DM Sans', 'Nunito', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&display=swap');
         @keyframes slideUp { from { transform:translateY(16px); opacity:0; } to { transform:translateY(0); opacity:1; } }
@@ -3484,7 +3484,7 @@ export default function CreateTimetablePage() {
 
   return (
     <div
-      className="min-h-screen bg-[#f8f7ff]"
+      className="space-y-6 max-w-7xl mx-auto"
       style={{ fontFamily: "'DM Sans', 'Nunito', sans-serif" }}
     >
       <style>{`

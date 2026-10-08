@@ -173,7 +173,7 @@ export default function ClassesPage() {
   const uncategorizedClasses = classes.filter(c => !c.category)
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 p-4 sm:p-8 sm:pt-6 bg-white min-h-screen">
+    <div className="flex-1 space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">

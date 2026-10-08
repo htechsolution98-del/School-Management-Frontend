@@ -262,15 +262,15 @@ export default function SuperAdminSubscriptionsPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-2 sm:p-4 text-slate-900">
+    <div className="w-full space-y-6 text-slate-900">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-6 md:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
           <BadgePercent size={260} />
         </div>
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-2">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-purple-200 text-xs font-semibold uppercase tracking-wider mb-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-200" />
             SaaS Tenant Licensing & Billing Engine
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">

@@ -399,7 +399,7 @@ export default function AcademicYearPage() {
         : [];
 
     return (
-        <div className="min-h-screen bg-[#f5f6fa] p-3 sm:p-6">
+        <div className="space-y-6 max-w-7xl mx-auto">
             {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>

@@ -102,7 +102,7 @@ export function InlineCertificate({ documentKey, revision, readDraft, onSave, ed
         <button type="button" title="Strikethrough" aria-label="Strikethrough" onMouseDown={event => event.preventDefault()} onClick={() => applyFormat("strikeThrough")}><Strikethrough size={16} /></button>
         <button type="button" title="Clear formatting" aria-label="Clear formatting" onMouseDown={event => event.preventDefault()} onClick={() => applyFormat("removeFormat")}><RemoveFormatting size={16} /></button>
         <span className="format-divider" />
-        <label className="format-color" title="Text color">Text color<input type="color" aria-label="Text color" defaultValue="#173044" onChange={event => applyFormat("foreColor", event.target.value)} /></label>
+        <label className="format-color" title="Text color">Text color<input type="color" aria-label="Text color" defaultValue="#1e1b4b" onChange={event => applyFormat("foreColor", event.target.value)} /></label>
         <span className="format-divider" />
         {[{ command: "justifyLeft", label: "Align left", icon: AlignLeft }, { command: "justifyCenter", label: "Align center", icon: AlignCenter }, { command: "justifyRight", label: "Align right", icon: AlignRight }, { command: "undo", label: "Undo", icon: Undo2 }, { command: "redo", label: "Redo", icon: Redo2 }].map(item => <button key={item.command} type="button" title={item.label} aria-label={item.label} onMouseDown={event => event.preventDefault()} onClick={() => applyFormat(item.command)}><item.icon size={16} /></button>)}
       </> : <span className="format-placeholder">{editorError ? "Formatting could not load. Please refresh to retry." : editable && !ready ? "Loading text formatting…" : "Click the certificate to start editing"}</span>}

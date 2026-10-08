@@ -171,7 +171,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-4 sm:p-8 sm:pt-6 bg-white min-h-screen">
+    <div className="flex-1 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -287,7 +287,7 @@ export default function CategoriesPage() {
               <CardHeader className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200">
+                    <div className="h-10 w-10 rounded-xl bg-indigo-50 text-[#5826df] flex items-center justify-center shrink-0 group-hover:bg-[#5826df] group-hover:text-white transition-colors duration-200">
                       <FolderOpen className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">

@@ -917,7 +917,7 @@ export default function HomeworkPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 overflow-x-hidden">
+    <div className="space-y-6 max-w-7xl mx-auto overflow-x-hidden">
       {selectedHw ? (
         <HomeworkDetailView
           hw={selectedHw}

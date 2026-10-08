@@ -311,17 +311,17 @@ export default function TrusteeDashboard() {
     STAFF_CATEGORIES.find((item) => item.value === category)?.label ?? category;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-emerald-200 text-xs font-semibold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" /> Board Governance & Oversight
             </div>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Trustee Governance Panel</h1>
-            <p className="text-emerald-100 max-w-xl text-sm md:text-base">
+            <p className="text-purple-100 max-w-xl text-sm md:text-base">
               Financial auditing, RTE compliance monitoring, board meeting schedules, and institutional staff directory.
             </p>
           </div>
@@ -331,7 +331,7 @@ export default function TrusteeDashboard() {
               onClick={() => {
                 setShowMeetingModal(true);
               }}
-              className="bg-white text-emerald-900 hover:bg-emerald-50 font-semibold shadow-lg"
+              className="bg-white text-[#5826df] hover:bg-purple-50 font-bold shadow-lg"
             >
               <Plus className="mr-1.5 h-4 w-4" /> Schedule Board Meeting
             </Button>
@@ -427,7 +427,7 @@ export default function TrusteeDashboard() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all whitespace-nowrap ${
                 isActive
-                  ? "bg-emerald-800 text-white shadow-md shadow-emerald-200"
+                  ? "bg-[#5826df] text-white shadow-md shadow-indigo-500/20"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               }`}
             >
@@ -563,7 +563,7 @@ export default function TrusteeDashboard() {
               <h3 className="font-bold text-gray-900">Trustee Board Meetings & Minutes</h3>
               <p className="text-xs text-gray-500">Schedule meetings, track resolutions, and archive official minutes</p>
             </div>
-            <Button onClick={() => setShowMeetingModal(true)} className="bg-emerald-800 hover:bg-emerald-900 text-white">
+            <Button onClick={() => setShowMeetingModal(true)} className="bg-[#5826df] hover:bg-[#4a1ec4] text-white">
               <Plus className="mr-1.5 h-4 w-4" /> Schedule Meeting
             </Button>
           </div>
@@ -605,7 +605,7 @@ export default function TrusteeDashboard() {
                                 ? "bg-emerald-50 text-emerald-700"
                                 : m.status === "CANCELLED"
                                 ? "bg-rose-50 text-rose-700"
-                                : "bg-blue-50 text-blue-700"
+                                : "bg-purple-50 text-purple-700"
                             }`}
                           >
                             {m.status}
@@ -649,7 +649,7 @@ export default function TrusteeDashboard() {
                 setIsAdding((prev) => !prev);
                 setIsEditing(false);
               }}
-              className="bg-emerald-800 hover:bg-emerald-900 text-white font-medium"
+              className="bg-[#5826df] hover:bg-[#4a1ec4] text-white font-medium"
             >
               {isAdding ? "Close Form" : "+ Add Staff Member"}
             </Button>
@@ -702,7 +702,7 @@ export default function TrusteeDashboard() {
                       value={formData.category || ""}
                       onChange={(e) => setFormData({ ...formData, category: Number(e.target.value) as any })}
                       required
-                      className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none"
+                      className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20"
                     >
                       <option value="">Select Category</option>
                       {staffCategories.map((cat: any, i: number) => (
@@ -743,7 +743,7 @@ export default function TrusteeDashboard() {
                     />
                   </div>
                   <div className="md:col-span-2 flex justify-end">
-                    <Button type="submit" disabled={isSubmitting} className="bg-emerald-800 hover:bg-emerald-900 text-white">
+                    <Button type="submit" disabled={isSubmitting} className="bg-[#5826df] hover:bg-[#4a1ec4] text-white">
                       Create Staff
                     </Button>
                   </div>
@@ -781,7 +781,7 @@ export default function TrusteeDashboard() {
                       <td className="px-6 py-4 text-center">
                         <span
                           className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            m.is_active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                            m.is_active ? "bg-purple-50 text-purple-700" : "bg-rose-50 text-rose-700"
                           }`}
                         >
                           {m.is_active ? "Active" : "Inactive"}
@@ -889,7 +889,7 @@ export default function TrusteeDashboard() {
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setShowMeetingModal(false)}>Cancel</Button>
-                  <Button type="submit" disabled={isSubmitting} className="bg-emerald-800 hover:bg-emerald-900 text-white">
+                  <Button type="submit" disabled={isSubmitting} className="bg-[#5826df] hover:bg-[#4a1ec4] text-white font-bold">
                     Schedule Meeting
                   </Button>
                 </div>

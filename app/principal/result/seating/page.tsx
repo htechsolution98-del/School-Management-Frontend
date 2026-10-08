@@ -296,7 +296,7 @@ export default function SeatingAllocationPage() {
             size="sm"
             onClick={handleAutoGenerate}
             disabled={isGenerating || !selectedExamTitle}
-            className="rounded-xl text-xs gap-1.5 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+            className="rounded-xl text-xs gap-1.5 font-bold bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-md shadow-indigo-500/20"
           >
             {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             Auto-Generate Seating
@@ -398,7 +398,7 @@ export default function SeatingAllocationPage() {
           <Button
             size="sm"
             onClick={() => { resetRoomForm(); setIsRoomModalOpen(true); }}
-            className="rounded-xl text-xs gap-1.5 font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            className="rounded-xl text-xs gap-1.5 font-bold bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-md shadow-indigo-500/20"
           >
             <Plus className="h-3.5 w-3.5" /> Add Room
           </Button>
@@ -626,7 +626,7 @@ export default function SeatingAllocationPage() {
               size="sm"
               onClick={handleSaveRoom}
               disabled={isSubmittingRoom}
-              className="rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+              className="rounded-xl text-xs font-bold bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-md shadow-indigo-500/20"
             >
               {isSubmittingRoom ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : editingRoom ? "Update Room" : "Save Room"}
             </Button>

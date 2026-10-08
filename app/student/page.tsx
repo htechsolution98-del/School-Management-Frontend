@@ -217,7 +217,7 @@ export default function StudentDashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 px-4 sm:px-6 md:px-8 py-6 bg-slate-50/60 min-h-screen">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       {/* Greeting Header */}
       <motion.div
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-zinc-200/80 shadow-xs"

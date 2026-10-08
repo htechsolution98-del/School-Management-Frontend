@@ -185,7 +185,7 @@ export default function StockAndLedgerPage() {
               if (items.length > 0) setOpeningForm(prev => ({ ...prev, item: items[0].id }));
               setIsOpeningModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" /> Add Opening Stock
           </button>
@@ -477,7 +477,7 @@ export default function StockAndLedgerPage() {
                 <button type="button" onClick={() => setIsOpeningModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save Opening Stock
                 </button>
               </div>
@@ -568,7 +568,7 @@ export default function StockAndLedgerPage() {
                 <button type="button" onClick={() => setIsAdjustModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Apply Adjustment
                 </button>
               </div>
