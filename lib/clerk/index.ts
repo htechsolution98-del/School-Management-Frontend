@@ -10,3 +10,4 @@ export * from "./timetable";
 export * from "./leaves";
 export * from "./roll-numbers";
 export * from "./teacher-workload";
+export * from "../hr-config";

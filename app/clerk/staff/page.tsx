@@ -9,13 +9,18 @@ import { StatusBadge } from "@/components/superadmin/status-badge";
 import { StaffRecordForm, type StaffRole } from "@/components/clerk/staff-record-form";
 import { createStaff, getStaffCategories, getStaffList, updateStaff, deleteStaff, getDepartments } from "@/lib/staff";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
-import { formatDDMMYYYY } from "@/lib/table-utils";
+import { formatDDMMYYYY, toInputDate } from "@/lib/table-utils";
 import { normalizePhone, validateStaffRecord, type StaffErrors } from "@/lib/clerk/hr-validation";
-import type { CreateStaffPayload, Staff, Department } from "@/types";
+import {
+  getAttendanceSettings,
+  getSalaryStructures,
+} from "@/lib/hr-config";
+import { getLeaveTemplates, type LeaveTemplate } from "@/lib/clerk/leaves";
+import type { CreateStaffPayload, Staff, Department, AttendanceSetting, SalaryStructure } from "@/types";
 import "../clerk-workspace.css";
 
 interface StaffFeature { id?: number; feature_id?: number; feature_name?: string }
-const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, address: "", date_of_birth: "", salary: "", is_active: true };
+const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, attendance_setting: undefined, leave_template: undefined, salary_structure: undefined, address: "", date_of_birth: "", joining_date: "", salary: "", is_active: true };
 const ALLOWED_ROLES = ["TEACHER", "CLERK", "ASSISTANT CLERK", "LIBRARIAN", "FEES MANAGEMENT", "PRINCIPAL", "VICE PRINCIPAL", "TRANSPORTATION", "INVENTORY"];
 const message = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 const title = (value: string) => value.toLowerCase().replace(/\b\w/g, character => character.toUpperCase());
@@ -24,6 +29,9 @@ export default function ClerkStaffDashboard() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [features, setFeatures] = useState<StaffFeature[]>([]);
+  const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSetting[]>([]);
+  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplate[]>([]);
+  const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<number | null>(null);
@@ -37,7 +45,14 @@ export default function ClerkStaffDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const results = await Promise.allSettled([getStaffList(), getDepartments(), getStaffCategories()]);
+    const results = await Promise.allSettled([
+      getStaffList(),
+      getDepartments(),
+      getStaffCategories(),
+      getAttendanceSettings(),
+      getLeaveTemplates(),
+      getSalaryStructures(),
+    ]);
     const failures: string[] = [];
     if (results[0].status === "fulfilled") setStaff(results[0].value); else failures.push(message(results[0].reason, "Could not load staff."));
     if (results[1].status === "fulfilled") setDepartments(results[1].value); else failures.push(message(results[1].reason, "Could not load departments."));
@@ -47,6 +62,9 @@ export default function ClerkStaffDashboard() {
       const filtered = raw.filter(item => ALLOWED_ROLES.some(role => String(item.feature_name || "").toUpperCase().trim().includes(role)));
       setFeatures(filtered.length ? filtered : raw);
     } else failures.push(message(results[2].reason, "Could not load staff roles."));
+    if (results[3].status === "fulfilled") setAttendanceSettings(results[3].value);
+    if (results[4].status === "fulfilled") setLeaveTemplates(results[4].value);
+    if (results[5].status === "fulfilled") setSalaryStructures(results[5].value);
     setError(failures.join(" "));
     setLoading(false);
   }, []);
@@ -71,17 +89,33 @@ export default function ClerkStaffDashboard() {
     { key: "email", header: "Email", search: member => member.email, camelCase: false },
     { key: "mobile", header: "Mobile", search: member => member.mobile, camelCase: false },
     { key: "dob", header: "Date of birth", search: member => member.date_of_birth, render: member => formatDDMMYYYY(member.date_of_birth) },
-    { key: "joining", header: "Joined", search: member => member.joining_date, render: member => formatDDMMYYYY(member.joining_date) },
+    { key: "joining", header: "Joined", search: member => member.joining_date || member.created_at || "", render: member => formatDDMMYYYY(member.joining_date || member.created_at) },
     { key: "salary", header: "Salary (INR)", search: member => member.salary, numeric: true, render: member => member.salary == null ? "-" : Number(member.salary).toLocaleString("en-IN", { minimumFractionDigits: 2 }) },
+    { key: "shift", header: "Shift", search: member => attendanceSettings.find(s => s.id === member.attendance_setting)?.name || "-", camelCase: false },
+    { key: "structure", header: "Structure", search: member => salaryStructures.find(s => s.id === member.salary_structure)?.name || "-", camelCase: false },
     { key: "address", header: "Address", search: member => member.address, camelCase: false },
     { key: "status", header: "Status", search: member => member.is_active ? "Active" : "Inactive", render: member => <StatusBadge active={!!member.is_active} /> },
-  ], [departments, roleLabel]);
+  ], [departments, roleLabel, attendanceSettings, salaryStructures]);
 
   const closeForm = () => { if (busy.current) return; setFormOpen(false); setEditing(null); setErrors({}); };
   const openForm = (member?: Staff) => {
     setError(""); setSuccess(""); setErrors({}); setEditing(member || null);
     const feature = member && features.find(item => String(item.feature_id || item.id) === String(member.category) || String(item.feature_name || "").toUpperCase().trim() === String(member.category).toUpperCase().trim());
-    setForm(member ? { name: member.name || "", email: member.email || "", mobile: member.mobile || "", category: feature ? String(feature.feature_id || feature.id) : String(member.category), department: member.department ?? undefined, address: member.address || "", date_of_birth: toHTMLDate(member.date_of_birth), salary: member.salary || "", is_active: !!member.is_active } : { ...EMPTY_FORM });
+    setForm(member ? {
+      name: member.name || "",
+      email: member.email || "",
+      mobile: member.mobile || "",
+      category: feature ? String(feature.feature_id || feature.id) : String(member.category),
+      department: member.department ?? undefined,
+      attendance_setting: member.attendance_setting ?? undefined,
+      leave_template: member.leave_template ?? undefined,
+      salary_structure: member.salary_structure ?? undefined,
+      address: member.address || "",
+      date_of_birth: toHTMLDate(member.date_of_birth),
+      joining_date: toHTMLDate(member.joining_date),
+      salary: member.salary || "",
+      is_active: !!member.is_active,
+    } : { ...EMPTY_FORM });
     setFormOpen(true);
   };
 
@@ -93,7 +127,20 @@ export default function ClerkStaffDashboard() {
     if (Object.keys(fieldErrors).length) { document.getElementById(`staff-${Object.keys(fieldErrors)[0]}`)?.focus(); return; }
     busy.current = true; setSaving(true);
     try {
-      const payload = { ...form, name: form.name.trim(), email: form.email.trim().toLowerCase(), mobile: normalizePhone(form.mobile), address: form.address.trim(), salary: form.salary.trim(), date_of_birth: toApiDate(form.date_of_birth) };
+      const formattedJoiningDate = form.joining_date?.trim() ? toInputDate(form.joining_date.trim()) : (editing ? null : undefined);
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        mobile: normalizePhone(form.mobile),
+        address: form.address.trim(),
+        salary: form.salary.trim(),
+        date_of_birth: toApiDate(form.date_of_birth),
+        joining_date: formattedJoiningDate,
+        attendance_setting: form.attendance_setting ? Number(form.attendance_setting) : null,
+        leave_template: form.leave_template ? Number(form.leave_template) : null,
+        salary_structure: form.salary_structure ? Number(form.salary_structure) : null,
+      };
       if (editing) await updateStaff(editing.id, payload); else await createStaff(payload);
       setSuccess(editing ? "Staff record updated successfully." : "Staff member created successfully.");
       setFormOpen(false); setEditing(null); setForm({ ...EMPTY_FORM });

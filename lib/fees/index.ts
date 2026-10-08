@@ -7,4 +7,5 @@ export * from "./salary-components";
 export * from "./staff-salary";
 export * from "./salary-payments";
 export * from "./utils";
+export * from "../hr-config";
 export type * from "@/types/fees";

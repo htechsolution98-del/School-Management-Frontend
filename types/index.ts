@@ -87,9 +87,14 @@ export interface Staff {
   mobile: string | null;
   category: StaffCategory;
   department: number | null;
+  designation?: string | null;
+  attendance_setting?: number | null;
+  leave_template?: number | null;
+  salary_structure?: number | null;
   address: string | null;
   date_of_birth: string | null;
   joining_date: string | null;
+  exit_date?: string | null;
   salary: string | null;
   is_active: boolean;
   created_at: string | null;
@@ -103,9 +108,17 @@ export interface CreateStaffPayload {
   mobile: string;
   category: StaffCategory | string;
   department?: number;
+  designation?: string;
+  attendance_setting?: number | null;
+  leave_template?: number | null;
+  salary_structure?: number | null;
   address: string;
   date_of_birth: string;
+  joining_date?: string | null;
+  exit_date?: string | null;
   salary: string;
   is_active: boolean;
 }
+
+export * from "./hr-config";
 

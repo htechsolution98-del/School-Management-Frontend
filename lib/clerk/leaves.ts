@@ -9,15 +9,23 @@ export interface LeaveDay {
 
 export interface LeaveRequest {
   id: number;
+  staff?: number;
   staff_name: string;
-  submission_date: string;
+  submission_date?: string;
   start_date: string;
   end_date: string;
-  total_requested_days: number;
-  leave_type: string; // e.g., "CASUAL", "SICK", etc.
+  total_days?: number;
+  total_requested_days?: number;
+  leave_type: string | number; // e.g., "CASUAL", "SICK", etc.
+  leave_type_name?: string;
+  dynamic_leave_type?: number | null;
+  dynamic_leave_type_name?: string;
+  is_paid?: boolean;
   reason: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected";
   days: LeaveDay[];
+  leave_days?: LeaveDay[];
+  remaining_leaves?: any[];
 }
 
 export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
@@ -96,7 +104,9 @@ export async function approveAllLeaveDays(
 // Leave Templates API Helpers
 export interface LeaveTemplate {
   id: number;
-  time_line: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | string;
+  name?: string | null;
+  time_line?: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | string;
+  is_active?: boolean;
   created_at?: string;
 }
 
@@ -114,12 +124,13 @@ export async function getLeaveTemplates(): Promise<LeaveTemplate[]> {
 }
 
 export async function createLeaveTemplate(
-  timeline: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | string
+  data: string | { name?: string; time_line?: string; is_active?: boolean }
 ): Promise<LeaveTemplate> {
+  const payload = typeof data === "string" ? { time_line: data, name: data } : data;
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-templates/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ time_line: timeline }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     let message = "Failed to create leave template.";
@@ -134,12 +145,13 @@ export async function createLeaveTemplate(
 
 export async function updateLeaveTemplate(
   id: number,
-  timeline: string
+  data: string | { name?: string; time_line?: string; is_active?: boolean }
 ): Promise<LeaveTemplate> {
+  const payload = typeof data === "string" ? { time_line: data } : data;
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-templates/${id}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ time_line: timeline }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     let message = "Failed to update leave template.";
@@ -169,10 +181,18 @@ export async function deleteLeaveTemplate(id: number): Promise<void> {
 // Leave Types API Helpers
 export interface LeaveTypePayload {
   leave_type: string;
+  name?: string;
+  code?: string;
   leave_template: number;
   leave_num: number;
+  allocation_count?: number;
+  allocation_period?: "Monthly" | "Quarterly" | "Yearly" | string;
+  is_paid?: boolean;
   category: number;
-  is_carry_forward: boolean;
+  is_carry_forward?: boolean;
+  carry_forward?: boolean;
+  max_carry_forward?: number;
+  allow_encashment?: boolean;
 }
 
 export interface LeaveTypeRecord extends LeaveTypePayload {

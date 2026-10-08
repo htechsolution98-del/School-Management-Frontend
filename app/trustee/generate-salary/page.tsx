@@ -26,48 +26,20 @@ import {
   Building2,
   Download,
 } from "lucide-react";
-import { getSalaryPayments, generateSalary, getStaffList } from "@/lib/fees";
+import {
+  getSalaryPayments,
+  generateSalary,
+  getStaffList,
+  triggerPayrollGeneration,
+} from "@/lib/fees";
+import type {
+  ComponentSnapshot,
+  SalaryPayment,
+  PayrollComponentBreakdown,
+  PayrollBreakdownComponent,
+} from "@/types/fees";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface ComponentSnapshot {
-  component_id: number;
-  name: string;
-  component_type: "earning" | "deduction";
-  calculation_type: string;
-  value: string;
-  amount: string;
-}
-
-interface SalaryPayment {
-  id: number;
-  school: number;
-  staff: number;
-  staff_name: string;
-  staff_category: string;
-  salary_month: string;
-  basic_salary: string;
-  total_earnings: string;
-  total_deductions: string;
-  working_days: number;
-  present_days: string;
-  absent_days: number;
-  half_days: number;
-  attendance_deduction: string;
-  component_snapshot: ComponentSnapshot[];
-  net_salary: string;
-  paid_amount: string;
-  payment_mode: string;
-  payment_status: string;
-  transaction_id: string | null;
-  receipt_number: string;
-  payment_date: string;
-  note: string;
-  paid_by: number;
-  paid_by_username: string;
-  created_at: string;
-  updated_at: string;
-}
 
 // payment_record stores the full backend response so "View Receipt" shows real data
 interface StaffMember {
@@ -212,7 +184,8 @@ const StatCard = ({
 );
 
 // ─── Receipt Modal ──────────────────────────────────────────────────────────────
-// Shows ONLY data that came from the backend. No fabricated fields.
+// Dynamically renders component_breakdown JSON (Earnings on left, Deductions on right).
+// No hardcoded columns. Directly reflects the dynamic Attendance, Leave, and Payroll engine.
 
 const ReceiptModal = ({
   data,
@@ -220,210 +193,312 @@ const ReceiptModal = ({
 }: {
   data: SalaryPayment;
   onClose: () => void;
-}) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-      {/* Gradient Header */}
-      <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors"
-        >
-          <X size={15} />
-        </button>
+}) => {
+  const breakdown: PayrollComponentBreakdown = useMemo(() => {
+    if (data.component_breakdown && typeof data.component_breakdown === "object") {
+      return data.component_breakdown;
+    }
+    // Fallback if component_breakdown was not present
+    const earnings: PayrollBreakdownComponent[] = (data.component_snapshot || [])
+      .filter((c) => c.component_type === "earning")
+      .map((c) => ({
+        component_id: c.component_id,
+        name: c.name,
+        type: "Earning",
+        calc_type: c.calculation_type,
+        calc_base: null,
+        value: c.value,
+        amount: c.amount,
+      }));
+    const deductions: PayrollBreakdownComponent[] = (data.component_snapshot || [])
+      .filter((c) => c.component_type === "deduction")
+      .map((c) => ({
+        component_id: c.component_id,
+        name: c.name,
+        type: "Deduction",
+        calc_type: c.calculation_type,
+        calc_base: null,
+        value: c.value,
+        amount: c.amount,
+      }));
+    const pDays = parseFloat(data.present_days || "0");
+    const hDays = data.half_days || 0;
+    const payable = pDays + hDays * 0.5;
+    return {
+      working_days: data.working_days || 0,
+      eligible_working_days: data.working_days || 0,
+      effective_start: "",
+      effective_end: "",
+      present_days: pDays,
+      late_days: 0,
+      half_days: hDays,
+      paid_leaves: 0,
+      unpaid_leaves: 0,
+      lop_deduction_amount: data.attendance_deduction || "0.00",
+      payable_days: payable,
+      pro_rata_multiplier:
+        data.working_days > 0 ? (payable / data.working_days).toFixed(4) : "1.0000",
+      earnings,
+      deductions,
+      gross_earnings: data.total_earnings || "0.00",
+      total_deductions: data.total_deductions || "0.00",
+      net_salary: data.net_salary || "0.00",
+      calculated_at: data.payment_date || new Date().toISOString(),
+    };
+  }, [data]);
 
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-white/15 rounded-xl p-2.5">
-            <FileText size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-indigo-200 tracking-widest uppercase">
-              Salary Slip
-            </p>
-            <p className="font-bold text-lg leading-tight">{data.staff_name}</p>
-            <p className="text-xs text-indigo-200 mt-0.5">
-              {data.staff_category}
-            </p>
-          </div>
-        </div>
+  const proRataPct = useMemo(() => {
+    const val = parseFloat(breakdown.pro_rata_multiplier || "1") * 100;
+    return isNaN(val) ? "100.0" : val.toFixed(1);
+  }, [breakdown.pro_rata_multiplier]);
 
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "Month", val: formatMonth(data.salary_month) },
-            { label: "Receipt No.", val: data.receipt_number },
-            { label: "Status", val: data.payment_status },
-          ].map(({ label, val }) => (
-            <div key={label} className="bg-white/10 rounded-xl p-2.5">
-              <p className="text-[10px] text-indigo-200 uppercase tracking-wider">
-                {label}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Gradient Header */}
+        <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white relative shrink-0">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors"
+          >
+            <X size={16} />
+          </button>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-white/15 rounded-xl p-2.5">
+              <FileText size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-indigo-200 tracking-widest uppercase">
+                Dynamic Salary Slip & Breakdown
               </p>
-              <p className="font-semibold text-sm mt-0.5 capitalize truncate">
-                {val}
+              <p className="font-bold text-xl leading-tight">{data.staff_name}</p>
+              <p className="text-xs text-indigo-200 mt-0.5">
+                {data.staff_category}
               </p>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Scrollable Body */}
-      <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-        {/* Attendance */}
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-            Attendance
-          </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
-              {
-                label: "Working",
-                val: data.working_days,
-                color: "text-slate-700",
-              },
-              {
-                label: "Present",
-                val: data.present_days,
-                color: "text-emerald-600",
-              },
-              { label: "Absent", val: data.absent_days, color: "text-red-500" },
-              {
-                label: "Half Day",
-                val: data.half_days,
-                color: "text-amber-500",
-              },
-            ].map(({ label, val, color }) => (
-              <div
-                key={label}
-                className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-center"
-              >
-                <p className={`text-xl font-bold ${color}`}>{val}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
+              { label: "Salary Month", val: formatMonth(data.salary_month) },
+              { label: "Receipt No.", val: data.receipt_number },
+              { label: "Status", val: data.payment_status },
+            ].map(({ label, val }) => (
+              <div key={label} className="bg-white/10 rounded-xl p-2.5">
+                <p className="text-[10px] text-indigo-200 uppercase tracking-wider">
+                  {label}
+                </p>
+                <p className="font-semibold text-sm mt-0.5 capitalize truncate">
+                  {val}
+                </p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Earnings & Deductions */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
-              Total Earnings
-            </p>
-            <p className="text-xl font-bold text-emerald-700">
-              {formatCurrency(data.total_earnings)}
-            </p>
-            <p className="text-xs text-emerald-500 mt-1">
-              Basic: {formatCurrency(data.basic_salary)}
-            </p>
-          </div>
-          <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
-            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">
-              Total Deductions
-            </p>
-            <p className="text-xl font-bold text-red-600">
-              {formatCurrency(data.total_deductions)}
-            </p>
-            <p className="text-xs text-red-400 mt-1">
-              Attendance: {formatCurrency(data.attendance_deduction)}
-            </p>
-          </div>
-        </div>
+        {/* Scrollable Body */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Pro-rata Joining/Exit Notice (Priority 1) */}
+          {breakdown.eligible_working_days < breakdown.working_days && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-900">
+                  Pro-Rata Eligible Working Days Applied
+                </p>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Staff active for <span className="font-bold">{breakdown.eligible_working_days}</span> of{" "}
+                  <span>{breakdown.working_days}</span> calendar days ({breakdown.effective_start} to {breakdown.effective_end}).
+                  Salary components are pro-rated accordingly.
+                </p>
+              </div>
+            </div>
+          )}
 
-        {/* Salary Components */}
-        {data.component_snapshot?.length > 0 && (
+          {/* Attendance & Calculation Engine Metrics */}
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-              Salary Components
-            </p>
-            <div className="space-y-1.5">
-              {data.component_snapshot.map((c) => (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Attendance & Calculation Metrics
+              </p>
+              <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                Factor: {proRataPct}% ({breakdown.payable_days} / {breakdown.working_days} days)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {[
+                { label: "Working Days", val: breakdown.working_days, color: "text-slate-700" },
+                { label: "Present Days", val: breakdown.present_days, color: "text-emerald-600" },
+                { label: "Paid Leaves", val: breakdown.paid_leaves, color: "text-blue-600" },
+                { label: "Half Days (×0.5)", val: breakdown.half_days, color: "text-amber-500" },
+                { label: "Late Punches", val: breakdown.late_days, color: "text-violet-600" },
+                { label: "Unpaid Leaves", val: breakdown.unpaid_leaves, color: "text-red-500" },
+                { label: "Payable Days", val: breakdown.payable_days, color: "text-indigo-700 font-extrabold" },
+                { label: "Pro-Rata Factor", val: `${proRataPct}%`, color: "text-indigo-700 font-extrabold" },
+              ].map(({ label, val, color }) => (
                 <div
-                  key={c.component_id}
-                  className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5"
+                  key={label}
+                  className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {c.name}
-                    </p>
-                    <p className="text-xs text-slate-400 capitalize">
-                      {c.component_type} · {c.calculation_type} · {c.value}
-                    </p>
-                  </div>
-                  <p
-                    className={`text-sm font-bold tabular-nums ${c.component_type === "earning"
-                      ? "text-emerald-600"
-                      : "text-red-500"
-                      }`}
-                  >
-                    {c.component_type === "deduction" ? "−" : "+"}
-                    {formatCurrency(c.amount)}
-                  </p>
+                  <p className={`text-lg font-bold ${color}`}>{val}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide">{label}</p>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Net Salary Banner */}
-        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-4 text-white flex justify-between items-center">
-          <div>
-            <p className="text-xs text-indigo-200">Net Salary Paid</p>
-            <p className="text-2xl font-bold mt-0.5 tabular-nums">
-              {formatCurrency(data.net_salary)}
-            </p>
+          {/* Dynamic 2-Column Salary Components (Earnings on Left, Deductions on Right) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Earnings Column */}
+            <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-emerald-600" /> Earnings
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600">
+                    {breakdown.earnings.length} item{breakdown.earnings.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="space-y-2 mt-3">
+                  {breakdown.earnings.map((c, idx) => (
+                    <div
+                      key={`${c.name}-${idx}`}
+                      className="flex items-start justify-between py-2 border-b border-emerald-50/80 last:border-0"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-bold text-slate-800 truncate">{c.name}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {c.calc_type === "Percentage"
+                            ? `${c.value}% of ${c.calc_base || "Basic"}`
+                            : `Fixed · ₹${c.value}`}
+                        </p>
+                      </div>
+                      <p className="text-xs font-bold text-emerald-700 tabular-nums shrink-0">
+                        +{formatCurrency(c.amount)}
+                      </p>
+                    </div>
+                  ))}
+                  {breakdown.earnings.length === 0 && (
+                    <p className="text-xs text-slate-400 py-4 text-center italic">No earnings found</p>
+                  )}
+                </div>
+              </div>
+              <div className="pt-3 border-t border-emerald-200 mt-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-900 uppercase">Gross Earnings</span>
+                <span className="text-base font-bold text-emerald-700 tabular-nums">
+                  {formatCurrency(breakdown.gross_earnings)}
+                </span>
+              </div>
+            </div>
+
+            {/* Deductions Column */}
+            <div className="bg-red-50/40 border border-red-100 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-red-100">
+                  <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet size={14} className="text-red-500" /> Deductions
+                  </span>
+                  <span className="text-xs font-semibold text-red-600">
+                    {breakdown.deductions.length} item{breakdown.deductions.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="space-y-2 mt-3">
+                  {breakdown.deductions.map((c, idx) => (
+                    <div
+                      key={`${c.name}-${idx}`}
+                      className="flex items-start justify-between py-2 border-b border-red-50/80 last:border-0"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-bold text-slate-800 truncate">{c.name}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {c.calc_type === "Percentage"
+                            ? `${c.value}% of ${c.calc_base || "Basic"}`
+                            : `Fixed · ₹${c.value}`}
+                        </p>
+                      </div>
+                      <p className="text-xs font-bold text-red-600 tabular-nums shrink-0">
+                        −{formatCurrency(c.amount)}
+                      </p>
+                    </div>
+                  ))}
+                  {breakdown.deductions.length === 0 && (
+                    <p className="text-xs text-slate-400 py-4 text-center italic">No deductions applied</p>
+                  )}
+                </div>
+              </div>
+              <div className="pt-3 border-t border-red-200 mt-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-red-900 uppercase">Total Deductions</span>
+                <span className="text-base font-bold text-red-600 tabular-nums">
+                  {formatCurrency(breakdown.total_deductions)}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-indigo-200">Payment Mode</p>
-            <p className="font-semibold capitalize mt-0.5">
-              {data.payment_mode}
-            </p>
-            {data.transaction_id && (
-              <p className="text-[10px] text-indigo-300 mt-0.5 font-mono">
-                {data.transaction_id}
+
+          {/* Net Salary Banner */}
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 text-white flex justify-between items-center shadow-md">
+            <div>
+              <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">Net Salary Payable</p>
+              <p className="text-3xl font-extrabold mt-1 tabular-nums">
+                {formatCurrency(breakdown.net_salary)}
               </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-indigo-200">Payment Mode</p>
+              <p className="font-semibold capitalize mt-0.5 text-sm">
+                {data.payment_mode}
+              </p>
+              {data.transaction_id && (
+                <p className="text-[10px] text-indigo-300 mt-0.5 font-mono">
+                  Txn: {data.transaction_id}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Meta Info */}
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Processed / Paid on</span>
+              <span className="text-slate-700 font-medium">
+                {formatDate(data.payment_date)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Processed by</span>
+              <span className="text-slate-700 font-medium">
+                {data.paid_by_username}
+              </span>
+            </div>
+            {data.note && (
+              <div className="flex justify-between text-xs gap-4">
+                <span className="text-slate-400 shrink-0">Note</span>
+                <span className="text-slate-700 font-medium text-right">
+                  {data.note}
+                </span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Meta Info */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-2">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Paid on</span>
-            <span className="text-slate-700 font-medium">
-              {formatDate(data.payment_date)}
-            </span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Processed by</span>
-            <span className="text-slate-700 font-medium">
-              {data.paid_by_username}
-            </span>
-          </div>
-          {data.note && (
-            <div className="flex justify-between text-xs gap-4">
-              <span className="text-slate-400 shrink-0">Note</span>
-              <span className="text-slate-700 font-medium text-right">
-                {data.note}
-              </span>
-            </div>
-          )}
+        {/* Footer */}
+        <div className="border-t border-slate-100 p-4 flex gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+          >
+            Close
+          </button>
+          <button className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200">
+            <Download size={14} /> Download PDF
+          </button>
         </div>
       </div>
-
-      {/* Footer */}
-      <div className="border-t border-slate-100 p-4 flex gap-3">
-        <button
-          onClick={onClose}
-          className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
-        >
-          Close
-        </button>
-        <button className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200">
-          <Download size={14} /> Download PDF
-        </button>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Generate Salary Modal ──────────────────────────────────────────────────────
 //
@@ -452,6 +527,10 @@ const GenerateModal = ({
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [missingPunchWarning, setMissingPunchWarning] = useState<{
+    message: string;
+    dates?: string[];
+  } | null>(null);
   const [staffOptions, setStaffOptions] = useState<StaffMember[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState<number>(0);
@@ -493,6 +572,7 @@ const GenerateModal = ({
       return;
     }
     setError("");
+    setMissingPunchWarning(null);
     setLoading(true);
 
     // ── Backend payload — staff id only, no category, no receipt_number ───
@@ -514,12 +594,21 @@ const GenerateModal = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = await generateSalary(body as any);
       onSuccess(data);
-    } catch (e) {
+    } catch (e: any) {
       const msg =
-        e instanceof Error
-          ? e.message
-          : "Failed to generate salary.";
+        e?.data?.message ||
+        (e instanceof Error ? e.message : "Failed to generate salary.");
       setError(msg);
+      if (
+        e?.data?.requires_regularization ||
+        msg.toLowerCase().includes("regularization") ||
+        msg.toLowerCase().includes("missing punch")
+      ) {
+        setMissingPunchWarning({
+          message: msg,
+          dates: e?.data?.dates || [],
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -754,12 +843,39 @@ const GenerateModal = ({
             />
           </div>
 
-          {error && (
+          {missingPunchWarning ? (
+            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-900">
+                  ⚠️ Action Required: Missing Punch Detected
+                </p>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  {missingPunchWarning.message}
+                </p>
+                {missingPunchWarning.dates && missingPunchWarning.dates.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {missingPunchWarning.dates.map((d) => (
+                      <span
+                        key={d}
+                        className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-semibold rounded-md border border-amber-300 font-mono"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[10px] text-amber-700 mt-2 font-medium">
+                  Calculation has been aborted in accordance with Priority 2. Attendance must be regularized and approved before salary can be calculated.
+                </p>
+              </div>
+            </div>
+          ) : error ? (
             <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
               <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
               <p className="text-xs text-red-600 leading-relaxed">{error}</p>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Footer */}
@@ -853,8 +969,8 @@ const MonthPicker = ({
               data-monthpicker
               onClick={() => { onChange(m.val); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${value === m.val
-                  ? "bg-indigo-50 text-indigo-700 font-semibold"
-                  : "text-slate-700"
+                ? "bg-indigo-50 text-indigo-700 font-semibold"
+                : "text-slate-700"
                 }`}
             >
               {m.label}
@@ -883,6 +999,17 @@ export default function GenerateSalaryPage() {
     msg: string;
     type: "success" | "error";
   } | null>(null);
+  const [engineRunning, setEngineRunning] = useState(false);
+  const [skippedStaffWarnings, setSkippedStaffWarnings] = useState<
+    Array<{
+      staff_id: number;
+      staff_name: string;
+      flag: string;
+      reason: string;
+      missing_punch_dates?: string[];
+    }>
+  >([]);
+
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     setToast({ msg, type });
     setTimeout(() => {
@@ -904,6 +1031,31 @@ export default function GenerateSalaryPage() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleRunPayrollEngine = async () => {
+    setEngineRunning(true);
+    setSkippedStaffWarnings([]);
+    try {
+      const result = await triggerPayrollGeneration(salaryMonth);
+      if (result.skipped && result.skipped.length > 0) {
+        setSkippedStaffWarnings(result.skipped);
+        showToast(
+          `Payroll generated with warnings: ${result.total_processed} processed, ${result.total_skipped} skipped.`,
+          "error"
+        );
+      } else {
+        showToast(
+          `Payroll engine completed successfully! ${result.total_processed} payslip(s) generated.`,
+          "success"
+        );
+      }
+      await fetchStaff(salaryMonth, true);
+    } catch (err: any) {
+      showToast(err?.message || "Failed to run payroll engine.", "error");
+    } finally {
+      setEngineRunning(false);
+    }
+  };
 
   useEffect(() => {
     fetchStaff(salaryMonth);
@@ -1049,61 +1201,119 @@ export default function GenerateSalaryPage() {
         )}
       </AnimatePresence>
       {/* ── Page Header Banner ── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
-          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
-                <Sparkles className="h-3.5 w-3.5" /> Payroll Disbursement
-              </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Generate Salary</h1>
-              <p className="text-purple-100 max-w-xl text-sm md:text-base">
-                Process monthly disbursements, manage payment receipts, and record payouts.
-              </p>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
+              <Sparkles className="h-3.5 w-3.5" /> Payroll Disbursement
             </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Generate Salary</h1>
+            <p className="text-purple-100 max-w-xl text-sm md:text-base">
+              Process monthly disbursements, manage payment receipts, and record payouts.
+            </p>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() =>
-                  setSelectedStaff({
-                    id: 0,
-                    name: "",
-                    role: "",
-                    department: "",
-                    basic_salary: 0,
-                    salary_generated: false,
-                  })
-                }
-                className="px-5 py-2.5 rounded-xl bg-white text-[#5826df] hover:bg-purple-50 text-sm font-bold transition flex items-center gap-2 shadow-md"
-              >
-                <IndianRupee size={16} />
-                Generate Salary
-              </button>
-              <div className="bg-white/10 border border-white/20 rounded-xl text-white">
-                <MonthPicker value={salaryMonth} onChange={setSalaryMonth} />
-              </div>
-              <button
-                onClick={() => setStaffList([])}
-                disabled={refreshing || pageLoading}
-                title="Refresh"
-                className="p-2.5 border border-white/20 rounded-xl text-white hover:bg-white/20 transition-colors disabled:opacity-40"
-              >
-                <RefreshCw
-                  size={16}
-                  className={refreshing ? "animate-spin" : ""}
-                />
-              </button>
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRunPayrollEngine}
+              disabled={engineRunning || refreshing || pageLoading}
+              className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm shadow-violet-200"
+              title="Run dynamic calculation engine for all staff for this month"
+            >
+              {engineRunning ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Running Engine…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={15} />
+                  Run Payroll Engine
+                </>
+              )}
+            </button>
+            <button
+              onClick={() =>
+                setSelectedStaff({
+                  id: 0,
+                  name: "",
+                  role: "",
+                  department: "",
+                  basic_salary: 0,
+                  salary_generated: false,
+                })
+              }
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm shadow-indigo-200"
+            >
+              <IndianRupee size={15} />
+              Generate Salary
+            </button>
+            <MonthPicker value={salaryMonth} onChange={setSalaryMonth} />
+            <button
+              onClick={() => fetchStaff(salaryMonth, true)}
+              disabled={refreshing || pageLoading || engineRunning}
+              title="Refresh"
+              className="p-2 border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+            >
+              <RefreshCw
+                size={15}
+                className={refreshing ? "animate-spin" : ""}
+              />
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* ── Page Body ── */}
-        <div className="space-y-6">
+      {/* ── Page Body ── */}
+      <div className="space-y-6">
         {/* Loading */}
         {pageLoading && (
           <div className="flex flex-col items-center justify-center py-36 gap-3">
             <Loader2 size={32} className="animate-spin text-indigo-400" />
             <p className="text-sm text-slate-400">Loading salary data…</p>
+          </div>
+        )}
+
+        {/* Skipped Staff / Missing Punch Warning Banner */}
+        {skippedStaffWarnings.length > 0 && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-amber-900">
+                    Attendance Regularization Required ({skippedStaffWarnings.length} staff member{skippedStaffWarnings.length > 1 ? "s" : ""} skipped)
+                  </h3>
+                  <p className="text-xs text-amber-800 mt-1">
+                    The following staff members have unregularized missing punches (check-in without check-out). Their payroll calculation was aborted in accordance with Priority 2:
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {skippedStaffWarnings.map((item) => (
+                      <div
+                        key={item.staff_id}
+                        className="bg-white/90 border border-amber-200 rounded-xl px-3.5 py-2 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span className="font-semibold text-slate-900">{item.staff_name}</span>
+                        <span className="text-[11px] text-amber-700">{item.reason}</span>
+                        {item.missing_punch_dates && item.missing_punch_dates.length > 0 && (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-medium">
+                            Missing Punches: {item.missing_punch_dates.join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSkippedStaffWarnings([])}
+                className="p-1 text-amber-600 hover:text-amber-900 rounded-lg hover:bg-amber-100 transition-colors"
+                title="Dismiss warning"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
         )}
 

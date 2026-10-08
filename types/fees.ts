@@ -275,6 +275,10 @@ export type SalaryComponent = {
   id: number;
   name: string;
   component_type: ComponentType;
+  type?: "Earning" | "Deduction";
+  calc_type?: "Fixed" | "Percentage" | "Formula" | string;
+  calc_base?: string | null;
+  value?: number | string;
 };
 
 export type StaffMember = {
@@ -283,6 +287,7 @@ export type StaffMember = {
   category?: string;
   employee_id?: string;
   designation?: string;
+  salary_structure?: number | null;
 };
 
 export type StaffSalaryComponent = {
@@ -314,6 +319,37 @@ export interface ComponentSnapshot {
   amount: string;
 }
 
+export interface PayrollBreakdownComponent {
+  component_id?: number | null;
+  name: string;
+  type: string;
+  calc_type: string;
+  calc_base?: string | null;
+  value: string;
+  amount: string;
+}
+
+export interface PayrollComponentBreakdown {
+  working_days: number;
+  eligible_working_days: number;
+  effective_start: string;
+  effective_end: string;
+  present_days: number;
+  late_days: number;
+  half_days: number;
+  paid_leaves: number;
+  unpaid_leaves: number;
+  lop_deduction_amount: string;
+  payable_days: number;
+  pro_rata_multiplier: string;
+  earnings: PayrollBreakdownComponent[];
+  deductions: PayrollBreakdownComponent[];
+  gross_earnings: string;
+  total_deductions: string;
+  net_salary: string;
+  calculated_at: string;
+}
+
 export interface SalaryPayment {
   id: number;
   school: number;
@@ -330,6 +366,7 @@ export interface SalaryPayment {
   half_days: number;
   attendance_deduction: string;
   component_snapshot: ComponentSnapshot[];
+  component_breakdown?: PayrollComponentBreakdown;
   net_salary: string;
   paid_amount: string;
   payment_mode: string;

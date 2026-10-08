@@ -83,6 +83,7 @@ export default function MyLeavesPage() {
   const [endDate, setEndDate] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState<string>("");
   const [reason, setReason] = useState("");
+  const [isHalfDay, setIsHalfDay] = useState(false);
   const [totalDays, setTotalDays] = useState(0);
 
   // Processing specific actions (e.g. canceling a request)
@@ -108,13 +109,15 @@ export default function MyLeavesPage() {
   // Compute total days automatically when start/end dates change
   // Note: startDate/endDate are stored as DD-MM-YYYY (API format)
   useEffect(() => {
-    if (startDate && endDate) {
+    if (isHalfDay) {
+      setTotalDays(0.5);
+    } else if (startDate && endDate) {
       const days = calculateDaysBetween(startDate, endDate);
       setTotalDays(days);
     } else {
       setTotalDays(0);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, isHalfDay]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -141,6 +144,7 @@ export default function MyLeavesPage() {
     setEndDate("");
     setLeaveTypeId("");
     setReason("");
+    setIsHalfDay(false);
     setTotalDays(0);
     setIsDialogOpen(true);
   };
@@ -149,6 +153,7 @@ export default function MyLeavesPage() {
     setEditingRequest(req);
     setStartDate(req.start_date);
     setEndDate(req.end_date);
+    setIsHalfDay(Number(req.total_days) === 0.5);
     
     // Find matching leave type ID from balances if possible
     const match = balances.find((b) => b.leave_type.toUpperCase() === String(req.leave_type).toUpperCase());
@@ -166,13 +171,23 @@ export default function MyLeavesPage() {
       return;
     }
 
+    const selectedBal = balances.find(
+      (b) => String(b.leave_type_id ?? b.leave_type) === leaveTypeId
+    );
+    const available = Number(selectedBal?.remaining ?? (selectedBal as any)?.remaining_leaves ?? 0);
+    if (selectedBal && selectedBal.is_paid !== false && totalDays > available) {
+      toast.error(`Insufficient leave balance. You have ${available} days available.`);
+      return;
+    }
+
     setIsSubmitting(true);
     const payload = {
       start_date: startDate,
-      end_date: endDate,
+      end_date: isHalfDay ? startDate : endDate,
       total_days: totalDays,
       reason,
       leave_type: Number(leaveTypeId),
+      dynamic_leave_type: Number(leaveTypeId),
     };
 
     try {
@@ -835,10 +850,31 @@ export default function MyLeavesPage() {
                   value={toHTMLDate(endDate)}
                   onChange={(e) => setEndDate(toApiDate(e.target.value))}
                   required
+                  disabled={isHalfDay}
                   min={toHTMLDate(startDate) || getTomorrowDateString()}
-                  className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+                  className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
                 />
               </div>
+            </div>
+
+            {/* Half Day Option */}
+            <div className="flex items-center space-x-2 pt-0.5 pb-0.5">
+              <input
+                type="checkbox"
+                id="half-day"
+                checked={isHalfDay}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setIsHalfDay(checked);
+                  if (checked && startDate) {
+                    setEndDate(startDate);
+                  }
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="half-day" className="text-xs font-medium cursor-pointer">
+                Half Day Request (0.5 Day)
+              </Label>
             </div>
 
             {totalDays > 0 && (
@@ -858,20 +894,63 @@ export default function MyLeavesPage() {
                         (b) => String(b.leave_type_id ?? b.leave_type) === leaveTypeId
                       );
                       return selectedBal
-                        ? getLeaveTypeDisplay((selectedBal as any).leave_type_name ?? selectedBal.leave_type)
+                        ? `${getLeaveTypeDisplay((selectedBal as any).leave_type_name ?? selectedBal.leave_type)} (Available: ${selectedBal.remaining ?? (selectedBal as any).remaining_leaves ?? 0} d)`
                         : undefined;
                     })() : undefined}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
-                  {balances.map((bal) => (
-                    <SelectItem key={bal.leave_type_id ?? bal.leave_type} value={String(bal.leave_type_id ?? bal.leave_type)}>
-                      {getLeaveTypeDisplay((bal as any).leave_type_name ?? bal.leave_type)} (Remaining: {bal.remaining ?? (bal as any).remaining_leaves ?? 0})
-                    </SelectItem>
-                  ))}
+                  {balances.map((bal) => {
+                    const rem = Number(bal.remaining ?? (bal as any).remaining_leaves ?? 0);
+                    const isPaid = bal.is_paid !== false;
+                    return (
+                      <SelectItem key={bal.leave_type_id ?? bal.leave_type} value={String(bal.leave_type_id ?? bal.leave_type)}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{getLeaveTypeDisplay((bal as any).leave_type_name ?? bal.leave_type)}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-semibold ${rem > 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"}`}>
+                            {rem}d left {isPaid ? "" : "• LOP"}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Dynamic Balance Preview Card */}
+            {leaveTypeId && (() => {
+              const selectedBal = balances.find(
+                (b) => String(b.leave_type_id ?? b.leave_type) === leaveTypeId
+              );
+              if (!selectedBal) return null;
+              const rem = Number(selectedBal.remaining ?? (selectedBal as any).remaining_leaves ?? 0);
+              const allocated = Number(selectedBal.allocated ?? 0) + Number(selectedBal.carry_forward ?? 0);
+              const used = Number(selectedBal.used ?? 0);
+              const pending = Number(selectedBal.pending ?? 0);
+              const isOverdraft = selectedBal.is_paid !== false && totalDays > rem;
+
+              return (
+                <div className={`p-3 rounded-lg border text-xs space-y-1.5 ${isOverdraft ? 'bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/50 text-rose-800 dark:text-rose-300' : 'bg-zinc-50 border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800'}`}>
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>Balance Overview</span>
+                    <span className={isOverdraft ? "text-rose-600 font-bold" : "text-emerald-600 font-bold"}>
+                      Available: {rem} days {selectedBal.is_paid === false ? "(Unpaid / LOP)" : "(Paid)"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-1 text-[11px] text-muted-foreground">
+                    <div>Allocated: <span className="font-semibold text-foreground">{allocated}d</span></div>
+                    <div>Used: <span className="font-semibold text-foreground">{used}d</span></div>
+                    <div>Pending: <span className="font-semibold text-foreground">{pending}d</span></div>
+                  </div>
+                  {isOverdraft && (
+                    <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 pt-1">
+                      ⚠️ Insufficient balance ({totalDays} days requested, but only {rem} available).
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="space-y-1.5">
               <Label htmlFor="reason" className="text-xs font-semibold">Reason for Leave</Label>

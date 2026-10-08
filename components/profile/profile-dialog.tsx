@@ -158,7 +158,7 @@ export function ProfileDialog({
                   <DetailRow icon={UserRound} label="Staff name" value={staff.name} />
                   <DetailRow icon={BadgeCheck} label="Category" value={staff.category} />
                   <DetailRow icon={Building2} label="Department" value={staff.department} />
-                  <DetailRow icon={CalendarDays} label="Joining date" value={formatDate(staff.joining_date)} />
+                  <DetailRow icon={CalendarDays} label="Joining date" value={formatDate(staff.joining_date || (staff as any).created_at)} />
                   <DetailRow icon={UserRound} label="Address" value={staff.address} />
                 </>
               )}
