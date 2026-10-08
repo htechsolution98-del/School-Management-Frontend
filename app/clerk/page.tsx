@@ -307,16 +307,35 @@ export default function ClerkDashboard() {
 
   return (
     <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-6">
-      <div className="office-actions justify-end">
-        <span className="mr-auto text-xs text-slate-500">{formatDDMMYYYY(new Date())}</span>
-        <Link href="/clerk/manual-admission" className="office-primary inline-flex items-center gap-2"><UserPlus size={15} /> New admission</Link>
-        <button onClick={() => loadDashboardData(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold"><RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />{refreshing ? "Updating" : "Refresh"}</button>
+      {/* ─── Top Sub-bar: Date & Action Buttons ───────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200/80 px-3.5 py-2.5 rounded-xl shadow-2xs">
+          <Calendar className="h-4 w-4 text-[#5826df]" />
+          <span>{formatDDMMYYYY(new Date())}</span>
+        </div>
+        <div className="flex items-center gap-2.5 ml-auto">
+          <Link
+            href="/clerk/manual-admission"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec6] text-white px-4 py-2.5 text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/20 transition-all active:scale-95"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>+ New admission</span>
+          </Link>
+          <button
+            onClick={() => loadDashboardData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition-all active:scale-95"
+          >
+            <RefreshCw className={`h-4 w-4 text-slate-600 ${refreshing ? "animate-spin" : ""}`} />
+            <span>{refreshing ? "Updating" : "Refresh"}</span>
+          </button>
+        </div>
       </div>
+
+      {/* ─── Search Bar ─────────────────────────────────────────────────── */}
       <div className="relative z-30">
-        <div className="dashboard-search bg-white flex items-center gap-3 transition-all focus-within:ring-2 focus-within:ring-teal-600/20">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 ml-1">
-            <Search size={20} />
-          </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs px-4 py-3 flex items-center gap-3 focus-within:ring-2 focus-within:ring-[#5826df]/20 focus-within:border-[#5826df]/40 transition-all">
+          <Search className="h-5 w-5 text-[#5826df] shrink-0" />
           <input
             type="text"
             placeholder="Find a student by name, GR number, roll number or class..."
@@ -328,12 +347,13 @@ export default function ClerkDashboard() {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
             >
               <X size={16} />
             </button>
           )}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-xl text-slate-500 text-xs font-bold shrink-0 mr-1">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#eef2ff] border border-[#e0e7ff] rounded-xl text-[#4338ca] text-xs font-bold shrink-0">
+            <Users className="h-3.5 w-3.5" />
             <span>{students.length} Students Active</span>
           </div>
         </div>
@@ -354,7 +374,7 @@ export default function ClerkDashboard() {
               >
                 <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
                   <span>Search Results ({searchResults.length})</span>
-                  <span className="text-teal-600">Showing top matches</span>
+                  <span className="text-[#5826df]">Showing top matches</span>
                 </div>
                 {searchResults.length === 0 ? (
                   <div className="p-8 text-center text-slate-400">
@@ -368,19 +388,19 @@ export default function ClerkDashboard() {
                         key={s.id}
                         href={`/clerk/students?search=${encodeURIComponent(s.gr_no || s.name)}`}
                         onClick={() => setIsSearchFocused(false)}
-                        className="flex items-center justify-between p-3.5 hover:bg-teal-50/50 transition-colors group"
+                        className="flex items-center justify-between p-3.5 hover:bg-indigo-50/50 transition-colors group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-600 to-teal-500 text-white font-bold text-sm flex items-center justify-center shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#5826df] to-indigo-500 text-white font-bold text-sm flex items-center justify-center shadow-xs">
                             {(s.name?.[0] || "S").toUpperCase()}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900 group-hover:text-teal-600 transition-colors">
+                              <span className="font-bold text-slate-900 group-hover:text-[#5826df] transition-colors">
                                 {s.name} {s.surname || ""}
                               </span>
                               {s.is_rte && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 border border-teal-200">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
                                   RTE
                                 </span>
                               )}
@@ -395,7 +415,7 @@ export default function ClerkDashboard() {
                           <span className="font-mono text-xs font-bold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
                             GR: {s.gr_no || "Pending"}
                           </span>
-                          <ChevronRight size={16} className="text-slate-400 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all" />
+                          <ChevronRight size={16} className="text-slate-400 group-hover:text-[#5826df] group-hover:translate-x-0.5 transition-all" />
                         </div>
                       </Link>
                     ))}
@@ -407,448 +427,415 @@ export default function ClerkDashboard() {
         </AnimatePresence>
       </div>
 
-      {/* ─── 5 Key Metrics Cards ─────────────────────────────────────────── */}
+      {/* ─── 5 Key Metrics Pastel Cards ──────────────────────────────────── */}
       <div className="dashboard-metrics grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        {/* 1. Total Students */}
+        {/* 1. Total Students (Sky Blue Pastel) */}
         <Link
           href="/clerk/students"
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-teal-300 transition-all group flex flex-col justify-between"
+          className="bg-gradient-to-br from-[#eff6ff] to-[#f8fafc] p-5 rounded-2xl border border-blue-100/90 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all group flex flex-col justify-between relative overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Students</span>
-            <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Users size={20} />
-            </div>
+          {/* Subtle Dot Matrix Pattern */}
+          <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-blue-400">
+            <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : totalStudentsCount.toLocaleString("en-IN")}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Users size={22} />
             </div>
-            <p className="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-1">
-              <CheckCircle2 size={12} /> Active Enrolled
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">TOTAL STUDENTS</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-slate-900">
+              {loading ? <Loader2 size={24} className="animate-spin text-blue-400" /> : totalStudentsCount.toLocaleString("en-IN")}
+            </div>
+            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active Enrolled
             </p>
           </div>
         </Link>
 
-        {/* 2. New Admissions */}
+        {/* 2. New Admissions (Mint Green Pastel) */}
         <Link
           href="/clerk/admission-form"
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-teal-300 transition-all group flex flex-col justify-between"
+          className="bg-gradient-to-br from-[#f0fdf4] to-[#f8fafc] p-5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-200 transition-all group flex flex-col justify-between relative overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">New Admissions</span>
-            <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UserPlus size={20} />
-            </div>
+          <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-emerald-400">
+            <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : newAdmissionsCount.toLocaleString("en-IN")}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <UserPlus size={22} />
             </div>
-            <p className="text-xs font-medium text-teal-600 mt-1 flex items-center gap-1">
-              <Sparkles size={12} /> Total Applications
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">NEW ADMISSIONS</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-slate-900">
+              {loading ? <Loader2 size={24} className="animate-spin text-emerald-400" /> : newAdmissionsCount.toLocaleString("en-IN")}
+            </div>
+            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Total Applications
             </p>
           </div>
         </Link>
 
-        {/* 3. Pending Admissions */}
+        {/* 3. Pending Review (Warm Amber Pastel) */}
         <div
           onClick={() => {
             const el = document.getElementById("recent-admissions-section");
             el?.scrollIntoView({ behavior: "smooth" });
             setAdmissionFilter("pending");
           }}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-amber-300 transition-all group flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-br from-[#fffbeb] to-[#f8fafc] p-5 rounded-2xl border border-amber-100/90 shadow-2xs hover:shadow-md hover:border-amber-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Review</span>
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Clock size={20} />
-            </div>
+          <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-amber-400">
+            <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold text-amber-700">
-              {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : pendingAdmissionsCount.toLocaleString("en-IN")}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Clock size={22} />
             </div>
-            <p className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
-              <AlertCircle size={12} /> Awaiting GR No.
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">PENDING REVIEW</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-slate-900">
+              {loading ? <Loader2 size={24} className="animate-spin text-amber-400" /> : pendingAdmissionsCount.toLocaleString("en-IN")}
+            </div>
+            <p className="text-xs font-semibold text-amber-600 mt-2 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500" /> Awaiting GR No.
             </p>
           </div>
         </div>
 
-        {/* 4. Pending Documents */}
+        {/* 4. Pending Docs (Soft Rose Pastel) */}
         <div
           onClick={() => {
             const el = document.getElementById("pending-docs-section");
             el?.scrollIntoView({ behavior: "smooth" });
             setDocFilter("pending");
           }}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all group flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-br from-[#fff1f2] to-[#f8fafc] p-5 rounded-2xl border border-rose-100/90 shadow-2xs hover:shadow-md hover:border-rose-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Docs</span>
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <FileCheck2 size={20} />
-            </div>
+          <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-rose-400">
+            <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold text-rose-700">
-              {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : pendingDocumentsCount.toLocaleString("en-IN")}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <FileCheck2 size={22} />
             </div>
-            <p className="text-xs font-medium text-rose-600 mt-1 flex items-center gap-1">
-              <AlertTriangle size={12} /> Needs Verification
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">PENDING DOCS</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-slate-900">
+              {loading ? <Loader2 size={24} className="animate-spin text-rose-400" /> : pendingDocumentsCount.toLocaleString("en-IN")}
+            </div>
+            <p className="text-xs font-semibold text-rose-600 mt-2 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-500" /> Needs Verification
             </p>
           </div>
         </div>
 
-        {/* 5. Today's Attendance */}
+        {/* 5. Today's Attendance (Soft Violet Pastel) */}
         <Link
           href="/clerk/location-settings"
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all group flex flex-col justify-between col-span-2 sm:col-span-1"
+          className="bg-gradient-to-br from-[#f5f3ff] to-[#f8fafc] p-5 rounded-2xl border border-indigo-100/90 shadow-2xs hover:shadow-md hover:border-indigo-200 transition-all group flex flex-col justify-between relative overflow-hidden col-span-1 sm:col-span-2 xl:col-span-1"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Today&apos;s Attendance</span>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <CalendarCheck2 size={20} />
-            </div>
+          <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-indigo-400">
+            <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-bold text-emerald-700">
-              {loading ? <Loader2 size={24} className="animate-spin text-slate-400" /> : `${attendanceRate}%`}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="w-11 h-11 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <CalendarCheck2 size={22} />
             </div>
-            <p className="text-xs font-medium text-slate-500 mt-1">
-              {attendanceStats.present} Present / {attendanceStats.total} Students
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">TODAY&apos;S ATTENDANCE</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-slate-900">
+              {loading ? <Loader2 size={24} className="animate-spin text-indigo-400" /> : `${attendanceStats.present}`}
+            </div>
+            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Present / {attendanceStats.total || totalStudentsCount} Students
             </p>
           </div>
         </Link>
       </div>
 
-      {/* ─── Quick Actions Shortcuts Bar ─────────────────────────────────── */}
-      <div className="dashboard-shortcuts">
-        <h3>Everyday essentials <span className="ml-2 text-xs font-normal text-slate-400">A little less searching. A lot more doing.</span></h3>
-        <div>
+      {/* ─── Everyday Essentials Quick Actions Grid ──────────────────────── */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6">
+        <div className="flex items-center">
+          <h3 className="text-base sm:text-lg font-bold text-[#2a1768]">Everyday essentials</h3>
+          <span className="text-xs text-slate-400 ml-3 hidden sm:inline">A little less searching. A lot more doing.</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-5">
+          {/* 1. + New Admission */}
           <Link
             href="/clerk/manual-admission"
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-sm shadow-teal-600/30 transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <UserPlus size={15} />
-            <span>+ New Admission</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6366f1] text-white shadow-2xs">
+                <UserPlus size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#5826df] transition-colors">+ New Admission</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#5826df] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 2. Search Student */}
           <Link
             href="/clerk/students"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <Users size={15} className="text-slate-600" />
-            <span>Search Student</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0284c7] text-white shadow-2xs">
+                <Search size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0284c7] transition-colors">Search Student</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0284c7] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 3. Verify Documents */}
           <button
             onClick={() => {
               const el = document.getElementById("pending-docs-section");
               el?.scrollIntoView({ behavior: "smooth" });
               setDocFilter("pending");
             }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group text-left"
           >
-            <FileCheck2 size={15} className="text-amber-600" />
-            <span>Verify Documents ({pendingDocumentsCount})</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f59e0b] text-white shadow-2xs">
+                <FileCheck2 size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#f59e0b] transition-colors">Verify Documents ({pendingDocumentsCount})</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#f59e0b] group-hover:translate-x-0.5 transition-all" />
           </button>
 
+          {/* 4. Certificates (LC/TC) */}
           <Link
             href="/clerk/certificates"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <Award size={15} className="text-teal-600" />
-            <span>Certificates (LC/TC)</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#10b981] text-white shadow-2xs">
+                <Award size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#10b981] transition-colors">Certificates (LC/TC)</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#10b981] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 5. G.R. Register Book */}
           <Link
             href="/clerk/general-register"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <BookOpen size={15} className="text-amber-600" />
-            <span>G.R. Register Book</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xs">
+                <BookOpen size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#2563eb] transition-colors">G.R. Register Book</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#2563eb] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 6. Student Promotion */}
           <Link
             href="/clerk/student-promotion"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <Rocket size={15} className="text-teal-600" />
-            <span>Student Promotion</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f43f5e] text-white shadow-2xs">
+                <Rocket size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#f43f5e] transition-colors">Student Promotion</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#f43f5e] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 7. Absentee Calling Desk */}
           <Link
             href="/clerk/absentee-desk"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <PhoneCall size={15} className="text-red-500" />
-            <span>Absentee Calling Desk</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0d9488] text-white shadow-2xs">
+                <PhoneCall size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0d9488] transition-colors">Absentee Calling Desk</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0d9488] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 8. Attendance Zone */}
           <Link
             href="/clerk/location-settings"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <MapPin size={15} className="text-emerald-600" />
-            <span>Attendance Zone</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7c3aed] text-white shadow-2xs">
+                <MapPin size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#7c3aed] transition-colors">Attendance Zone</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#7c3aed] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 9. Assign Division */}
           <Link
             href="/clerk/assign-division"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <Layers size={15} className="text-teal-600" />
-            <span>Assign Division</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ea580c] text-white shadow-2xs">
+                <Layers size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#ea580c] transition-colors">Assign Division</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#ea580c] group-hover:translate-x-0.5 transition-all" />
           </Link>
 
+          {/* 10. Assign Roll No */}
           <Link
             href="/clerk/assign-roll-no"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-all"
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
           >
-            <Hash size={15} className="text-teal-600" />
-            <span>Assign Roll No</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0891b2] text-white shadow-2xs">
+                <Hash size={16} />
+              </span>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0891b2] transition-colors">Assign Roll No</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0891b2] group-hover:translate-x-0.5 transition-all" />
           </Link>
         </div>
       </div>
 
       {/* ─── Grid: Today's Tasks & Today's Attendance Breakdown ──────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Tasks (2 Columns on Large Screens) */}
-        <div className="office-section lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
+        {/* Today's Administrative Tasks (2 Columns) */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                <Clock size={18} />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-[#5826df] flex items-center justify-center font-bold">
+                <FileCheck2 size={20} />
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Today&apos;s Administrative Tasks</h3>
                 <p className="text-xs text-slate-500">Action items needing clerk attention</p>
               </div>
             </div>
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-[#5826df] border border-indigo-100">
               {pendingAdmissionsCount + pendingDocumentsCount + pendingCertCount} Pending
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
             {/* Task 1: Pending Admissions */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-amber-300 hover:bg-amber-50/30 transition-all flex flex-col justify-between gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                    <UserPlus size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Pending Admissions</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {pendingAdmissionsCount} student application(s) awaiting GR No. assignment
-                    </p>
-                  </div>
+            <div
+              onClick={() => {
+                const el = document.getElementById("recent-admissions-section");
+                el?.scrollIntoView({ behavior: "smooth" });
+                setAdmissionFilter("pending");
+              }}
+              className="p-4 rounded-2xl bg-[#f0fdf4]/50 border border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50 transition-all flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <UserPlus size={18} />
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                  {pendingAdmissionsCount}
-                </span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Pending Admissions</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Applications awaiting review and approval
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  const el = document.getElementById("recent-admissions-section");
-                  el?.scrollIntoView({ behavior: "smooth" });
-                  setAdmissionFilter("pending");
-                }}
-                className="flex items-center justify-between w-full px-3 py-1.5 bg-white hover:bg-amber-100/60 rounded-xl text-xs font-bold text-amber-800 border border-slate-200 transition-colors"
-              >
-                <span>Review Applications</span>
-                <ChevronRight size={14} />
-              </button>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs shrink-0">
+                {pendingAdmissionsCount}
+              </span>
             </div>
 
             {/* Task 2: Pending Documents Verification */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-rose-300 hover:bg-rose-50/30 transition-all flex flex-col justify-between gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                    <FileCheck2 size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Document Verification</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {pendingDocumentsCount} document(s) uploaded by students needing approval
-                    </p>
-                  </div>
+            <div
+              onClick={() => {
+                const el = document.getElementById("pending-docs-section");
+                el?.scrollIntoView({ behavior: "smooth" });
+                setDocFilter("pending");
+              }}
+              className="p-4 rounded-2xl bg-[#fff1f2]/50 border border-rose-100 hover:border-rose-300 hover:bg-rose-50 transition-all flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <FileText size={18} />
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-900">
-                  {pendingDocumentsCount}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  const el = document.getElementById("pending-docs-section");
-                  el?.scrollIntoView({ behavior: "smooth" });
-                  setDocFilter("pending");
-                }}
-                className="flex items-center justify-between w-full px-3 py-1.5 bg-white hover:bg-rose-100/60 rounded-xl text-xs font-bold text-rose-800 border border-slate-200 transition-colors"
-              >
-                <span>Verify Documents</span>
-                <ChevronRight size={14} />
-              </button>
-            </div>
-
-            {/* Task 3: TC / Leaving Certificate Requests */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/30 transition-all flex flex-col justify-between gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
-                    <GraduationCap size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">TC / Certificate Requests</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {pendingCertCount} certificate request(s) awaiting processing & signature
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-200 text-teal-900">
-                  {pendingCertCount}
-                </span>
-              </div>
-              <Link
-                href="/clerk/leave-requests"
-                className="flex items-center justify-between w-full px-3 py-1.5 bg-white hover:bg-teal-100/60 rounded-xl text-xs font-bold text-teal-800 border border-slate-200 transition-colors"
-              >
-                <span>Process Certificates</span>
-                <ChevronRight size={14} />
-              </Link>
-            </div>
-
-            {/* Task 4: Roll No & Division Allocation */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/30 transition-all flex flex-col justify-between gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
-                    <Layers size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Division & Roll Numbers</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Assign sections and roll numbers for new term batches
-                    </p>
-                  </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Document Verification</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Documents pending verification
+                  </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/clerk/assign-division"
-                  className="text-center px-2 py-1.5 bg-white hover:bg-teal-50 rounded-xl text-[11px] font-bold text-teal-700 border border-slate-200 transition-colors"
-                >
-                  Divisions
-                </Link>
-                <Link
-                  href="/clerk/assign-roll-no"
-                  className="text-center px-2 py-1.5 bg-white hover:bg-teal-50 rounded-xl text-[11px] font-bold text-teal-700 border border-slate-200 transition-colors"
-                >
-                  Roll Numbers
-                </Link>
-              </div>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-100 text-rose-800 font-bold text-xs shrink-0">
+                {pendingDocumentsCount}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Today's Attendance Summary Card */}
-        <div className="office-section bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5 flex flex-col justify-between">
+        {/* Today's Attendance Summary Card (1 Column) */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <CalendarCheck2 size={18} />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <CalendarCheck2 size={20} />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Today&apos;s Attendance</h3>
                   <p className="text-xs text-slate-500">Real-time attendance overview</p>
                 </div>
               </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                 {attendanceRate}% Present
               </span>
             </div>
 
-            {/* Attendance Progress Bars */}
-            <div className="space-y-4 mt-5">
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Present Students
-                  </span>
-                  <span className="font-bold text-emerald-700">
-                    {attendanceStats.present} ({attendanceRate}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+            {/* Attendance Details */}
+            <div className="space-y-3.5 mt-5">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-slate-600 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Present Students
+                </span>
+                <span className="font-bold text-slate-900">
+                  {attendanceStats.present} ({attendanceRate}%)
+                </span>
+              </div>
+
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-slate-600 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" /> Total Students
+                </span>
+                <span className="font-bold text-slate-900">
+                  {totalStudentsCount}
+                </span>
+              </div>
+
+              <div className="pt-2">
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    className="bg-[#5826df] h-full rounded-full transition-all duration-500"
                     style={{ width: `${attendanceRate}%` }}
                   />
                 </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Absent Students
-                  </span>
-                  <span className="font-bold text-rose-700">
-                    {attendanceStats.absent} (
-                    {totalStudentsCount > 0 ? Math.round((attendanceStats.absent / totalStudentsCount) * 100) : 0}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-rose-500 h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${
-                        totalStudentsCount > 0
-                          ? Math.round((attendanceStats.absent / totalStudentsCount) * 100)
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Not Marked Yet
-                  </span>
-                  <span className="font-bold text-amber-700">
-                    {attendanceStats.notMarked} (
-                    {totalStudentsCount > 0 ? Math.round((attendanceStats.notMarked / totalStudentsCount) * 100) : 0}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-400 h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${
-                        totalStudentsCount > 0
-                          ? Math.round((attendanceStats.notMarked / totalStudentsCount) * 100)
-                          : 0
-                      }%`,
-                    }}
-                  />
+                <div className="flex justify-end text-[11px] font-bold text-slate-500 mt-1">
+                  {attendanceRate}%
                 </div>
               </div>
             </div>
           </div>
-
-          <Link
-            href="/clerk/location-settings"
-            className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 text-center transition-colors flex items-center justify-center gap-1.5"
-          >
-            <MapPin size={14} className="text-emerald-600" />
-            <span>Manage Location & Settings</span>
-          </Link>
         </div>
       </div>
 
@@ -983,7 +970,7 @@ export default function ClerkDashboard() {
                                 setSelectedStudentForGr(adm);
                                 setGrInput("");
                               }}
-                              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                              className="px-3 py-1.5 bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs font-bold rounded-xl shadow-xs transition-all"
                             >
                               Assign GR
                             </button>
@@ -1131,7 +1118,7 @@ export default function ClerkDashboard() {
                 <button
                   type="submit"
                   disabled={assigningGr || !grInput.trim()}
-                  className="flex items-center gap-2 px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all"
+                  className="flex items-center gap-2 px-5 py-2 bg-[#5826df] hover:bg-[#4a1ec2] disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all"
                 >
                   {assigningGr ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                   <span>Assign & Approve</span>

@@ -239,7 +239,7 @@ export default function StudentItemIssuePage() {
         </div>
         <button
           onClick={() => setIsEntitlementModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
         >
           <Plus className="w-4 h-4" /> Generate Class Entitlements
         </button>
@@ -447,7 +447,7 @@ export default function StudentItemIssuePage() {
                 <button
                   type="submit"
                   disabled={singleSubmitting || !selectedStudent}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
                 >
                   {singleSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Confirm Issue & Deduct Stock
@@ -682,7 +682,7 @@ export default function StudentItemIssuePage() {
               type="button"
               onClick={handleBulkIssue}
               disabled={bulkSubmitting || selectedStudentIds.length === 0}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
             >
               {bulkSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Issue to {selectedStudentIds.length} Selected Students
@@ -829,7 +829,7 @@ export default function StudentItemIssuePage() {
                 <button type="button" onClick={() => setIsEntitlementModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
                   Cancel
                 </button>
-                <button type="submit" disabled={generatingEntitlement} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+                <button type="submit" disabled={generatingEntitlement} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
                   {generatingEntitlement ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Generate for Class
                 </button>
               </div>

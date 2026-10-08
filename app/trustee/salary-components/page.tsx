@@ -18,14 +18,14 @@ import {
 type ComponentType = "earning" | "deduction";
 
 const PRESETS: { name: string; type: ComponentType; icon: string }[] = [
-  { name: "HRA",     type: "earning",   icon: "🏠" },
-  { name: "DA",      type: "earning",   icon: "📈" },
-  { name: "Bonus",   type: "earning",   icon: "🎁" },
-  { name: "Medical", type: "earning",   icon: "🏥" },
-  { name: "PF",      type: "deduction", icon: "🏦" },
-  { name: "Tax",     type: "deduction", icon: "📋" },
-  { name: "ESI",     type: "deduction", icon: "🛡️" },
-  { name: "TDS",     type: "deduction", icon: "💸" },
+  { name: "HRA", type: "earning", icon: "🏠" },
+  { name: "DA", type: "earning", icon: "📈" },
+  { name: "Bonus", type: "earning", icon: "🎁" },
+  { name: "Medical", type: "earning", icon: "🏥" },
+  { name: "PF", type: "deduction", icon: "🏦" },
+  { name: "Tax", type: "deduction", icon: "📋" },
+  { name: "ESI", type: "deduction", icon: "🛡️" },
+  { name: "TDS", type: "deduction", icon: "💸" },
 ];
 
 // ─── Component Badge ──────────────────────────────────────────────────────────
@@ -68,19 +68,19 @@ function PresetChip({
       style={
         used
           ? {
-              background: "#f8fafc",
-              borderColor: "#e2e8f0",
-              color: "#94a3b8",
-              cursor: "not-allowed",
-            }
+            background: "#f8fafc",
+            borderColor: "#e2e8f0",
+            color: "#94a3b8",
+            cursor: "not-allowed",
+          }
           : preset.type === "earning"
-          ? {
+            ? {
               background: "#f0fdf4",
               borderColor: "#86efac",
               color: "#15803d",
               cursor: "pointer",
             }
-          : {
+            : {
               background: "#fef2f2",
               borderColor: "#fca5a5",
               color: "#b91c1c",
@@ -99,18 +99,18 @@ function PresetChip({
 
 export default function SalaryComponentsPage() {
   const [components, setComponents] = useState<SalaryComponent[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
-  const [creating, setCreating]     = useState(false);
-  const [toast, setToast]           = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   // Form state
-  const [name, setName]                   = useState("");
+  const [name, setName] = useState("");
   const [componentType, setComponentType] = useState<ComponentType>("earning");
-  const [calcType, setCalcType]           = useState<"Fixed" | "Percentage" | "Formula">("Fixed");
-  const [calcBase, setCalcBase]           = useState("");
-  const [value, setValue]                 = useState("");
-  const [formError, setFormError]         = useState("");
+  const [calcType, setCalcType] = useState<"Fixed" | "Percentage" | "Formula">("Fixed");
+  const [calcBase, setCalcBase] = useState("");
+  const [value, setValue] = useState("");
+  const [formError, setFormError] = useState("");
 
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -166,16 +166,11 @@ export default function SalaryComponentsPage() {
     }
   };
 
-  const earnings   = components.filter((c) => c.component_type === "earning");
+  const earnings = components.filter((c) => c.component_type === "earning");
   const deductions = components.filter((c) => c.component_type === "deduction");
 
   return (
-    <div
-      className="min-h-screen w-full px-4 md:px-6 lg:px-8 py-5 space-y-5"
-      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-    >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
-
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -198,65 +193,53 @@ export default function SalaryComponentsPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Header ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex items-end justify-between gap-4 flex-wrap"
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-7 w-7 rounded-lg bg-orange-500 flex items-center justify-center shadow-md shadow-orange-200">
-              <Layers className="h-3.5 w-3.5 text-white" />
+      {/* ── Header Banner ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
+              <Sparkles className="h-3.5 w-3.5" /> Payroll Configuration
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">
-              Payroll Setup 
-            </span>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Salary Components</h1>
+            <p className="text-purple-100 max-w-xl text-sm md:text-base">
+              Define earning and deduction components for your institutional payroll structure.
+            </p>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-            Salary Components
-          </h1>
-          <p className="text-sm text-slate-500 mt-1 font-medium">
-            Define earning and deduction components for your payroll structure
-          </p>
+
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={fetchComponents}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-all shadow-sm disabled:opacity-50 self-start md:self-auto"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </motion.button>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={fetchComponents}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 hover:border-orange-300 hover:text-orange-600 transition-all shadow-sm disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </motion.button>
-      </motion.div>
+      </div>
 
       {/* ── Create Card ── */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.4 }}
-        className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden"
-        style={{ boxShadow: "0 4px 24px -4px rgba(249,115,22,0.12)" }}
+        className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm"
       >
         {/* Card header */}
-        <div
-          className="px-5 py-4 border-b border-slate-100 flex items-center gap-3"
-          style={{ background: "linear-gradient(135deg, #fff7ed, #fff)" }}
-        >
-          <div className="h-9 w-9 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-            <Plus className="h-4.5 w-4.5 text-orange-600" />
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+          <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
+            <Plus className="h-4.5 w-4.5 text-[#5826df]" />
           </div>
           <div>
-            <p className="text-sm font-black text-slate-800">Add New Component</p>
+            <p className="text-sm font-bold text-slate-800">Add New Component</p>
             <p className="text-[11px] text-slate-500 font-medium">
               Create a custom or preset salary component
             </p>
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-6 space-y-5">
           {/* Presets */}
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2.5">

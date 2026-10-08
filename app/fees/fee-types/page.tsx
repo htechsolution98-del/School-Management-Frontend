@@ -436,14 +436,14 @@ function FeeTypeModal({
                 onClick={() => setValue("is_rte_applicable", true, { shouldValidate: true })}
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   isRteApplicableValue
-                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
+                    ? "border-[#5826df] bg-indigo-50 text-[#5826df] shadow-sm"
                     : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-xs mb-1">
                   <span>Yes (Student Pays)</span>
                   {isRteApplicableValue && (
-                    <span className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span className="w-2 h-2 rounded-full bg-[#5826df]" />
                   )}
                 </div>
                 <p className="text-[11px] leading-tight text-gray-500">
@@ -750,7 +750,7 @@ export default function FeeTypePage() {
       />
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="space-y-6 max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -769,7 +769,7 @@ export default function FeeTypePage() {
             </button>
             <button
               onClick={openCreate}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300 active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-500/20 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               Create Fee Type

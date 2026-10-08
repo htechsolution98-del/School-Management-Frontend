@@ -109,6 +109,7 @@ export interface DataTableProps<T> {
   caption?: React.ReactNode;
   footerNote?: React.ReactNode;
   rowClassName?: (row: T, index: number) => string | undefined;
+  onRowClick?: (row: T, index: number) => void;
   maxHeight?: string;
 }
 
@@ -119,7 +120,7 @@ const ALIGN_CLASS: Record<DataTableAlign, string> = {
 };
 
 function filterSelectClass() {
-  return "h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600";
+  return "h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-medium text-slate-700 shadow-2xs outline-none focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all";
 }
 
 /** Default cell content when a column has no explicit `render`. */
@@ -167,6 +168,7 @@ export function DataTable<T>({
   caption,
   footerNote,
   rowClassName,
+  onRowClick,
   maxHeight,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
@@ -284,13 +286,13 @@ export function DataTable<T>({
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
       {(search || resolvedFilters.length || createdDateRange || toolbarExtra) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
           <div className="flex flex-wrap items-center gap-3">
             {search && (
               <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#5826df]" />
                 <Input
                   aria-label={searchAriaLabel}
                   value={query}
@@ -299,7 +301,7 @@ export function DataTable<T>({
                     setPage(1);
                   }}
                   placeholder={searchPlaceholder}
-                  className="h-10 rounded-lg border-slate-200 pl-9"
+                  className="h-10 rounded-xl border-slate-200 bg-white pl-10 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs focus-visible:border-[#5826df] focus-visible:ring-3 focus-visible:ring-[#5826df]/20"
                 />
               </div>
             )}
@@ -307,7 +309,7 @@ export function DataTable<T>({
               <button
                 type="button"
                 onClick={clearAll}
-                className="h-10 cursor-pointer rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                className="h-10 cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 shadow-2xs transition-colors hover:bg-slate-50 hover:text-slate-900"
               >
                 Clear filters
               </button>
@@ -437,7 +439,8 @@ export function DataTable<T>({
               visible.map((row, index) => (
                 <tr
                   key={getRowId(row, index)}
-                  className={cn("align-middle transition-colors hover:bg-slate-50/70", rowClassName?.(row, index))}
+                  onClick={() => onRowClick?.(row, index)}
+                  className={cn("align-middle transition-colors hover:bg-indigo-50/40", rowClassName?.(row, index))}
                 >
                   {allColumns.map(column => {
                     const content = column.render
@@ -503,19 +506,19 @@ export function DataTable<T>({
               aria-label="Previous page"
               disabled={safeCurrentPage <= 1}
               onClick={() => setPage(safeCurrentPage - 1)}
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-all hover:bg-indigo-50 hover:text-[#5826df] hover:border-indigo-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="whitespace-nowrap">
-              Page {safeCurrentPage} of {totalPages}
+            <span className="whitespace-nowrap font-medium text-slate-700">
+              Page <strong className="text-[#5826df]">{safeCurrentPage}</strong> of {totalPages}
             </span>
             <button
               type="button"
               aria-label="Next page"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setPage(safeCurrentPage + 1)}
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-all hover:bg-indigo-50 hover:text-[#5826df] hover:border-indigo-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

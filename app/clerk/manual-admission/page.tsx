@@ -152,7 +152,7 @@ function getSectionIcon(title: string) {
     return <Building2 className="h-4 w-4 text-amber-700" />;
   }
   if (t.includes("personal") || t.includes("student") || t.includes("identity") || t.includes("basic")) {
-    return <User className="h-4 w-4 text-[#173044]" />;
+    return <User className="h-4 w-4 text-[#5826df]" />;
   }
   return <ClipboardList className="h-4 w-4 text-slate-700" />;
 }
@@ -188,7 +188,7 @@ function DocumentFileThumbnail({
     <div className="space-y-2.5">
       <div
         onClick={onPreview}
-        className="group relative flex items-center gap-3 p-2.5 rounded-xl border border-teal-100 bg-white hover:border-teal-300 dark:bg-zinc-800 dark:border-zinc-700 cursor-pointer transition-all shadow-2xs"
+        className="group relative flex items-center gap-3 p-2.5 rounded-xl border border-indigo-100 bg-white hover:border-indigo-300 dark:bg-zinc-800 dark:border-zinc-700 cursor-pointer transition-all shadow-2xs"
         title="Click to view full preview"
       >
         {isImg && thumbnailUrl ? (
@@ -203,7 +203,7 @@ function DocumentFileThumbnail({
             </div>
           </div>
         ) : (
-          <span className="flex size-14 shrink-0 flex-col items-center justify-center rounded-lg bg-teal-50 text-[#147d73] border border-teal-100">
+          <span className="flex size-14 shrink-0 flex-col items-center justify-center rounded-lg bg-indigo-50 text-[#5826df] border border-indigo-100">
             <FileText size={20} />
             <span className="text-[10px] font-bold mt-0.5">{isPdf ? "PDF" : "DOC"}</span>
           </span>
@@ -216,7 +216,7 @@ function DocumentFileThumbnail({
           <p className="text-[10px] text-slate-400 font-mono mt-0.5">
             {(file.size / 1024).toFixed(0)} KB • {isImg ? "Image preview ready" : "PDF Document"}
           </p>
-          <span className="inline-flex items-center text-[10px] font-medium text-[#147d73] mt-1 group-hover:underline">
+          <span className="inline-flex items-center text-[10px] font-medium text-[#5826df] mt-1 group-hover:underline">
             <Eye size={11} className="mr-1" /> Click to view full
           </span>
         </div>
@@ -228,7 +228,7 @@ function DocumentFileThumbnail({
           variant="outline"
           size="sm"
           onClick={onPreview}
-          className="h-8 flex-1 text-xs font-semibold text-[#147d73] hover:bg-teal-50 border-teal-200 gap-1 rounded-lg"
+          className="h-8 flex-1 text-xs font-semibold text-[#5826df] hover:bg-indigo-50 border-indigo-200 gap-1 rounded-lg"
         >
           <Eye size={13} /> Preview
         </Button>
@@ -306,7 +306,7 @@ function FileDocumentPreviewModal({
         <DialogHeader className="shrink-0 pr-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-teal-50 text-[#147d73]">
+              <span className="p-2 rounded-xl bg-indigo-50 text-[#5826df]">
                 {isImg ? <ImageIcon size={18} /> : <FileText size={18} />}
               </span>
               <div>
@@ -763,7 +763,7 @@ export default function ManualAdmissionPage() {
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-emerald-100 dark:border-emerald-900/40">
                 <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">Admission Form / Ref No.</span>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 font-mono text-sm px-3 py-1 font-bold">
+                <Badge variant="outline" className="bg-indigo-50 text-[#5826df] border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 font-mono text-sm px-3 py-1 font-bold">
                   {successData.admission_number}
                 </Badge>
               </div>
@@ -776,10 +776,10 @@ export default function ManualAdmissionPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <Button onClick={resetForm} variant="outline" className="h-12 text-sm font-semibold rounded-xl border-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800">
-                <UserPlus className="mr-2 h-4 w-4 text-blue-600" /> Fill Another Application
+              <Button onClick={resetForm} variant="outline" className="h-12 text-sm font-semibold rounded-xl border-gray-300 hover:bg-indigo-50 hover:text-[#5826df] dark:hover:bg-zinc-800">
+                <UserPlus className="mr-2 h-4 w-4 text-[#5826df]" /> Fill Another Application
               </Button>
-              <Button onClick={() => router.push("/clerk/students")} className="h-12 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md">
+              <Button onClick={() => router.push("/clerk/students")} className="h-12 text-sm font-semibold bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl shadow-md shadow-indigo-500/20">
                 <GraduationCap className="mr-2 h-4 w-4" /> Go to Student Directory
               </Button>
             </div>
@@ -946,10 +946,10 @@ export default function ManualAdmissionPage() {
                       ) : (
                         <label
                           htmlFor={`doc-input-${docField.id}`}
-                          className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-slate-300 hover:border-teal-400 hover:bg-teal-50/30 transition-all cursor-pointer text-center bg-white dark:bg-zinc-800"
+                          className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer text-center bg-white dark:bg-zinc-800"
                         >
                           <UploadCloud className="h-6 w-6 text-slate-400" />
-                          <span className="text-xs font-semibold text-[#147d73]">Choose file to upload</span>
+                          <span className="text-xs font-semibold text-[#5826df]">Choose file to upload</span>
                           <span className="text-[10px] text-slate-400">PDF, JPG, PNG up to 3MB</span>
                         </label>
                       )}
@@ -975,10 +975,10 @@ export default function ManualAdmissionPage() {
           )}
 
           {/* RTE (RIGHT TO EDUCATION) SECTION */}
-          <Card className="rounded-2xl border-teal-200 dark:border-teal-900/50 shadow-xs overflow-hidden bg-teal-50/20 dark:bg-teal-950/20">
-            <CardHeader className="border-b border-teal-100 dark:border-teal-900/50 py-3.5 px-6">
+          <Card className="rounded-2xl border-indigo-200 dark:border-indigo-900/50 shadow-xs overflow-hidden bg-indigo-50/20 dark:bg-indigo-950/20">
+            <CardHeader className="border-b border-indigo-100 dark:border-indigo-900/50 py-3.5 px-6">
               <div className="flex items-center gap-2">
-                <FileCheck className="h-4 w-4 text-[#147d73]" />
+                <FileCheck className="h-4 w-4 text-[#5826df]" />
                 <CardTitle className="text-sm font-bold text-slate-900 dark:text-zinc-100">
                   RTE (Right to Education) Applicable?
                 </CardTitle>
@@ -991,7 +991,7 @@ export default function ManualAdmissionPage() {
                   id="is_rte"
                   checked={isRte}
                   onChange={(e) => setIsRte(e.target.checked)}
-                  className="h-4 w-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500 cursor-pointer"
+                  className="h-4 w-4 text-[#5826df] border-slate-300 rounded focus:ring-[#5826df] cursor-pointer"
                 />
                 <label htmlFor="is_rte" className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200 cursor-pointer">
                   Yes, this student is applying under the RTE Act (0 School Tuition Fee)
@@ -999,13 +999,13 @@ export default function ManualAdmissionPage() {
               </div>
 
               {isRte && (
-                <div className="p-4 rounded-xl border border-teal-200 bg-white dark:bg-zinc-900 space-y-3 animate-in fade-in">
+                <div className="p-4 rounded-xl border border-indigo-200 bg-white dark:bg-zinc-900 space-y-3 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
                       Upload RTE Verification Document <span className="text-red-500">*</span>
                     </span>
                     {rteDocument ? (
-                      <span className="inline-flex items-center text-[10px] font-semibold text-[#147d73] bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      <span className="inline-flex items-center text-[10px] font-semibold text-[#5826df] bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                         <FileCheck size={12} className="mr-1" /> Selected
                       </span>
                     ) : (

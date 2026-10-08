@@ -140,7 +140,7 @@ export default function StudentLibraryPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
@@ -159,14 +159,14 @@ export default function StudentLibraryPage() {
       </AnimatePresence>
 
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 p-8 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-white text-xs font-semibold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" /> School Library Catalogue
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">Student Library & Loans</h1>
-            <p className="text-blue-100 max-w-xl text-sm md:text-base">
+            <p className="text-purple-100 max-w-xl text-sm md:text-base">
               Explore textbooks, check shelf locations, track your borrowed loans, and reserve out-of-stock books.
             </p>
           </div>
@@ -188,7 +188,7 @@ export default function StudentLibraryPage() {
           onClick={() => setActiveTab("catalog")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
             activeTab === "catalog"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+              ? "bg-[#5826df] text-white shadow-md shadow-indigo-500/20"
               : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
           }`}
         >
@@ -198,7 +198,7 @@ export default function StudentLibraryPage() {
           onClick={() => setActiveTab("my_books")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
             activeTab === "my_books"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+              ? "bg-[#5826df] text-white shadow-md shadow-indigo-500/20"
               : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
           }`}
         >
@@ -208,7 +208,7 @@ export default function StudentLibraryPage() {
           onClick={() => setActiveTab("reservations")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
             activeTab === "reservations"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+              ? "bg-[#5826df] text-white shadow-md shadow-indigo-500/20"
               : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
           }`}
         >

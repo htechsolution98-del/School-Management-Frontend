@@ -70,22 +70,22 @@ export default function InventoryDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-6 rounded-2xl text-white shadow-xl">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-6 rounded-3xl text-white shadow-xl">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-purple-200 text-xs font-semibold uppercase tracking-wider mb-2">
             Student Inventory Hub
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Inventory & Student Item Management
           </h1>
-          <p className="text-slate-300 text-sm mt-1">
+          <p className="text-purple-100 text-sm mt-1">
             Real-time stock tracking, student item entitlements, purchases, and issue operations.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/inventory/issue"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/30 transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-lg shadow-indigo-500/30 active:scale-95 transition-all"
           >
             <UserCheck className="w-4 h-4" /> Issue Item
           </Link>

@@ -158,6 +158,26 @@ export interface SchoolDetailedStats {
     boys: number;
     girls: number;
   }[];
+  students?: {
+    id: number;
+    name: string;
+    first_name?: string;
+    surname?: string;
+    father_name?: string;
+    mother_name?: string;
+    class_id?: number | null;
+    class_name: string;
+    division?: string;
+    roll_no?: string;
+    gr_no?: string;
+    gender?: string;
+    mobile?: string;
+    is_rte?: boolean;
+    is_verified?: boolean;
+    admission_date?: string | null;
+    dob?: string | null;
+    aadhar_number?: string;
+  }[];
   staff: {
     id: number;
     name: string;
@@ -173,6 +193,8 @@ export interface SchoolDetailedStats {
     is_enabled: boolean;
   }[];
 }
+
+export type SchoolStudent = NonNullable<SchoolDetailedStats["students"]>[number];
 
 /**
  * GET /SchoolView/{id}/details/ — fetch detailed statistics for a specific school

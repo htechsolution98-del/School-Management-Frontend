@@ -61,17 +61,17 @@ export default function ParentDashboard() {
   const activeChild: ChildProfile | undefined = children[selectedChildIndex];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-blue-200 text-xs font-semibold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" /> Parent Portal
             </div>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Parent & Ward Dashboard</h1>
-            <p className="text-blue-100 max-w-xl text-sm md:text-base">
+            <p className="text-purple-100 max-w-xl text-sm md:text-base">
               Monitor your ward&apos;s daily attendance, academic achievements, pending fees, and school notifications in real time.
             </p>
           </div>

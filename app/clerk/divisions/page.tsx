@@ -312,7 +312,7 @@ export default function DivisionsPage() {
   const paginatedDivisions = filteredDivisions.slice(startIndex, endIndex);
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-slate-50/50 min-h-screen overflow-x-hidden">
+    <div className="flex-1 space-y-6 overflow-x-hidden">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

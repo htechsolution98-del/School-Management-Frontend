@@ -227,30 +227,39 @@ export default function FeaturesManagerPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="w-full space-y-6">
 
       {/* ================= HEADER ================= */}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-300">
+              <Sparkles className="h-3.5 w-3.5 text-white" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+              System Modules
+            </span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 sm:text-3xl tracking-tight">
             School Features
           </h1>
 
-          <p className="text-sm text-slate-500 mt-1">
-            Manage school system features and modules.
+          <p className="text-sm text-slate-500 mt-1 font-medium">
+            Manage school system features and module permissions.
           </p>
         </div>
 
         <Button
           variant="outline"
-          size="icon"
           onClick={fetchFeatures}
           disabled={loading || submitting || busyFeatureId !== null}
+          className="rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs"
         >
           <RefreshCw
-            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
           />
+          Refresh
         </Button>
       </div>
 

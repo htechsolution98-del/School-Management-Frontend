@@ -278,7 +278,7 @@ function EditModal({
                 <button
                   onClick={onClose}
                   className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-                > 
+                >
                   <X className="h-4 w-4 text-slate-500" />
                 </button>
               </div>
@@ -927,16 +927,15 @@ function CreateStructureModal({
                           <div
                             key={c.id}
                             onClick={() => toggleComponent(c.id)}
-                            className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all ${
-                              checked
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all ${checked
                                 ? "bg-indigo-50/70 border-indigo-200 text-indigo-900 shadow-sm"
                                 : "bg-white border-slate-100 text-slate-700 hover:border-slate-200"
-                            }`}
+                              }`}
                           >
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               className="rounded text-indigo-600 focus:ring-indigo-400 h-3.5 w-3.5 pointer-events-none"
                             />
                             <div className="min-w-0 flex-1">
@@ -1544,22 +1543,20 @@ export default function StaffSalaryPage() {
         <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
           <button
             onClick={() => setActiveTab("components")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "components"
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === "components"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
+              }`}
           >
             <Banknote className="h-4 w-4" />
             Component Assignments ({assignments.length})
           </button>
           <button
             onClick={() => setActiveTab("structures")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "structures"
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === "structures"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
+              }`}
           >
             <Layers className="h-4 w-4" />
             Salary Structures & Bundles ({structures.length})
@@ -1872,11 +1869,10 @@ export default function StaffSalaryPage() {
                                     resolvedComponents.map((c: any) => (
                                       <span
                                         key={c!.id}
-                                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold ${
-                                          c!.component_type === "earning"
+                                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold ${c!.component_type === "earning"
                                             ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                             : "bg-red-50 text-red-700 border border-red-100"
-                                        }`}
+                                          }`}
                                       >
                                         {c!.name}
                                       </span>

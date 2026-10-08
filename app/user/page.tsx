@@ -181,7 +181,7 @@ export default function AdmissionPortal() {
 
   return (
     <div
-      className={`w-full bg-slate-50 flex flex-col font-sans ${selectedChild ? "h-screen overflow-hidden" : "min-h-screen"}`}
+      className="w-full flex flex-col font-sans"
     >
       <AnimatePresence mode="wait">
         {!selectedChild ? (
@@ -191,7 +191,7 @@ export default function AdmissionPortal() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 min-h-screen flex flex-col items-center justify-center gap-5"
+              className="flex-1 py-16 flex flex-col items-center justify-center gap-5"
             >
               <motion.div
                 animate={{ rotate: 360 }}
@@ -446,7 +446,7 @@ function ChildrenList({
                 </div>
 
                 {/* Modal header */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-500 px-5 sm:px-7 py-5 sm:py-6 text-white shrink-0">
+                <div className="relative overflow-hidden bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] px-5 sm:px-7 py-5 sm:py-6 text-white shrink-0">
                   <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10" />
                   <div className="absolute right-10 -bottom-8 w-20 h-20 rounded-full bg-white/10" />
                   <div className="relative flex items-center gap-3 sm:gap-4">
@@ -457,7 +457,7 @@ function ChildrenList({
                       <p className="font-black text-base sm:text-lg leading-tight">
                         Payment Confirmed!
                       </p>
-                      <p className="text-emerald-100 text-xs font-medium mt-0.5">
+                      <p className="text-purple-200 text-xs font-medium mt-0.5">
                         Admission fee received successfully
                       </p>
                     </div>
@@ -1200,7 +1200,7 @@ function MultiStepForm({
 
   if (!hasSections) {
     return (
-      <div className="flex-1 min-h-screen bg-white flex flex-col">
+      <div className="flex-1 bg-white flex flex-col rounded-3xl overflow-hidden shadow-xs border border-slate-100">
         <div className="h-[60px] sm:h-[72px] border-b border-slate-100 flex items-center px-4 sm:px-8 bg-white shadow-sm">
           <motion.button
             onClick={onBack}
@@ -1855,7 +1855,7 @@ function ReviewStep({
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-500 to-teal-500 p-5 sm:p-6 text-white shadow-xl shadow-emerald-100"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-5 sm:p-6 text-white shadow-xl shadow-purple-200"
       >
         <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10" />
         <div className="absolute -right-4 -bottom-10 w-28 h-28 rounded-full bg-white/10" />

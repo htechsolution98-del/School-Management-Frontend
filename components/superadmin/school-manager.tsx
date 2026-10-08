@@ -182,13 +182,43 @@ export default function SchoolManager() {
       key: "features",
       header: "Features",
       search: school => [school.school_features?.filter(feature => feature.is_enabled).length ?? 0],
-      render: school => <button type="button" onClick={() => { setAccessSchool(school); setAccessError(""); }} className="whitespace-nowrap text-sm font-medium text-[#1D496C] underline-offset-4 hover:underline">{school.school_features?.filter(feature => feature.is_enabled).length ?? 0} enabled</button>,
+      render: school => (
+        <button
+          type="button"
+          onClick={() => { setAccessSchool(school); setAccessError(""); }}
+          className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+        >
+          {school.school_features?.filter(feature => feature.is_enabled).length ?? 0} enabled
+        </button>
+      ),
     },
     { key: "status", header: "Status", search: school => [(school.is_active ?? true) ? "active" : "inactive"], render: school => <StatusBadge active={school.is_active ?? true} /> },
   ];
 
-  return <div className="mx-auto max-w-7xl space-y-6 pb-6">
-    <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">Manage Schools</h1><p className="mt-1 text-sm text-slate-500">Manage school registrations, contact details and feature access.</p></div><div className="flex gap-2"><AdminButton onClick={load} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</AdminButton><AdminButton onClick={() => startForm()} disabled={loading}><Plus className="h-4 w-4" /> Add School</AdminButton></div></div>
+  return (
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-300">
+              <Building2 className="h-3.5 w-3.5 text-white" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+              School Management
+            </span>
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Manage Schools</h1>
+          <p className="mt-1 text-sm font-medium text-slate-500">Manage school registrations, contact details and feature access.</p>
+        </div>
+        <div className="flex gap-2">
+          <AdminButton onClick={load} disabled={loading} variant="outline" className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </AdminButton>
+          <AdminButton onClick={() => startForm()} disabled={loading} className="bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/20">
+            <Plus className="h-4 w-4" /> Add School
+          </AdminButton>
+        </div>
+      </div>
     {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {success && <p role="status" className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700"><Check className="h-4 w-4" />{success}</p>}
     <DataTable
@@ -232,7 +262,17 @@ export default function SchoolManager() {
     <SchoolDetails school={detailsSchool} onClose={() => setDetailsSchool(null)} />
     <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
       <DialogContent className="admin-scroll-area flex h-[min(760px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 border-b border-slate-200 p-6 pr-14"><DialogTitle className="text-lg font-semibold">{editing ? "Edit school" : "Add school"}</DialogTitle><DialogDescription>Enter school details and select feature access. Required fields are marked *.</DialogDescription></DialogHeader>
+        <DialogHeader className="shrink-0 border-b border-slate-200 p-6 pr-14">
+          <div className="flex items-center gap-3">
+            {(editing?.logo || preview) && (
+              <SchoolLogo src={preview || editing?.logo} name={camelCaseText(editing?.name)} className="h-10 w-10 rounded-xl" />
+            )}
+            <div>
+              <DialogTitle className="text-lg font-semibold">{editing ? "Edit school" : "Add school"}</DialogTitle>
+              <DialogDescription>Enter school details and select feature access. Required fields are marked *.</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
         <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="admin-scroll-area min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <fieldset disabled={saving} className="grid min-w-0 grid-cols-1 gap-4 p-6 sm:grid-cols-2">
@@ -252,9 +292,46 @@ export default function SchoolManager() {
       </DialogContent>
     </Dialog>
 
-    <Dialog open={!!accessSchool} onOpenChange={value => { if (!value && busyFeature === null) setAccessSchool(null); }}><DialogContent className="admin-scroll-area flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-lg"><DialogHeader className="border-b border-slate-200 p-6 pr-14"><DialogTitle className="text-lg font-semibold">Feature access</DialogTitle><DialogDescription>{camelCaseText(accessSchool?.name)}</DialogDescription></DialogHeader><div className="admin-scroll-area min-h-0 space-y-1 overflow-y-auto p-4">{features.map(feature => {
-      const enabled = accessSchool?.school_features?.some(assignment => assignment.feature === feature.id && assignment.is_enabled) ?? false;
-      return <div key={feature.id} className="flex items-center justify-between gap-4 rounded-lg px-2 py-3 hover:bg-slate-50"><span className="text-sm font-medium text-slate-700">{camelCaseText(feature.name)}</span><button type="button" role="switch" aria-checked={enabled} aria-label={`${camelCaseText(feature.name)} access`} disabled={busyFeature !== null} onClick={() => toggleAccess(feature)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-[#1D496C]" : "bg-slate-200"}`}><span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0.5"}`}>{busyFeature === feature.id && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}</span></button></div>;
-    })}{accessError && <p role="alert" className="p-2 text-sm text-red-600">{accessError}</p>}</div><div className="flex shrink-0 justify-end border-t border-slate-200 p-4"><AdminButton onClick={() => setAccessSchool(null)} disabled={busyFeature !== null}>Done</AdminButton></div></DialogContent></Dialog>
-  </div>;
+    <Dialog open={!!accessSchool} onOpenChange={value => { if (!value && busyFeature === null) setAccessSchool(null); }}>
+      <DialogContent className="admin-scroll-area flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-lg">
+        <DialogHeader className="border-b border-slate-200 p-6 pr-14">
+          <div className="flex items-center gap-3">
+            <SchoolLogo src={accessSchool?.logo} name={camelCaseText(accessSchool?.name)} className="h-10 w-10 rounded-xl" />
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Feature Access</DialogTitle>
+              <DialogDescription className="font-medium text-slate-500">{camelCaseText(accessSchool?.name)}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="admin-scroll-area min-h-0 space-y-1 overflow-y-auto p-4">
+          {features.map(feature => {
+            const enabled = accessSchool?.school_features?.some(assignment => assignment.feature === feature.id && assignment.is_enabled) ?? false;
+            return (
+              <div key={feature.id} className="flex items-center justify-between gap-4 rounded-xl px-3 py-3 hover:bg-slate-50">
+                <span className="text-sm font-bold text-slate-700">{camelCaseText(feature.name)}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  aria-label={`${camelCaseText(feature.name)} access`}
+                  disabled={busyFeature !== null}
+                  onClick={() => toggleAccess(feature)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-indigo-600" : "bg-slate-200"}`}
+                >
+                  <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0.5"}`}>
+                    {busyFeature === feature.id && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}
+                  </span>
+                </button>
+              </div>
+            );
+          })}
+          {accessError && <p role="alert" className="p-2 text-sm text-red-600">{accessError}</p>}
+        </div>
+        <div className="flex shrink-0 justify-end border-t border-slate-200 p-4">
+          <AdminButton onClick={() => setAccessSchool(null)} disabled={busyFeature !== null}>Done</AdminButton>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </div>
+  );
 }

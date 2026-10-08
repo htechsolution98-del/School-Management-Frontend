@@ -404,7 +404,7 @@ export default function ClassesPage() {
   const missingGovIdsCount = useMemo(() => (Array.isArray(students) ? students.filter((s) => !s?.abc_id || !s?.udise_no).length : 0), [students])
 
   return (
-    <div className="flex-1 space-y-6 p-4 sm:p-8 sm:pt-6 bg-slate-50/50 dark:bg-zinc-950 min-h-screen">
+    <div className="flex-1 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
         <div>

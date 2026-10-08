@@ -156,7 +156,7 @@ export default function ReplacementsAndReturnsPage() {
         </div>
         <button
           onClick={() => setIsReturnModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/20 transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
         >
           <RotateCcw className="w-4 h-4" /> Record Student Return
         </button>
@@ -249,7 +249,7 @@ export default function ReplacementsAndReturnsPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleOpenReview(r, "APPROVE")}
-                              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+                              className="px-2.5 py-1 rounded-lg bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs font-semibold shadow-xs"
                             >
                               Approve
                             </button>
@@ -426,7 +426,7 @@ export default function ReplacementsAndReturnsPage() {
                 <button type="button" onClick={() => setIsReviewModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
                   Cancel
                 </button>
-                <button type="submit" disabled={submittingReview} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+                <button type="submit" disabled={submittingReview} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
                   {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Confirm
                 </button>
               </div>
@@ -528,7 +528,7 @@ export default function ReplacementsAndReturnsPage() {
                 <button type="button" onClick={() => setIsReturnModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
                   Cancel
                 </button>
-                <button type="submit" disabled={submittingReturn} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+                <button type="submit" disabled={submittingReturn} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
                   {submittingReturn ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Accept Return
                 </button>
               </div>

@@ -119,7 +119,7 @@ export default function DepartmentsPage() {
             <Button
               type="submit"
               disabled={loading || submitting || !input.trim()}
-              className="office-primary px-6 h-10 font-semibold"
+              className="bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl shadow-md shadow-indigo-500/20 active:scale-95 px-6 h-10 font-semibold"
             >
               {submitting ? (
                 <Loader2 size={15} className="animate-spin mr-2" />

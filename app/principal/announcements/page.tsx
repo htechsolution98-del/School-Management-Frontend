@@ -331,7 +331,7 @@ export default function AnnouncementsPage() {
   const broadcastCount = announcements.filter(a => String(a.is_everyone) === "true" || !a.announcement_for).length;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-3 sm:p-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>

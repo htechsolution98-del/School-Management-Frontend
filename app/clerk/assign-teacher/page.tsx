@@ -276,7 +276,7 @@ export default function AssignTeacherPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 bg-white min-h-screen overflow-x-hidden">
+    <div className="flex-1 space-y-6 overflow-x-hidden">
       {/* ── Page Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">

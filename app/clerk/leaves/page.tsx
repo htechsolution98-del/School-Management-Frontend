@@ -393,7 +393,7 @@ export default function ClerkMyLeavesPage() {
   });
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto bg-linear-to-b from-zinc-50 to-zinc-100/30 dark:from-zinc-950 dark:to-zinc-900/30 min-h-screen">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5">
         <div>
