@@ -22,7 +22,10 @@ import {
   CircleDot,
   Shield,
   Trash2,
-  Pencil,   // ← NEW: edit icon
+  Pencil,
+  Layers,
+  Building2,
+  UserCheck,
 } from "lucide-react";
 import {
   getSalaryComponents,
@@ -36,6 +39,13 @@ import {
   type StaffSalaryAssignment as Assignment,
   type StaffMember,
 } from "@/lib/fees";
+import {
+  getSalaryStructures,
+  createSalaryStructure,
+  deleteSalaryStructure,
+  assignSalaryStructureToStaff,
+} from "@/lib/hr-config";
+import type { SalaryStructure } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -773,6 +783,398 @@ function AssignModal({
   );
 }
 
+// ─── Create Salary Structure Modal ──────────────────────────────────────────
+function CreateStructureModal({
+  open,
+  onClose,
+  components,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  components: SalaryComponent[];
+  onCreated: (s: SalaryStructure) => void;
+}) {
+  const [name, setName] = useState("");
+  const [baseSalary, setBaseSalary] = useState("");
+  const [selectedComponents, setSelectedComponents] = useState<number[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [formErr, setFormErr] = useState("");
+
+  const toggleComponent = (id: number) => {
+    setSelectedComponents((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setFormErr("Structure name is required.");
+      return;
+    }
+    setFormErr("");
+    setSubmitting(true);
+    try {
+      const created = await createSalaryStructure({
+        name: name.trim(),
+        base_salary: Number(baseSalary) || 0,
+        components: selectedComponents,
+        is_active: true,
+      });
+      onCreated(created);
+      setName("");
+      setBaseSalary("");
+      setSelectedComponents([]);
+      onClose();
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "Failed to create structure");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 32 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none"
+          >
+            <div
+              className="relative w-full max-w-lg rounded-3xl overflow-hidden pointer-events-auto bg-white"
+              style={{
+                boxShadow: "0 32px 80px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05)",
+              }}
+            >
+              <div
+                className="h-1.5 w-full"
+                style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef)" }}
+              />
+              <div className="flex items-start justify-between px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                  >
+                    <Layers className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900 leading-none">
+                      Create Salary Structure
+                    </h2>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      Bundle base salary and default components
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                >
+                  <X className="h-4 w-4 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="px-6 pb-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                    Structure Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Senior Faculty Grade A"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setFormErr(""); }}
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                    Default Base Salary (₹)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 35000"
+                    value={baseSalary}
+                    onChange={(e) => setBaseSalary(e.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                    Included Components ({selectedComponents.length} selected)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+                    {components.length === 0 ? (
+                      <p className="col-span-2 text-xs text-slate-400 text-center py-4">No components defined yet</p>
+                    ) : (
+                      components.map((c) => {
+                        const checked = selectedComponents.includes(c.id);
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => toggleComponent(c.id)}
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all ${
+                              checked
+                                ? "bg-indigo-50/70 border-indigo-200 text-indigo-900 shadow-sm"
+                                : "bg-white border-slate-100 text-slate-700 hover:border-slate-200"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {}}
+                              className="rounded text-indigo-600 focus:ring-indigo-400 h-3.5 w-3.5 pointer-events-none"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold truncate">{c.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                {c.component_type === "earning" ? "Earning" : "Deduction"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {formErr && (
+                  <p className="text-xs font-bold text-red-500 flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" /> {formErr}
+                  </p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-3 rounded-xl border-2 border-slate-100 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSave}
+                    disabled={submitting || !name.trim()}
+                    className="flex-1 py-3 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                    style={{
+                      background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                      boxShadow: "0 4px 16px rgba(99,102,241,0.4)",
+                    }}
+                  >
+                    {submitting ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                    ) : (
+                      <><Plus className="h-3.5 w-3.5" /> Create Structure</>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─── Assign Salary Structure Modal ───────────────────────────────────────────
+function AssignStructureModal({
+  open,
+  onClose,
+  staffList,
+  structures,
+  onAssigned,
+}: {
+  open: boolean;
+  onClose: () => void;
+  staffList: StaffMember[];
+  structures: SalaryStructure[];
+  onAssigned: (staffId: number, structureId: number, staffName: string, structureName: string) => void;
+}) {
+  const [staffId, setStaffId] = useState<number | "">("");
+  const [structureId, setStructureId] = useState<number | "">("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formErr, setFormErr] = useState("");
+
+  const handleSave = async () => {
+    if (!staffId) {
+      setFormErr("Please select a staff member.");
+      return;
+    }
+    if (!structureId) {
+      setFormErr("Please select a salary structure.");
+      return;
+    }
+    setFormErr("");
+    setSubmitting(true);
+    try {
+      await assignSalaryStructureToStaff(Number(staffId), Number(structureId));
+      const sMember = staffList.find((s) => s.id === Number(staffId));
+      const sStruct = structures.find((st) => st.id === Number(structureId));
+      onAssigned(
+        Number(staffId),
+        Number(structureId),
+        sMember?.name || `Staff #${staffId}`,
+        sStruct?.name || "Structure"
+      );
+      setStaffId("");
+      setStructureId("");
+      onClose();
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "Failed to assign structure");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 32 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none"
+          >
+            <div
+              className="relative w-full max-w-md rounded-3xl overflow-hidden pointer-events-auto bg-white"
+              style={{
+                boxShadow: "0 32px 80px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05)",
+              }}
+            >
+              <div
+                className="h-1.5 w-full"
+                style={{ background: "linear-gradient(90deg, #4f46e5, #06b6d4)" }}
+              />
+              <div className="flex items-start justify-between px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-indigo-50"
+                  >
+                    <UserCheck className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900 leading-none">
+                      Assign Salary Structure
+                    </h2>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      Link an employee to a defined payroll policy
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                >
+                  <X className="h-4 w-4 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="px-6 pb-6 space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                    Select Staff Member <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={staffId}
+                    onChange={(e) => {
+                      setStaffId(e.target.value ? Number(e.target.value) : "");
+                      setFormErr("");
+                    }}
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.designation || s.category || "Staff"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                    Salary Structure <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={structureId}
+                    onChange={(e) => {
+                      setStructureId(e.target.value ? Number(e.target.value) : "");
+                      setFormErr("");
+                    }}
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                  >
+                    <option value="">-- Choose Structure --</option>
+                    {structures.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} (Base: ₹{st.base_salary || 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {formErr && (
+                  <p className="text-xs font-bold text-red-500 flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" /> {formErr}
+                  </p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-3 rounded-xl border-2 border-slate-100 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSave}
+                    disabled={submitting || !staffId || !structureId}
+                    className="flex-1 py-3 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                    style={{
+                      background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                      boxShadow: "0 4px 16px rgba(99,102,241,0.4)",
+                    }}
+                  >
+                    {submitting ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Assigning…</>
+                    ) : (
+                      <><UserCheck className="h-3.5 w-3.5" /> Assign Structure</>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Employee Card ────────────────────────────────────────────────────────────
 // CHANGED: added onEdit prop and edit button (pencil) alongside the delete button
 function EmployeeCard({
@@ -898,9 +1300,13 @@ export default function StaffSalaryPage() {
   const [allComponents, setAllComponents] = useState<SalaryComponent[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [structures, setStructures] = useState<SalaryStructure[]>([]);
+  const [activeTab, setActiveTab] = useState<"components" | "structures">("components");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [createStructureOpen, setCreateStructureOpen] = useState(false);
+  const [assignStructureOpen, setAssignStructureOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "earning" | "deduction">("all");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -921,14 +1327,16 @@ export default function StaffSalaryPage() {
     setLoading(true);
     setError("");
     try {
-      const [components, staff, existing] = await Promise.all([
+      const [components, staff, existing, structList] = await Promise.all([
         getSalaryComponents(),
         getStaffList(),
         getAllStaffSalaryComponents(),
+        getSalaryStructures().catch(() => []),
       ]);
       setAllComponents(components);
       setStaffList(staff);
       setAssignments(existing);
+      setStructures(structList);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -941,6 +1349,34 @@ export default function StaffSalaryPage() {
   const handleAssigned = (a: Assignment) => {
     setAssignments((prev) => [a, ...prev]);
     showToast(`${a.componentName} assigned to ${a.staffName}!`, "success");
+  };
+
+  const handleStructureCreated = (newStruct: SalaryStructure) => {
+    setStructures((prev) => [newStruct, ...prev]);
+    showToast(`Salary structure "${newStruct.name}" created!`, "success");
+  };
+
+  const handleStructureAssigned = (
+    staffId: number,
+    structureId: number,
+    staffName: string,
+    structureName: string
+  ) => {
+    setStaffList((prev) =>
+      prev.map((s) => (s.id === staffId ? { ...s, salary_structure: structureId } : s))
+    );
+    showToast(`Assigned ${structureName} to ${staffName}!`, "success");
+  };
+
+  const handleDeleteStructure = async (id: number, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete structure "${name}"?`)) return;
+    try {
+      await deleteSalaryStructure(id);
+      setStructures((prev) => prev.filter((s) => s.id !== id));
+      showToast(`Structure "${name}" deleted.`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Failed to delete structure", "error");
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -1016,6 +1452,22 @@ export default function StaffSalaryPage() {
         onUpdated={handleUpdated}
       />
 
+      {/* ── Structure Modals ── */}
+      <CreateStructureModal
+        open={createStructureOpen}
+        onClose={() => setCreateStructureOpen(false)}
+        components={allComponents}
+        onCreated={handleStructureCreated}
+      />
+
+      <AssignStructureModal
+        open={assignStructureOpen}
+        onClose={() => setAssignStructureOpen(false)}
+        staffList={staffList}
+        structures={structures}
+        onAssigned={handleStructureAssigned}
+      />
+
       <div className="w-full px-3 sm:px-4 md:px-6 xl:px-10 py-5 space-y-6 overflow-x-hidden">
         {/* ── Header ── */}
         <motion.div
@@ -1034,7 +1486,7 @@ export default function StaffSalaryPage() {
               <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Payroll</span>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 leading-tight tracking-tight">Staff Salary</h1>
-            <p className="text-sm text-slate-400 mt-1 font-medium">Manage salary component assignments for all staff</p>
+            <p className="text-sm text-slate-400 mt-1 font-medium">Manage salary component assignments and policy structures</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1048,19 +1500,71 @@ export default function StaffSalaryPage() {
               Refresh
             </motion.button>
 
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={() => setModalOpen(true)}
-              disabled={loading || allComponents.length === 0}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.4)" }}
-            >
-              <Plus className="h-4 w-4" />
-              Assign Salary Component
-            </motion.button>
+            {activeTab === "components" ? (
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => setModalOpen(true)}
+                disabled={loading || allComponents.length === 0}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.4)" }}
+              >
+                <Plus className="h-4 w-4" />
+                Assign Salary Component
+              </motion.button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => setAssignStructureOpen(true)}
+                  disabled={loading || structures.length === 0}
+                  className="flex items-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition-all disabled:opacity-50"
+                >
+                  <UserCheck className="h-4 w-4" />
+                  Assign Structure
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => setCreateStructureOpen(true)}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.4)" }}
+                >
+                  <Plus className="h-4 w-4" />
+                  New Structure
+                </motion.button>
+              </div>
+            )}
           </div>
         </motion.div>
+
+        {/* ── Tab Switcher ── */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <button
+            onClick={() => setActiveTab("components")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "components"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <Banknote className="h-4 w-4" />
+            Component Assignments ({assignments.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("structures")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "structures"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            Salary Structures & Bundles ({structures.length})
+          </button>
+        </div>
 
         {/* ── Loading / Error ── */}
         {loading && (
@@ -1082,166 +1586,352 @@ export default function StaffSalaryPage() {
 
         {!loading && !error && (
           <>
-            {/* ── Stats ── */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-4"
-            >
-              {[
-                { label: "Total Assigned", value: assignments.length, icon: Users, color: "#4f46e5", bg: "#eef2ff", border: "#e0e7ff" },
-                { label: "Earnings", value: earnings, icon: TrendingUp, color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
-                { label: "Deductions", value: deductions, icon: TrendingDown, color: "#ef4444", bg: "#fef2f2", border: "#fecaca" },
-              ].map(({ label, value, icon: Icon, color, bg, border }, i) => (
+            {activeTab === "components" ? (
+              <>
+                {/* ── Stats ── */}
                 <motion.div
-                  key={label}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 + i * 0.05 }}
-                  className="rounded-3xl border p-5 flex items-center gap-4 hover:shadow-lg transition-all duration-300"
-                  style={{ background: bg, borderColor: border }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 }}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
                 >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}20` }}>
-                    <Icon className="h-5 w-5" style={{ color }} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-black" style={{ color, fontFamily: "'DM Mono', monospace" }}>{value}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider mt-0.5" style={{ color: `${color}88` }}>{label}</p>
-                  </div>
+                  {[
+                    { label: "Total Assigned", value: assignments.length, icon: Users, color: "#4f46e5", bg: "#eef2ff", border: "#e0e7ff" },
+                    { label: "Earnings", value: earnings, icon: TrendingUp, color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
+                    { label: "Deductions", value: deductions, icon: TrendingDown, color: "#ef4444", bg: "#fef2f2", border: "#fecaca" },
+                  ].map(({ label, value, icon: Icon, color, bg, border }, i) => (
+                    <motion.div
+                      key={label}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.1 + i * 0.05 }}
+                      className="rounded-3xl border p-5 flex items-center gap-4 hover:shadow-lg transition-all duration-300"
+                      style={{ background: bg, borderColor: border }}
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}20` }}>
+                        <Icon className="h-5 w-5" style={{ color }} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-black" style={{ color, fontFamily: "'DM Mono', monospace" }}>{value}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider mt-0.5" style={{ color: `${color}88` }}>{label}</p>
+                      </div>
+                    </motion.div>
+                  ))}
                 </motion.div>
-              ))}
-            </motion.div>
 
-            {/* ── List Panel ── */}
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="w-full bg-white rounded-3xl border border-slate-100 overflow-hidden"
-              style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}
-            >
-              {/* Panel header */}
-              <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-100 flex-wrap">
-                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
-                    <BarChart3 className="h-4 w-4 text-indigo-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Assignment Records</p>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
+                {/* ── List Panel ── */}
+                <motion.div
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="w-full bg-white rounded-3xl border border-slate-100 overflow-hidden"
+                  style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}
+                >
+                  {/* Panel header */}
+                  <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-100 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+                        <BarChart3 className="h-4 w-4 text-indigo-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">Assignment Records</p>
+                        <p className="text-[11px] text-slate-400 font-medium">
+                          {filtered.length} record{filtered.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-1 bg-slate-50 rounded-xl p-1 border border-slate-100">
-                    {(["all", "earning", "deduction"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all capitalize"
-                        style={
-                          filter === f
-                            ? { background: "white", color: "#4f46e5", boxShadow: "0 1px 6px rgba(0,0,0,0.08)" }
-                            : { color: "#94a3b8" }
-                        }
-                      >
-                        {f === "all" ? "All" : f === "earning" ? "Earnings" : "Deductions"}
-                      </button>
-                    ))}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1 bg-slate-50 rounded-xl p-1 border border-slate-100">
+                        {(["all", "earning", "deduction"] as const).map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all capitalize"
+                            style={
+                              filter === f
+                                ? { background: "white", color: "#4f46e5", boxShadow: "0 1px 6px rgba(0,0,0,0.08)" }
+                                : { color: "#94a3b8" }
+                            }
+                          >
+                            {f === "all" ? "All" : f === "earning" ? "Earnings" : "Deductions"}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="relative w-full sm:w-auto">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search staff or component…"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className="pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all w-full sm:w-52"
+                        />
+                        {search && (
+                          <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="relative w-full sm:w-auto">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search staff or component…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all w-full sm:w-52"
-                    />
-                    {search && (
-                      <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                  {/* List body */}
+                  <div className="p-5">
+                    {assignments.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-5 py-14 md:py-20 text-center">
+                        <div className="relative">
+                          <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #eef2ff, #f5f3ff)" }}>
+                            <Users className="h-9 w-9 text-indigo-300" />
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl bg-white border-2 border-slate-100 flex items-center justify-center">
+                            <Plus className="h-3.5 w-3.5 text-indigo-400" />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-slate-700">No assignments yet</p>
+                          <p className="text-sm text-slate-400 font-medium mt-1 max-w-xs">
+                            Click "Assign Salary Component" to link a salary component to a staff member
+                          </p>
+                        </div>
+                        <motion.button
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setModalOpen(true)}
+                          className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white"
+                          style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.35)" }}
+                        >
+                          <Plus className="h-4 w-4" /> Assign Salary Component
+                        </motion.button>
+                      </div>
+                    ) : filtered.length === 0 ? (
+                      <div className="flex flex-col items-center gap-3 py-16">
+                        <Search className="h-8 w-8 text-slate-200" />
+                        <p className="text-sm font-semibold text-slate-400">No results found</p>
+                        <p className="text-xs text-slate-300">Try adjusting your search or filter</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <AnimatePresence initial={false}>
+                          {filtered.map((a, i) => (
+                            <EmployeeCard
+                              key={a.id}
+                              a={a}
+                              index={i}
+                              onDelete={(a) => setDeleteTarget(a)}
+                              onEdit={(a) => setEditTarget(a)}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
 
-              {/* List body */}
-              <div className="p-5">
-                {assignments.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-5 py-14 md:py-20 text-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #eef2ff, #f5f3ff)" }}>
-                        <Users className="h-9 w-9 text-indigo-300" />
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl bg-white border-2 border-slate-100 flex items-center justify-center">
-                        <Plus className="h-3.5 w-3.5 text-indigo-400" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-slate-700">No assignments yet</p>
-                      <p className="text-sm text-slate-400 font-medium mt-1 max-w-xs">
-                        Click "Assign Salary Component" to link a salary component to a staff member
-                      </p>
-                    </div>
-                    <motion.button
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => setModalOpen(true)}
-                      className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white"
-                      style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.35)" }}
+                  {/* Footer */}
+                  {assignments.length > 0 && (
+                    <div
+                      className="px-6 py-4 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap"
+                      style={{ background: "#fafbff" }}
                     >
-                      <Plus className="h-4 w-4" /> Assign Salary Component
-                    </motion.button>
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-16">
-                    <Search className="h-8 w-8 text-slate-200" />
-                    <p className="text-sm font-semibold text-slate-400">No results found</p>
-                    <p className="text-xs text-slate-300">Try adjusting your search or filter</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    <AnimatePresence initial={false}>
-                      {filtered.map((a, i) => (
-                        <EmployeeCard
-                          key={a.id}
-                          a={a}
-                          index={i}
-                          onDelete={(a) => setDeleteTarget(a)}
-                          onEdit={(a) => setEditTarget(a)}   // ← NEW
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              {assignments.length > 0 && (
-                <div
-                  className="px-6 py-4 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap"
-                  style={{ background: "#fafbff" }}
+                      <p className="text-xs text-slate-400 font-semibold">
+                        Showing <span className="text-slate-700 font-bold">{filtered.length}</span> of{" "}
+                        <span className="text-slate-700 font-bold">{assignments.length}</span> records
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> {earnings} Earnings
+                        </span>
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> {deductions} Deductions
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              </>
+            ) : (
+              /* ── SALARY STRUCTURES VIEW ── */
+              <div className="space-y-6">
+                {/* Stats */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
                 >
-                  <p className="text-xs text-slate-400 font-semibold">
-                    Showing <span className="text-slate-700 font-bold">{filtered.length}</span> of{" "}
-                    <span className="text-slate-700 font-bold">{assignments.length}</span> records
-                  </p>
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> {earnings} Earnings
-                    </span>
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                      <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> {deductions} Deductions
-                    </span>
+                  {[
+                    { label: "Salary Structures", value: structures.length, icon: Layers, color: "#4f46e5", bg: "#eef2ff", border: "#e0e7ff" },
+                    {
+                      label: "Staff Assigned",
+                      value: staffList.filter((s) => s.salary_structure !== undefined && s.salary_structure !== null).length,
+                      icon: UserCheck,
+                      color: "#16a34a",
+                      bg: "#f0fdf4",
+                      border: "#bbf7d0",
+                    },
+                    { label: "Available Components", value: allComponents.length, icon: Banknote, color: "#ea580c", bg: "#fff7ed", border: "#ffedd5" },
+                  ].map(({ label, value, icon: Icon, color, bg, border }) => (
+                    <div
+                      key={label}
+                      className="rounded-3xl border p-5 flex items-center gap-4 hover:shadow-lg transition-all duration-300"
+                      style={{ background: bg, borderColor: border }}
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}20` }}>
+                        <Icon className="h-5 w-5" style={{ color }} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-black" style={{ color, fontFamily: "'DM Mono', monospace" }}>{value}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider mt-0.5" style={{ color: `${color}88` }}>{label}</p>
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+
+                {/* Structures List / Grid */}
+                <div
+                  className="w-full bg-white rounded-3xl border border-slate-100 overflow-hidden p-6"
+                  style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}
+                >
+                  <div className="flex items-center justify-between pb-5 border-b border-slate-100 flex-wrap gap-4">
+                    <div>
+                      <h2 className="text-base font-extrabold text-slate-800">Defined Salary Structures</h2>
+                      <p className="text-xs text-slate-400 font-medium">Bundle base salaries and earnings/deductions into reusable packages</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setAssignStructureOpen(true)}
+                        disabled={structures.length === 0 || staffList.length === 0}
+                        className="flex items-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all disabled:opacity-50"
+                      >
+                        <UserCheck className="h-3.5 w-3.5" /> Assign to Staff
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setCreateStructureOpen(true)}
+                        className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white transition-all"
+                        style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 14px rgba(99,102,241,0.35)" }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> New Structure
+                      </motion.button>
+                    </div>
                   </div>
+
+                  {structures.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                        <Layers className="h-8 w-8 text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-slate-700">No salary structures configured</p>
+                        <p className="text-xs text-slate-400 font-medium mt-1">Create a salary package bundling basic pay and components</p>
+                      </div>
+                      <button
+                        onClick={() => setCreateStructureOpen(true)}
+                        className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white mt-1"
+                        style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Create First Structure
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-6">
+                      {structures.map((st) => {
+                        const assignedMembers = staffList.filter((s) => s.salary_structure === st.id);
+                        const compIds: number[] = st.components || [];
+                        const resolvedComponents = compIds
+                          .map((id: number) => allComponents.find((c: any) => c.id === id))
+                          .filter(Boolean);
+
+                        return (
+                          <div
+                            key={st.id}
+                            className="rounded-2xl border-2 border-slate-100 bg-slate-50/40 p-5 hover:border-indigo-200 hover:bg-white hover:shadow-md transition-all flex flex-col justify-between"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <h3 className="text-sm font-extrabold text-slate-800">{st.name}</h3>
+                                  <p className="text-xs font-bold text-indigo-600 mt-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>
+                                    Base: ₹{Number(st.base_salary || 0).toLocaleString("en-IN")}
+                                  </p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${st.is_active !== false ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+                                  {st.is_active !== false ? "Active" : "Inactive"}
+                                </span>
+                              </div>
+
+                              {/* Components */}
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                                  Included Components ({resolvedComponents.length})
+                                </p>
+                                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                  {resolvedComponents.length === 0 ? (
+                                    <span className="text-[11px] text-slate-400 italic">No specific components</span>
+                                  ) : (
+                                    resolvedComponents.map((c: any) => (
+                                      <span
+                                        key={c!.id}
+                                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                                          c!.component_type === "earning"
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                            : "bg-red-50 text-red-700 border border-red-100"
+                                        }`}
+                                      >
+                                        {c!.name}
+                                      </span>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Assigned staff */}
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                  Assigned Employees ({assignedMembers.length})
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {assignedMembers.length === 0 ? (
+                                    <span className="text-[11px] text-slate-400 italic">None assigned yet</span>
+                                  ) : (
+                                    assignedMembers.slice(0, 3).map((m) => (
+                                      <span key={m.id} className="rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                                        {m.name}
+                                      </span>
+                                    ))
+                                  )}
+                                  {assignedMembers.length > 3 && (
+                                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                                      +{assignedMembers.length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-4">
+                              <button
+                                onClick={() => setAssignStructureOpen(true)}
+                                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" /> Assign Staff
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStructure(st.id, st.name)}
+                                className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </motion.div>
+              </div>
+            )}
           </>
         )}
       </div>

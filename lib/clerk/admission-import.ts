@@ -25,7 +25,7 @@ export async function readAdmissionWorkbook(file: File, form: AdmissionConfig): 
   if (sheet.rowCount > 501 || sheet.columnCount > 200) throw new Error("Import up to 500 student rows and 200 columns at a time.");
   const fields = admissionFields(form);
   const columns = new Map<number, number>();
-  sheet.getRow(1).eachCell((cell, column) => {
+  sheet.getRow(1).eachCell((cell: any, column: any) => {
     const header = cell.text.trim();
     if (!header) return;
     const match = /\[(\d+)\]$/.exec(header);

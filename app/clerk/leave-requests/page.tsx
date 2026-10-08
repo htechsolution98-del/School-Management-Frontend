@@ -116,13 +116,15 @@ export default function ClerkLeaveRequestsPage() {
     return "PARTIAL";
   };
 
-  // Human-readable mapper for Leave Type (handles numeric IDs like 1, 2, or lowercase strings)
-  const getLeaveTypeDisplay = (leaveType: any): string => {
+  // Human-readable mapper for Leave Type (handles dynamic leave types, numeric IDs, or strings)
+  const getLeaveTypeDisplay = (leaveType: any, req?: any): string => {
+    if (req?.dynamic_leave_type_name) return req.dynamic_leave_type_name;
+    if (req?.leave_type_name) return req.leave_type_name;
     if (!leaveType) return "Casual Leave";
     
     let val: any = leaveType;
     if (typeof leaveType === "object" && leaveType !== null) {
-      val = leaveType.name || leaveType.type || leaveType.title || leaveType.label || "Casual Leave";
+      val = leaveType.name || leaveType.leave_type || leaveType.type || leaveType.title || leaveType.label || "Casual Leave";
     }
 
     if (typeof val === "number" || !isNaN(Number(val))) {
@@ -279,8 +281,8 @@ export default function ClerkLeaveRequestsPage() {
     return true;
   });
 
-  const getLeaveTypeBadgeClass = (leaveType: any) => {
-    const type = getLeaveTypeDisplay(leaveType).toUpperCase();
+  const getLeaveTypeBadgeClass = (leaveType: any, req?: any) => {
+    const type = getLeaveTypeDisplay(leaveType, req).toUpperCase();
     if (type.includes("SICK")) return "bg-rose-500/10 text-rose-600 border-rose-200/50 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/50";
     if (type.includes("CASUAL")) return "bg-sky-500/10 text-sky-600 border-sky-200/50 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/50";
     if (type.includes("MATERNITY") || type.includes("PATERNITY")) return "bg-purple-500/10 text-purple-600 border-purple-200/50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50";
@@ -647,9 +649,16 @@ export default function ClerkLeaveRequestsPage() {
                               </td>
 
                               <td className="px-4 py-3.5">
-                                <Badge variant="outline" className={cn("font-bold px-2.5 py-0.5 border text-[11px] rounded-md", getLeaveTypeBadgeClass(leaveType))}>
-                                  {getLeaveTypeDisplay(leaveType)}
-                                </Badge>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge variant="outline" className={cn("font-bold px-2.5 py-0.5 border text-[11px] rounded-md", getLeaveTypeBadgeClass(leaveType, request))}>
+                                    {getLeaveTypeDisplay(leaveType, request)}
+                                  </Badge>
+                                  {request.is_paid === false && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-200/50 dark:bg-amber-950/30 dark:text-amber-400">
+                                      LOP
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               <td className="px-4 py-3.5 font-mono text-slate-700 dark:text-zinc-300">
@@ -779,10 +788,15 @@ export default function ClerkLeaveRequestsPage() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2.5 self-start sm:self-auto">
-                                <Badge variant="outline" className={cn("font-bold px-3 py-1 border text-xs tracking-wider rounded-md", getLeaveTypeBadgeClass(leaveType))}>
-                                  {getLeaveTypeDisplay(leaveType)}
+                              <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+                                <Badge variant="outline" className={cn("font-bold px-3 py-1 border text-xs tracking-wider rounded-md", getLeaveTypeBadgeClass(leaveType, request))}>
+                                  {getLeaveTypeDisplay(leaveType, request)}
                                 </Badge>
+                                {request.is_paid === false && (
+                                  <Badge variant="outline" className="font-bold px-2 py-0.5 border text-[11px] rounded-md bg-amber-500/10 text-amber-600 border-amber-200/50 dark:bg-amber-950/30 dark:text-amber-400">
+                                    LOP / Unpaid
+                                  </Badge>
+                                )}
                                 {getStatusBadge(reqStatus)}
                               </div>
                             </div>

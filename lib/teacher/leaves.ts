@@ -4,9 +4,15 @@ import { API_BASE_URL } from "@/lib/config";
 export interface RemainingLeave {
   leave_type_id: number;
   leave_type: string;
-  total_allowed: number;
+  leave_type_name?: string;
+  total_allowed?: number;
+  allocated?: number;
+  carry_forward?: number;
   used: number;
+  pending?: number;
   remaining: number;
+  remaining_leaves?: number;
+  is_paid?: boolean;
 }
 
 export interface MyLeaveRequest {
@@ -16,6 +22,8 @@ export interface MyLeaveRequest {
   total_days: number;
   reason: string;
   leave_type: string | number; // Can be a string or dynamic type object/ID
+  dynamic_leave_type?: number | null;
+  dynamic_leave_type_name?: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | string;
   created_at: string;
 }
@@ -26,6 +34,7 @@ export interface LeaveRequestPayload {
   total_days: number;
   reason: string;
   leave_type: number;
+  dynamic_leave_type?: number;
 }
 
 export async function getRemainingLeaves(): Promise<RemainingLeave[]> {

@@ -64,6 +64,24 @@ export function validateStaffRecord(data: CreateStaffPayload, staff: Staff[], de
     }
   }
   if (!/^\d{1,8}(\.\d{1,2})?$/.test(data.salary.trim())) errors.salary = "Enter a salary from 0 to 99,999,999.99 with at most 2 decimal places.";
+  if (data.joining_date) {
+    const joinMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data.joining_date);
+    if (!joinMatch) {
+      errors.joining_date = "Enter a valid joining date.";
+    } else {
+      const [, jy, jm, jd] = joinMatch;
+      const joinDate = new Date(Number(jy), Number(jm) - 1, Number(jd));
+      if (joinDate.getFullYear() !== Number(jy) || joinDate.getMonth() !== Number(jm) - 1 || joinDate.getDate() !== Number(jd)) {
+        errors.joining_date = "Enter a valid calendar date.";
+      } else if (match) {
+        const [, by, bm, bd] = match;
+        const birthDate = new Date(Number(by), Number(bm) - 1, Number(bd));
+        if (joinDate < birthDate) {
+          errors.joining_date = "Joining date cannot be earlier than date of birth.";
+        }
+      }
+    }
+  }
   if (typeof data.is_active !== "boolean") errors.is_active = "Select a valid employment status.";
   return errors;
 }

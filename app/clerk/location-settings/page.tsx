@@ -44,6 +44,12 @@ import {
   getLocationSettings,
   saveLocationSettings,
 } from "@/lib/clerk";
+import {
+  getAttendanceSettings,
+  createAttendanceSetting,
+  updateAttendanceSetting,
+} from "@/lib/hr-config";
+import type { AttendanceSetting } from "@/types";
 import type { LocationSettingsRecord } from "@/types/clerk";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -796,6 +802,25 @@ function DataView({
                 </span>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-indigo-600" /> Grace Period
+                  </span>
+                  <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                    {(data as any).grace_period_mins ?? 15} mins
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <AlarmClock className="h-3 w-3 text-amber-600" /> Half-Day Threshold
+                  </span>
+                  <p className="font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
+                    {(data as any).half_day_threshold_mins ?? 120} mins
+                  </p>
+                </div>
+              </div>
+
               {data.start_time && data.end_time && (
                 <ScheduleTimeline
                   start={fmt(data.start_time)}
@@ -859,12 +884,15 @@ function LocationForm({
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
+    shift_name: (initialData as any)?.shift_name || "General Shift",
     latitude: initialData?.latitude ? String(initialData.latitude) : "23.022505",
     longitude: initialData?.longitude ? String(initialData.longitude) : "72.571362",
     radius: initialData?.radius ? String(initialData.radius) : "100",
     start_time: initialData?.start_time || "09:00:00",
     end_time: initialData?.end_time || "17:00:00",
     half_day_time: initialData?.half_day_time || "13:00:00",
+    grace_period_mins: String((initialData as any)?.grace_period_mins ?? 15),
+    half_day_threshold_mins: String((initialData as any)?.half_day_threshold_mins ?? 120),
   });
 
   const setVal = (key: string, val: string) =>
@@ -884,7 +912,29 @@ function LocationForm({
     setError(null);
     try {
       await saveLocationSettings(form);
-      toast.success("Attendance zone settings saved successfully!");
+
+      // Also persist to dynamic AttendanceSetting
+      const existingSettings = await getAttendanceSettings().catch(() => []);
+      const primarySetting = existingSettings.length > 0 ? existingSettings[0] : null;
+
+      const dynamicPayload = {
+        name: form.shift_name.trim() || "General Shift",
+        check_in_time: form.start_time,
+        check_out_time: form.end_time,
+        grace_period_mins: Number(form.grace_period_mins) || 15,
+        half_day_threshold_mins: Number(form.half_day_threshold_mins) || 120,
+        geo_radius_meters: Number(form.radius) || 100,
+        geo_required: true,
+        is_active: true,
+      };
+
+      if (primarySetting?.id) {
+        await updateAttendanceSetting(primarySetting.id, dynamicPayload).catch(() => {});
+      } else {
+        await createAttendanceSetting(dynamicPayload).catch(() => {});
+      }
+
+      toast.success("Attendance zone & policy settings saved successfully!");
       onSaved(form);
     } catch (err: any) {
       const msg = err.message || "Failed to save location settings.";
@@ -1035,10 +1085,24 @@ function LocationForm({
                 <Clock className="h-4 w-4 text-indigo-600" /> Step 2: Working Hours & Schedule
               </CardTitle>
               <CardDescription className="text-xs">
-                Configure official school shift hours and cutoff threshold for half-day status.
+                Configure official school shift hours, grace periods, and cutoff threshold for half-day status.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                  <Layers className="h-3.5 w-3.5 text-indigo-600" /> Shift Policy Name:
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g. General School Shift"
+                  value={form.shift_name}
+                  onChange={(e) => setVal("shift_name", e.target.value)}
+                  className="h-10 text-xs font-semibold rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
@@ -1071,7 +1135,7 @@ function LocationForm({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                  <AlarmClock className="h-3.5 w-3.5 text-amber-600" /> Half-Day Cutoff Threshold:
+                  <AlarmClock className="h-3.5 w-3.5 text-amber-600" /> Half-Day Cutoff Threshold (Time):
                 </label>
                 <Input
                   type="time"
@@ -1083,6 +1147,40 @@ function LocationForm({
                 <p className="text-[11px] text-muted-foreground">
                   Teachers punching in after this cutoff are logged as half-day.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-indigo-600" /> Grace Period (Minutes):
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="60"
+                    placeholder="15"
+                    value={form.grace_period_mins}
+                    onChange={(e) => setVal("grace_period_mins", e.target.value)}
+                    className="h-10 text-xs font-mono font-medium rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Allowed late buffer (e.g. 15 mins)</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <AlarmClock className="h-3.5 w-3.5 text-amber-600" /> Half-Day Threshold (Mins):
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="480"
+                    placeholder="120"
+                    value={form.half_day_threshold_mins}
+                    onChange={(e) => setVal("half_day_threshold_mins", e.target.value)}
+                    className="h-10 text-xs font-mono font-medium rounded-xl bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Lateness threshold (e.g. 120 mins)</p>
+                </div>
               </div>
 
               <ScheduleTimeline
@@ -1112,6 +1210,11 @@ function LocationForm({
               <div className="space-y-2">
                 {[
                   {
+                    label: "Policy Name",
+                    value: form.shift_name || "General Shift",
+                    icon: Layers,
+                  },
+                  {
                     label: "Coordinates",
                     value: `${form.latitude || "—"}, ${form.longitude || "—"}`,
                     icon: Navigation,
@@ -1132,6 +1235,16 @@ function LocationForm({
                   {
                     label: "Half-Day After",
                     value: toTimeInput(form.half_day_time) || "—",
+                    icon: AlarmClock,
+                  },
+                  {
+                    label: "Grace Period",
+                    value: `${form.grace_period_mins || 15} mins`,
+                    icon: Clock,
+                  },
+                  {
+                    label: "Half-Day Threshold",
+                    value: `${form.half_day_threshold_mins || 120} mins`,
                     icon: AlarmClock,
                   },
                 ].map(({ label, value, icon: Icon }) => (
@@ -1201,14 +1314,34 @@ export default function LocationSettingsPage() {
     setPageState("loading");
     setFetchError(null);
     try {
-      const data = await getLocationSettings();
+      const [data, attendanceList] = await Promise.all([
+        getLocationSettings(),
+        getAttendanceSettings().catch(() => []),
+      ]);
+      const primaryAttendance = attendanceList.length > 0 ? attendanceList[0] : null;
+
       const hasData =
-        data &&
-        (String(data.latitude || "").trim() !== "" ||
-          String(data.longitude || "").trim() !== "");
+        (data &&
+          (String(data.latitude || "").trim() !== "" ||
+            String(data.longitude || "").trim() !== "")) ||
+        primaryAttendance !== null;
 
       if (hasData) {
-        setExistingData(data);
+        const mergedData = {
+          ...(data || {}),
+          id: data?.id,
+          latitude: data?.latitude,
+          longitude: data?.longitude,
+          radius: data?.radius || (primaryAttendance ? String(primaryAttendance.geo_radius_meters) : "100"),
+          start_time: data?.start_time || primaryAttendance?.check_in_time || "09:00:00",
+          end_time: data?.end_time || primaryAttendance?.check_out_time || "17:00:00",
+          half_day_time: data?.half_day_time || "13:00:00",
+          shift_name: primaryAttendance?.name || "General Shift",
+          grace_period_mins: primaryAttendance?.grace_period_mins ?? 15,
+          half_day_threshold_mins: primaryAttendance?.half_day_threshold_mins ?? 120,
+          attendance_setting_id: primaryAttendance?.id,
+        };
+        setExistingData(mergedData as any);
         setPageState("view");
       } else {
         setExistingData(null);

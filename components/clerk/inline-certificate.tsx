@@ -40,7 +40,7 @@ export function InlineCertificate({ documentKey, revision, readDraft, onSave, ed
         spellcheck: true,
         paste: { forcePlainText: true, cleanPastedHTML: true },
       });
-      instance.subscribe("editableInput", (_event, element) => saveDraft.current(element.innerHTML));
+      instance.subscribe("editableInput", (_event: any, element: any) => saveDraft.current(element.innerHTML));
       richEditor.current = instance;
       setReady(true);
       setEditorError(false);

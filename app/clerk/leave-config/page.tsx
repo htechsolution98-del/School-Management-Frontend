@@ -72,17 +72,24 @@ export default function LeaveConfigPage() {
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isTemplateSubmitting, setIsTemplateSubmitting] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<LeaveTemplate | null>(null);
-  const [templateTimeline, setTemplateTimeline] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [templateTimeline, setTemplateTimeline] = useState("ANNUAL");
+  const [templateIsActive, setTemplateIsActive] = useState(true);
 
   // Leave Type Modal Form state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [isTypeSubmitting, setIsTypeSubmitting] = useState(false);
   const [editingType, setEditingType] = useState<LeaveTypeRecord | null>(null);
   const [typeName, setTypeName] = useState("");
+  const [typeCode, setTypeCode] = useState("");
   const [typeTemplateId, setTypeTemplateId] = useState("");
   const [typeNum, setTypeNum] = useState<number>(0);
+  const [typeAllocationPeriod, setTypeAllocationPeriod] = useState<string>("Yearly");
+  const [typeIsPaid, setTypeIsPaid] = useState(true);
+  const [typeAllowEncashment, setTypeAllowEncashment] = useState(false);
   const [typeCategoryIds, setTypeCategoryIds] = useState<number[]>([]);
   const [typeCarryForward, setTypeCarryForward] = useState(false);
+  const [maxCarryForward, setMaxCarryForward] = useState<number>(0);
 
   // Deletion loading tracking
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -140,27 +147,39 @@ export default function LeaveConfigPage() {
 
   const handleOpenCreateTemplate = () => {
     setEditingTemplate(null);
-    setTemplateTimeline("MONTHLY");
+    setTemplateName("");
+    setTemplateTimeline("ANNUAL");
+    setTemplateIsActive(true);
     setIsTemplateDialogOpen(true);
   };
 
   const handleOpenEditTemplate = (tmpl: LeaveTemplate) => {
     setEditingTemplate(tmpl);
-    setTemplateTimeline(tmpl.time_line);
+    setTemplateName(tmpl.name || "");
+    setTemplateTimeline(tmpl.time_line || "ANNUAL");
+    setTemplateIsActive(tmpl.is_active !== false);
     setIsTemplateDialogOpen(true);
   };
 
   const handleTemplateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!templateTimeline) return;
+    if (!templateName.trim()) {
+      toast.error("Please enter a policy name.");
+      return;
+    }
     setIsTemplateSubmitting(true);
     try {
+      const payload = {
+        name: templateName.trim(),
+        time_line: templateTimeline.trim() || "ANNUAL",
+        is_active: templateIsActive,
+      };
       if (editingTemplate) {
-        await updateLeaveTemplate(editingTemplate.id, templateTimeline);
-        toast.success("Leave template updated successfully");
+        await updateLeaveTemplate(editingTemplate.id, payload);
+        toast.success("Leave policy updated successfully");
       } else {
-        await createLeaveTemplate(templateTimeline);
-        toast.success("Leave template created successfully");
+        await createLeaveTemplate(payload);
+        toast.success("Leave policy created successfully");
       }
       setIsTemplateDialogOpen(false);
       fetchData();
@@ -197,20 +216,30 @@ export default function LeaveConfigPage() {
   const handleOpenCreateType = () => {
     setEditingType(null);
     setTypeName("");
+    setTypeCode("");
     setTypeTemplateId(templates[0] ? String(templates[0].id) : "");
     setTypeNum(1);
+    setTypeAllocationPeriod("Yearly");
+    setTypeIsPaid(true);
+    setTypeAllowEncashment(false);
     setTypeCategoryIds([]);
     setTypeCarryForward(false);
+    setMaxCarryForward(0);
     setIsTypeDialogOpen(true);
   };
 
   const handleOpenEditType = (typeRec: LeaveTypeRecord) => {
     setEditingType(typeRec);
-    setTypeName(typeRec.leave_type);
+    setTypeName(typeRec.name || typeRec.leave_type);
+    setTypeCode(typeRec.code || "");
     setTypeTemplateId(String(typeRec.leave_template));
-    setTypeNum(typeRec.leave_num);
+    setTypeNum(Number(typeRec.allocation_count ?? typeRec.leave_num ?? 0));
+    setTypeAllocationPeriod(typeRec.allocation_period || "Yearly");
+    setTypeIsPaid(typeRec.is_paid !== false);
+    setTypeAllowEncashment(!!typeRec.allow_encashment);
     setTypeCategoryIds([typeRec.category]); // single category for edit mode
-    setTypeCarryForward(typeRec.is_carry_forward);
+    setTypeCarryForward(!!(typeRec.carry_forward || typeRec.is_carry_forward));
+    setMaxCarryForward(Number(typeRec.max_carry_forward || 0));
     setIsTypeDialogOpen(true);
   };
 
@@ -227,14 +256,26 @@ export default function LeaveConfigPage() {
     setIsTypeSubmitting(true);
 
     try {
+      const basePayload = {
+        name: typeName.trim(),
+        leave_type: typeName.trim().toUpperCase(),
+        code: typeCode.trim().toUpperCase() || undefined,
+        leave_template: Number(typeTemplateId),
+        leave_num: typeNum,
+        allocation_count: typeNum,
+        allocation_period: typeAllocationPeriod,
+        is_paid: typeIsPaid,
+        allow_encashment: typeAllowEncashment,
+        is_carry_forward: typeCarryForward,
+        carry_forward: typeCarryForward,
+        max_carry_forward: typeCarryForward ? maxCarryForward : 0,
+      };
+
       if (editingType) {
         // Edit mode: single category (keep as-is)
         const payload = {
-          leave_type: typeName.trim().toUpperCase(),
-          leave_template: Number(typeTemplateId),
-          leave_num: typeNum,
+          ...basePayload,
           category: typeCategoryIds[0] ?? editingType.category,
-          is_carry_forward: typeCarryForward,
         };
         await updateLeaveType(editingType.id, payload);
         toast.success("Leave type updated successfully");
@@ -245,11 +286,8 @@ export default function LeaveConfigPage() {
         const results = await Promise.allSettled(
           typeCategoryIds.map((catId) =>
             createLeaveType({
-              leave_type: typeName.trim().toUpperCase(),
-              leave_template: Number(typeTemplateId),
-              leave_num: typeNum,
+              ...basePayload,
               category: catId,
-              is_carry_forward: typeCarryForward,
             })
           )
         );
@@ -306,11 +344,19 @@ export default function LeaveConfigPage() {
       const results = await Promise.allSettled(
         newCatIds.map((catId) =>
           createLeaveType({
+            name: first.name || typeName,
             leave_type: typeName,
+            code: first.code,
             leave_template: first.leave_template,
             leave_num: first.leave_num,
+            allocation_count: first.allocation_count ?? first.leave_num,
+            allocation_period: first.allocation_period || "Yearly",
+            is_paid: first.is_paid !== false,
+            allow_encashment: !!first.allow_encashment,
             category: catId,
             is_carry_forward: first.is_carry_forward,
+            carry_forward: first.carry_forward ?? first.is_carry_forward,
+            max_carry_forward: first.max_carry_forward ?? 0,
           })
         )
       );
@@ -350,7 +396,8 @@ export default function LeaveConfigPage() {
     );
   };
 
-  const getTimelineDisplay = (timeline: string) => {
+  const getTimelineDisplay = (timeline?: string | null) => {
+    if (!timeline) return "ANNUAL (1 Year)";
     const t = String(timeline).toUpperCase();
     if (t === "MONTHLY") return "MONTHLY (1 Month)";
     if (t === "QUARTERLY") return "QUARTERLY (4 Months)";
@@ -866,27 +913,49 @@ export default function LeaveConfigPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Sliders className="h-5 w-5 text-primary" />
-              {editingTemplate ? "Edit Template Period" : "Create Leave Template"}
+              {editingTemplate ? "Edit Leave Policy" : "Create Leave Policy"}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Define the period under which leave types will be configured.
+              Define a dynamic leave policy template and cycle for your staff.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleTemplateSubmit} className="space-y-4 pt-4">
             <div className="space-y-1.5">
-              <Label htmlFor="timeline" className="text-xs font-semibold">Timeline Period</Label>
-              <Select value={templateTimeline} onValueChange={(val) => setTemplateTimeline(val || "")} required>
-                <SelectTrigger id="timeline" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
-                  <SelectValue placeholder="Select Timeline" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
-                  <SelectItem value="MONTHLY">MONTHLY (1 Month)</SelectItem>
-                  <SelectItem value="QUARTERLY">QUARTERLY (4 Months)</SelectItem>
-                  <SelectItem value="SEMI_ANNUAL">SEMI_ANNUAL (6 Months)</SelectItem>
-                  <SelectItem value="ANNUAL">ANNUAL (1 Year)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="template-name" className="text-xs font-semibold">Policy Name</Label>
+              <Input
+                id="template-name"
+                placeholder="e.g., Teaching Staff Policy, Annual Staff Leave Policy"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                required
+                className="rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="template-timeline" className="text-xs font-semibold">Policy Cycle / Timeline</Label>
+              <Input
+                id="template-timeline"
+                placeholder="e.g., 2026-2027, ANNUAL, MONTHLY"
+                value={templateTimeline}
+                onChange={(e) => setTemplateTimeline(e.target.value)}
+                className="rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+              <div className="space-y-0.5">
+                <Label htmlFor="template-active" className="text-xs font-semibold">Active Policy</Label>
+                <span className="text-[10px] text-muted-foreground block">
+                  Enable this template for new employee assignments.
+                </span>
+              </div>
+              <Switch
+                id="template-active"
+                checked={templateIsActive}
+                onCheckedChange={setTemplateIsActive}
+              />
             </div>
 
             <DialogFooter className="pt-4 border-t dark:border-zinc-800 flex items-center gap-3">
@@ -934,16 +1003,29 @@ export default function LeaveConfigPage() {
           </DialogHeader>
 
           <form onSubmit={handleTypeSubmit} className="space-y-4 pt-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="type-name" className="text-xs font-semibold">Category Name (e.g. SICK, CASUAL)</Label>
-              <Input
-                id="type-name"
-                placeholder="e.g., CASUAL"
-                value={typeName}
-                onChange={(e) => setTypeName(e.target.value)}
-                required
-                className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="type-name" className="text-xs font-semibold">Category Name (e.g. SICK, CASUAL)</Label>
+                <Input
+                  id="type-name"
+                  placeholder="e.g., CASUAL"
+                  value={typeName}
+                  onChange={(e) => setTypeName(e.target.value)}
+                  required
+                  className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="type-code" className="text-xs font-semibold">Short Code (e.g. CL, SL, EL)</Label>
+                <Input
+                  id="type-code"
+                  placeholder="e.g., CL"
+                  value={typeCode}
+                  onChange={(e) => setTypeCode(e.target.value)}
+                  className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary uppercase"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -959,6 +1041,21 @@ export default function LeaveConfigPage() {
                   className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="allocation-period" className="text-xs font-semibold">Allocation Period</Label>
+                <Select value={typeAllocationPeriod} onValueChange={(val) => setTypeAllocationPeriod(val || "Yearly")}>
+                  <SelectTrigger id="allocation-period" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
+                    <SelectValue placeholder="Period" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
+                    <SelectItem value="Monthly">Monthly</SelectItem>
+                    <SelectItem value="Quarterly">Quarterly</SelectItem>
+                    <SelectItem value="Yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="type-cat" className="text-xs font-semibold">
@@ -1073,7 +1170,6 @@ export default function LeaveConfigPage() {
                   </div>
                 )}
               </div>
-            </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="type-template" className="text-xs font-semibold">Parent Leave Template Period</Label>
@@ -1098,16 +1194,61 @@ export default function LeaveConfigPage() {
 
             <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="space-y-0.5">
-                <Label htmlFor="carry-forward" className="text-xs font-semibold">Enable Carry Forward</Label>
+                <Label htmlFor="is-paid" className="text-xs font-semibold">Paid Leave</Label>
                 <span className="text-[10px] text-muted-foreground block">
-                  Whether unused leaves in this category carry over to the next period.
+                  Whether taking this leave deducts from pay or remains fully paid.
                 </span>
               </div>
               <Switch
-                id="carry-forward"
-                checked={typeCarryForward}
-                onCheckedChange={setTypeCarryForward}
+                id="is-paid"
+                checked={typeIsPaid}
+                onCheckedChange={setTypeIsPaid}
               />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+              <div className="space-y-0.5">
+                <Label htmlFor="allow-encashment" className="text-xs font-semibold">Allow Encashment</Label>
+                <span className="text-[10px] text-muted-foreground block">
+                  Whether unused leaves can be encashed during annual payroll settlement.
+                </span>
+              </div>
+              <Switch
+                id="allow-encashment"
+                checked={typeAllowEncashment}
+                onCheckedChange={setTypeAllowEncashment}
+              />
+            </div>
+
+            <div className="space-y-2 p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="carry-forward" className="text-xs font-semibold">Enable Carry Forward</Label>
+                  <span className="text-[10px] text-muted-foreground block">
+                    Whether unused leaves in this category carry over to the next period.
+                  </span>
+                </div>
+                <Switch
+                  id="carry-forward"
+                  checked={typeCarryForward}
+                  onCheckedChange={setTypeCarryForward}
+                />
+              </div>
+
+              {typeCarryForward && (
+                <div className="space-y-1.5 pt-2 border-t dark:border-zinc-800">
+                  <Label htmlFor="max-carry-forward" className="text-xs font-semibold">Max Carry Forward (Days)</Label>
+                  <Input
+                    id="max-carry-forward"
+                    type="number"
+                    min="0"
+                    placeholder="0 = unlimited"
+                    value={maxCarryForward}
+                    onChange={(e) => setMaxCarryForward(Number(e.target.value))}
+                    className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-4 border-t dark:border-zinc-800 flex items-center gap-3">
