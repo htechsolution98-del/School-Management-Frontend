@@ -269,7 +269,7 @@ export default function AbsenteeDeskPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
         <div>
@@ -558,7 +558,7 @@ export default function AbsenteeDeskPage() {
                 type="button"
                 size="sm"
                 onClick={handleSaveReason}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+                className="bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20"
               >
                 Save Reason
               </Button>

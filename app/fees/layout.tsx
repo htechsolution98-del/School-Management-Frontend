@@ -5,7 +5,9 @@ import {
   LayoutDashboard,
   Calendar,
   ReceiptText,
-  Tags,           // Fee Types icon
+  Tags,
+  Layers,
+  CreditCard,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -13,22 +15,34 @@ const sidebarLinks = [
   { 
     title: "Dashboard", 
     href: "/fees", 
-    icon: LayoutDashboard 
+    icon: LayoutDashboard,
+    exact: true,
   },
-  
   { 
     title: "Academic Year", 
     href: "/fees/academic-year", 
-    icon: Calendar 
+    icon: Calendar,
   },
   { 
     title: "Fee Types",           
     href: "/fees/fee-types",      
-    icon: Tags 
+    icon: Tags,
   },
-  { title: "Fee Structure", href: "/fees/fee-structure", icon: LayoutDashboard },
-  { title: "Genrate Fee", href: "/fees/Genrate-Fees", icon: LayoutDashboard },
-  { title: "Student Ledger", href: "/fees/student-ledger", icon: ReceiptText },
+  { 
+    title: "Fee Structure", 
+    href: "/fees/fee-structure", 
+    icon: Layers,
+  },
+  { 
+    title: "Generate Fee", 
+    href: "/fees/Genrate-Fees", 
+    icon: CreditCard,
+  },
+  { 
+    title: "Student Ledger", 
+    href: "/fees/student-ledger", 
+    icon: ReceiptText,
+  },
 ];
 
 export default function FeesLayout({

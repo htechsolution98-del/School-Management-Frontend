@@ -1016,51 +1016,44 @@ export default function StaffSalaryPage() {
         onUpdated={handleUpdated}
       />
 
-      <div className="w-full px-3 sm:px-4 md:px-6 xl:px-10 py-5 space-y-6 overflow-x-hidden">
-        {/* ── Header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between gap-4 flex-wrap"
-        >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-7 h-7 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
-              >
-                <Shield className="w-3.5 h-3.5 text-white" />
+      <div className="space-y-6 max-w-7xl mx-auto overflow-x-hidden">
+        {/* ── Header Banner ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
+                <Shield className="h-3.5 w-3.5" /> Staff Payroll Engine
               </div>
-              <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Payroll</span>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Staff Salary Structure</h1>
+              <p className="text-purple-100 max-w-xl text-sm md:text-base">
+                Manage salary component assignments, individual rates, and earnings/deductions for all staff members.
+              </p>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 leading-tight tracking-tight">Staff Salary</h1>
-            <p className="text-sm text-slate-400 mt-1 font-medium">Manage salary component assignments for all staff</p>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={loadAll}
-              disabled={loading}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-500 transition-all shadow-sm disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={() => setModalOpen(true)}
-              disabled={loading || allComponents.length === 0}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 4px 16px rgba(99,102,241,0.4)" }}
-            >
-              <Plus className="h-4 w-4" />
-              Assign Salary Component
-            </motion.button>
+            <div className="flex flex-wrap items-center gap-3">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => setModalOpen(true)}
+                disabled={loading || allComponents.length === 0}
+                className="flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-[#5826df] hover:bg-purple-50 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="h-4 w-4" />
+                Assign Salary Component
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={loadAll}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-all shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </motion.button>
+            </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Loading / Error ── */}
         {loading && (

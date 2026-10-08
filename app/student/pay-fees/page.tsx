@@ -656,9 +656,8 @@ export default function PayFeesPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Render ──
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Error Banner */}
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-600 text-sm">

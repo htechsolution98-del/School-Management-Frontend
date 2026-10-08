@@ -599,8 +599,8 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       transition={{ duration: 0.4 }}
       className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 border border-teal-100 mb-4 shadow-xs">
-        <FileText className="h-8 w-8 text-[#147d73]" />
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-100 mb-4 shadow-xs">
+        <FileText className="h-8 w-8 text-[#5826df]" />
       </div>
       <h3 className="text-base font-bold text-slate-800 mb-1">
         No admission forms created yet
@@ -608,7 +608,7 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       <p className="text-xs text-slate-500 max-w-xs mb-6">
         Create an online admission form to start accepting student applications with custom fields and document uploads.
       </p>
-      <Button onClick={onCreateClick} className="gap-2 bg-[#173044] hover:bg-[#25495e] text-white rounded-xl shadow-xs text-xs font-bold px-4 py-2">
+      <Button onClick={onCreateClick} className="gap-2 bg-[#5826df] hover:bg-[#4a1ec2] text-white rounded-xl shadow-md shadow-indigo-500/20 text-xs font-bold px-4 py-2">
         <Plus className="h-4 w-4" />
         Create Admission Form
       </Button>
@@ -802,7 +802,7 @@ function PublishedLinkBanner({
 
       <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#173044] text-white shadow-md shrink-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5826df] text-white shadow-md shadow-indigo-500/20 shrink-0">
             <ExternalLink className="h-5 w-5" />
           </div>
           <div>
@@ -1146,7 +1146,7 @@ export default function AdmissionFormPage() {
                     onClick={() => setStatusFilter(filter)}
                     className={`px-3 py-1 text-xs font-bold rounded-lg transition-all capitalize ${
                       statusFilter === filter
-                        ? "bg-[#173044] text-white shadow-2xs"
+                        ? "bg-[#5826df] text-white shadow-xs"
                         : "text-slate-600 hover:bg-slate-100"
                     }`}
                   >

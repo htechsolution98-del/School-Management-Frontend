@@ -1016,7 +1016,7 @@ export default function GenerateSalaryPage() {
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -1048,58 +1048,57 @@ export default function GenerateSalaryPage() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* ── Page Header — NOT sticky ── */}
-      <div className="bg-white border-b border-slate-100 px-6 py-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-200">
-              <Sparkles size={18} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">
-                Generate Salary
-              </h1>
-              <p className="text-slate-400 text-sm mt-0.5">
-                Process and manage staff salary payments
+      {/* ── Page Header Banner ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
+                <Sparkles className="h-3.5 w-3.5" /> Payroll Disbursement
+              </div>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Generate Salary</h1>
+              <p className="text-purple-100 max-w-xl text-sm md:text-base">
+                Process monthly disbursements, manage payment receipts, and record payouts.
               </p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() =>
-                setSelectedStaff({
-                  id: 0,
-                  name: "",
-                  role: "",
-                  department: "",
-                  basic_salary: 0,
-                  salary_generated: false,
-                })
-              }
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm shadow-indigo-200"
-            >
-              <IndianRupee size={15} />
-              Generate Salary
-            </button>
-            <MonthPicker value={salaryMonth} onChange={setSalaryMonth} />
-            <button
-              onClick={() => setStaffList([])}
-              disabled={refreshing || pageLoading}
-              title="Refresh"
-              className="p-2 border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
-            >
-              <RefreshCw
-                size={15}
-                className={refreshing ? "animate-spin" : ""}
-              />
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() =>
+                  setSelectedStaff({
+                    id: 0,
+                    name: "",
+                    role: "",
+                    department: "",
+                    basic_salary: 0,
+                    salary_generated: false,
+                  })
+                }
+                className="px-5 py-2.5 rounded-xl bg-white text-[#5826df] hover:bg-purple-50 text-sm font-bold transition flex items-center gap-2 shadow-md"
+              >
+                <IndianRupee size={16} />
+                Generate Salary
+              </button>
+              <div className="bg-white/10 border border-white/20 rounded-xl text-white">
+                <MonthPicker value={salaryMonth} onChange={setSalaryMonth} />
+              </div>
+              <button
+                onClick={() => setStaffList([])}
+                disabled={refreshing || pageLoading}
+                title="Refresh"
+                className="p-2.5 border border-white/20 rounded-xl text-white hover:bg-white/20 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw
+                  size={16}
+                  className={refreshing ? "animate-spin" : ""}
+                />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Page Body ── */}
-      <div className="p-6 space-y-6">
+        {/* ── Page Body ── */}
+        <div className="space-y-6">
         {/* Loading */}
         {pageLoading && (
           <div className="flex flex-col items-center justify-center py-36 gap-3">

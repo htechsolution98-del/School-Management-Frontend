@@ -458,30 +458,38 @@ export default function RazorpayCredentialsPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="w-full space-y-6">
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-7 w-7 rounded-lg bg-[#1D496C]/10 flex items-center justify-center">
-              <CreditCard className="h-3.5 w-3.5 text-[#1D496C]" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-300">
+              <CreditCard className="h-3.5 w-3.5 text-white" />
             </div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">
-              Razorpay Credentials
-            </h2>
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+              Payment Gateway
+            </span>
           </div>
-          <p className="text-sm text-gray-500">
-            Manage payment gateway credentials for each school.
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Razorpay Credentials
+          </h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">
+            Manage payment gateway credentials and webhook settings for each school.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={fetchAll} disabled={isFetching} title="Refresh"
-           >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            onClick={fetchAll}
+            disabled={isFetching}
+            className="rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
           </Button>
           <Button
             onClick={() => { setIsAdding(!isAdding); setEditingRecord(null); setError(""); }}
-            className={`h-9 px-4 rounded-lg text-sm font-semibold transition-all ${isAdding ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200" : "bg-[#1D496C] hover:bg-[#163b58] text-white"}`}
+            className={`h-10 px-4 rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/20 ${isAdding ? "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200" : "bg-indigo-600 hover:bg-indigo-700 text-white"}`}
           >
             {isAdding ? (<><X className="h-4 w-4 mr-1.5" />Cancel</>) : (<><Plus className="h-4 w-4 mr-1.5" />Add Credentials</>)}
           </Button>
