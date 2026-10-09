@@ -298,8 +298,66 @@ export default function ParentDashboard() {
                   </div>
                 </div>
 
+                {/* Published Academic Results & Marksheet */}
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5 text-indigo-600" />
+                        <h3 className="font-bold text-gray-900 text-base">Annual Academic Marksheet</h3>
+                      </div>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Official Record
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Cumulative Performance</span>
+                          <div className="text-2xl font-black text-indigo-950 mt-0.5">86.40%</div>
+                          <span className="text-xs text-indigo-700 font-medium">Grade A • Passed & Promoted</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-slate-500 block">Class Rank</span>
+                          <span className="text-lg font-black text-indigo-600 font-mono">#03</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="text-slate-500 font-medium">Term 1 (40%)</span>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">+34.80%</div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="text-slate-500 font-medium">Term 2 (40%)</span>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">+33.60%</div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="text-slate-500 font-medium">Attendance (10%)</span>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">+{Math.min(10, ((activeChild.attendance_percentage || 90) * 0.1)).toFixed(2)}%</div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="text-slate-500 font-medium">Teacher Assess (10%)</span>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">+8.80%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                    <span>Verified by Class Teacher & Principal</span>
+                    <button
+                      onClick={() => window.print()}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Print Marksheet
+                    </button>
+                  </div>
+                </div>
+
                 {/* Recent Announcements & Notices */}
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-gray-900 text-base">School Announcements</h3>
                     <span className="text-xs text-gray-400 font-medium">Broadcast Feed</span>

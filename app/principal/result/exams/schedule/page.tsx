@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import {
-  FileCheck,
+  CalendarDays,
   Plus,
   Calendar,
   Clock,
@@ -18,6 +18,9 @@ import {
   Percent,
   Pencil,
   Trash2,
+  Hash,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,54 +38,47 @@ import { getDivisions } from "@/lib/clerk/divisions";
 import { getSubjects, getSubjectsByClass } from "@/lib/clerk/subjects";
 import {
   getExamTerms,
-  createExamTerm,
+  getExamRooms,
   getExamsFull,
   createExamFull,
   updateExamFull,
   deleteExamFull,
   getWeightageConfigs,
   type ExamTerm,
+  type ExamRoom,
   type ExamFull,
   type ResultWeightageComponent,
 } from "@/lib/exam-api";
 
-export default function ExamManagementPage() {
+export default function ExamSchedulePage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<ExamRoom[]>([]);
+  const [examTerms, setExamTerms] = useState<ExamTerm[]>([]);
+  const [weightageComponents, setWeightageComponents] = useState<ResultWeightageComponent[]>([]);
 
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedClassId, setSelectedClassId] = useState<string>("ALL");
   const [selectedDivFilter, setSelectedDivFilter] = useState<string>("ALL");
-
-  const availableDivisions = useMemo(() => {
-    let filtered = divisions;
-    if (selectedClassId && selectedClassId !== "ALL") {
-      filtered = divisions.filter((d: any) => String(d.SchoolClass || d.school_class) === String(selectedClassId));
-    }
-    const divSet = new Set(filtered.map((d: any) => d.division).filter(Boolean));
-    if (divSet.size === 0 && divisions.length > 0) {
-      divisions.forEach((d: any) => { if (d.division) divSet.add(d.division); });
-    }
-    return Array.from(divSet).sort();
-  }, [divisions, selectedClassId]);
-
-  const [examTerms, setExamTerms] = useState<ExamTerm[]>([]);
-  const [exams, setExams] = useState<ExamFull[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedTermFilter, setSelectedTermFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Dialog state for adding/editing Exam Schedule
-  const [editingExam, setEditingExam] = useState<ExamFull | null>(null);
+  const [exams, setExams] = useState<ExamFull[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<ExamFull | null>(null);
   const [newExamTitle, setNewExamTitle] = useState("");
+  const [newTermId, setNewTermId] = useState("");
   const [newSubjectId, setNewSubjectId] = useState("");
   const [newClassId, setNewClassId] = useState("");
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [loadingClassSubjects, setLoadingClassSubjects] = useState(false);
-  const [newDivision, setNewDivision] = useState("");
+  const [newDivision, setNewDivision] = useState("ALL");
+  const [newRoomId, setNewRoomId] = useState("");
   const [newExamDate, setNewExamDate] = useState("");
   const [newStartTime, setNewStartTime] = useState("09:00");
   const [newEndTime, setNewEndTime] = useState("12:00");
@@ -134,75 +130,62 @@ export default function ExamManagementPage() {
     }
   };
 
-  const resetForm = () => {
-    setEditingExam(null);
-    setNewExamTitle("");
-    setNewClassId("");
-    setNewSubjectId("");
-    setClassSubjects([]);
-    setNewDivision("ALL");
-    setNewExamDate("");
-    setNewStartTime("09:00");
-    setNewEndTime("12:00");
-    setNewMaxMarks("100");
-    setNewPassingMarks("33");
-  };
-
-  const modalDivisions = useMemo(() => {
-    let filtered = divisions;
-    if (newClassId) {
-      filtered = divisions.filter((d: any) => String(d.SchoolClass || d.school_class) === String(newClassId));
-    }
-    const divSet = new Set(filtered.map((d: any) => d.division).filter(Boolean));
-    if (divSet.size === 0 && divisions.length > 0) {
-      divisions.forEach((d: any) => { if (d.division) divSet.add(d.division); });
-    }
-    return Array.from(divSet).sort();
-  }, [divisions, newClassId]);
-
   const modalSubjects = useMemo(() => {
     if (classSubjects.length > 0) return classSubjects;
     if (!newClassId) return [];
-    let filtered = subjects;
     const classDivIds = new Set(
       divisions
         .filter((d: any) => String(d.SchoolClass || d.school_class) === String(newClassId))
         .map((d: any) => d.id)
     );
     if (classDivIds.size > 0) {
-      filtered = subjects.filter(
+      const filtered = subjects.filter(
         (s: any) => !s.division || classDivIds.has(s.division) || classDivIds.has(s.division_id)
       );
+      if (filtered.length > 0) return filtered;
     }
-    const map = new Map<string, any>();
-    filtered.forEach((s: any) => {
-      const nameKey = (s.name || s.subject_name || "").trim().toLowerCase();
-      if (nameKey && !map.has(nameKey)) {
-        map.set(nameKey, s);
-      }
-    });
-    return Array.from(map.values());
-  }, [classSubjects, subjects, divisions, newClassId]);
+    return subjects;
+  }, [classSubjects, newClassId, divisions, subjects]);
+
+  const availableDivisions = useMemo(() => {
+    if (selectedClassId && selectedClassId !== "ALL") {
+      const filtered = divisions.filter((d: any) => String(d.SchoolClass || d.school_class) === String(selectedClassId));
+      const divSet = new Set(filtered.map((d: any) => d.division).filter(Boolean));
+      return Array.from(divSet).sort();
+    }
+    const divSet = new Set(divisions.map((d: any) => d.division).filter(Boolean));
+    return Array.from(divSet).sort();
+  }, [divisions, selectedClassId]);
+
+  const modalDivisions = useMemo(() => {
+    if (!newClassId) return [];
+    const filtered = divisions.filter((d: any) => String(d.SchoolClass || d.school_class) === String(newClassId));
+    const divSet = new Set(filtered.map((d: any) => d.division).filter(Boolean));
+    return Array.from(divSet).sort();
+  }, [divisions, newClassId]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      const [yearsRes, classesRes, divisionsRes, subjectsRes] = await Promise.allSettled([
+      const [yearsRes, classesRes, divisionsRes, subjectsRes, roomsRes] = await Promise.allSettled([
         getAcademicYearsForPrincipal(),
         getClasses(),
         getDivisions(),
         getSubjects(),
+        getExamRooms(),
       ]);
 
       const yearsData = yearsRes.status === "fulfilled" ? yearsRes.value : [];
       const classesData = classesRes.status === "fulfilled" ? classesRes.value : [];
       const divisionsData = divisionsRes.status === "fulfilled" ? divisionsRes.value : [];
       const subjectsData = subjectsRes.status === "fulfilled" ? subjectsRes.value : [];
+      const roomsData = roomsRes.status === "fulfilled" ? roomsRes.value : [];
 
       setAcademicYears(yearsData || []);
       setClasses(classesData || []);
       setDivisions(divisionsData || []);
       setSubjects(subjectsData || []);
+      setRooms(roomsData || []);
 
       if (yearsData && yearsData.length > 0 && !selectedYearId) {
         const activeYr = yearsData.find((y: any) => y.is_active) || yearsData[0];
@@ -218,10 +201,6 @@ export default function ExamManagementPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
-
-  const [weightageComponents, setWeightageComponents] = useState<ResultWeightageComponent[]>([]);
-  const [selectedComponentFilter, setSelectedComponentFilter] = useState<string>("ALL");
-  const [selectedComponentId, setSelectedComponentId] = useState<string>("");
 
   const loadExams = async () => {
     if (!selectedYearId) return;
@@ -245,12 +224,12 @@ export default function ExamManagementPage() {
       setExamTerms(termsData || []);
       setExams(examsData || []);
 
-      if (examComponents.length > 0 && !selectedComponentId) {
-        setSelectedComponentId(String(examComponents[0].id));
-        setNewExamTitle(examComponents[0].name);
+      if (termsData.length > 0 && !newTermId) {
+        setNewTermId(String(termsData[0].id));
+        setNewExamTitle(termsData[0].name);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to load exams list.");
+      toast.error(err?.message || "Failed to load exam schedules.");
     } finally {
       setIsLoading(false);
     }
@@ -260,12 +239,27 @@ export default function ExamManagementPage() {
     if (selectedYearId) {
       loadExams();
     }
-  }, [selectedYearId, selectedClassId, selectedDivFilter]);
+  }, [selectedYearId, selectedClassId, selectedDivFilter, selectedTermFilter]);
 
-  // Handle Exam Schedule Creation or Update
+  const resetForm = () => {
+    setEditingExam(null);
+    setNewExamTitle(examTerms.length > 0 ? examTerms[0].name : "Term 1 Examination");
+    setNewTermId(examTerms.length > 0 ? String(examTerms[0].id) : "");
+    setNewClassId("");
+    setNewSubjectId("");
+    setClassSubjects([]);
+    setNewDivision("ALL");
+    setNewRoomId("");
+    setNewExamDate("");
+    setNewStartTime("09:00");
+    setNewEndTime("12:00");
+    setNewMaxMarks("100");
+    setNewPassingMarks("33");
+  };
+
   const handleSaveExam = async () => {
     if (!newExamTitle || !newSubjectId || !newClassId || !newExamDate) {
-      toast.error("Please fill in all required fields (Title, Subject, Class, Date).");
+      toast.error("Please fill in all required fields (Title, Class, Subject, Exam Date).");
       return;
     }
 
@@ -273,10 +267,12 @@ export default function ExamManagementPage() {
     try {
       const payload: Partial<ExamFull> = {
         academic_year: Number(selectedYearId),
+        exam_term: newTermId ? Number(newTermId) : undefined,
         title: newExamTitle,
         subject: Number(newSubjectId),
         class_group: Number(newClassId),
         division: newDivision && newDivision !== "ALL" ? newDivision : undefined,
+        room: newRoomId ? Number(newRoomId) : undefined,
         exam_date: newExamDate,
         start_time: newStartTime,
         end_time: newEndTime,
@@ -287,17 +283,17 @@ export default function ExamManagementPage() {
 
       if (editingExam) {
         await updateExamFull(editingExam.id, payload);
-        toast.success("🎉 Exam schedule updated successfully!");
+        toast.success("Exam schedule updated successfully!");
       } else {
         await createExamFull(payload);
-        toast.success("🎉 Exam schedule created successfully!");
+        toast.success("Exam scheduled successfully!");
       }
 
       setIsModalOpen(false);
       resetForm();
       await loadExams();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to save exam schedule.");
+      toast.error(err?.message || "Failed to schedule exam.");
     } finally {
       setIsSubmitting(false);
     }
@@ -306,11 +302,13 @@ export default function ExamManagementPage() {
   const handleEditExam = (ex: ExamFull) => {
     setEditingExam(ex);
     setNewExamTitle(ex.title);
+    setNewTermId(ex.exam_term ? String(ex.exam_term) : "");
     const cId = String(ex.class_group);
     setNewClassId(cId);
     handleModalClassChange(cId);
     setNewSubjectId(ex.subject ? String(ex.subject) : "");
     setNewDivision(ex.division || "ALL");
+    setNewRoomId(ex.room ? String(ex.room) : "");
     setNewExamDate(ex.exam_date || "");
     setNewStartTime(ex.start_time ? ex.start_time.slice(0, 5) : "09:00");
     setNewEndTime(ex.end_time ? ex.end_time.slice(0, 5) : "12:00");
@@ -320,34 +318,40 @@ export default function ExamManagementPage() {
   };
 
   const handleDeleteExam = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this scheduled exam paper?")) return;
+    if (!confirm("Are you sure you want to delete this exam schedule?")) return;
     try {
       await deleteExamFull(id);
-      toast.success("🗑️ Exam schedule deleted successfully!");
+      toast.success("Exam schedule deleted.");
       await loadExams();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to delete exam schedule.");
+      toast.error(err?.message || "Failed to delete exam.");
     }
   };
 
   const filteredExams = exams.filter((ex) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (ex.title || "").toLowerCase().includes(q) ||
-      (ex.subject_name || "").toLowerCase().includes(q) ||
-      (ex.class_name || "").toLowerCase().includes(q)
-    );
+    if (selectedTermFilter !== "ALL") {
+      if (String(ex.exam_term) !== selectedTermFilter && !ex.title.toLowerCase().includes(selectedTermFilter.toLowerCase())) {
+        return false;
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchSub = ex.subject_name?.toLowerCase().includes(q);
+      const matchTitle = ex.title?.toLowerCase().includes(q);
+      const matchClass = ex.class_name?.toLowerCase().includes(q);
+      if (!matchSub && !matchTitle && !matchClass) return false;
+    }
+    return true;
   });
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner */}
+      {/* Top Banner Card */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-sm">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
-              <FileCheck className="h-5 w-5" />
+              <CalendarDays className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -365,31 +369,29 @@ export default function ExamManagementPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
-            <SelectTrigger className="w-56 h-10 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 border-gray-200 font-bold text-slate-700">
-              <SelectValue placeholder="Select Academic Year">
-                {academicYears.find((y) => String(y.id) === selectedYearId)
-                  ? (academicYears.find((y) => String(y.id) === selectedYearId).name ||
-                     `${academicYears.find((y) => String(y.id) === selectedYearId).start_year || ""}-${academicYears.find((y) => String(y.id) === selectedYearId).end_year || ""}`.replace(/^-$/, "") ||
-                     `Academic Year #${selectedYearId}`)
-                  : "Select Academic Year"}
+            <SelectTrigger className="h-10 w-36 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 border-gray-200 font-bold text-slate-700">
+              <SelectValue placeholder="Academic Year">
+                {academicYears.find((y) => String(y.id) === selectedYearId)?.name ||
+                 `${academicYears.find((y) => String(y.id) === selectedYearId)?.start_year || ""}-${academicYears.find((y) => String(y.id) === selectedYearId)?.end_year || ""}`.replace(/^-$/, "") ||
+                 "Academic Year"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {academicYears.map((y) => {
-                const label = y.name || (y.start_year && y.end_year ? `${y.start_year}-${y.end_year}` : `Academic Year #${y.id}`);
-                return (
-                  <SelectItem key={y.id} value={String(y.id)}>
-                    {label} {y.is_active ? "(Active)" : ""}
-                  </SelectItem>
-                );
-              })}
+              {academicYears.map((y) => (
+                <SelectItem key={y.id} value={String(y.id)}>
+                  {y.name || `${y.start_year}-${y.end_year}`}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
           <Button
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
             className="rounded-xl text-xs gap-1.5 font-bold bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20 px-4 h-10"
           >
             <Plus className="h-4 w-4" /> Schedule New Exam
@@ -397,30 +399,37 @@ export default function ExamManagementPage() {
         </div>
       </div>
 
-      {/* Control Card: Class & Division Filter */}
+      {/* Filter Card */}
       <Card className="rounded-2xl border border-gray-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
         <CardHeader className="pb-3 border-b border-gray-100 dark:border-zinc-800">
           <CardTitle className="text-xs font-bold text-[#5c28e8] dark:text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
             <Filter className="h-4 w-4" /> FILTER EXAM SCHEDULES
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Exam Component:</label>
-              <Select value={selectedComponentFilter} onValueChange={(val) => { if (val) setSelectedComponentFilter(val); }}>
-                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-medium">
+              <Select value={selectedTermFilter} onValueChange={(val) => { if (val) setSelectedTermFilter(val); }}>
+                <SelectTrigger className="h-10 rounded-xl text-xs bg-white dark:bg-zinc-800 border-gray-200 font-medium">
                   <SelectValue placeholder="All Components">
-                    {selectedComponentFilter === "ALL"
+                    {selectedTermFilter === "ALL"
                       ? "All Components"
-                      : weightageComponents.find((c) => String(c.id) === selectedComponentFilter)?.name || "Component"}
+                      : examTerms.find((t) => String(t.id) === selectedTermFilter)?.name ||
+                        weightageComponents.find((w) => w.name === selectedTermFilter)?.name ||
+                        selectedTermFilter}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Components</SelectItem>
-                  {weightageComponents.map((comp) => (
-                    <SelectItem key={comp.id} value={String(comp.id)}>
-                      {comp.name} ({comp.weightage_percentage}%)
+                  {examTerms.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                  {weightageComponents.map((w) => (
+                    <SelectItem key={`comp-${w.id}`} value={w.name}>
+                      {w.name} ({w.weightage_percentage}%)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -430,7 +439,7 @@ export default function ExamManagementPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Class:</label>
               <Select value={selectedClassId} onValueChange={(val) => { if (val) setSelectedClassId(val); }}>
-                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-medium">
+                <SelectTrigger className="h-10 rounded-xl text-xs bg-white dark:bg-zinc-800 border-gray-200 font-medium">
                   <SelectValue placeholder="All Classes">
                     {selectedClassId === "ALL"
                       ? "All Classes"
@@ -451,7 +460,7 @@ export default function ExamManagementPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Division:</label>
               <Select value={selectedDivFilter} onValueChange={(val) => { if (val) setSelectedDivFilter(val); }}>
-                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-medium">
+                <SelectTrigger className="h-10 rounded-xl text-xs bg-white dark:bg-zinc-800 border-gray-200 font-medium">
                   <SelectValue placeholder="All Divisions">
                     {selectedDivFilter === "ALL" ? "All Divisions" : `Division ${selectedDivFilter}`}
                   </SelectValue>
@@ -470,12 +479,12 @@ export default function ExamManagementPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Search Paper:</label>
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Search exam title or subject..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 text-xs rounded-xl"
+                  className="h-10 pl-9 text-xs rounded-xl border-gray-200 bg-white"
                 />
               </div>
             </div>
@@ -483,97 +492,104 @@ export default function ExamManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Main Exam Timetable Table */}
-      <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-        <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
-              Master Examination Timetable
-            </CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              List of all finalized exam subject papers scheduled for the selected Academic Year.
-            </CardDescription>
+      {/* Master Timetable Table */}
+      <Card className="rounded-2xl border border-gray-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <CardHeader className="p-5 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100">
+                Master Examination Timetable
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                List of all finalized exam subject papers scheduled for the selected Academic Year.
+              </CardDescription>
+            </div>
           </div>
 
-          <Button size="sm" variant="outline" onClick={loadExams} className="rounded-xl text-xs gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadExams}
+            className="rounded-xl text-xs gap-1.5 border-gray-200 hover:bg-slate-50 h-9 font-medium"
+          >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </CardHeader>
 
-        <CardContent className="p-0 overflow-hidden">
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-purple-600" /> Loading exam timetable...
+            <div className="p-16 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+              <Loader2 className="h-7 w-7 animate-spin text-[#5c28e8]" /> Loading scheduled exams...
             </div>
           ) : filteredExams.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-              <AlertCircle className="h-6 w-6 text-amber-500" /> No exam schedules found. Click "Schedule New Exam" above to add paper schedules.
+            <div className="p-16 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+              <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-1">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <p className="font-semibold text-slate-700">No exam schedules found.</p>
+              <p className="text-slate-400">Click &quot;Schedule New Exam&quot; above to add paper schedules.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-slate-50 dark:bg-zinc-800/50">
+                <TableHeader className="bg-slate-50/80 dark:bg-zinc-800/50 border-b border-gray-100">
                   <TableRow>
-                    <TableHead className="w-12 text-center font-bold text-xs">#</TableHead>
-                    <TableHead className="font-bold text-xs">Exam Title</TableHead>
-                    <TableHead className="w-36 font-bold text-xs">Subject</TableHead>
-                    <TableHead className="w-32 font-bold text-xs">Class / Div</TableHead>
-                    <TableHead className="w-32 font-bold text-xs">Exam Date</TableHead>
-                    <TableHead className="w-36 font-bold text-xs">Time Slot</TableHead>
-                    <TableHead className="w-28 text-center font-bold text-xs">Max Marks</TableHead>
-                    <TableHead className="w-24 text-center font-bold text-xs">Status</TableHead>
-                    <TableHead className="w-24 text-center font-bold text-xs">Action</TableHead>
+                    <TableHead className="w-12 text-center font-bold text-xs uppercase tracking-wider text-slate-500">#</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Term / Component</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Subject Paper</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Class & Division</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Exam Date</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Time Slot</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Room</TableHead>
+                    <TableHead className="w-28 text-center font-bold text-xs uppercase tracking-wider text-slate-500">Max / Pass Marks</TableHead>
+                    <TableHead className="w-24 text-center font-bold text-xs uppercase tracking-wider text-slate-500">Status</TableHead>
+                    <TableHead className="w-24 text-center font-bold text-xs uppercase tracking-wider text-slate-500">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-
                 <TableBody>
                   {filteredExams.map((ex, idx) => (
-                    <TableRow key={ex.id}>
-                      <TableCell className="text-center font-mono text-xs font-medium text-slate-500">
-                        {idx + 1}
-                      </TableCell>
-
+                    <TableRow key={ex.id} className="hover:bg-slate-50/60 dark:hover:bg-zinc-800/60 transition-colors">
+                      <TableCell className="text-center font-mono text-xs text-slate-400">{idx + 1}</TableCell>
                       <TableCell className="text-xs font-bold text-slate-900 dark:text-zinc-100">
-                        {ex.title}
+                        {ex.term_name || ex.title}
                       </TableCell>
-
-                      <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                      <TableCell className="text-xs font-semibold text-[#5c28e8] dark:text-purple-400">
                         {ex.subject_name || "—"}
                       </TableCell>
-
                       <TableCell className="text-xs">
-                        <Badge variant="outline" className="font-mono bg-purple-50 text-purple-700 dark:bg-purple-950 border-purple-200">
-                          {ex.class_name || "Class"} {ex.division ? `(Div ${ex.division})` : ""}
-                        </Badge>
+                        <span className="font-semibold text-slate-700 dark:text-zinc-300">
+                          {ex.class_name} {ex.division ? `(Div ${ex.division})` : ""}
+                        </span>
                       </TableCell>
-
-                      <TableCell className="text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                      <TableCell className="text-xs font-mono font-semibold text-slate-800 dark:text-zinc-200">
                         {ex.exam_date}
                       </TableCell>
-
                       <TableCell className="text-xs text-slate-600 dark:text-zinc-400 font-mono">
-                        {ex.start_time} - {ex.end_time}
+                        {ex.start_time?.slice(0, 5)} - {ex.end_time?.slice(0, 5)}
                       </TableCell>
-
-                      <TableCell className="text-center text-xs font-bold font-mono text-indigo-600">
-                        {ex.max_marks} (Pass: {ex.passing_marks})
+                      <TableCell className="text-xs">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 font-mono text-[11px] font-semibold text-slate-600">
+                          {ex.room_number ? `Room ${ex.room_number}` : "TBA"}
+                        </span>
                       </TableCell>
-
+                      <TableCell className="text-center text-xs font-bold font-mono text-slate-900 dark:text-zinc-100">
+                        {ex.max_marks} <span className="text-slate-400 font-normal">/ {ex.passing_marks}</span>
+                      </TableCell>
                       <TableCell className="text-center">
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] uppercase">
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
                           {ex.status}
                         </Badge>
                       </TableCell>
-
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEditExam(ex)}
-                            title="Edit Exam Schedule"
-                            className="h-7 w-7 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg"
+                            className="h-8 w-8 text-[#5c28e8] hover:bg-purple-50 rounded-xl"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -581,8 +597,7 @@ export default function ExamManagementPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteExam(ex.id)}
-                            title="Delete Exam Schedule"
-                            className="h-7 w-7 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg"
+                            className="h-8 w-8 text-rose-600 hover:bg-rose-50 rounded-xl"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -597,51 +612,63 @@ export default function ExamManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Schedule New Exam Modal */}
+      {/* Schedule Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-lg rounded-3xl p-6 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl">
           <DialogHeader className="pb-2 border-b border-gray-100 dark:border-zinc-800">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
-                <Calendar className="h-5 w-5" />
+                <CalendarDays className="h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 dark:text-zinc-100">
                   {editingExam ? "Edit Exam Paper Schedule" : "Schedule Exam Paper"}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                  Assign exam term, subject, class/division, date, and timing.
+                  Add paper schedule date, time, subject and class division for this examination.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <div className="space-y-4 py-3 text-xs">
+            {/* Weightage Component Selector */}
             <div className="space-y-1.5">
-              <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center gap-1">
-                <Percent className="h-3.5 w-3.5" /> Exam Weightage Component:
+              <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center gap-1 text-xs">
+                <Percent className="h-3.5 w-3.5" /> Select Weightage Exam Component / Term:
               </label>
               <Select
-                value={selectedComponentId}
+                value={newTermId}
                 onValueChange={(val) => {
                   if (val) {
-                    setSelectedComponentId(val);
-                    const comp = weightageComponents.find((c) => String(c.id) === val);
-                    if (comp) setNewExamTitle(comp.name);
+                    setNewTermId(val);
+                    const t = examTerms.find((term) => String(term.id) === val);
+                    const w = weightageComponents.find((comp) => String(comp.id) === val);
+                    if (t) setNewExamTitle(t.name);
+                    else if (w) setNewExamTitle(w.name);
                   }
                 }}
               >
                 <SelectTrigger className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800 border-gray-200 font-semibold text-slate-800">
                   <SelectValue placeholder="Select EXAM Weightage Component...">
-                    {weightageComponents.find((c) => String(c.id) === selectedComponentId)
-                      ? `${weightageComponents.find((c) => String(c.id) === selectedComponentId)?.name} (${weightageComponents.find((c) => String(c.id) === selectedComponentId)?.weightage_percentage}% Weightage)`
-                      : "Select EXAM Weightage Component..."}
+                    {(() => {
+                      const t = examTerms.find((term) => String(term.id) === newTermId);
+                      if (t) return t.name;
+                      const w = weightageComponents.find((comp) => String(comp.id) === newTermId);
+                      if (w) return `${w.name} (${w.weightage_percentage}% Weightage)`;
+                      return "Select EXAM Weightage Component...";
+                    })()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl shadow-xl">
-                  {weightageComponents.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)} className="text-xs font-semibold py-2">
-                      {c.name} ({c.weightage_percentage}% Weightage)
+                  {examTerms.map((t) => (
+                    <SelectItem key={`term-${t.id}`} value={String(t.id)} className="text-xs font-semibold py-2">
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                  {weightageComponents.map((w) => (
+                    <SelectItem key={`weight-${w.id}`} value={String(w.id)} className="text-xs font-semibold py-2">
+                      {w.name} ({w.weightage_percentage}% Weightage)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -651,9 +678,9 @@ export default function ExamManagementPage() {
             <div className="space-y-1.5">
               <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Title / Paper Name:</label>
               <Input
-                placeholder="e.g. Term 1 Mathematics Examination"
                 value={newExamTitle}
                 onChange={(e) => setNewExamTitle(e.target.value)}
+                placeholder="e.g. Term 1 Mathematics Examination"
                 className="h-11 text-xs rounded-2xl border-gray-200 bg-white"
               />
             </div>
@@ -709,7 +736,7 @@ export default function ExamManagementPage() {
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 dark:text-zinc-300">Division (Optional):</label>
-                <Select value={newDivision || "ALL"} onValueChange={(val) => { if (val) setNewDivision(val); }}>
+                <Select value={newDivision} onValueChange={(val) => { if (val) setNewDivision(val); }}>
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
                     <SelectValue placeholder="All Divisions">
                       {newDivision && newDivision !== "ALL" ? `Division ${newDivision}` : "All Divisions"}
@@ -717,7 +744,7 @@ export default function ExamManagementPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
                     <SelectItem value="ALL" className="text-xs font-semibold py-2">All Divisions</SelectItem>
-                    {modalDivisions.map((divName) => (
+                    {modalDivisions.map((divName: string) => (
                       <SelectItem key={divName} value={divName} className="text-xs font-semibold py-2">
                         Division {divName}
                       </SelectItem>

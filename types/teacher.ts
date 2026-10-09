@@ -174,12 +174,16 @@ export interface RosterEntry {
   max_marks: number | null;
   is_absent: boolean;
   remarks: string | null;
+  status?: string;
   is_published: boolean;
 }
 
 export interface ExamRosterResponse {
   exam: number;
   class_group: number;
+  is_class_teacher?: boolean;
+  status?: string;
+  can_edit?: boolean;
   roster: RosterEntry[];
 }
 
@@ -188,10 +192,13 @@ export interface BulkSaveEntry {
   marks_obtained: number;
   is_absent: "True" | "False";
   remarks: string;
+  status?: string;
 }
 
 export interface BulkSavePayload {
   exam: number;
   max_marks: number;
+  status?: string;
   entries: BulkSaveEntry[];
 }
+

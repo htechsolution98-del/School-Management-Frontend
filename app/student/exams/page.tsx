@@ -156,15 +156,15 @@ export default function StudentExamsPage() {
       `}</style>
 
       {/* Background Decorative Blur Blobs */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 z-10">
         <div>
-          <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Timetable Dashboard</p>
+          <p className="text-[11px] font-bold text-[#5c28e8] uppercase tracking-widest">Timetable Dashboard</p>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-            <CalendarRange className="text-indigo-600 h-8 w-8" />
+            <CalendarRange className="text-[#5c28e8] h-8 w-8" />
             Exam Timetable
           </h1>
           <p className="text-slate-400 text-sm mt-1">
@@ -179,7 +179,7 @@ export default function StudentExamsPage() {
           className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 rounded-xl shadow-sm px-4 h-11 transition-all duration-300 font-semibold text-slate-600 self-start sm:self-auto"
         >
           {isLoading ? (
-            <Loader2 size={16} className="animate-spin text-indigo-600" />
+            <Loader2 size={16} className="animate-spin text-[#5c28e8]" />
           ) : (
             <RefreshCw size={16} className="text-slate-500" />
           )}

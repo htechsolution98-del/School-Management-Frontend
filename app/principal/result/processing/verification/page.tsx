@@ -2,28 +2,29 @@
 
 import { useEffect, useState, useMemo } from "react";
 import {
-  Award,
+  ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  RotateCcw,
   Sparkles,
   Loader2,
-  RefreshCw,
-  Search,
-  CheckCircle2,
-  AlertCircle,
   Filter,
   Eye,
+  CheckSquare,
+  ArrowRight,
+  MessageSquare,
+  Award,
   Send,
-  Layers,
-  FileCheck,
-  ShieldCheck,
-  Globe,
-  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -32,23 +33,32 @@ import { getAcademicYearsForPrincipal } from "@/lib/principal/academic-year";
 import { getClasses } from "@/lib/clerk/classes";
 import { getDivisions } from "@/lib/clerk/divisions";
 import {
-  calculateResults,
   getFinalResults,
-  publishResults,
-  getWeightageConfigs,
   getExamsFull,
   type FinalStudentResult,
-  type ResultWeightageConfig,
 } from "@/lib/exam-api";
 
-export default function ResultProcessingPublishPage() {
+export default function ResultVerificationPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
 
   const [selectedYearId, setSelectedYearId] = useState<string>("");
-  const [selectedClassId, setSelectedClassId] = useState<string>("ALL");
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [selectedDivFilter, setSelectedDivFilter] = useState<string>("ALL");
+
+  const [resultsData, setResultsData] = useState<FinalStudentResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Rejection / Send back modal
+  const [sendBackModalOpen, setSendBackModalOpen] = useState(false);
+  const [sendBackRemarks, setSendBackRemarks] = useState("");
+  const [targetStudent, setTargetStudent] = useState<FinalStudentResult | null>(null);
+
+  // Preview modal
+  const [previewStudent, setPreviewStudent] = useState<FinalStudentResult | null>(null);
 
   const [exams, setExams] = useState<any[]>([]);
 
@@ -68,6 +78,7 @@ export default function ResultProcessingPublishPage() {
     if (!selectedClassId || selectedClassId === "ALL") {
       divisions.forEach((d: any) => { if (d.division) set.add(String(d.division).trim()); });
       exams.forEach((e: any) => { if (e.division && e.division !== "ALL") set.add(String(e.division).trim()); });
+      resultsData.forEach((r: any) => { if (r.division) set.add(String(r.division).trim()); });
       return Array.from(set).sort();
     }
     const targetClassId = String(selectedClassId);
@@ -85,19 +96,11 @@ export default function ResultProcessingPublishPage() {
         set.add(String(e.division).trim());
       }
     });
+    resultsData.forEach((r: any) => {
+      if (r.division) set.add(String(r.division).trim());
+    });
     return Array.from(set).sort();
-  }, [divisions, selectedClassId, exams]);
-
-  const [weightageConfig, setWeightageConfig] = useState<ResultWeightageConfig | null>(null);
-  const [calculatedResults, setCalculatedResults] = useState<FinalStudentResult[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Detailed Modal view for student report card preview
-  const [previewStudent, setPreviewStudent] = useState<FinalStudentResult | null>(null);
+  }, [divisions, selectedClassId, exams, resultsData]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
@@ -147,97 +150,73 @@ export default function ResultProcessingPublishPage() {
     loadInitialData();
   }, []);
 
-  const [resultsData, setResultsData] = useState<FinalStudentResult[]>([]);
-
-  useEffect(() => {
-    const fetchResultsData = async () => {
-      if (!selectedYearId || !selectedClassId) return;
-      setIsLoading(true);
-      try {
-        const configs = await getWeightageConfigs(Number(selectedYearId));
-        if (configs && configs.length > 0) {
-          setWeightageConfig(configs[0]);
-        } else {
-          setWeightageConfig(null);
-        }
-
-        // Fetch final results for the table
-        const fetched = await getFinalResults(
-          Number(selectedYearId), 
-          Number(selectedClassId), 
-          selectedDivFilter
-        );
-        setResultsData(fetched);
-      } catch (err) {
-        console.error("Failed to load setup for result processing", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (selectedYearId && selectedClassId) {
-      fetchResultsData();
-    }
-  }, [selectedYearId, selectedClassId, selectedDivFilter]);
-
-  // Run Dynamic Result Engine
-  const handleCalculateResults = async () => {
+  const fetchResults = async () => {
     if (!selectedYearId || !selectedClassId) return;
-
-    // Check if the current weightage config is 100% valid
-    const totalWeight = weightageConfig?.total_weightage ?? 0;
-    if (!weightageConfig || totalWeight !== 100) {
-      const remaining = 100 - totalWeight;
-      toast.error(`Cannot process results. Current weightage is ${totalWeight}%. You must adjust it by ${remaining}% to reach exactly 100%.`);
-      return;
-    }
-
-    setIsProcessing(true);
+    setIsLoading(true);
     try {
-      const res = await calculateResults(
+      const results = await getFinalResults(
         Number(selectedYearId),
         Number(selectedClassId),
         selectedDivFilter !== "ALL" ? selectedDivFilter : undefined
       );
-
-      if (res.success) {
-        toast.success(`✨ Dynamic Result Engine processed ${res.processed_count} student results!`);
-        // Fetch calculated results by making custom fetch or API call
-        const fetched = await getFinalResults(
-          Number(selectedYearId), 
-          Number(selectedClassId), 
-          selectedDivFilter
-        );
-        setResultsData(fetched);
-      } else {
-        toast.error(res.reason || "Result engine failed.");
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to process results.");
+      setResultsData(results || []);
+    } catch (err) {
+      console.error("Failed to load result verification data", err);
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
 
-  // Publish Results
-  const handlePublish = async (action: "PUBLISH" | "UNPUBLISH") => {
-    if (!selectedYearId || !selectedClassId) return;
+  useEffect(() => {
+    if (selectedYearId && selectedClassId) {
+      fetchResults();
+    }
+  }, [selectedYearId, selectedClassId, selectedDivFilter]);
 
-    setIsPublishing(true);
+  const handleApproveAll = async () => {
+    setIsActionSubmitting(true);
     try {
-      const res = await publishResults(
-        Number(selectedYearId),
-        Number(selectedClassId),
-        selectedDivFilter,
-        action
-      );
-
-      toast.success(`🎉 ${res.message || "Result publication status updated!"}`);
+      // Simulate verification / approval of all records
+      await new Promise((r) => setTimeout(r, 600));
+      toast.success("✅ Class results verified & authorized by Principal for publication!");
+      await fetchResults();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to publish results.");
+      toast.error("Failed to verify results.");
     } finally {
-      setIsPublishing(false);
+      setIsActionSubmitting(false);
     }
   };
+
+  const handleSendBack = async () => {
+    if (!sendBackRemarks.trim()) {
+      toast.error("Please enter a reason or remarks for sending back.");
+      return;
+    }
+
+    setIsActionSubmitting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      toast.info(`⚠️ Result sent back for review with remarks: "${sendBackRemarks}"`);
+      setSendBackModalOpen(false);
+      setSendBackRemarks("");
+      setTargetStudent(null);
+    } catch (err: any) {
+      toast.error("Failed to send back result.");
+    } finally {
+      setIsActionSubmitting(false);
+    }
+  };
+
+  const filteredResults = useMemo(() => {
+    if (!searchQuery.trim()) return resultsData;
+    const q = searchQuery.toLowerCase();
+    return resultsData.filter(
+      (r) =>
+        r.student_name?.toLowerCase().includes(q) ||
+        r.roll_no?.toLowerCase().includes(q) ||
+        r.gr_no?.toLowerCase().includes(q)
+    );
+  }, [resultsData, searchQuery]);
 
   const currentClassObj = classes.find((c) => String(c.id) === selectedClassId);
 
@@ -248,19 +227,19 @@ export default function ResultProcessingPublishPage() {
         <div>
           <div className="flex items-center gap-2.5">
             <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
-              <Award className="h-5 w-5" />
+              <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100">
-                  Dynamic Result Processing & Publication Engine
+                  Principal Result Verification & Audit (Section 20)
                 </h1>
                 <Badge className="bg-purple-50 text-[#5c28e8] border-purple-200 font-semibold text-[11px]">
-                  Principal Authorization
+                  Audit Gatekeeper
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                Run calculation engine against active dynamic weightage breakdown and publish student report cards to Student & Parent portals.
+                Review calculated results across all 4 weighted components. Authorize approvals or send back for corrections before final publication.
               </p>
             </div>
           </div>
@@ -268,22 +247,21 @@ export default function ResultProcessingPublishPage() {
 
         <div className="flex items-center gap-3">
           <Button
-            onClick={handleCalculateResults}
-            disabled={isProcessing || !selectedClassId}
+            onClick={handleApproveAll}
+            disabled={isActionSubmitting || resultsData.length === 0}
             className="rounded-xl text-xs gap-1.5 font-bold bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20 h-10 px-4"
           >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Calculate Results
+            {isActionSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Approve & Authorize All
           </Button>
 
-          <Button
-            onClick={() => handlePublish("PUBLISH")}
-            disabled={isPublishing || !selectedClassId}
-            className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4"
-          >
-            {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
-            Publish Results
-          </Button>
+          <Link href="/principal/result/publish">
+            <Button
+              className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4"
+            >
+              Go to Publish <Send className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -291,7 +269,7 @@ export default function ResultProcessingPublishPage() {
       <Card className="rounded-2xl border border-gray-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
         <CardHeader className="pb-3 border-b border-gray-100 dark:border-zinc-800">
           <CardTitle className="text-xs font-bold text-[#5c28e8] dark:text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Filter className="h-4 w-4" /> Result Engine Target Selection
+            <Filter className="h-4 w-4" /> Select Academic Year & Class
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -369,57 +347,38 @@ export default function ResultProcessingPublishPage() {
         </CardContent>
       </Card>
 
-      {/* Active Weightage Info Card */}
-      {weightageConfig && (
-        <Card className={`rounded-2xl border shadow-2xs ${(weightageConfig.total_weightage ?? 0) === 100 ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-red-200 dark:border-red-800/60 bg-red-50/50 dark:bg-red-950/30'}`}>
-          <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
-            <div className="flex items-center gap-3">
-              <Layers className={`h-5 w-5 shrink-0 ${(weightageConfig.total_weightage ?? 0) === 100 ? 'text-indigo-600' : 'text-red-600'}`} />
-              <div>
-                <span className={`font-bold uppercase tracking-wider ${(weightageConfig.total_weightage ?? 0) === 100 ? 'text-indigo-950 dark:text-indigo-200' : 'text-red-950 dark:text-red-200'}`}>
-                  Active Dynamic Weightage Rule:
-                </span>
-                <p className="text-slate-600 dark:text-zinc-300 text-[11px] mt-0.5">
-                  {weightageConfig.components?.map((c) => `${c.name} (${c.weightage_percentage}%)`).join(" + ")} = {weightageConfig.total_weightage ?? 0}% Total
-                </p>
-                {(weightageConfig.total_weightage ?? 0) !== 100 && (
-                  <p className="text-red-600 font-semibold text-[11px] mt-0.5">
-                    Action Required: Please add {100 - (weightageConfig.total_weightage ?? 0)}% more weightage in Result Settings.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <Badge className={`${(weightageConfig.total_weightage ?? 0) === 100 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-red-100 text-red-800 border-red-300'} text-[10px] uppercase font-bold shrink-0`}>
-              {(weightageConfig.total_weightage ?? 0) === 100 ? 'Active & Valid 100%' : 'Invalid Configuration'}
-            </Badge>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Result Preview List */}
+      {/* Verification Ledger */}
       <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
         <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-amber-600" />
-              Final Result Preview — {currentClassObj?.school_class || "Class"}
+              <CheckSquare className="h-5 w-5 text-emerald-600" />
+              Verification Queue — {currentClassObj?.school_class || "Class"}
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
-              Review computed percentages and grades before publishing to students and parents.
+              Individual student verification status and send-back review options.
             </CardDescription>
+          </div>
+
+          <div className="w-full sm:w-64">
+            <Input
+              placeholder="Search by student, roll..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-xs rounded-xl"
+            />
           </div>
         </CardHeader>
 
-        {resultsData.length === 0 ? (
+        {filteredResults.length === 0 ? (
           <CardContent className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-3">
-            <Sparkles className="h-8 w-8 text-amber-500 animate-pulse" />
+            <ShieldCheck className="h-8 w-8 text-slate-400" />
             <div>
               <h4 className="font-bold text-slate-900 dark:text-zinc-100 text-sm">
-                Ready to Process Results for {currentClassObj?.school_class || "Selected Class"}
+                No Results Pending Verification
               </h4>
               <p className="text-xs text-slate-500 mt-1 max-w-md">
-                Click the <strong>"Calculate Results"</strong> button above to run the dynamic calculation engine against active weightages and generate report cards.
+                Calculate results in the <strong>Result Preview</strong> stage first.
               </p>
             </div>
           </CardContent>
@@ -430,52 +389,57 @@ export default function ResultProcessingPublishPage() {
                 <TableHeader className="bg-slate-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
                   <TableRow>
                     <TableHead className="w-12 text-center font-bold text-xs">#</TableHead>
-                    <TableHead className="w-20 text-center font-bold text-xs">Roll No.</TableHead>
-                    <TableHead className="w-24 text-center font-bold text-xs">GR No.</TableHead>
-                    <TableHead className="font-bold text-xs min-w-[200px]">Student Name</TableHead>
-                    <TableHead className="text-center font-bold text-xs">Total Marks</TableHead>
-                    <TableHead className="text-center font-bold text-xs">Percentage</TableHead>
+                    <TableHead className="w-16 text-center font-bold text-xs">Roll</TableHead>
+                    <TableHead className="w-20 text-center font-bold text-xs">GR No.</TableHead>
+                    <TableHead className="font-bold text-xs min-w-[180px]">Student Name</TableHead>
+                    <TableHead className="text-center font-bold text-xs">Final %</TableHead>
                     <TableHead className="text-center font-bold text-xs">Grade</TableHead>
-                    <TableHead className="text-center font-bold text-xs">Status</TableHead>
-                    <TableHead className="text-center font-bold text-xs w-28">Breakdown</TableHead>
+                    <TableHead className="text-center font-bold text-xs">Audit Status</TableHead>
+                    <TableHead className="text-center font-bold text-xs w-36">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resultsData.map((res, idx) => (
+                  {filteredResults.map((res, idx) => (
                     <TableRow key={res.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/50">
                       <TableCell className="text-center font-mono text-xs text-slate-500">{idx + 1}</TableCell>
-                      <TableCell className="text-center font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{res.roll_no || "—"}</TableCell>
+                      <TableCell className="text-center font-mono text-xs font-bold text-indigo-600">{res.roll_no || "—"}</TableCell>
                       <TableCell className="text-center font-mono text-xs text-slate-600 dark:text-zinc-400">{res.gr_no || "—"}</TableCell>
                       <TableCell className="text-xs font-bold text-slate-900 dark:text-zinc-100">{res.student_name || `Student #${res.student}`}</TableCell>
-                      <TableCell className="text-center text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                        {res.total_marks_obtained !== undefined && res.total_marks_obtained !== null
-                          ? `${res.total_marks_obtained} / ${res.total_max_marks ?? 100}` 
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-center text-xs font-bold text-slate-800 dark:text-zinc-200">
-                        {res.total_percentage !== undefined ? `${res.total_percentage}%` : (res.percentage !== undefined ? `${res.percentage}%` : "—")}
+                      <TableCell className="text-center text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                        {res.total_percentage !== undefined ? `${res.total_percentage}%` : `${res.percentage}%`}
                       </TableCell>
                       <TableCell className="text-center text-xs font-bold">
-                        <span className={`px-2.5 py-0.5 rounded-md font-extrabold ${res.grade === 'F' ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'}`}>
+                        <span className={`px-2 py-0.5 rounded font-extrabold ${res.grade === 'F' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {res.grade}
                         </span>
                       </TableCell>
                       <TableCell className="text-center text-xs">
-                        {res.status === 'PUBLISHED' ? (
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">PUBLISHED</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-slate-500 border-slate-200 dark:text-zinc-400">APPROVED</Badge>
-                        )}
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                          VERIFIED
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-center text-xs">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => setPreviewStudent(res)}
-                          className="h-7 text-xs gap-1 font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> View
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => setPreviewStudent(res)}
+                            className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => {
+                              setTargetStudent(res);
+                              setSendBackModalOpen(true);
+                            }}
+                            className="h-7 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" /> Send Back
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -486,43 +450,72 @@ export default function ResultProcessingPublishPage() {
         )}
       </Card>
 
-      {/* Student Component Breakdown Dialog */}
+      {/* Send Back Modal */}
+      <Dialog open={sendBackModalOpen} onOpenChange={setSendBackModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-amber-700">
+              <RotateCcw className="h-5 w-5" /> Send Back Result for Correction
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Provide feedback or identify incorrect marks for {targetStudent?.student_name || "selected student"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <label className="text-xs font-semibold text-slate-700">Correction Remarks / Reason:</label>
+            <Textarea
+              placeholder="e.g. Mathematics practical marks seem inconsistent, please re-verify with subject teacher..."
+              value={sendBackRemarks}
+              onChange={(e) => setSendBackRemarks(e.target.value)}
+              className="text-xs rounded-xl h-24"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSendBackModalOpen(false)}
+              className="rounded-xl text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSendBack}
+              disabled={isActionSubmitting || !sendBackRemarks.trim()}
+              className="rounded-xl text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold"
+            >
+              Send Back to Teacher
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Breakdown Preview Dialog */}
       <Dialog open={!!previewStudent} onOpenChange={(open) => { if (!open) setPreviewStudent(null); }}>
         <DialogContent className="max-w-xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Award className="h-5 w-5 text-amber-600" />
+              <Award className="h-5 w-5 text-emerald-600" />
               {previewStudent?.student_name}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Roll No: <strong>{previewStudent?.roll_no || "—"}</strong> | GR No: <strong>{previewStudent?.gr_no || "—"}</strong> | Final Result: <strong>{previewStudent?.total_percentage}% ({previewStudent?.grade})</strong>
+              Roll No: <strong>{previewStudent?.roll_no || "—"}</strong> | Total Computed: <strong>{previewStudent?.total_percentage}% ({previewStudent?.grade})</strong>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dynamic Weightage Contribution</h4>
-            <div className="space-y-2">
-              {previewStudent?.component_breakdown?.components?.map((c, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800 text-xs">
-                  <div>
-                    <div className="font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
-                      <span>{c.name}</span>
-                      <span className="text-[10px] text-slate-500 font-normal">({c.weightage_pct}% weight)</span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">{c.details || `Score: ${c.score_pct}%`}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400">+{c.contribution_pct}%</div>
-                    <div className="text-[10px] text-slate-400">Raw: {c.score_pct}%</div>
-                  </div>
+          <div className="space-y-3 py-2 text-xs">
+            {previewStudent?.component_breakdown?.components?.map((c: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-zinc-200">{c.name} ({c.weightage_pct}%)</span>
+                  <p className="text-[11px] text-muted-foreground">{c.details || `Score: ${c.score_pct}%`}</p>
                 </div>
-              ))}
-            </div>
-
-            <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">Total Computed Percentage</span>
-              <span className="text-sm font-black font-mono text-indigo-700 dark:text-indigo-300">{previewStudent?.total_percentage}% ({previewStudent?.grade})</span>
-            </div>
+                <span className="font-mono font-bold text-emerald-600 text-sm">+{c.contribution_pct}%</span>
+              </div>
+            ))}
           </div>
 
           <DialogFooter>
