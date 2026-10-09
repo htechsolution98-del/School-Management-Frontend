@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Percent,
   Plus,
@@ -14,7 +14,9 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  Info,
+  School,
+  GraduationCap,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,71 +28,147 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { getAcademicYearsForPrincipal } from "@/lib/principal/academic-year";
+import { getClasses } from "@/lib/clerk/classes";
 import {
   getWeightageConfigs,
   createWeightageConfig,
   saveWeightageComponents,
   toggleWeightageLock,
+  getExamsFull,
   type ResultWeightageConfig,
   type ResultWeightageComponent,
 } from "@/lib/exam-api";
 
 export default function WeightageConfigPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [exams, setExams] = useState<any[]>([]);
+  const [allConfigs, setAllConfigs] = useState<ResultWeightageConfig[]>([]);
+
   const [selectedYearId, setSelectedYearId] = useState<string>("");
+  const [selectedClassId, setSelectedClassId] = useState<string>("ALL"); // "ALL" = Default School-wide
   const [currentConfig, setCurrentConfig] = useState<ResultWeightageConfig | null>(null);
 
-  const [components, setComponents] = useState<ResultWeightageComponent[]>([
+  const defaultComponents: ResultWeightageComponent[] = [
     { name: "Term 1 Examination", component_type: "EXAM", weightage_percentage: 40, sequence: 1 },
     { name: "Term 2 Examination", component_type: "EXAM", weightage_percentage: 40, sequence: 2 },
     { name: "Attendance Percentage", component_type: "ATTENDANCE", weightage_percentage: 10, sequence: 3 },
     { name: "Teacher Assessment", component_type: "TEACHER_ASSESSMENT", weightage_percentage: 10, sequence: 4 },
-  ]);
+  ];
 
+  const [components, setComponents] = useState<ResultWeightageComponent[]>(defaultComponents);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load initial academic years and weightage config
-  const loadData = async () => {
+  // Filter classes that have exams scheduled (or all classes if none yet)
+  const classesWithExams = useMemo(() => {
+    if (!exams || exams.length === 0) return classes;
+    const classIdsWithExams = new Set(
+      exams.map((e: any) =>
+        String(typeof e.class_group === "object" && e.class_group !== null ? e.class_group.id : e.class_group)
+      ).filter(Boolean)
+    );
+    const filtered = classes.filter((c: any) => classIdsWithExams.has(String(c.id)));
+    return filtered.length > 0 ? filtered : classes;
+  }, [classes, exams]);
+
+  // Load initial academic years, classes, and exams
+  const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      const years = await getAcademicYearsForPrincipal();
+      const [years, classList] = await Promise.all([
+        getAcademicYearsForPrincipal(),
+        getClasses(),
+      ]);
+
       setAcademicYears(years || []);
+      setClasses(classList || []);
 
       if (years && years.length > 0) {
         const activeYr = years.find((y: any) => y.is_active) || years[0];
         const yrId = selectedYearId || String(activeYr.id);
         setSelectedYearId(yrId);
-
-        const configs = await getWeightageConfigs(Number(yrId));
-        if (configs && configs.length > 0) {
-          const cfg = configs[0];
-          setCurrentConfig(cfg);
-          if (cfg.components && cfg.components.length > 0) {
-            setComponents(
-              cfg.components.map((c) => ({
-                id: c.id,
-                name: c.name,
-                component_type: c.component_type,
-                weightage_percentage: Number(c.weightage_percentage),
-                sequence: c.sequence,
-              }))
-            );
-          }
-        } else {
-          setCurrentConfig(null);
-        }
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to load weightage configuration.");
+      toast.error(err?.message || "Failed to load academic setup data.");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadInitialData();
+  }, []);
+
+  // Fetch configs and exams whenever academic year changes
+  const loadYearConfigsAndExams = async () => {
+    if (!selectedYearId) return;
+    setIsLoading(true);
+    try {
+      const [configs, examsList] = await Promise.all([
+        getWeightageConfigs(Number(selectedYearId)),
+        getExamsFull({ academic_year: Number(selectedYearId) }),
+      ]);
+
+      setAllConfigs(configs || []);
+      setExams(examsList || []);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load weightage configurations.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadYearConfigsAndExams();
   }, [selectedYearId]);
+
+  // Sync active configuration when selectedClassId or allConfigs changes
+  useEffect(() => {
+    if (!selectedYearId) return;
+
+    let targetConfig: ResultWeightageConfig | undefined;
+    if (selectedClassId === "ALL") {
+      // Find global/school-wide config (school_class is null)
+      targetConfig = allConfigs.find((c) => !c.school_class);
+    } else {
+      // Find class-specific config
+      targetConfig = allConfigs.find((c) => String(c.school_class) === String(selectedClassId));
+    }
+
+    if (targetConfig) {
+      setCurrentConfig(targetConfig);
+      if (targetConfig.components && targetConfig.components.length > 0) {
+        setComponents(
+          targetConfig.components.map((c) => ({
+            id: c.id,
+            name: c.name,
+            component_type: c.component_type,
+            weightage_percentage: Number(c.weightage_percentage),
+            sequence: c.sequence,
+          }))
+        );
+      } else {
+        setComponents(defaultComponents);
+      }
+    } else {
+      setCurrentConfig(null);
+      // Pre-fill with global components if available, otherwise default
+      const globalCfg = allConfigs.find((c) => !c.school_class);
+      if (globalCfg && globalCfg.components && globalCfg.components.length > 0) {
+        setComponents(
+          globalCfg.components.map((c) => ({
+            name: c.name,
+            component_type: c.component_type,
+            weightage_percentage: Number(c.weightage_percentage),
+            sequence: c.sequence,
+          }))
+        );
+      } else {
+        setComponents(defaultComponents);
+      }
+    }
+  }, [selectedClassId, allConfigs, selectedYearId]);
 
   // Calculate live sum
   const totalPercentage = components.reduce((acc, c) => acc + (Number(c.weightage_percentage) || 0), 0);
@@ -145,14 +223,24 @@ export default function WeightageConfigPage() {
     setIsSaving(true);
     try {
       let cfgId = currentConfig?.id;
+      const targetClassNum = selectedClassId !== "ALL" ? Number(selectedClassId) : null;
+      const selectedClassObj = classes.find((c) => String(c.id) === selectedClassId);
+      const title = targetClassNum
+        ? `${selectedClassObj?.school_class || "Class"} Result Weightage`
+        : "Academic Year School-Wide Weightage";
+
       if (!cfgId) {
-        const newCfg = await createWeightageConfig(Number(selectedYearId), "Academic Year Dynamic Weightage");
+        const newCfg = await createWeightageConfig(Number(selectedYearId), targetClassNum, title);
         cfgId = newCfg.id;
       }
 
-      const res = await saveWeightageComponents(cfgId, components);
-      toast.success("🎉 Dynamic Result Weightage saved and activated successfully!");
-      await loadData();
+      await saveWeightageComponents(cfgId, components);
+      toast.success(
+        targetClassNum
+          ? `🎉 Result Weightage for ${selectedClassObj?.school_class || "Class"} saved and activated!`
+          : "🎉 School-Wide Result Weightage saved and activated successfully!"
+      );
+      await loadYearConfigsAndExams();
     } catch (err: any) {
       toast.error(err?.message || "Failed to save weightage components.");
     } finally {
@@ -166,36 +254,55 @@ export default function WeightageConfigPage() {
     try {
       const res = await toggleWeightageLock(currentConfig.id);
       toast.success(res.message || "Updated lock status.");
-      await loadData();
+      await loadYearConfigsAndExams();
     } catch (err: any) {
       toast.error(err?.message || "Failed to toggle lock.");
     }
   };
 
   const isLocked = currentConfig?.is_locked || false;
+  const isClassSpecific = selectedClassId !== "ALL";
+  const selectedClassObj = classes.find((c) => String(c.id) === selectedClassId);
 
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-sm">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <Percent className="h-6 w-6 text-indigo-600" />
-              Dynamic Result Weightage Builder
-            </h1>
-            <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200">
-              100% Fully Dynamic
-            </Badge>
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
+              <Percent className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100">
+                  Dynamic Result Weightage Builder
+                </h1>
+                <Badge className="bg-purple-50 text-[#5c28e8] border-purple-200 font-semibold text-[11px]">
+                  100% Dynamic Formula
+                </Badge>
+                {isClassSpecific ? (
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[11px] flex items-center gap-1">
+                    <GraduationCap className="h-3 w-3" />
+                    {selectedClassObj?.school_class || `Class #${selectedClassId}`} Custom
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px]">
+                    School-Wide Default
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Configure weightage percentages globally or customize specifically for individual classes (e.g. Class 10 Board prep). Total must sum to 100%.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Define dynamic components (Terms, Attendance, Assessment, Projects) & assign weightage percentages. Total must sum to 100%.
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Academic Year Selector */}
           <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
-            <SelectTrigger className="w-52 h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
+            <SelectTrigger className="w-48 h-10 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 border-gray-200 font-bold text-slate-700">
               <SelectValue placeholder="Select Academic Year">
                 {academicYears.find((y) => String(y.id) === selectedYearId)
                   ? (academicYears.find((y) => String(y.id) === selectedYearId).name ||
@@ -216,12 +323,38 @@ export default function WeightageConfigPage() {
             </SelectContent>
           </Select>
 
+          {/* Class / Scope Selector */}
+          <Select value={selectedClassId} onValueChange={(val) => { if (val) setSelectedClassId(val); }}>
+            <SelectTrigger className="w-56 h-10 rounded-xl text-xs bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 font-bold text-purple-950 dark:text-purple-200">
+              <SelectValue placeholder="Target Scope / Class">
+                {selectedClassId === "ALL" ? (
+                  "All Classes (Default)"
+                ) : (
+                  `${classes.find((c) => String(c.id) === selectedClassId)?.school_class || `Class #${selectedClassId}`} (Class-Specific)`
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="font-bold text-emerald-700">
+                🌐 All Classes (School-Wide Default)
+              </SelectItem>
+              {classesWithExams.map((c) => {
+                const hasConfig = allConfigs.some((cfg) => String(cfg.school_class) === String(c.id));
+                return (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    🎓 {c.school_class} {hasConfig ? "• (Custom Active)" : "• (Uses Default)"}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
           {currentConfig && (
             <Button
               size="sm"
               variant={isLocked ? "destructive" : "outline"}
               onClick={handleToggleLock}
-              className="rounded-xl text-xs gap-1.5"
+              className="rounded-xl text-xs gap-1.5 h-10 border-gray-200"
             >
               {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
               {isLocked ? "Locked" : "Lock Config"}
@@ -232,10 +365,10 @@ export default function WeightageConfigPage() {
             size="sm"
             onClick={handleSave}
             disabled={isSaving || isLocked || !isValid100}
-            className={`rounded-xl text-xs gap-1.5 font-bold shadow-xs ${
+            className={`rounded-xl text-xs gap-1.5 font-bold shadow-md shadow-purple-500/20 h-10 px-5 ${
               !isValid100 || isLocked
                 ? "bg-zinc-300 text-zinc-600 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-[#5c28e8] hover:bg-[#4d20cb] text-white"
             }`}
           >
             {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -260,17 +393,23 @@ export default function WeightageConfigPage() {
           )}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider">
-              {isValid100 ? "Valid Weightage Configuration (Sum = 100%)" : "Invalid Weightage Sum"}
+              {isValid100
+                ? isClassSpecific
+                  ? `Valid Class Weightage Configuration for ${selectedClassObj?.school_class || "Selected Class"} (Sum = 100%)`
+                  : "Valid School-Wide Weightage Configuration (Sum = 100%)"
+                : "Invalid Weightage Sum"}
             </h4>
             <p className="text-xs mt-0.5 opacity-90">
               {isValid100
-                ? "Total weightage equals 100%. The Result Engine can process final report cards using this dynamic breakdown."
+                ? isClassSpecific
+                  ? `Students in ${selectedClassObj?.school_class || "this class"} will be evaluated specifically using this formula.`
+                  : "Total weightage equals 100%. The Result Engine will use this dynamic breakdown for all classes without custom weightage."
                 : `Total weightage is currently ${totalPercentage}%. Adjust component percentages until the total equals 100%.`}
             </p>
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <span className="text-xs uppercase font-semibold block text-slate-500">Live Total:</span>
           <span
             className={`text-2xl font-black font-mono ${
@@ -289,41 +428,22 @@ export default function WeightageConfigPage() {
             <div>
               <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
                 <Layers className="h-5 w-5 text-indigo-600" />
-                Dynamic Component Weightage Breakdown
+                {isClassSpecific ? (
+                  <span>
+                    Dynamic Weightage Breakdown: <span className="text-[#5c28e8]">{selectedClassObj?.school_class || "Class"}</span>
+                  </span>
+                ) : (
+                  <span>School-Wide Dynamic Component Breakdown</span>
+                )}
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Add custom evaluation components and set their percentage contribution towards the final 100% result.
+                {isClassSpecific
+                  ? `Override the school-wide default formula with custom components specifically for ${selectedClassObj?.school_class || "this class"}.`
+                  : "Add custom evaluation components and set their percentage contribution towards the final 100% result."}
               </CardDescription>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-indigo-600" /> Select Academic Year:
-                </label>
-                <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
-                  <SelectTrigger className="w-56 h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-bold border-indigo-200">
-                    <SelectValue placeholder="Select Academic Year...">
-                      {academicYears.find((y) => String(y.id) === selectedYearId)
-                        ? (academicYears.find((y) => String(y.id) === selectedYearId).name ||
-                           `${academicYears.find((y) => String(y.id) === selectedYearId).start_year || ""}-${academicYears.find((y) => String(y.id) === selectedYearId).end_year || ""}`.replace(/^-$/, "") ||
-                           `Academic Year #${selectedYearId}`)
-                        : "Select Academic Year..."}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears.map((y) => {
-                      const label = y.name || (y.start_year && y.end_year ? `${y.start_year}-${y.end_year}` : `Academic Year #${y.id}`);
-                      return (
-                        <SelectItem key={y.id} value={String(y.id)}>
-                          {label} {y.is_active ? "(Active Year)" : ""}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <Button
                 size="sm"
                 onClick={handleAddComponent}
@@ -348,7 +468,7 @@ export default function WeightageConfigPage() {
                   <TableRow>
                     <TableHead className="w-12 text-center font-bold text-xs">Seq</TableHead>
                     <TableHead className="font-bold text-xs">Component Name</TableHead>
-                    <TableHead className="w-48 font-bold text-xs">Component Type</TableHead>
+                    <TableHead className="w-52 font-bold text-xs">Component Type</TableHead>
                     <TableHead className="w-40 text-center font-bold text-xs">Weightage %</TableHead>
                     <TableHead className="w-20 text-center font-bold text-xs">Action</TableHead>
                   </TableRow>

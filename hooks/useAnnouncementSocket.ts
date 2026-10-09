@@ -22,10 +22,12 @@ function isTargetAudienceForUser(announcement: AnnouncementResponse, userRoles: 
   const normTarget = (announcement.announcement_for || "").toUpperCase();
   const isEveryone = String(announcement.is_everyone) === "true";
 
-  // Staff roles include: teacher, clerk, librarian, trustee, principal, superadmin
+  // Staff roles include: teacher, clerk, assistant clerk, librarian, trustee, principal, superadmin
   const isStaffUser =
     normUserRoles.includes("TEACHER") ||
     normUserRoles.includes("CLERK") ||
+    normUserRoles.includes("ASSISTANT CLERK") ||
+    normUserRoles.includes("ASSISTANT_CLERK") ||
     normUserRoles.includes("LIBRARIAN") ||
     normUserRoles.includes("TRUSTEE") ||
     normUserRoles.includes("PRINCIPAL") ||

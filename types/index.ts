@@ -66,10 +66,14 @@ export * from "./user";
 export type StaffCategory =
   | "TEACHER"
   | "CLERK"
+  | "ASSISTANT CLERK"
   | "LIBRARIAN"
   | "FEE MANAGEMENT"
+  | "FEES MANAGEMENT"
   | "PRINCIPAL"
+  | "VICE PRINCIPAL"
   | "TRANSOPORTATION"
+  | "TRANSPORTATION"
   | "INVENTORY";
 
 export interface Department {
