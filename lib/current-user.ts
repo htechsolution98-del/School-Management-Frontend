@@ -1,5 +1,5 @@
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
-import { fetchWithAuth } from "./auth";
+import { fetchWithAuth, setRoleCookies } from "./auth";
 import { apiValidationError } from "./api-errors";
 import type { CurrentUserProfile } from "../types";
 
@@ -26,5 +26,25 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     );
   }
 
-  return response.json() as Promise<CurrentUserProfile>;
+  const profile = (await response.json()) as CurrentUserProfile;
+
+  if (typeof window !== "undefined" && profile) {
+    const rawRoles = profile.roles || (profile.role ? [profile.role] : []);
+    const normalizedRoles = rawRoles.map((r) => String(r).toLowerCase().trim()).filter(Boolean);
+    if (normalizedRoles.length > 0) {
+      localStorage.setItem("roles", JSON.stringify(normalizedRoles));
+      setRoleCookies(normalizedRoles);
+    }
+    if (profile.school?.name) {
+      localStorage.setItem("school_name", profile.school.name);
+    }
+    if (profile.school?.id) {
+      localStorage.setItem("school_id", String(profile.school.id));
+    }
+    if (profile.school?.slug) {
+      localStorage.setItem("school_slug", profile.school.slug);
+    }
+  }
+
+  return profile;
 }

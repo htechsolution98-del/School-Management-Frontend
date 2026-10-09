@@ -12,6 +12,7 @@ import {
   FileCheck,
   Hash,
   Award,
+  Clock,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -24,6 +25,7 @@ const sidebarLinks = [
   { title: "Result Processing & Publish", href: "/principal/result/publish", icon: Award },
   { title: "Announcements", href: "/principal/announcements", icon: Megaphone },
   { title: "Staff Leave", href: "/principal/leave-requests", icon: CalendarCheck },
+  { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
 ];
 
 export default function PrincipalLayout({ children }: { children: React.ReactNode }) {

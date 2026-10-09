@@ -41,14 +41,14 @@ const ROLE_ALLOWED_MAP: Record<string, string[]> = {
   "Super Admin": ["super_admin", "superadmin"],
   Trustee: ["admin(trustee)", "trustee", "super_admin", "superadmin"],
   Principal: ["principal", "super_admin", "superadmin"],
-  Clerk: ["clerk", "fees_clerk", "principal", "super_admin", "superadmin"],
-  Teacher: ["teacher", "principal", "super_admin", "superadmin"],
-  Librarian: ["librarian", "principal", "super_admin", "superadmin"],
-  Inventory: ["inventory", "principal", "super_admin", "superadmin"],
-  Fees: ["fees management", "fees", "fees_clerk", "clerk", "principal", "super_admin", "superadmin"],
-  Student: ["student", "principal", "super_admin", "superadmin"],
-  Parent: ["parents", "parent", "principal", "super_admin", "superadmin"],
-  Applicant: ["temp_user", "user", "super_admin", "superadmin"],
+  Clerk: ["clerk", "fees_clerk"],
+  Teacher: ["teacher", "staff"],
+  Librarian: ["librarian"],
+  Inventory: ["inventory"],
+  Fees: ["fees management", "fees", "fees_clerk", "clerk"],
+  Student: ["student"],
+  Parent: ["parents", "parent"],
+  Applicant: ["temp_user", "user"],
 };
 
 function clampWidth(width: number) {
@@ -79,13 +79,17 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
         window.location.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
         return;
       }
-      const roles: unknown = JSON.parse(localStorage.getItem("roles") || "[]");
-      if (!Array.isArray(roles)) throw new Error("Invalid stored roles");
-      const normalized = roles.map(role => String(role).toLowerCase().trim());
-      if (!ROLE_ALLOWED_MAP[roleTitle!].some(role => normalized.includes(role))) {
-        const route = getDashboardRoute(roles);
-        window.location.replace(route && route !== pathname ? route : "/login");
-        return;
+      const rawRoles = localStorage.getItem("roles");
+      if (rawRoles) {
+        const roles: unknown = JSON.parse(rawRoles);
+        if (Array.isArray(roles) && roles.length > 0) {
+          const normalized = roles.map(role => String(role).toLowerCase().trim());
+          if (!ROLE_ALLOWED_MAP[roleTitle!].some(role => normalized.includes(role))) {
+            const route = getDashboardRoute(roles as string[]);
+            window.location.replace(route && route !== pathname ? route : "/login");
+            return;
+          }
+        }
       }
       setAuthorizedPath(pathname);
     } catch {
@@ -111,10 +115,21 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   useEffect(() => {
     let mounted = true;
     getCurrentUserProfile()
-      .then((data) => { if (mounted) setProfile(data); })
+      .then((data) => {
+        if (!mounted) return;
+        setProfile(data);
+        const serverRoles = (data.roles || (data.role ? [data.role] : [])).map(r => String(r).toLowerCase().trim());
+        if (requiresRoleCheck && roleTitle && ROLE_ALLOWED_MAP[roleTitle]) {
+          const isAllowed = ROLE_ALLOWED_MAP[roleTitle].some(r => serverRoles.includes(r));
+          if (!isAllowed) {
+            const redirectRoute = getDashboardRoute(data.roles || (data.role ? [data.role] : []));
+            window.location.replace(redirectRoute && redirectRoute !== pathname ? redirectRoute : "/login");
+          }
+        }
+      })
       .catch(() => { /* keep the static fallback label */ });
     return () => { mounted = false; };
-  }, []);
+  }, [requiresRoleCheck, roleTitle, pathname]);
 
   useEffect(() => {
     try { setSchoolName(localStorage.getItem("school_name")); } catch { /* ignore */ }

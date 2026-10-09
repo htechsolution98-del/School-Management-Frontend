@@ -274,3 +274,80 @@ export async function createDynamicLeaveType(
   });
   return handleResponse<DynamicLeaveType>(res, "Failed to create leave type.");
 }
+
+// ─────────────────────────────────────────────────────────────
+// ATTENDANCE REGULARIZATIONS API
+// ─────────────────────────────────────────────────────────────
+
+export async function getAttendanceRegularizations(params?: {
+  staff_id?: number;
+  status?: string;
+}): Promise<AttendanceRegularization[]> {
+  const query = new URLSearchParams();
+  if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+  if (params?.status) query.set("status", params.status);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+
+  const res = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE_REGULARIZATIONS}${qs}`
+  );
+  const data = await handleResponse<any>(res, "Failed to fetch attendance regularizations.");
+  return normalizeList<AttendanceRegularization>(data);
+}
+
+export async function createAttendanceRegularization(payload: {
+  attendance_date: string;
+  requested_check_in?: string | null;
+  requested_check_out?: string | null;
+  reason: string;
+  staff?: number;
+}): Promise<AttendanceRegularization> {
+  const res = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE_REGULARIZATIONS}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  return handleResponse<AttendanceRegularization>(
+    res,
+    "Failed to submit attendance regularization request."
+  );
+}
+
+export async function approveAttendanceRegularization(
+  id: number,
+  note?: string
+): Promise<AttendanceRegularization> {
+  const res = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE_REGULARIZATIONS}${id}/approve/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: note || "Approved" }),
+    }
+  );
+  return handleResponse<AttendanceRegularization>(
+    res,
+    "Failed to approve attendance regularization."
+  );
+}
+
+export async function rejectAttendanceRegularization(
+  id: number,
+  note?: string
+): Promise<AttendanceRegularization> {
+  const res = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE_REGULARIZATIONS}${id}/reject/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: note || "Rejected" }),
+    }
+  );
+  return handleResponse<AttendanceRegularization>(
+    res,
+    "Failed to reject attendance regularization."
+  );
+}

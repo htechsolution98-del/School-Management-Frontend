@@ -20,14 +20,27 @@ export interface AttendanceRegularization {
   attendance_date: string;
   requested_check_in?: string | null;
   requested_check_out?: string | null;
+  original_check_in?: string | null;
+  original_check_out?: string | null;
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
   approved_by?: number | null;
   approved_by_username?: string | null;
   audit_log?: Array<{
     action: string;
-    by: string;
+    by?: number | string;
+    by_username?: string;
     timestamp: string;
+    original_punch?: {
+      check_in?: string | null;
+      check_out?: string | null;
+    };
+    new_punch?: {
+      check_in?: string | null;
+      check_out?: string | null;
+      requested_check_in?: string | null;
+      requested_check_out?: string | null;
+    };
     note?: string;
   }>;
   created_at?: string;
