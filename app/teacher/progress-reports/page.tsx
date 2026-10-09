@@ -164,22 +164,22 @@ function ClassicReportCardModal({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto rounded-3xl p-4 sm:p-6 bg-slate-900 border border-slate-800 shadow-2xl text-slate-100">
+      <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto rounded-3xl p-4 sm:p-6 bg-white border border-slate-200 shadow-2xl text-slate-900">
         {/* Modal Top Header Bar */}
-        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-800 gap-3">
+        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-200 gap-3">
           <div className="pr-6">
-            <DialogTitle className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-              <Award className="h-5 w-5 text-indigo-400 shrink-0" />
+            <DialogTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+              <Award className="h-5 w-5 text-indigo-600 shrink-0" />
               {report.reportMonth} Report Card: {report.studentName}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+            <DialogDescription className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
               <span>{report.className} - Div {report.divisionName} (GR No: {report.grNo})</span>
-              <span className="text-slate-600">•</span>
+              <span className="text-slate-400">•</span>
               <Badge
                 className={`text-[10px] font-bold ${
                   report.isPublished
-                    ? "bg-emerald-950 text-emerald-300 border-emerald-800"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
                 }`}
               >
                 {report.isPublished ? `Published (${report.publishedDate})` : "Draft (Hidden from Portals)"}
@@ -192,7 +192,7 @@ function ClassicReportCardModal({
               size="sm"
               variant="outline"
               onClick={() => setIsEditing(!isEditing)}
-              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
+              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
             >
               <Sliders className="h-3.5 w-3.5" />
               {isEditing ? "Cancel Edit" : "Edit Marks & Behavior"}
@@ -204,8 +204,8 @@ function ClassicReportCardModal({
               onClick={() => onTogglePublish(report.studentId)}
               className={`h-8 text-xs font-bold rounded-xl gap-1.5 border ${
                 report.isPublished
-                  ? "bg-amber-950/60 text-amber-300 border-amber-800 hover:bg-amber-900"
-                  : "bg-emerald-950/60 text-emerald-300 border-emerald-800 hover:bg-emerald-900"
+                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
               }`}
             >
               {report.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}

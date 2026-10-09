@@ -522,9 +522,13 @@ export function StudentProfileDrawer({
                     <Input
                       id="mobile"
                       type="tel"
-                      placeholder="Primary contact number"
+                      maxLength={10}
+                      placeholder="10-digit mobile number"
                       value={formData.mobile}
-                      onChange={(e) => handleInputChange("mobile", e.target.value)}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        handleInputChange("mobile", clean);
+                      }}
                     />
                   </div>
                 </div>
