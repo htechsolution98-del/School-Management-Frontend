@@ -25,6 +25,8 @@ export interface SubscriptionPlan {
   max_staff: number;
   max_admin_users: number;
   storage_limit_mb: number;
+  gst_included?: boolean;
+  gst_percentage?: number | string;
   is_active: boolean;
   plan_modules?: SubscriptionPlanModule[];
   enabled_module_ids?: number[];
@@ -58,6 +60,8 @@ export interface SchoolSubscription {
   start_date: string;
   due_date: string;
   grace_period_days: number;
+  gst_included?: boolean;
+  gst_percentage?: number | string;
   status:
     | "TRIAL"
     | "TRIAL_EXPIRED"

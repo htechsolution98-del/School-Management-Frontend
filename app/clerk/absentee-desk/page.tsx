@@ -271,16 +271,16 @@ export default function AbsenteeDeskPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <Link href="/clerk" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
+            <Link href="/clerk" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
               <ArrowLeft size={18} />
             </Link>
-            <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-950/50 text-red-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
               <PhoneCall className="h-5 w-5" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-zinc-100 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
               Daily Absentee Calling & Follow-up Desk
             </h1>
           </div>
@@ -290,54 +290,54 @@ export default function AbsenteeDeskPage() {
         </div>
 
         {/* Date Selector */}
-        <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-xs">
+        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-xs">
           <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
           <span className="text-xs font-semibold text-gray-500">Attendance Date:</span>
           <DatePicker
             value={selectedDate}
             onChange={date => setSelectedDate(date)}
-            className="w-auto h-7 text-xs border-0 p-0 focus-visible:ring-0 font-bold text-gray-800 dark:text-zinc-200 cursor-pointer"
+            className="w-auto h-7 text-xs border-0 p-0 focus-visible:ring-0 font-bold text-gray-800 cursor-pointer"
           />
         </div>
       </div>
 
       {/* KPI METRICS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <Card className="rounded-2xl border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 shadow-xs p-4">
+        <Card className="rounded-2xl border-red-200 bg-red-50/50 shadow-xs p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Total Absent Today</span>
+            <span className="text-xs font-bold text-red-800 uppercase tracking-wider">Total Absent Today</span>
             <UserX size={18} className="text-red-600" />
           </div>
-          <p className="text-2xl font-black text-red-700 dark:text-red-400 mt-2">{stats.totalAbsent}</p>
+          <p className="text-2xl font-black text-red-700 mt-2">{stats.totalAbsent}</p>
         </Card>
 
-        <Card className="rounded-2xl border-amber-200 dark:border-amber-900/50 bg-amber-50/40 dark:bg-amber-950/20 shadow-xs p-4">
+        <Card className="rounded-2xl border-amber-200 bg-amber-50/50 shadow-xs p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Pending Call</span>
+            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Pending Call</span>
             <Clock size={18} className="text-amber-600" />
           </div>
-          <p className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-2">{stats.pending}</p>
+          <p className="text-2xl font-black text-amber-700 mt-2">{stats.pending}</p>
         </Card>
 
-        <Card className="rounded-2xl border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 shadow-xs p-4">
+        <Card className="rounded-2xl border-blue-200 bg-blue-50/50 shadow-xs p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">Contacted / Logged</span>
+            <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">Contacted / Logged</span>
             <MessageSquare size={18} className="text-blue-600" />
           </div>
-          <p className="text-2xl font-black text-blue-700 dark:text-blue-400 mt-2">{stats.contacted}</p>
+          <p className="text-2xl font-black text-blue-700 mt-2">{stats.contacted}</p>
         </Card>
 
-        <Card className="rounded-2xl border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs p-4">
+        <Card className="rounded-2xl border-emerald-200 bg-emerald-50/50 shadow-xs p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Leave Approved</span>
+            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Leave Approved</span>
             <FileCheck size={18} className="text-emerald-600" />
           </div>
-          <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-2">{stats.leaveApproved}</p>
+          <p className="text-2xl font-black text-emerald-700 mt-2">{stats.leaveApproved}</p>
         </Card>
       </div>
 
       {/* FILTER CONTROLS */}
-      <Card className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-zinc-900 p-4">
+      <Card className="rounded-2xl border-gray-200 shadow-xs bg-white p-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -354,7 +354,7 @@ export default function AbsenteeDeskPage() {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
+              className="w-full text-xs h-9 rounded-xl border border-gray-200 px-3 bg-white font-medium text-gray-800"
             >
               <option value="all">All Classes</option>
               {classes.map((c) => (
@@ -369,7 +369,7 @@ export default function AbsenteeDeskPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
+              className="w-full text-xs h-9 rounded-xl border border-gray-200 px-3 bg-white font-medium text-gray-800"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending Calling</option>
@@ -381,9 +381,9 @@ export default function AbsenteeDeskPage() {
       </Card>
 
       {/* ABSENTEE LIST ROSTER */}
-      <Card className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900 overflow-hidden">
-        <CardHeader className="p-4 px-6 bg-slate-50 dark:bg-zinc-800/40 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
-          <CardTitle className="text-sm font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+      <Card className="rounded-2xl border-gray-200 shadow-sm bg-white overflow-hidden">
+        <CardHeader className="p-4 px-6 bg-slate-50 border-b border-gray-100 flex items-center justify-between">
+          <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
             <Users size={16} className="text-red-500" /> Absent Students List ({filteredAbsentees.length})
           </CardTitle>
           <Button
@@ -400,7 +400,7 @@ export default function AbsenteeDeskPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-100/70 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 font-bold border-b border-gray-200 dark:border-zinc-700 text-[11px] uppercase tracking-wider">
+              <tr className="bg-slate-100/70 text-gray-600 font-bold border-b border-gray-200 text-[11px] uppercase tracking-wider">
                 <th className="p-3.5 w-20 text-center">Roll / GR</th>
                 <th className="p-3.5 min-w-[170px]">Student Name</th>
                 <th className="p-3.5 w-28">Class & Div</th>
@@ -410,7 +410,7 @@ export default function AbsenteeDeskPage() {
                 <th className="p-3.5 w-48 text-center">Quick Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
+            <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="p-10 text-center text-gray-500">
@@ -427,29 +427,29 @@ export default function AbsenteeDeskPage() {
                 </tr>
               ) : (
                 filteredAbsentees.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors">
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3 text-center">
-                      <div className="font-mono font-bold text-gray-700 dark:text-zinc-300">#{item.rollNumber}</div>
+                      <div className="font-mono font-bold text-gray-700">#{item.rollNumber}</div>
                       <div className="text-[10px] font-mono text-gray-400">{item.grNumber}</div>
                     </td>
                     <td className="p-3">
-                      <div className="font-bold text-gray-900 dark:text-zinc-100">{item.name}</div>
+                      <div className="font-bold text-gray-900">{item.name}</div>
                       {item.clerkNotes && (
                         <div className="text-[10px] text-gray-500 italic mt-0.5">Note: {item.clerkNotes}</div>
                       )}
                     </td>
-                    <td className="p-3 font-semibold text-gray-700 dark:text-zinc-300">
+                    <td className="p-3 font-semibold text-gray-700">
                       {item.className} - Div {item.divisionName}
                     </td>
                     <td className="p-3">
-                      <div className="text-gray-900 dark:text-zinc-100 font-medium">{item.fatherName}</div>
-                      <div className="text-[11px] font-mono text-blue-600 dark:text-blue-400">{item.phone}</div>
+                      <div className="text-gray-900 font-medium">{item.fatherName}</div>
+                      <div className="text-[11px] font-mono text-blue-600">{item.phone}</div>
                     </td>
                     <td className="p-3">
                       <button
                         type="button"
                         onClick={() => openReasonModal(item)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                       >
                         {item.reasonTag === "Sick / Fever" && <HeartPulse size={12} className="text-red-500" />}
                         {item.reasonTag === "Family Function" && <Home size={12} className="text-purple-500" />}
@@ -505,9 +505,9 @@ export default function AbsenteeDeskPage() {
       {/* LOG REASON MODAL */}
       {activeReasonModalStudent && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in">
             <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-gray-900">
                 Log Absence Reason
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
@@ -517,11 +517,11 @@ export default function AbsenteeDeskPage() {
 
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300">Absence Reason</label>
+                <label className="text-xs font-semibold text-gray-700">Absence Reason</label>
                 <select
                   value={modalReason}
                   onChange={(e) => setModalReason(e.target.value)}
-                  className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-3 bg-white dark:bg-zinc-900 font-medium"
+                  className="w-full text-xs h-9 rounded-xl border border-gray-200 px-3 bg-white font-medium text-gray-800"
                 >
                   <option value="Sick / Fever">Sick / Fever / Medical</option>
                   <option value="Family Function">Family Event / Function</option>
@@ -534,7 +534,7 @@ export default function AbsenteeDeskPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300">Clerk Follow-up Notes (Optional)</label>
+                <label className="text-xs font-semibold text-gray-700">Clerk Follow-up Notes (Optional)</label>
                 <Input
                   value={modalNotes}
                   onChange={(e) => setModalNotes(e.target.value)}
@@ -544,7 +544,7 @@ export default function AbsenteeDeskPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
               <Button
                 type="button"
                 variant="outline"

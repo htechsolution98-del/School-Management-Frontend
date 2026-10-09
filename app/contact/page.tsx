@@ -285,10 +285,11 @@ export default function ContactPage() {
                           <Input
                             id="phone"
                             type="tel"
+                            maxLength={10}
                             required
-                            placeholder="Enter your mobile number"
+                            placeholder="Enter 10-digit mobile number"
                             value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                             className="pl-10.5 h-12 rounded-xl border-slate-200 bg-white placeholder:text-slate-400 text-slate-800 shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/10 transition-all"
                           />
                         </div>
