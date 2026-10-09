@@ -8,6 +8,7 @@ import { fetchAdmissions } from "@/lib/clerk/admissions";
 import { getStaffList } from "@/lib/staff";
 import type { Staff } from "@/types";
 import { Loader2 } from "lucide-react";
+import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 const ROLE_COLORS: Record<string, string> = {
   TEACHER: "bg-blue-100 text-blue-700",
@@ -79,6 +80,9 @@ export default function PrincipalDashboard() {
         <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Principal Dashboard</h2>
         <p className="text-sm text-gray-500 mt-1">Overview of school activities and administration.</p>
       </div>
+
+      {/* ─── Staff Attendance Widget ────────────────────────────────────────── */}
+      <StaffAttendanceCard roleName="Principal / Leadership" />
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, idx) => {

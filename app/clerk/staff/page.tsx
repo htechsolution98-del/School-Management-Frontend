@@ -245,7 +245,20 @@ export default function ClerkStaffDashboard() {
       </div>
       <DataTable data={staff} columns={columns} getRowId={member => member.id} createdDate createdDateRange search searchPlaceholder="Search name, email, mobile or department" loading={loading} emptyTitle="No staff records yet" emptyDescription="Add a staff member to start your directory." caption="Staff directory" minWidth={1050} filters={[
         { key: "status", label: "Status", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }], match: (member, value) => (value === "active") === !!member.is_active },
-        { key: "role", label: "Role", optionsFrom: rows => Array.from(new Set(rows.map(member => roleLabel(member.category)))).map(label => ({ value: label, label })), match: (member, value) => roleLabel(member.category) === value },
+        {
+          key: "role",
+          label: "Role",
+          optionsFrom: rows => {
+            const roleLabelsFromFeatures = roles.map(r => r.label);
+            const roleLabelsFromAllowed = ALLOWED_ROLES.map(title);
+            const roleLabelsFromRows = rows.map(member => roleLabel(member.category));
+            const uniqueRoles = Array.from(
+              new Set([...roleLabelsFromFeatures, ...roleLabelsFromAllowed, ...roleLabelsFromRows])
+            ).filter(label => label && label !== "-");
+            return uniqueRoles.map(label => ({ value: label, label }));
+          },
+          match: (member, value) => roleLabel(member.category) === value
+        },
         { key: "department", label: "Department", optionsFrom: () => departments.map(item => ({ value: String(item.id), label: item.name })), match: (member, value) => String(member.department ?? "") === value },
       ]} renderActions={member => <div className="flex items-center gap-1">{[{ label: "Edit", icon: Edit2, onClick: () => openForm(member), color: "text-[#5826df] hover:bg-indigo-50 hover:text-[#4a1ec2]" }, { label: member.is_active ? "Deactivate" : "Activate", icon: Power, onClick: () => void act(member), color: "text-amber-600 hover:bg-amber-50" }, { label: "Delete", icon: Trash2, onClick: () => void act(member, true), color: "text-rose-600 hover:bg-rose-50" }].map(action => <button type="button" key={action.label} title={action.label} aria-label={`${action.label} ${member.name || "staff member"}`} disabled={loading || saving || actionId !== null} onClick={action.onClick} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-90 disabled:opacity-40 ${action.color}`}>{actionId === member.id ? <Loader2 size={14} className="animate-spin" /> : <action.icon size={14} />}</button>)}</div>} />
     </div>

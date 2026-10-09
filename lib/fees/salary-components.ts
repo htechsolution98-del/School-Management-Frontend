@@ -44,3 +44,49 @@ export async function createSalaryComponent(payload: {
   return data;
 }
 
+export async function updateSalaryComponent(
+  id: number,
+  payload: {
+    name?: string;
+    component_type?: ComponentType;
+    type?: "Earning" | "Deduction";
+    calc_type?: "Fixed" | "Percentage" | "Formula" | string;
+    calc_base?: string;
+    value?: number | string;
+  }
+): Promise<SalaryComponent> {
+  const typeValue = payload.type || (payload.component_type ? (payload.component_type === "deduction" ? "Deduction" : "Earning") : undefined);
+  const componentTypeValue = payload.component_type || (typeValue ? (typeValue === "Deduction" ? "deduction" : "earning") : undefined);
+
+  const body: Record<string, any> = {};
+  if (payload.name !== undefined) body.name = payload.name;
+  if (typeValue !== undefined) body.type = typeValue;
+  if (componentTypeValue !== undefined) body.component_type = componentTypeValue;
+  if (payload.calc_type !== undefined) body.calc_type = payload.calc_type;
+  if (payload.calc_base !== undefined) body.calc_base = payload.calc_base || null;
+  if (payload.value !== undefined) body.value = payload.value;
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/dynamic-salary-components/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail || data?.message || "Failed to update salary component");
+  return data;
+}
+
+export async function deleteSalaryComponent(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/dynamic-salary-components/${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 204) {
+    let msg = "Failed to delete salary component";
+    try {
+      const data = await response.json();
+      msg = data?.detail || data?.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+}
+

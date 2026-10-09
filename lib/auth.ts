@@ -152,15 +152,39 @@ function removeCookie(name: string) {
   document.cookie = `${name}=; ${COOKIE_PATH}; ${COOKIE_SAME_SITE}; Max-Age=0${getSecureCookieFlag()}`;
 }
 
-function clearLegacyLocalTokens() {
-  if (typeof window === "undefined") {
-    return;
-  }
+export function setRoleCookies(roles: string[], maxAge?: number | null) {
+  if (typeof document === "undefined") return;
+  const normalized = (roles || []).map((r) => String(r).toLowerCase().trim()).filter(Boolean);
+  const primaryRole = normalized[0] || "";
+  setCookie("user_role", primaryRole, maxAge);
+  setCookie("user_roles", JSON.stringify(normalized), maxAge);
+}
 
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("token");
-  localStorage.removeItem("authToken");
+export function clearAuthSession(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("roles");
+    localStorage.removeItem("school_id");
+    localStorage.removeItem("school_name");
+    localStorage.removeItem("school_slug");
+    localStorage.removeItem("username");
+    localStorage.removeItem("current_user");
+    localStorage.removeItem("announcement_notifications");
+    localStorage.removeItem("read_announcement_ids");
+    localStorage.removeItem("announcement_notifications_unread_count");
+    sessionStorage.clear();
+  }
+  removeCookie(ACCESS_TOKEN_COOKIE);
+  removeCookie(REFRESH_TOKEN_COOKIE);
+  removeCookie("user_role");
+  removeCookie("user_roles");
+}
+
+function clearLegacyLocalTokens() {
+  clearAuthSession();
 }
 
 export function getAccessToken(): string | null {
@@ -173,9 +197,9 @@ export function getRefreshToken(): string | null {
 
 function setTokens(access: string, refresh?: string | null) {
   const nextRefresh = refresh || getRefreshToken();
-  clearLegacyLocalTokens();
+  const maxAge = getTokenMaxAge(access);
 
-  setCookie(ACCESS_TOKEN_COOKIE, access, getTokenMaxAge(access));
+  setCookie(ACCESS_TOKEN_COOKIE, access, maxAge);
 
   if (nextRefresh) {
     setCookie(REFRESH_TOKEN_COOKIE, nextRefresh, getTokenMaxAge(nextRefresh));
@@ -187,14 +211,15 @@ function setTokens(access: string, refresh?: string | null) {
 }
 
 function clearTokens() {
-  clearLegacyLocalTokens();
-  removeCookie(ACCESS_TOKEN_COOKIE);
-  removeCookie(REFRESH_TOKEN_COOKIE);
+  clearAuthSession();
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 export async function loginUser(credentials: LoginRequest): Promise<LoginResponse> {
+  // Purge any existing session completely first to ensure account switches don't bleed data
+  clearAuthSession();
+
   const url = `${API_BASE_URL}${API_ENDPOINTS.LOGIN}`;
 
   const response = await apiFetch(url, {
@@ -217,16 +242,20 @@ export async function loginUser(credentials: LoginRequest): Promise<LoginRespons
     setTokens(data.access, data.refresh);
   }
 
+  // Ensure roles is available at top level
+  if (data.user?.roles && !data.roles) {
+    data.roles = data.user.roles;
+  }
+
+  const userRoles = (data.roles || []).map((r) => String(r).toLowerCase().trim()).filter(Boolean);
+  const tokenMaxAge = getTokenMaxAge(data.access);
+  setRoleCookies(userRoles, tokenMaxAge);
+
   if (typeof window !== "undefined") {
     if (data.school_id)   localStorage.setItem("school_id",   String(data.school_id));
     if (data.school_name) localStorage.setItem("school_name", data.school_name);
     if (data.school_slug) localStorage.setItem("school_slug", data.school_slug);
-    if (data.roles)       localStorage.setItem("roles",       JSON.stringify(data.roles));
-  }
-  
-  // Ensure roles is available at the top level for backward compatibility
-  if (data.user?.roles && !data.roles) {
-    data.roles = data.user.roles;
+    localStorage.setItem("roles", JSON.stringify(userRoles));
   }
 
   return data;
@@ -315,6 +344,14 @@ export async function refreshToken(): Promise<boolean> {
       const data = await response.json() as { access?: string; refresh?: string };
       if (!data.access) return false;
       setTokens(data.access, data.refresh);
+      if (typeof window !== "undefined") {
+        try {
+          const roles = JSON.parse(localStorage.getItem("roles") || "[]");
+          if (Array.isArray(roles) && roles.length) {
+            setRoleCookies(roles, getTokenMaxAge(data.access));
+          }
+        } catch {}
+      }
       return true;
     }
     return false;
@@ -349,7 +386,7 @@ export async function fetchWithAuth(
     const errBody = await response.clone().json();
     const msg = errBody?.detail || errBody?.message || "";
     if (/deactivated|disabled/i.test(msg)) {
-      clearTokens();
+      clearAuthSession();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
@@ -365,7 +402,7 @@ export async function fetchWithAuth(
 
   // REFRESH FAILED
   if (!refreshed) {
-    clearTokens();
+    clearAuthSession();
     return response;
   }
 
@@ -377,7 +414,7 @@ export async function fetchWithAuth(
 
 /** Immediately clears tokens and redirects to login (no API call). */
 export function forceLogout(): void {
-  clearTokens();
+  clearAuthSession();
 
   if (typeof window !== "undefined") {
     window.location.href = "/login";
@@ -395,7 +432,7 @@ export async function logoutUser(): Promise<void> {
 
   } catch {}
 
-  clearTokens();
+  clearAuthSession();
 
   if (typeof window !== "undefined") {
     window.location.href = "/login";
@@ -408,7 +445,13 @@ export function getDashboardRoute(roles: string[]): string {
   const normalizedRoles = (roles || []).map((r) => (r || "").toLowerCase().trim());
   if (normalizedRoles.includes("super_admin") || normalizedRoles.includes("superadmin")) return "/superadmin";
   if (normalizedRoles.includes("admin(trustee)") || normalizedRoles.includes("trustee")) return "/trustee";
-  if (normalizedRoles.includes("principal")) return "/principal";
+  if (
+    normalizedRoles.includes("principal") ||
+    normalizedRoles.includes("vice principal") ||
+    normalizedRoles.includes("vice_principal")
+  ) {
+    return "/principal";
+  }
   if (normalizedRoles.includes("librarian")) return "/librarian";
   if (
     normalizedRoles.includes("clerk") ||
@@ -422,7 +465,14 @@ export function getDashboardRoute(roles: string[]): string {
   if (normalizedRoles.includes("inventory")) return "/inventory";
   if (normalizedRoles.includes("temp_user")) return "/user";
   if (normalizedRoles.includes("fees management") || normalizedRoles.includes("fees")) return "/fees";
-  if (normalizedRoles.includes("teacher")) return "/teacher";
+  if (
+    normalizedRoles.includes("teacher") ||
+    normalizedRoles.includes("staff") ||
+    normalizedRoles.includes("transportation") ||
+    normalizedRoles.includes("transport")
+  ) {
+    return "/teacher";
+  }
   if (normalizedRoles.includes("student")) return "/student";
   if (normalizedRoles.includes("parents") || normalizedRoles.includes("parent")) return "/parent";
   return "/user";

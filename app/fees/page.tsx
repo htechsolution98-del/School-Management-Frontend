@@ -37,6 +37,7 @@ import {
 } from "@/lib/fees";
 import { getClasses } from "@/lib/clerk";
 import { cn } from "@/lib/utils";
+import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 /* ─── Animated counter ───────────────────────────────────────────────────── */
 function AnimatedNumber({
@@ -740,6 +741,9 @@ export default function ClerkDashboard() {
             Refresh
           </motion.button>
         </motion.div>
+
+        {/* ── Staff Attendance Widget ── */}
+        <StaffAttendanceCard roleName="Fees Management" />
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

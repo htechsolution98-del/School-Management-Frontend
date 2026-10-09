@@ -33,6 +33,11 @@ export interface AttendanceRecord {
   is_half_day: boolean;
   check_in: string | null;       // "2026-05-13T05:12:38.748103Z"
   check_out: string | null;      // null or ISO string
+  is_late?: boolean;
+  is_early_exit?: boolean;
+  is_missing_punch?: boolean;
+  working_hours?: string | number | null;
+  source?: string;
 }
 
 // ─── Student Attendance Types ─────────────────────────────────────────────────

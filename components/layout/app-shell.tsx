@@ -100,13 +100,17 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
         window.location.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
         return;
       }
-      const roles: unknown = JSON.parse(localStorage.getItem("roles") || "[]");
-      if (!Array.isArray(roles)) throw new Error("Invalid stored roles");
-      const normalized = roles.map(role => String(role).toLowerCase().trim());
-      if (!ROLE_ALLOWED_MAP[roleTitle!].some(role => normalized.includes(role))) {
-        const route = getDashboardRoute(roles);
-        window.location.replace(route && route !== pathname ? route : "/login");
-        return;
+      const rawRoles = localStorage.getItem("roles");
+      if (rawRoles) {
+        const roles: unknown = JSON.parse(rawRoles);
+        if (Array.isArray(roles) && roles.length > 0) {
+          const normalized = roles.map(role => String(role).toLowerCase().trim());
+          if (!ROLE_ALLOWED_MAP[roleTitle!].some(role => normalized.includes(role))) {
+            const route = getDashboardRoute(roles as string[]);
+            window.location.replace(route && route !== pathname ? route : "/login");
+            return;
+          }
+        }
       }
       setAuthorizedPath(pathname);
     } catch {
@@ -132,10 +136,21 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
   useEffect(() => {
     let mounted = true;
     getCurrentUserProfile()
-      .then((data) => { if (mounted) setProfile(data); })
+      .then((data) => {
+        if (!mounted) return;
+        setProfile(data);
+        const serverRoles = (data.roles || (data.role ? [data.role] : [])).map(r => String(r).toLowerCase().trim());
+        if (requiresRoleCheck && roleTitle && ROLE_ALLOWED_MAP[roleTitle]) {
+          const isAllowed = ROLE_ALLOWED_MAP[roleTitle].some(r => serverRoles.includes(r));
+          if (!isAllowed) {
+            const redirectRoute = getDashboardRoute(data.roles || (data.role ? [data.role] : []));
+            window.location.replace(redirectRoute && redirectRoute !== pathname ? redirectRoute : "/login");
+          }
+        }
+      })
       .catch(() => { /* keep the static fallback label */ });
     return () => { mounted = false; };
-  }, []);
+  }, [requiresRoleCheck, roleTitle, pathname]);
 
   useEffect(() => {
     try { setSchoolName(localStorage.getItem("school_name")); } catch { /* ignore */ }

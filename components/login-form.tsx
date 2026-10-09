@@ -141,7 +141,7 @@ function LoginFormInner() {
       </motion.div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" suppressHydrationWarning>
         {/* Username */}
         <motion.div
           custom={1}
@@ -171,6 +171,7 @@ function LoginFormInner() {
               onChange={(e) => setUsername(e.target.value)}
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}
+              suppressHydrationWarning
               className="pl-10 h-12 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#CBD5E1] shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/20 transition-all duration-200"
             />
           </div>
@@ -213,11 +214,13 @@ function LoginFormInner() {
               onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setFocused("password")}
               onBlur={() => setFocused(null)}
+              suppressHydrationWarning
               className="pl-10 pr-11 h-12 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#CBD5E1] shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/20 transition-all duration-200"
             />
             <button
               type="button"
               tabIndex={-1}
+              suppressHydrationWarning
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] transition-colors"
             >
@@ -262,6 +265,7 @@ function LoginFormInner() {
           <Button
             type="submit"
             disabled={isLoading}
+            suppressHydrationWarning
             className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-[#1D496C] via-[#285E89] to-[#429CE4] text-white font-bold text-sm shadow-lg shadow-[#1D496C]/10 hover:shadow-xl hover:from-[#153957] hover:to-[#2e7ca8] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
           >
             <AnimatePresence mode="wait" initial={false}>

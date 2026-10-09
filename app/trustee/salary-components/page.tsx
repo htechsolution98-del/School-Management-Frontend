@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Trash2, TrendingUp, TrendingDown,
   Loader2, AlertCircle, RefreshCw, Sparkles,
   CheckCircle2, X, Layers, BadgeIndianRupee,
+  Pencil,
 } from "lucide-react";
 import {
   createSalaryComponent,
+  updateSalaryComponent,
+  deleteSalaryComponent,
   getSalaryComponents,
   type SalaryComponent,
 } from "@/lib/fees";
@@ -46,6 +49,19 @@ function TypeBadge({ type }: { type: ComponentType }) {
       {type === "earning" ? "Earning" : "Deduction"}
     </span>
   );
+}
+
+// ─── Dynamic Value Formatter ──────────────────────────────────────────────────
+
+function formatComponentDisplay(c: SalaryComponent): string {
+  const isPercent = (c.calc_type || "").toLowerCase() === "percentage";
+  const rawVal = c.value !== undefined && c.value !== null && c.value !== "" ? c.value : 0;
+  if (isPercent) {
+    return `${rawVal}% of ${c.calc_base?.trim() || "basic"}`;
+  }
+  const numVal = Number(rawVal);
+  const formatted = isNaN(numVal) ? "0" : numVal.toLocaleString("en-IN");
+  return `₹${formatted}`;
 }
 
 // ─── Preset Chip ─────────────────────────────────────────────────────────────
@@ -101,8 +117,12 @@ export default function SalaryComponentsPage() {
   const [components, setComponents] = useState<SalaryComponent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -132,9 +152,39 @@ export default function SalaryComponentsPage() {
 
   useEffect(() => { fetchComponents(); }, [fetchComponents]);
 
-  const usedNames = new Set(components.map((c) => c.name.toLowerCase()));
+  const usedNames = new Set(
+    components
+      .filter((c) => editingId === null || c.id !== editingId)
+      .map((c) => c.name.toLowerCase())
+  );
 
-  const handleCreate = async (customName?: string, customType?: ComponentType) => {
+  const handleStartEdit = (c: SalaryComponent) => {
+    setEditingId(c.id);
+    setName(c.name);
+    setComponentType(
+      (c.component_type || (c.type?.toLowerCase() === "deduction" ? "deduction" : "earning")) as ComponentType
+    );
+    setCalcType(
+      c.calc_type === "Percentage" ? "Percentage" : c.calc_type === "Formula" ? "Formula" : "Fixed"
+    );
+    setValue(c.value !== undefined && c.value !== null ? String(c.value) : "");
+    setCalcBase(c.calc_base || "");
+    setFormError("");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setName("");
+    setCalcBase("");
+    setValue("");
+    setCalcType("Fixed");
+    setComponentType("earning");
+    setFormError("");
+  };
+
+  const handleSave = async (customName?: string, customType?: ComponentType) => {
+    const isEditing = !customName && editingId !== null;
     const finalName = (customName ?? name).trim();
     const finalType = customType ?? componentType;
 
@@ -144,25 +194,61 @@ export default function SalaryComponentsPage() {
     }
 
     setFormError("");
-    setCreating(true);
+    setSubmitting(true);
     try {
-      const created = await createSalaryComponent({
-        name: finalName,
-        component_type: finalType,
-        type: finalType === "earning" ? "Earning" : "Deduction",
-        calc_type: calcType,
-        calc_base: calcBase.trim() || undefined,
-        value: Number(value) || 0,
-      });
-      setComponents((prev) => [...prev, created]);
-      setName("");
-      setCalcBase("");
-      setValue("");
-      showToast(`"${finalName}" component created successfully!`, "success");
+      if (isEditing && editingId !== null) {
+        const updated = await updateSalaryComponent(editingId, {
+          name: finalName,
+          component_type: finalType,
+          type: finalType === "earning" ? "Earning" : "Deduction",
+          calc_type: calcType,
+          calc_base: calcBase.trim() || undefined,
+          value: Number(value) || 0,
+        });
+        setComponents((prev) =>
+          prev.map((c) => (c.id === editingId ? { ...c, ...updated } : c))
+        );
+        handleCancelEdit();
+        showToast(`"${finalName}" component updated successfully!`, "success");
+      } else {
+        const created = await createSalaryComponent({
+          name: finalName,
+          component_type: finalType,
+          type: finalType === "earning" ? "Earning" : "Deduction",
+          calc_type: calcType,
+          calc_base: calcBase.trim() || undefined,
+          value: Number(value) || 0,
+        });
+        setComponents((prev) => [...prev, created]);
+        handleCancelEdit();
+        showToast(`"${finalName}" component created successfully!`, "success");
+      }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to create component", "error");
+      showToast(
+        err instanceof Error ? err.message : `Failed to ${isEditing ? "update" : "create"} component`,
+        "error"
+      );
     } finally {
-      setCreating(false);
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (c: SalaryComponent) => {
+    if (!confirm(`Are you sure you want to delete the "${c.name}" component?`)) {
+      return;
+    }
+    setDeletingId(c.id);
+    try {
+      await deleteSalaryComponent(c.id);
+      setComponents((prev) => prev.filter((item) => item.id !== c.id));
+      if (editingId === c.id) {
+        handleCancelEdit();
+      }
+      showToast(`"${c.name}" deleted successfully!`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete component", "error");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -219,52 +305,84 @@ export default function SalaryComponentsPage() {
         </div>
       </div>
 
-      {/* ── Create Card ── */}
+      {/* ── Create / Edit Card ── */}
       <motion.div
+        ref={formRef}
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.4 }}
-        className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm"
+        className={`bg-white rounded-3xl border overflow-hidden shadow-sm transition-all ${
+          editingId !== null ? "border-indigo-300 ring-2 ring-indigo-200" : "border-slate-200/80"
+        }`}
       >
         {/* Card header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-          <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
-            <Plus className="h-4.5 w-4.5 text-[#5826df]" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800">Add New Component</p>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Create a custom or preset salary component
-            </p>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-5">
-          {/* Presets */}
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2.5">
-              Quick Presets
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {PRESETS.map((p) => (
-                <PresetChip
-                  key={p.name}
-                  preset={p}
-                  used={usedNames.has(p.name.toLowerCase())}
-                  onClick={() => handleCreate(p.name, p.type)}
-                />
-              ))}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border ${
+              editingId !== null
+                ? "bg-indigo-100 border-indigo-200 text-indigo-700"
+                : "bg-indigo-50 border-indigo-100 text-[#5826df]"
+            }`}>
+              {editingId !== null ? (
+                <Pencil className="h-4.5 w-4.5" />
+              ) : (
+                <Plus className="h-4.5 w-4.5" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">
+                {editingId !== null ? "Edit Component" : "Add New Component"}
+              </p>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {editingId !== null
+                  ? `Editing "${name || 'Component'}" — Update attributes below`
+                  : "Create a custom or preset salary component"}
+              </p>
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-100" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">or custom</span>
-            <div className="flex-1 h-px bg-slate-100" />
-          </div>
+          {editingId !== null && (
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all shadow-xs"
+            >
+              <X className="h-3.5 w-3.5 text-slate-400" />
+              Cancel Edit
+            </button>
+          )}
+        </div>
 
-          {/* Custom form */}
+        <div className="p-6 space-y-5">
+          {/* Presets (Only visible when not editing) */}
+          {editingId === null && (
+            <>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2.5">
+                  Quick Presets
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {PRESETS.map((p) => (
+                    <PresetChip
+                      key={p.name}
+                      preset={p}
+                      used={usedNames.has(p.name.toLowerCase())}
+                      onClick={() => handleSave(p.name, p.type)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-slate-100" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">or custom</span>
+                <div className="flex-1 h-px bg-slate-100" />
+              </div>
+            </>
+          )}
+
+          {/* Form */}
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
               {/* Name input */}
@@ -277,8 +395,8 @@ export default function SalaryComponentsPage() {
                   placeholder="e.g. House Rent Allowance"
                   value={name}
                   onChange={(e) => { setName(e.target.value); setFormError(""); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
-                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 transition-all"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                 />
               </div>
 
@@ -318,7 +436,7 @@ export default function SalaryComponentsPage() {
                 <select
                   value={calcType}
                   onChange={(e) => setCalcType(e.target.value as "Fixed" | "Percentage" | "Formula")}
-                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 transition-all h-[42px]"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all h-[42px]"
                 >
                   <option value="Fixed">Fixed Amount (₹)</option>
                   <option value="Percentage">Percentage (%)</option>
@@ -338,7 +456,7 @@ export default function SalaryComponentsPage() {
                   placeholder={calcType === "Percentage" ? "e.g. 12" : "e.g. 5000"}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 transition-all"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                 />
               </div>
 
@@ -352,26 +470,43 @@ export default function SalaryComponentsPage() {
                   placeholder={calcType === "Percentage" ? "e.g. Basic Salary" : calcType === "Formula" ? "e.g. BASIC * 0.40" : "e.g. basic"}
                   value={calcBase}
                   onChange={(e) => setCalcBase(e.target.value)}
-                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 transition-all"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                 />
               </div>
 
-              {/* Submit */}
-              <div className="md:col-span-3 flex justify-end">
+              {/* Submit / Cancel Actions */}
+              <div className="md:col-span-3 flex items-center gap-2 justify-end">
+                {editingId !== null && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 transition-all h-[42px]"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleCreate()}
-                  disabled={creating || !name.trim()}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black text-white transition-all disabled:opacity-50 h-[42px]"
+                  onClick={() => handleSave()}
+                  disabled={submitting || !name.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-white transition-all disabled:opacity-50 h-[42px]"
                   style={{
-                    background: "linear-gradient(135deg, #f97316, #ea580c)",
-                    boxShadow: "0 4px 14px rgba(249,115,22,0.35)",
+                    background: editingId !== null
+                      ? "linear-gradient(135deg, #4f46e5, #4338ca)"
+                      : "linear-gradient(135deg, #f97316, #ea580c)",
+                    boxShadow: editingId !== null
+                      ? "0 4px 14px rgba(79,70,229,0.35)"
+                      : "0 4px 14px rgba(249,115,22,0.35)",
                   }}
                 >
-                  {creating
-                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
-                    : <><Plus className="h-3.5 w-3.5" /> Save Component</>}
+                  {submitting ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {editingId !== null ? "Updating…" : "Saving…"}</>
+                  ) : editingId !== null ? (
+                    <><Pencil className="h-3.5 w-3.5" /> Update Component</>
+                  ) : (
+                    <><Plus className="h-3.5 w-3.5" /> Save Component</>
+                  )}
                 </motion.button>
               </div>
             </div>
@@ -454,25 +589,28 @@ export default function SalaryComponentsPage() {
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 group"
+                      className={`flex items-center justify-between rounded-xl border px-4 py-3 group transition-all ${
+                        editingId === c.id
+                          ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-400 shadow-sm"
+                          : "border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50/80"
+                      }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <div className={`w-2 h-2 rounded-full ${editingId === c.id ? "bg-indigo-500 animate-pulse" : "bg-emerald-400"}`} />
                         <div>
-                          <span className="text-sm font-bold text-slate-800">{c.name}</span>
-                          {(c.calc_type || (c.value !== undefined && c.value !== null)) && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] font-semibold text-slate-500">
-                                {c.calc_type || "Fixed"}
-                                {c.value ? `: ${c.calc_type === "Percentage" ? `${c.value}%` : `₹${c.value}`}` : ""}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-800">{c.name}</span>
+                            {editingId === c.id && (
+                              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                Editing
                               </span>
-                              {c.calc_base && (
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  ({c.calc_base})
-                                </span>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              {formatComponentDisplay(c)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -482,6 +620,31 @@ export default function SalaryComponentsPage() {
                           </span>
                         )}
                         <TypeBadge type="earning" />
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 border-l border-emerald-200/70 pl-2 ml-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(c)}
+                            title="Edit Component"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-slate-200 transition-all"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(c)}
+                            disabled={deletingId === c.id}
+                            title="Delete Component"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all disabled:opacity-50"
+                          >
+                            {deletingId === c.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-500" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   ))
@@ -522,25 +685,28 @@ export default function SalaryComponentsPage() {
                       initial={{ opacity: 0, x: 8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/40 px-4 py-3 group"
+                      className={`flex items-center justify-between rounded-xl border px-4 py-3 group transition-all ${
+                        editingId === c.id
+                          ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-400 shadow-sm"
+                          : "border-red-100 bg-red-50/40 hover:bg-red-50/70"
+                      }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-2 h-2 rounded-full bg-red-400" />
+                        <div className={`w-2 h-2 rounded-full ${editingId === c.id ? "bg-indigo-500 animate-pulse" : "bg-red-400"}`} />
                         <div>
-                          <span className="text-sm font-bold text-slate-800">{c.name}</span>
-                          {(c.calc_type || (c.value !== undefined && c.value !== null)) && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] font-semibold text-slate-500">
-                                {c.calc_type || "Fixed"}
-                                {c.value ? `: ${c.calc_type === "Percentage" ? `${c.value}%` : `₹${c.value}`}` : ""}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-800">{c.name}</span>
+                            {editingId === c.id && (
+                              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                Editing
                               </span>
-                              {c.calc_base && (
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  ({c.calc_base})
-                                </span>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              {formatComponentDisplay(c)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -550,6 +716,31 @@ export default function SalaryComponentsPage() {
                           </span>
                         )}
                         <TypeBadge type="deduction" />
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 border-l border-red-200/70 pl-2 ml-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(c)}
+                            title="Edit Component"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-slate-200 transition-all"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(c)}
+                            disabled={deletingId === c.id}
+                            title="Delete Component"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all disabled:opacity-50"
+                          >
+                            {deletingId === c.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-500" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   ))

@@ -51,6 +51,7 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  suppressHydrationWarning = true,
   children,
   ...props
 }: ButtonProps) {
@@ -61,6 +62,7 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
+      suppressHydrationWarning={suppressHydrationWarning}
       className={cn(buttonVariants({ variant, size, className }))}
       render={render}
       nativeButton={!asChild} // add this after error 

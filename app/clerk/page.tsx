@@ -50,6 +50,7 @@ import type { Admission } from "@/types/clerk";
 import { fetchAdmissions, assignGrNumber } from "@/lib/clerk/admissions";
 import { groupStudentDocuments, type PendingDocItem } from "@/lib/clerk/pending-documents";
 import { StudentDocumentRows } from "@/components/clerk/student-document-rows";
+import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 interface StudentItem {
   id: number;
@@ -331,6 +332,9 @@ export default function ClerkDashboard() {
           </button>
         </div>
       </div>
+
+      {/* ─── Staff Attendance Widget ────────────────────────────────────── */}
+      <StaffAttendanceCard roleName="Clerk / Staff" className="mb-2" />
 
       {/* ─── Search Bar ─────────────────────────────────────────────────── */}
       <div className="relative z-30">
