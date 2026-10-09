@@ -10,6 +10,7 @@ import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
 import { type AnnouncementResponse } from "@/lib/principal";
 import { getCurrentUserProfile } from "@/lib/current-user";
 import { ProfileDialog } from "@/components/profile/profile-dialog";
+import { TrialBanner } from "@/components/subscription/TrialBanner";
 import type { CurrentUserProfile } from "@/types";
 
 export interface SidebarLink {
@@ -601,6 +602,9 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
             </button>
           </div>
         </header>
+
+        {/* Global School Subscription / Free Trial Status Notification (Shown only to School Trustees) */}
+        {roleTitle === "Trustee" && <TrialBanner />}
 
         {/* Content Body */}
         <main className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-5 bg-[#f4f6fb]">

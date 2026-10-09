@@ -6,6 +6,22 @@ export interface SchoolFeature {
   feature_name?: string;
 }
 
+export interface SchoolSubscriptionDetails {
+  id: number;
+  status: string;
+  trial_start_date?: string | null;
+  trial_end_date?: string | null;
+  days_left: number;
+  plan_name?: string;
+  pricing_model: "PER_STUDENT" | "FLAT";
+  monthly_price: number | string;
+  quarterly_price: number | string;
+  half_yearly_price: number | string;
+  yearly_price: number | string;
+  gst_included?: boolean;
+  gst_percentage?: number | string;
+}
+
 export interface School {
   id?: number;
   name: string | null;
@@ -25,6 +41,16 @@ export interface School {
   login_id?: number | null;
   school_features?: SchoolFeature[];
   feature_ids?: number[];
+  trial_start_date?: string | null;
+  trial_end_date?: string | null;
+  pricing_model?: "PER_STUDENT" | "FLAT";
+  monthly_price?: number | string;
+  quarterly_price?: number | string;
+  half_yearly_price?: number | string;
+  yearly_price?: number | string;
+  gst_included?: boolean;
+  gst_percentage?: number | string;
+  subscription_details?: SchoolSubscriptionDetails | null;
 }
 
 export interface CreateSchoolPayload {
@@ -40,6 +66,15 @@ export interface CreateSchoolPayload {
   index_no?: string;
   feature_ids: number[];
   is_active?: boolean;
+  trial_start_date?: string;
+  trial_end_date?: string;
+  pricing_model?: "PER_STUDENT" | "FLAT";
+  monthly_price?: number | string;
+  quarterly_price?: number | string;
+  half_yearly_price?: number | string;
+  yearly_price?: number | string;
+  gst_included?: boolean;
+  gst_percentage?: number | string;
 }
 
 export interface CreateSchoolResponse {

@@ -31,10 +31,26 @@ export const schoolFormSchema = z.object({
     .refine(file => ["image/png", "image/jpeg", "image/webp"].includes(file.type), "Upload a valid PNG, JPEG or WebP image.").nullable().optional(),
   feature_ids: z.array(z.number().int().positive()).min(1, "Select at least one feature.").refine(ids => new Set(ids).size === ids.length, "Duplicate features are not allowed."),
   is_active: z.boolean().optional(),
+  trial_start_date: z.string().optional(),
+  trial_end_date: z.string().optional(),
+  pricing_model: z.enum(["PER_STUDENT", "FLAT"]).optional(),
+  monthly_price: z.union([z.number(), z.string()]).optional(),
+  quarterly_price: z.union([z.number(), z.string()]).optional(),
+  half_yearly_price: z.union([z.number(), z.string()]).optional(),
+  yearly_price: z.union([z.number(), z.string()]).optional(),
+  gst_included: z.boolean().optional(),
+  gst_percentage: z.union([z.number(), z.string()]).optional(),
 }).superRefine((data, ctx) => {
   const indian = ["india", "in", "bharat"].includes(data.country.toLowerCase());
   if (!(indian ? /^[1-9][0-9]{5}$/ : /^[A-Za-z0-9][A-Za-z0-9 -]{1,9}$/).test(data.pincode)) {
     ctx.addIssue({ code: "custom", path: ["pincode"], message: indian ? "Enter a valid 6-digit Indian PIN code." : "Enter a postal code of 2 to 10 letters or numbers." });
+  }
+  if (data.trial_start_date && data.trial_end_date && data.trial_end_date < data.trial_start_date) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["trial_end_date"],
+      message: "Trial Expiration Date cannot be before Trial Start Date.",
+    });
   }
 });
 

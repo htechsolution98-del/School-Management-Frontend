@@ -1367,14 +1367,14 @@ export default function LocationSettingsPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-zinc-200/80 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <LocateFixed className="h-6 w-6 text-indigo-600" />
               Attendance Zone Settings
             </h1>
-            <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200">
+            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200">
               Clerk Portal
             </Badge>
           </div>
@@ -1421,11 +1421,11 @@ export default function LocationSettingsPage() {
 
       {/* Fetch Error Warning */}
       {fetchError && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900/60 p-4">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
-            <p className="font-bold text-xs text-amber-900 dark:text-amber-200">Notice</p>
-            <p className="text-xs text-amber-700 dark:text-amber-300">
+            <p className="font-bold text-xs text-amber-900">Notice</p>
+            <p className="text-xs text-amber-700">
               {fetchError} — You can still configure and save new settings below.
             </p>
           </div>
@@ -1434,7 +1434,7 @@ export default function LocationSettingsPage() {
 
       {/* ── State 1: Loading ── */}
       {pageState === "loading" && (
-        <div className="flex items-center justify-center py-24 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+        <div className="flex items-center justify-center py-24 bg-white rounded-2xl border border-zinc-200/80 shadow-2xs">
           <div className="flex flex-col items-center gap-3 text-slate-500">
             <Loader2 className="h-7 w-7 animate-spin text-indigo-600" />
             <p className="text-xs font-medium">Loading attendance zone settings...</p>
@@ -1456,12 +1456,12 @@ export default function LocationSettingsPage() {
 
       {/* ── State 3: Empty State ── */}
       {pageState === "empty" && (
-        <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-16 flex flex-col items-center gap-5 text-center px-6 shadow-2xs">
-          <div className="h-16 w-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600">
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 flex flex-col items-center gap-5 text-center px-6 shadow-2xs">
+          <div className="h-16 w-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
             <MapPin className="h-8 w-8" />
           </div>
           <div className="space-y-1.5 max-w-md">
-            <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100">
+            <h3 className="text-base font-bold text-slate-900">
               No Attendance Zone Configured
             </h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
