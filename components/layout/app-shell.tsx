@@ -42,11 +42,31 @@ const ROLE_ALLOWED_MAP: Record<string, string[]> = {
   "Super Admin": ["super_admin", "superadmin"],
   Trustee: ["admin(trustee)", "trustee", "super_admin", "superadmin"],
   Principal: ["principal", "super_admin", "superadmin"],
-  Clerk: ["clerk", "fees_clerk", "principal", "super_admin", "superadmin"],
+  Clerk: [
+    "clerk",
+    "fees_clerk",
+    "assistant clerk",
+    "assistant_clerk",
+    "assistantclerk",
+    "principal",
+    "super_admin",
+    "superadmin",
+  ],
   Teacher: ["teacher", "principal", "super_admin", "superadmin"],
   Librarian: ["librarian", "principal", "super_admin", "superadmin"],
   Inventory: ["inventory", "principal", "super_admin", "superadmin"],
-  Fees: ["fees management", "fees", "fees_clerk", "clerk", "principal", "super_admin", "superadmin"],
+  Fees: [
+    "fees management",
+    "fees",
+    "fees_clerk",
+    "clerk",
+    "assistant clerk",
+    "assistant_clerk",
+    "assistantclerk",
+    "principal",
+    "super_admin",
+    "superadmin",
+  ],
   Student: ["student", "principal", "super_admin", "superadmin"],
   Parent: ["parents", "parent", "principal", "super_admin", "superadmin"],
   Applicant: ["temp_user", "user", "super_admin", "superadmin"],
@@ -184,14 +204,37 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
 
   const getBadgeColor = (title: string, index: number) => {
     const lower = title.toLowerCase().trim();
-    if (lower.includes("dashboard")) return "bg-indigo-500 text-white";
+    if (lower === "dashboard") return "bg-indigo-500 text-white";
+    if (lower.includes("academic year")) return "bg-[#3b82f6] text-white";
+    if (lower.includes("result dashboard")) return "bg-[#6366f1] text-white";
+    if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#8b5cf6] text-white";
+    
+    // Exam Management
+    if (lower === "exam management") return "bg-[#ec4899] text-white";
+    if (lower.includes("exam config") || lower.includes("configuration")) return "bg-[#64748b] text-white";
+    if (lower.includes("exam schedule")) return "bg-[#06b6d4] text-white";
+    if (lower.includes("exam timetable") || lower === "exam timetable") return "bg-[#38bdf8] text-white";
+    if (lower.includes("seating")) return "bg-[#f97316] text-white";
+
+    // Marks Management
+    if (lower === "marks management" || lower.includes("marks entry")) return "bg-[#10b981] text-white";
+    if (lower.includes("marks overview")) return "bg-[#14b8a6] text-white";
+    if (lower.includes("marks verification") || lower.includes("class verification")) return "bg-[#22c55e] text-white";
+    if (lower.includes("teacher assessment") || lower === "teacher assessment") return "bg-[#f59e0b] text-white";
+
+    // Result Processing
+    if (lower === "result processing") return "bg-[#e11d48] text-white";
+    if (lower.includes("result preview")) return "bg-[#3b82f6] text-white";
+    if (lower.includes("result verification")) return "bg-[#a855f7] text-white";
+    if (lower.includes("result publish") || lower === "result publish") return "bg-[#06b6d4] text-white";
+    if (lower.includes("published result") || lower.includes("progress report")) return "bg-[#f59e0b] text-white";
+
     if (lower.includes("generate salary") || lower.includes("generate-salary")) return "bg-[#f43f5e] text-white";
     if (lower.includes("salary component") || lower.includes("component")) return "bg-[#10b981] text-white";
     if (lower.includes("staff salary")) return "bg-[#f97316] text-white";
     if (lower.includes("certificate") || lower.includes("g.r.") || lower.includes("award") || lower.includes("docs")) return "bg-[#fbbf24] text-white";
     if (lower.includes("hr") || lower.includes("staff") || lower.includes("department")) return "bg-[#06b6d4] text-white";
     if (lower.includes("admission") || lower.includes("applicant") || lower.includes("student directory") || lower.includes("students")) return "bg-[#f43f5e] text-white";
-    if (lower.includes("academic year")) return "bg-[#3b82f6] text-white";
     if (lower.includes("fee type")) return "bg-[#ec4899] text-white";
     if (lower.includes("fee structure")) return "bg-[#8b5cf6] text-white";
     if (lower.includes("generate fee") || lower.includes("genrate fee")) return "bg-[#10b981] text-white";

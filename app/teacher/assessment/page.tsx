@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -84,7 +85,7 @@ export default function TeacherAssessmentPage() {
     try {
       let url = `/api/get-student/?school_class=${classId}`;
       if (division) {
-        url += `&division=${division}`;
+        url += `&division=${encodeURIComponent(division)}`;
       }
       
       const [studentsData, existingData] = await Promise.all([
@@ -125,7 +126,16 @@ export default function TeacherAssessmentPage() {
         }
       }
 
-      setStudentRows(mappedMarks);
+      const sortedMarks = mappedMarks.sort((a, b) => {
+        const rollA = parseInt(a.roll_no || "", 10);
+        const rollB = parseInt(b.roll_no || "", 10);
+        if (!isNaN(rollA) && !isNaN(rollB)) return rollA - rollB;
+        if (!isNaN(rollA)) return -1;
+        if (!isNaN(rollB)) return 1;
+        return (a.student_name || "").localeCompare(b.student_name || "");
+      });
+
+      setStudentRows(sortedMarks);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load students.");
     } finally {
@@ -206,16 +216,23 @@ export default function TeacherAssessmentPage() {
   );
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+    <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
-            <Users className="h-6 w-6 text-indigo-600" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8] shrink-0 mt-0.5">
+            <Users className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Teacher Assessment</h1>
-            <p className="text-sm text-slate-500 font-medium mt-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100">
+                Teacher Assessment
+              </h1>
+              <Badge className="bg-purple-50 text-[#5c28e8] border-purple-200 font-semibold text-[11px]">
+                Teacher Module
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
               {step === "YEAR" && "Select an academic year to continue."}
               {step === "CLASS" && "Select a class to enter assessment scores."}
               {step === "SUBJECT" && `Select a subject for ${selectedClass?.class_name} ${selectedClass?.division_name || ""}.`}
@@ -231,9 +248,9 @@ export default function TeacherAssessmentPage() {
               if (step === "SUBJECT") setStep("CLASS");
               if (step === "ENTRY") setStep("SUBJECT");
             }}
-            className="rounded-xl h-10 px-4 font-bold border-zinc-200 hover:bg-zinc-50"
+            className="rounded-xl h-10 px-4 font-bold border-gray-200 hover:bg-slate-50 text-xs gap-1.5"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
         )}
@@ -241,7 +258,7 @@ export default function TeacherAssessmentPage() {
 
       {isLoading && step !== "ENTRY" ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#5c28e8]" />
           <p className="text-slate-500 mt-4 text-sm font-medium">Loading data...</p>
         </div>
       ) : (
@@ -251,19 +268,19 @@ export default function TeacherAssessmentPage() {
               {academicYears.map((year) => (
                 <Card 
                   key={year.id} 
-                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-zinc-200/80 hover:border-indigo-300 bg-white"
+                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-gray-200/80 hover:border-purple-300 bg-white rounded-2xl shadow-sm"
                   onClick={() => handleYearSelect(year)}
                 >
                   <CardContent className="p-6 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center">
-                        <Calendar className="h-6 w-6 text-indigo-600" />
+                      <div className="h-12 w-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8]">
+                        <Calendar className="h-6 w-6 text-[#5c28e8]" />
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-900">{year.name}</h3>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] transition-colors" />
                   </CardContent>
                 </Card>
               ))}
@@ -275,25 +292,25 @@ export default function TeacherAssessmentPage() {
               {uniqueClasses.map((cls, idx) => (
                 <Card 
                   key={idx} 
-                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-zinc-200/80 hover:border-emerald-300 bg-white"
+                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-gray-200/80 hover:border-purple-300 bg-white rounded-2xl shadow-sm"
                   onClick={() => handleClassSelect(cls.class_name, cls.division_name, cls.class_id)}
                 >
                   <CardContent className="p-6 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
-                        <GraduationCap className="h-6 w-6 text-emerald-600" />
+                      <div className="h-12 w-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8]">
+                        <GraduationCap className="h-6 w-6 text-[#5c28e8]" />
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-900">{cls.class_name}</h3>
                         {cls.division_name && <p className="text-xs text-slate-500 font-medium mt-0.5">Division {cls.division_name}</p>}
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] transition-colors" />
                   </CardContent>
                 </Card>
               ))}
               {uniqueClasses.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed">
+                <div className="col-span-full py-12 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed border-gray-200">
                   You are not assigned to any classes.
                 </div>
               )}
@@ -305,24 +322,24 @@ export default function TeacherAssessmentPage() {
               {classSubjects.map((sub, idx) => (
                 <Card 
                   key={idx} 
-                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-zinc-200/80 hover:border-amber-300 bg-white"
+                  className="group cursor-pointer hover:shadow-md transition-all duration-300 border-gray-200/80 hover:border-purple-300 bg-white rounded-2xl shadow-sm"
                   onClick={() => handleSubjectSelect(sub.subject, sub.subject_name || "Unknown")}
                 >
                   <CardContent className="p-6 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center">
-                        <BookOpen className="h-6 w-6 text-amber-600" />
+                      <div className="h-12 w-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8]">
+                        <BookOpen className="h-6 w-6 text-[#5c28e8]" />
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-900">{sub.subject_name}</h3>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-amber-600 transition-colors" />
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] transition-colors" />
                   </CardContent>
                 </Card>
               ))}
               {classSubjects.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed">
+                <div className="col-span-full py-12 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed border-gray-200">
                   No subjects found for this class.
                 </div>
               )}
@@ -331,7 +348,7 @@ export default function TeacherAssessmentPage() {
 
           {step === "ENTRY" && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-sm">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm font-bold text-slate-700">Max Score (From Principal config):</span>
                   <Input 
@@ -339,26 +356,24 @@ export default function TeacherAssessmentPage() {
                     value={globalMaxScore} 
                     onChange={(e) => handleGlobalMaxScoreChange(e.target.value)}
                     disabled={hasExistingScores && !isEditMode}
-                    className="w-24 h-9 font-bold bg-slate-50 border-zinc-300 text-indigo-700" 
+                    className="w-24 h-10 font-bold bg-slate-50 border-gray-200 text-[#5c28e8] rounded-xl text-center" 
                   />
                   <p className="text-xs text-slate-500 font-medium">Set max score as per Principal's guidelines</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {hasExistingScores && !isEditMode && (
                     <Button
-                      size="sm"
                       variant="outline"
                       onClick={() => setIsEditMode(true)}
-                      className="rounded-xl text-xs gap-1.5 font-bold shadow-xs"
+                      className="rounded-xl text-xs gap-1.5 font-bold h-10 px-4 border-gray-200"
                     >
                       Edit Scores
                     </Button>
                   )}
                   <Button
-                    size="sm"
                     onClick={handleSaveScores}
                     disabled={isSaving || studentRows.length === 0 || (hasExistingScores && !isEditMode)}
-                    className="rounded-xl text-xs gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                    className="rounded-xl text-xs gap-1.5 font-bold h-10 px-5 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20"
                   >
                     {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     {hasExistingScores ? (isEditMode ? "Update Scores" : "Scores Saved") : "Save Scores"}
@@ -366,30 +381,30 @@ export default function TeacherAssessmentPage() {
                 </div>
               </div>
 
-              <Card className="rounded-2xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
+              <Card className="rounded-2xl border border-gray-200/80 bg-white shadow-sm overflow-hidden">
                 {isLoading ? (
                   <div className="p-12 text-center flex flex-col items-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-2" />
+                    <Loader2 className="h-8 w-8 animate-spin text-[#5c28e8] mb-2" />
                     <p className="text-xs text-slate-500">Loading students...</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-slate-50/80 border-b border-gray-100">
                         <TableRow>
-                          <TableHead className="w-12 text-center font-bold text-xs">#</TableHead>
-                          <TableHead className="w-24 font-bold text-xs">Roll No.</TableHead>
-                          <TableHead className="w-28 font-bold text-xs">GR No.</TableHead>
-                          <TableHead className="font-bold text-xs">Student Name</TableHead>
-                          <TableHead className="w-36 text-center font-bold text-xs">Score (out of {globalMaxScore})</TableHead>
-                          <TableHead className="w-64 font-bold text-xs">Remarks</TableHead>
+                          <TableHead className="w-12 text-center font-bold text-xs uppercase tracking-wider text-slate-500">#</TableHead>
+                          <TableHead className="w-24 font-bold text-xs uppercase tracking-wider text-slate-500">Roll No.</TableHead>
+                          <TableHead className="w-28 font-bold text-xs uppercase tracking-wider text-slate-500">GR No.</TableHead>
+                          <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Student Name</TableHead>
+                          <TableHead className="w-36 text-center font-bold text-xs uppercase tracking-wider text-slate-500">Score (out of {globalMaxScore})</TableHead>
+                          <TableHead className="w-64 font-bold text-xs uppercase tracking-wider text-slate-500">Remarks</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {studentRows.map((st, idx) => (
-                          <TableRow key={st.student_id}>
+                          <TableRow key={st.student_id} className="hover:bg-slate-50/50">
                             <TableCell className="text-center font-mono text-xs text-slate-500">{idx + 1}</TableCell>
-                            <TableCell className="text-xs font-mono font-bold text-indigo-600">{st.roll_no || "—"}</TableCell>
+                            <TableCell className="text-xs font-mono font-bold text-[#5c28e8]">{st.roll_no || "—"}</TableCell>
                             <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
                             <TableCell className="text-xs font-bold text-slate-900">{st.student_name}</TableCell>
                             <TableCell>
@@ -401,7 +416,7 @@ export default function TeacherAssessmentPage() {
                                 disabled={hasExistingScores && !isEditMode}
                                 value={st.score}
                                 onChange={(e) => handleScoreChange(st.student_id, "score", e.target.value)}
-                                className="h-8 text-center font-bold bg-white text-xs"
+                                className="h-9 text-center font-bold bg-white text-xs rounded-xl border-gray-200 text-[#5c28e8]"
                               />
                             </TableCell>
                             <TableCell>
@@ -410,7 +425,7 @@ export default function TeacherAssessmentPage() {
                                 disabled={hasExistingScores && !isEditMode}
                                 value={st.remarks || ""}
                                 onChange={(e) => handleScoreChange(st.student_id, "remarks", e.target.value)}
-                                className="h-8 text-xs bg-white"
+                                className="h-9 text-xs bg-white rounded-xl border-gray-200"
                               />
                             </TableCell>
                           </TableRow>

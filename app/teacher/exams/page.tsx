@@ -167,6 +167,11 @@ export default function TeacherExamsPage() {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [rosterMeta, setRosterMeta] = useState<{ is_class_teacher: boolean; status: string; can_edit: boolean }>({
+    is_class_teacher: false,
+    status: "DRAFT",
+    can_edit: true,
+  });
   const [maxMarks, setMaxMarks] = useState<number>(50);
   const [savingMarks, setSavingMarks] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -258,6 +263,12 @@ export default function TeacherExamsPage() {
       const rosterRes = await getExamRoster(exam.id);
       const rawList = rosterRes.roster || [];
 
+      setRosterMeta({
+        is_class_teacher: rosterRes.is_class_teacher ?? false,
+        status: rosterRes.status ?? "DRAFT",
+        can_edit: rosterRes.can_edit ?? true,
+      });
+
       // Normalize entry fields — API might use different field names
       const list: RosterEntry[] = rawList.map((r: any) => ({
         student: r.student ?? r.student_id ?? r.id ?? 0,
@@ -278,6 +289,7 @@ export default function TeacherExamsPage() {
         max_marks: r.max_marks !== undefined ? r.max_marks : null,
         is_absent: r.is_absent === true || r.is_absent === "True",
         remarks: r.remarks ?? r.comment ?? r.remark ?? null,
+        status: r.status ?? "DRAFT",
         is_published: r.is_published === true || r.is_published === "True",
       }));
 
@@ -447,7 +459,7 @@ export default function TeacherExamsPage() {
   };
 
   // Save Roster Marks
-  const handleSaveMarks = async () => {
+  const handleSaveMarks = async (targetStatus: "DRAFT" | "SUBMITTED" = "DRAFT") => {
     if (!selectedExam) return;
     setSavingMarks(true);
 
@@ -462,19 +474,25 @@ export default function TeacherExamsPage() {
       const payload: BulkSavePayload = {
         exam: selectedExam.id,
         max_marks: maxMarks,
+        status: targetStatus,
         entries: roster.map((r) => ({
           student: r.student,
           marks_obtained: r.is_absent ? 0 : Number(r.marks_obtained || 0),
           is_absent: r.is_absent ? "True" : "False",
           remarks: r.remarks || "",
+          status: targetStatus,
         })),
       };
 
       await bulkSaveMarks(payload);
-      toast.success("Marks saved successfully!");
+      toast.success(
+        targetStatus === "SUBMITTED"
+          ? "Marks submitted to Class Teacher successfully!"
+          : "Draft marks saved successfully!"
+      );
       
       // Re-load roster to sync values
-      loadExamRoster(selectedExam);
+      await loadExamRoster(selectedExam);
     } catch (err: any) {
       toast.error(err?.message || "Failed to save exam marks.");
     } finally {
@@ -498,23 +516,25 @@ export default function TeacherExamsPage() {
       const savePayload: BulkSavePayload = {
         exam: selectedExam.id,
         max_marks: maxMarks,
+        status: "VERIFIED",
         entries: roster.map((r) => ({
           student: r.student,
           marks_obtained: r.is_absent ? 0 : Number(r.marks_obtained || 0),
           is_absent: r.is_absent ? "True" : "False",
           remarks: r.remarks || "",
+          status: "VERIFIED",
         })),
       };
 
-      // Autosave draft marks
+      // Autosave verified marks
       await bulkSaveMarks(savePayload);
 
       // Publish results
       await publishResults(selectedExam.id);
-      toast.success("Marks saved and results published successfully!");
+      toast.success("Marks verified and results published successfully!");
       
       // Re-load roster to sync state
-      loadExamRoster(selectedExam);
+      await loadExamRoster(selectedExam);
     } catch (err: any) {
       toast.error(err?.message || "Failed to publish exam results.");
     } finally {
@@ -642,17 +662,17 @@ export default function TeacherExamsPage() {
       `}</style>
 
       {/* Background Decorative Blur Blobs */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl pointer-events-none animate-pulse-slow" />
-      <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none animate-pulse-slow" />
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
 
       {view === "list" ? (
         <>
           {/* Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 z-10">
             <div>
-              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Timetable Manager</p>
+              <p className="text-[11px] font-bold text-[#5c28e8] uppercase tracking-widest">Timetable Manager</p>
               <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-                <CalendarRange className="text-indigo-600 h-8 w-8" />
+                <CalendarRange className="text-[#5c28e8] h-8 w-8" />
                 Exam Timetable
               </h1>
               <p className="text-slate-400 text-sm mt-1">
@@ -664,7 +684,7 @@ export default function TeacherExamsPage() {
               <Link href="/teacher/exams/class-teacher">
                 <Button
                   variant="outline"
-                  className="flex items-center gap-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl shadow-sm px-4 h-11 font-bold transition-all duration-300"
+                  className="flex items-center gap-2 border-purple-200 bg-purple-50 hover:bg-purple-100 text-[#5c28e8] rounded-xl shadow-sm px-4 h-11 font-bold transition-all duration-300"
                 >
                   <Users size={16} />
                   Class Teacher View
@@ -678,7 +698,7 @@ export default function TeacherExamsPage() {
                 className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 rounded-xl shadow-sm px-4 h-11 transition-all duration-300 font-semibold text-slate-600"
               >
                 {isLoading ? (
-                  <Loader2 size={16} className="animate-spin text-indigo-600" />
+                  <Loader2 size={16} className="animate-spin text-[#5c28e8]" />
                 ) : (
                   <RefreshCw size={16} className="text-slate-500" />
                 )}
@@ -687,7 +707,7 @@ export default function TeacherExamsPage() {
 
               <Button
                 onClick={() => setShowScheduleModal(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl shadow-md px-5 h-11 font-bold transition-all duration-300"
+                className="flex items-center gap-2 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl shadow-md shadow-purple-500/20 px-5 h-11 font-bold transition-all duration-300"
               >
                 <Plus size={16} />
                 Schedule Exam
@@ -1002,33 +1022,69 @@ export default function TeacherExamsPage() {
                 <ArrowLeft size={16} className="text-slate-600" />
               </Button>
               <div>
-                <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">
-                  Class Group: {selectedExam?.class_group_name}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">
+                    Class Group: {selectedExam?.class_group_name}
+                  </span>
+                  {rosterMeta.is_class_teacher && (
+                    <span className="bg-purple-100 text-[#5c28e8] text-[10px] font-bold px-2 py-0.5 rounded-md">
+                      Class Teacher
+                    </span>
+                  )}
+                  {rosterMeta.status === "SUBMITTED" && (
+                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                      Submitted to Class Teacher
+                    </span>
+                  )}
+                  {rosterMeta.status === "VERIFIED" && (
+                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                      Verified & Locked
+                    </span>
+                  )}
+                </div>
                 <h1 className="text-2xl font-black text-slate-800 leading-tight">
                   {selectedExam?.title} Results
                 </h1>
                 <p className="text-slate-400 text-xs mt-0.5">
-                  Enter evaluations, grade marks, and publish results to student cards.
+                  {rosterMeta.is_class_teacher
+                    ? "As Class Teacher, you have full authority to edit, save, and submit/publish class marks."
+                    : "Subject teachers can edit and save draft marks until submitted to the Class Teacher."}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2.5 self-start sm:self-auto">
-              <Button
-                onClick={handlePublishResults}
-                disabled={publishing || isRosterPublished || roster.length === 0}
-                className="h-11 px-5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md hover:shadow-lg disabled:opacity-50"
-              >
-                {publishing ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Check size={15} />
-                )}
-                {isRosterPublished ? "Published" : "Publish Results"}
-              </Button>
+              {rosterMeta.is_class_teacher && (
+                <Button
+                  onClick={handlePublishResults}
+                  disabled={publishing || isRosterPublished || roster.length === 0}
+                  className="h-11 px-5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md hover:shadow-lg disabled:opacity-50"
+                >
+                  {publishing ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Check size={15} />
+                  )}
+                  {isRosterPublished ? "Published" : "Publish Results"}
+                </Button>
+              )}
             </div>
           </div>
+
+          {/* Locked Status Notice for Subject Teachers */}
+          {(!rosterMeta.can_edit || (rosterMeta.status === "SUBMITTED" || rosterMeta.status === "VERIFIED")) && !rosterMeta.is_class_teacher && (
+            <div className="flex items-start gap-3 p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-900 text-xs">
+              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-950">
+                  Marks Submitted to Class Teacher (Read Only)
+                </p>
+                <p className="text-amber-800 mt-0.5">
+                  You have submitted these subject marks to the Class Teacher. Subject teachers can only edit marks until submission. All update and verification authority is now with the Class Teacher.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Config & Controls Box */}
           <Card className="border-slate-100 shadow-sm rounded-2xl bg-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1037,7 +1093,7 @@ export default function TeacherExamsPage() {
               <Input
                 type="number"
                 value={maxMarks}
-                disabled={isRosterPublished}
+                disabled={isRosterPublished || !rosterMeta.can_edit}
                 onChange={(e) => setMaxMarks(Math.max(1, Number(e.target.value)))}
                 className="w-24 h-11 text-center font-extrabold focus-visible:ring-indigo-500/50 border-slate-200 text-slate-800 rounded-xl"
               />
@@ -1108,64 +1164,67 @@ export default function TeacherExamsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {roster.map((row) => (
-                      <tr key={row.student} className="hover:bg-slate-50/40 transition-colors">
-                        {/* GR Number */}
-                        <td className="px-6 py-4 font-bold text-slate-400 tracking-wider">
-                          {row.gr_no || "—"}
-                        </td>
-                        
-                        {/* Student Name */}
-                        <td className="px-6 py-4 font-bold text-slate-800 capitalize">
-                          {row.student_name}
-                        </td>
-                        
-                        {/* Absent Toggle Checkbox */}
-                        <td className="px-6 py-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={row.is_absent}
-                            disabled={isRosterPublished}
-                            onChange={(e) => updateRosterRow(row.student, { is_absent: e.target.checked })}
-                            className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/50 cursor-pointer disabled:cursor-not-allowed"
-                          />
-                        </td>
-                        
-                        {/* Marks Obtained Input */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={maxMarks}
-                              value={row.marks_obtained !== null ? row.marks_obtained : ""}
-                              disabled={row.is_absent || isRosterPublished}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? 0 : Number(e.target.value);
-                                updateRosterRow(row.student, { marks_obtained: val });
-                              }}
-                              className={`w-20 text-center font-extrabold h-9 rounded-xl focus-visible:ring-indigo-500/50 ${
-                                row.marks_obtained !== null && row.marks_obtained > maxMarks
-                                  ? "border-rose-300 bg-rose-50/30 text-rose-600"
-                                  : "border-slate-200 text-slate-800"
-                              }`}
+                    {roster.map((row) => {
+                      const isInputDisabled = isRosterPublished || !rosterMeta.can_edit;
+                      return (
+                        <tr key={row.student} className="hover:bg-slate-50/40 transition-colors">
+                          {/* GR Number */}
+                          <td className="px-6 py-4 font-bold text-slate-400 tracking-wider">
+                            {row.gr_no || "—"}
+                          </td>
+                          
+                          {/* Student Name */}
+                          <td className="px-6 py-4 font-bold text-slate-800 capitalize">
+                            {row.student_name}
+                          </td>
+                          
+                          {/* Absent Toggle Checkbox */}
+                          <td className="px-6 py-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={row.is_absent}
+                              disabled={isInputDisabled}
+                              onChange={(e) => updateRosterRow(row.student, { is_absent: e.target.checked })}
+                              className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/50 cursor-pointer disabled:cursor-not-allowed"
                             />
-                            <span className="text-slate-400 font-bold">/ {maxMarks}</span>
-                          </div>
-                        </td>
-                        
-                        {/* Remarks Input */}
-                        <td className="px-6 py-4">
-                          <Input
-                            placeholder="e.g. Good progress, outstanding work"
-                            value={row.remarks || ""}
-                            disabled={isRosterPublished}
-                            onChange={(e) => updateRosterRow(row.student, { remarks: e.target.value })}
-                            className="h-9 focus-visible:ring-indigo-500/50 border-slate-200 rounded-xl"
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          
+                          {/* Marks Obtained Input */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={maxMarks}
+                                value={row.marks_obtained !== null ? row.marks_obtained : ""}
+                                disabled={row.is_absent || isInputDisabled}
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? 0 : Number(e.target.value);
+                                  updateRosterRow(row.student, { marks_obtained: val });
+                                }}
+                                className={`w-20 text-center font-extrabold h-9 rounded-xl focus-visible:ring-indigo-500/50 ${
+                                  row.marks_obtained !== null && row.marks_obtained > maxMarks
+                                    ? "border-rose-300 bg-rose-50/30 text-rose-600"
+                                    : "border-slate-200 text-slate-800"
+                                }`}
+                              />
+                              <span className="text-slate-400 font-bold">/ {maxMarks}</span>
+                            </div>
+                          </td>
+                          
+                          {/* Remarks Input */}
+                          <td className="px-6 py-4">
+                            <Input
+                              placeholder="e.g. Good progress, outstanding work"
+                              value={row.remarks || ""}
+                              disabled={isInputDisabled}
+                              onChange={(e) => updateRosterRow(row.student, { remarks: e.target.value })}
+                              className="h-9 focus-visible:ring-indigo-500/50 border-slate-200 rounded-xl"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1180,21 +1239,41 @@ export default function TeacherExamsPage() {
                 onClick={() => setView("list")}
                 className="h-11 rounded-xl px-6 font-semibold text-slate-600 border-slate-200 bg-white hover:bg-slate-50"
               >
-                Cancel
+                Back to List
               </Button>
               
-              <Button
-                onClick={handleSaveMarks}
-                disabled={savingMarks || rosterLoading}
-                className="h-11 px-6 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-md hover:shadow-lg disabled:opacity-50"
-              >
-                {savingMarks ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Save size={15} />
-                )}
-                Save Draft Marks
-              </Button>
+              {rosterMeta.can_edit && (
+                <>
+                  {/* Save Draft Marks button */}
+                  <Button
+                    onClick={() => handleSaveMarks("DRAFT")}
+                    disabled={savingMarks || rosterLoading}
+                    variant="outline"
+                    className="h-11 px-5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-200 shadow-sm disabled:opacity-50"
+                  >
+                    {savingMarks ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Save size={15} />
+                    )}
+                    Save Draft Marks
+                  </Button>
+
+                  {/* Submit Marks Button */}
+                  <Button
+                    onClick={() => handleSaveMarks("SUBMITTED")}
+                    disabled={savingMarks || rosterLoading}
+                    className="h-11 px-6 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-[#5c28e8] hover:bg-[#4d20cb] shadow-md shadow-purple-500/20 disabled:opacity-50"
+                  >
+                    {savingMarks ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={15} />
+                    )}
+                    {rosterMeta.is_class_teacher ? "Submit Marks" : "Submit Marks to Class Teacher"}
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1253,7 +1332,7 @@ export default function TeacherExamsPage() {
                   placeholder="e.g. Mid-Term Chemistry Evaluation"
                   value={formData.title}
                   onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  className="rounded-xl h-11 focus-visible:ring-indigo-500/50 border-slate-200"
+                  className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200"
                 />
               </div>
 
@@ -1264,7 +1343,7 @@ export default function TeacherExamsPage() {
                   placeholder="e.g. 50 Marks MCQ test covering chapters 1 to 4. Standard calculator allowed."
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  className="rounded-xl min-h-[80px] resize-none focus-visible:ring-indigo-500/50 border-slate-200 text-xs"
+                  className="rounded-xl min-h-[80px] resize-none focus-visible:ring-purple-500/50 border-slate-200 text-xs"
                 />
               </div>
 
@@ -1275,7 +1354,7 @@ export default function TeacherExamsPage() {
                   <select
                     value={formData.class_group}
                     onChange={(e) => handleClassChange(e.target.value)}
-                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
                   >
                     <option value="">Select Class</option>
                     {classes.map((cls) => (
@@ -1292,7 +1371,7 @@ export default function TeacherExamsPage() {
                     value={formData.subject}
                     onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
                     disabled={!formData.class_group || formSubjectsLoading}
-                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer disabled:opacity-50"
+                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer disabled:opacity-50"
                   >
                     <option value="">
                       {formSubjectsLoading
@@ -1316,10 +1395,10 @@ export default function TeacherExamsPage() {
                 <div className="relative">
                   <Input
                     type="date"
-                    min={getTomorrowDateString()} // getTomorrowDateString outputs YYYY-MM-DD which is correct for HTML min attribute
+                    min={getTomorrowDateString()}
                     value={toHTMLDate(formData.exam_date)}
                     onChange={(e) => setFormData((prev) => ({ ...prev, exam_date: toApiDate(e.target.value) }))}
-                    className="rounded-xl h-11 focus-visible:ring-indigo-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
+                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
                   />
                 </div>
               </div>
@@ -1341,7 +1420,7 @@ export default function TeacherExamsPage() {
                         return next;
                       });
                     }}
-                    className="rounded-xl h-11 focus-visible:ring-indigo-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
+                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
                   />
                 </div>
 
@@ -1352,7 +1431,7 @@ export default function TeacherExamsPage() {
                     min={formData.start_time}
                     value={formData.end_time}
                     onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
-                    className="rounded-xl h-11 focus-visible:ring-indigo-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
+                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
                   />
                 </div>
               </div>
@@ -1367,7 +1446,7 @@ export default function TeacherExamsPage() {
                   <div className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold w-fit animate-fade-in ${
                     isOverLimit 
                       ? "bg-rose-50 border-rose-100 text-rose-600" 
-                      : "bg-indigo-50/60 border border-indigo-100 text-indigo-600"
+                      : "bg-purple-50/60 border border-purple-100 text-[#5c28e8]"
                   }`}>
                     {isOverLimit ? (
                       <>
@@ -1376,7 +1455,7 @@ export default function TeacherExamsPage() {
                       </>
                     ) : (
                       <>
-                        <Clock size={13} className="text-indigo-500 shrink-0" />
+                        <Clock size={13} className="text-[#5c28e8] shrink-0" />
                         <span>Total Duration: {calculateDuration(formData.start_time, formData.end_time)}</span>
                       </>
                     )}
@@ -1411,7 +1490,7 @@ export default function TeacherExamsPage() {
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl h-11 font-bold shadow-md hover:shadow-lg transition-all"
+                  className="flex-1 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl h-11 font-bold shadow-md shadow-purple-500/20 transition-all"
                 >
                   {submitting ? (
                     <>

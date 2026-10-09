@@ -405,12 +405,20 @@ export async function logoutUser(): Promise<void> {
 // ─── Role → Route ─────────────────────────────────────────────────────────────
 
 export function getDashboardRoute(roles: string[]): string {
-  const normalizedRoles = (roles || []).map((r) => (r || "").toLowerCase());
-  if (normalizedRoles.includes("super_admin")) return "/superadmin";
+  const normalizedRoles = (roles || []).map((r) => (r || "").toLowerCase().trim());
+  if (normalizedRoles.includes("super_admin") || normalizedRoles.includes("superadmin")) return "/superadmin";
   if (normalizedRoles.includes("admin(trustee)") || normalizedRoles.includes("trustee")) return "/trustee";
   if (normalizedRoles.includes("principal")) return "/principal";
   if (normalizedRoles.includes("librarian")) return "/librarian";
-  if (normalizedRoles.includes("clerk") || normalizedRoles.includes("fees_clerk")) return "/clerk";
+  if (
+    normalizedRoles.includes("clerk") ||
+    normalizedRoles.includes("fees_clerk") ||
+    normalizedRoles.includes("assistant clerk") ||
+    normalizedRoles.includes("assistant_clerk") ||
+    normalizedRoles.includes("assistantclerk")
+  ) {
+    return "/clerk";
+  }
   if (normalizedRoles.includes("inventory")) return "/inventory";
   if (normalizedRoles.includes("temp_user")) return "/user";
   if (normalizedRoles.includes("fees management") || normalizedRoles.includes("fees")) return "/fees";

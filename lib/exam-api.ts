@@ -31,6 +31,8 @@ export interface ResultWeightageConfig {
   school: number;
   academic_year: number;
   academic_year_name: string;
+  school_class?: number | null;
+  school_class_name?: string | null;
   title: string;
   status: "DRAFT" | "ACTIVE" | "LOCKED";
   is_active: boolean;
@@ -133,19 +135,25 @@ export interface FinalStudentResult {
 }
 
 // APIs
-export async function getWeightageConfigs(academicYearId?: number): Promise<ResultWeightageConfig[]> {
-  const query = academicYearId ? `?academic_year=${academicYearId}` : "";
+export async function getWeightageConfigs(academicYearId?: number, schoolClassId?: number | string | null): Promise<ResultWeightageConfig[]> {
+  const queryParts: string[] = [];
+  if (academicYearId) queryParts.push(`academic_year=${academicYearId}`);
+  if (schoolClassId !== undefined && schoolClassId !== null) {
+    queryParts.push(`school_class=${schoolClassId}`);
+  }
+  const query = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
   const res = await apiFetch(`/api/result-weightage/${query}`);
   if (Array.isArray(res)) return res;
   return res?.results || [];
 }
 
-export async function createWeightageConfig(academicYearId: number, title?: string): Promise<ResultWeightageConfig> {
+export async function createWeightageConfig(academicYearId: number, schoolClassId?: number | null, title?: string): Promise<ResultWeightageConfig> {
   return await apiFetch("/api/result-weightage/", {
     method: "POST",
     body: JSON.stringify({
       academic_year: academicYearId,
-      title: title || "Academic Year Weightage",
+      school_class: schoolClassId || null,
+      title: title || (schoolClassId ? "Class-Specific Weightage" : "Academic Year Weightage"),
     }),
   });
 }
@@ -242,21 +250,51 @@ export async function autoGenerateSeating(examId: number) {
   });
 }
 
-export async function getSeatingAllocations(params: { examId?: number, academicYearId?: number, title?: string }): Promise<SeatingRecord[]> {
+export async function getSeatingAllocations(params: {
+  examId?: number;
+  academicYearId?: number;
+  title?: string;
+  classId?: number | string;
+  division?: string;
+}): Promise<SeatingRecord[]> {
   const queryParams = new URLSearchParams();
   if (params.examId) queryParams.append("exam", String(params.examId));
   if (params.academicYearId) queryParams.append("academic_year", String(params.academicYearId));
   if (params.title) queryParams.append("title", params.title);
+  if (params.classId && String(params.classId).toUpperCase() !== "ALL") queryParams.append("school_class", String(params.classId));
+  if (params.division && params.division.toUpperCase() !== "ALL") queryParams.append("division", params.division);
 
   const res = await apiFetch(`/api/seating-allocation/?${queryParams.toString()}`);
   if (Array.isArray(res)) return res;
   return res?.results || [];
 }
 
-export async function bulkAutoGenerateSeating(academicYearId: number, title: string): Promise<{ message: string; allocated_count: number }> {
+export async function bulkAutoGenerateSeating(
+  academicYearId: number,
+  title: string,
+  strategy?: string,
+  classId?: number | string,
+  division?: string
+): Promise<{ message: string; allocated_count: number }> {
   return await apiFetch("/api/seating-allocation/bulk-auto-generate/", {
     method: "POST",
-    body: JSON.stringify({ academic_year: academicYearId, title }),
+    body: JSON.stringify({
+      academic_year: academicYearId,
+      title,
+      strategy: strategy || "ROLL_NO",
+      ...(classId && String(classId).toUpperCase() !== "ALL" ? { class_id: classId } : {}),
+      ...(division && division.toUpperCase() !== "ALL" ? { division } : {}),
+    }),
+  });
+}
+
+export async function updateSeatingAllocation(
+  id: number,
+  data: { seat_number?: string; room?: number }
+): Promise<SeatingRecord> {
+  return await apiFetch(`/api/seating-allocation/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
   });
 }
 
@@ -292,3 +330,166 @@ export async function getFinalResults(academicYearId: number, classId: number, d
   const response = await apiFetch(url);
   return Array.isArray(response) ? response : response?.results || [];
 }
+
+export interface ResultDashboardSummary {
+  academic_year_id: number | null;
+  academic_year_name: string;
+  weightage: {
+    is_configured: boolean;
+    status: "DRAFT" | "ACTIVE" | "LOCKED";
+    total_weightage: number;
+    is_active: boolean;
+    components: Array<{
+      name: string;
+      type: string;
+      weightage: number;
+    }>;
+  };
+  terms: Array<{
+    term_id: number;
+    term_name: string;
+    exams_count: number;
+    is_scheduled: boolean;
+    marks_percentage: number;
+    verification_percentage: number;
+    status: string;
+  }>;
+  attendance: {
+    is_available: boolean;
+    total_logs: number;
+    status: string;
+  };
+  teacher_assessment: {
+    total_students: number;
+    assessed_students: number;
+    percentage: number;
+    status: string;
+  };
+  overall_readiness: {
+    is_ready: boolean;
+    status: string;
+    blockers: string[];
+    warnings: string[];
+    total_students?: number;
+  };
+  counts: {
+    total_exams: number;
+    scheduled_exams: number;
+    completed_exams: number;
+    ready_count: number;
+    approved_count: number;
+    published_count: number;
+    total_students: number;
+  };
+}
+
+export async function getResultDashboardSummary(academicYearId?: number): Promise<ResultDashboardSummary> {
+  const query = academicYearId ? `?academic_year=${academicYearId}` : "";
+  return await apiFetch(`/api/result-dashboard-summary/${query}`);
+}
+
+export async function getResultReadiness(params: { academic_year: number; school_class?: number; division?: string }) {
+  const queryParts: string[] = [`academic_year=${params.academic_year}`];
+  if (params.school_class) queryParts.push(`school_class=${params.school_class}`);
+  if (params.division && params.division !== "ALL") queryParts.push(`division=${encodeURIComponent(params.division)}`);
+  return await apiFetch(`/api/result-readiness/?${queryParts.join("&")}`);
+}
+
+export interface MarksOverviewRow {
+  exam_id: number;
+  term_name: string;
+  class_id: number;
+  class_name: string;
+  division: string;
+  subject_id: number;
+  subject_name: string;
+  max_marks: number;
+  passing_marks: number;
+  total_students: number;
+  entered_count: number;
+  submitted_count: number;
+  absent_count: number;
+  completion_percentage: number;
+  verification_status: "PENDING" | "VERIFIED" | "SENT_BACK";
+  is_verified: boolean;
+  exam_date: string;
+  time: string;
+  status: string;
+}
+
+export async function getMarksOverview(params?: { academic_year?: number; school_class?: number; exam_term?: number }): Promise<{ exams: MarksOverviewRow[]; total_count: number }> {
+  const queryParts: string[] = [];
+  if (params?.academic_year) queryParts.push(`academic_year=${params.academic_year}`);
+  if (params?.school_class) queryParts.push(`school_class=${params.school_class}`);
+  if (params?.exam_term) queryParts.push(`exam_term=${params.exam_term}`);
+  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+  return await apiFetch(`/api/marks-overview/${qs}`);
+}
+
+export async function publishExamTimetable(params: { academic_year?: number; exam_term?: number; class_group?: number; division?: string; action?: "PUBLISH" | "DRAFT" }) {
+  return await apiFetch("/api/exam-full/publish-timetable/", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getExamTimetableGrid(params: { academic_year?: number; exam_term?: number; class_group?: number; division?: string }) {
+  const queryParts: string[] = [];
+  if (params?.academic_year) queryParts.push(`academic_year=${params.academic_year}`);
+  if (params?.exam_term) queryParts.push(`exam_term=${params.exam_term}`);
+  if (params?.class_group) queryParts.push(`class_group=${params.class_group}`);
+  if (params?.division && params.division !== "ALL") queryParts.push(`division=${encodeURIComponent(params.division)}`);
+  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+  return await apiFetch(`/api/exam-full/timetable-grid/${qs}`);
+}
+
+export async function publishSeatingAllocations(params: { academic_year?: number; exam_id?: number; title?: string; action?: "PUBLISH" | "UNPUBLISH" }) {
+  return await apiFetch("/api/seating-allocation/publish-all/", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function saveSubjectMarks(examId: number, marks: Array<{ student_id: number; marks_obtained: number | null; is_absent: boolean; remarks?: string; status?: string }>) {
+  return await apiFetch("/api/subject-marks/bulk-save/", {
+    method: "POST",
+    body: JSON.stringify({ exam_id: examId, marks }),
+  });
+}
+
+export async function getClassMarksGrid(params: { academic_year: number; school_class?: number; class_name?: string; exam_term?: number; division?: string }) {
+  const queryParts: string[] = [`academic_year=${params.academic_year}`];
+  if (params.school_class) queryParts.push(`school_class=${params.school_class}`);
+  if (params.class_name) queryParts.push(`class_name=${encodeURIComponent(params.class_name)}`);
+  if (params.exam_term) queryParts.push(`exam_term=${params.exam_term}`);
+  if (params.division && params.division !== "ALL") queryParts.push(`division=${encodeURIComponent(params.division)}`);
+  return await apiFetch(`/api/class-verification/marks-grid/?${queryParts.join("&")}`);
+}
+
+export async function verifyClassMarks(params: { academic_year: number; exam_term: number; school_class: number; division?: string; status: "VERIFIED" | "SENT_BACK"; remarks?: string }) {
+  return await apiFetch("/api/class-verification/", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function saveTeacherAssessments(params: { academic_year: number; subject_id: number; school_class: number; scores: Array<{ student_id: number; score: number; max_score: number; remarks?: string }> }) {
+  return await apiFetch("/api/teacher-assessment/bulk-save/", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getStudentExamSchedule(studentId?: number) {
+  const qs = studentId ? `?student_id=${studentId}` : "";
+  return await apiFetch(`/api/student-exam-schedule/${qs}`);
+}
+
+export async function getStudentReportCard(params?: { student_id?: number; academic_year?: number }) {
+  const queryParts: string[] = [];
+  if (params?.student_id) queryParts.push(`student_id=${params.student_id}`);
+  if (params?.academic_year) queryParts.push(`academic_year=${params.academic_year}`);
+  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+  return await apiFetch(`/api/student-report-card/${qs}`);
+}
+
