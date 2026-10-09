@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const ROLE_ROUTE_PREFIX_MAP: Record<string, string[]> = {
-  "/teacher": ["teacher", "staff"],
-  "/principal": ["principal", "super_admin", "superadmin"],
+  "/teacher": ["teacher", "staff", "transportation", "transport"],
+  "/principal": ["principal", "vice principal", "vice_principal", "super_admin", "superadmin"],
   "/trustee": ["admin(trustee)", "trustee", "super_admin", "superadmin"],
-  "/clerk": ["clerk", "fees_clerk"],
+  "/clerk": ["clerk", "assistant clerk", "assistant_clerk", "fees_clerk"],
   "/librarian": ["librarian"],
   "/inventory": ["inventory"],
-  "/fees": ["fees management", "fees", "fees_clerk", "clerk"],
+  "/fees": ["fees management", "fees", "fees_clerk", "clerk", "assistant clerk", "assistant_clerk"],
   "/student": ["student"],
   "/parent": ["parents", "parent"],
   "/superadmin": ["super_admin", "superadmin"],
@@ -21,9 +21,29 @@ function resolveDashboardRoute(roles: string[]): string {
   const normalized = (roles || []).map((r) => String(r).toLowerCase().trim());
   if (normalized.includes("super_admin") || normalized.includes("superadmin")) return "/superadmin";
   if (normalized.includes("admin(trustee)") || normalized.includes("trustee")) return "/trustee";
-  if (normalized.includes("principal")) return "/principal";
-  if (normalized.includes("clerk") || normalized.includes("fees_clerk")) return "/clerk";
-  if (normalized.includes("teacher") || normalized.includes("staff")) return "/teacher";
+  if (
+    normalized.includes("principal") ||
+    normalized.includes("vice principal") ||
+    normalized.includes("vice_principal")
+  ) {
+    return "/principal";
+  }
+  if (
+    normalized.includes("clerk") ||
+    normalized.includes("assistant clerk") ||
+    normalized.includes("assistant_clerk") ||
+    normalized.includes("fees_clerk")
+  ) {
+    return "/clerk";
+  }
+  if (
+    normalized.includes("teacher") ||
+    normalized.includes("staff") ||
+    normalized.includes("transportation") ||
+    normalized.includes("transport")
+  ) {
+    return "/teacher";
+  }
   if (normalized.includes("librarian")) return "/librarian";
   if (normalized.includes("inventory")) return "/inventory";
   if (normalized.includes("fees") || normalized.includes("fees management")) return "/fees";

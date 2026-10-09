@@ -36,6 +36,7 @@ export interface AttendanceRecord {
   is_late?: boolean;
   is_early_exit?: boolean;
   is_missing_punch?: boolean;
+  working_hours?: string | number | null;
   source?: string;
 }
 

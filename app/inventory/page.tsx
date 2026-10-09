@@ -18,6 +18,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 export default function InventoryDashboardPage() {
   const [stats, setStats] = useState({
@@ -97,6 +98,9 @@ export default function InventoryDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Staff Attendance Widget */}
+      <StaffAttendanceCard roleName="Inventory Manager" className="mb-2" />
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -31,11 +31,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn("font-sans scroll-smooth", "font-sans", inter.variable)}
     >
       <body
-  className={`${geistSans.variable} ${geistMono.variable} antialiased w-full max-w-full overflow-x-clip`}
->
+        suppressHydrationWarning
+        className={`${geistSans.variable} ${geistMono.variable} antialiased w-full max-w-full overflow-x-clip`}
+      >
         <ConfirmProvider>
           {children}
         </ConfirmProvider>

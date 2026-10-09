@@ -38,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 import {
   Book,
   BookIssued,
@@ -624,6 +625,9 @@ export default function LibrarianDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Staff Attendance Widget */}
+        <StaffAttendanceCard roleName="Librarian" className="mb-2" />
 
         {/* Live Counters */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">

@@ -445,13 +445,33 @@ export function getDashboardRoute(roles: string[]): string {
   const normalizedRoles = (roles || []).map((r) => (r || "").toLowerCase().trim());
   if (normalizedRoles.includes("super_admin") || normalizedRoles.includes("superadmin")) return "/superadmin";
   if (normalizedRoles.includes("admin(trustee)") || normalizedRoles.includes("trustee")) return "/trustee";
-  if (normalizedRoles.includes("principal")) return "/principal";
+  if (
+    normalizedRoles.includes("principal") ||
+    normalizedRoles.includes("vice principal") ||
+    normalizedRoles.includes("vice_principal")
+  ) {
+    return "/principal";
+  }
   if (normalizedRoles.includes("librarian")) return "/librarian";
-  if (normalizedRoles.includes("clerk") || normalizedRoles.includes("fees_clerk")) return "/clerk";
+  if (
+    normalizedRoles.includes("clerk") ||
+    normalizedRoles.includes("assistant clerk") ||
+    normalizedRoles.includes("assistant_clerk") ||
+    normalizedRoles.includes("fees_clerk")
+  ) {
+    return "/clerk";
+  }
   if (normalizedRoles.includes("inventory")) return "/inventory";
   if (normalizedRoles.includes("temp_user")) return "/user";
   if (normalizedRoles.includes("fees management") || normalizedRoles.includes("fees")) return "/fees";
-  if (normalizedRoles.includes("teacher") || normalizedRoles.includes("staff")) return "/teacher";
+  if (
+    normalizedRoles.includes("teacher") ||
+    normalizedRoles.includes("staff") ||
+    normalizedRoles.includes("transportation") ||
+    normalizedRoles.includes("transport")
+  ) {
+    return "/teacher";
+  }
   if (normalizedRoles.includes("student")) return "/student";
   if (normalizedRoles.includes("parents") || normalizedRoles.includes("parent")) return "/parent";
   return "/user";
