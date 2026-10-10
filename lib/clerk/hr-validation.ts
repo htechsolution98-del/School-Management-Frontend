@@ -82,6 +82,27 @@ export function validateStaffRecord(data: CreateStaffPayload, staff: Staff[], de
       }
     }
   }
+  if (data.exit_date) {
+    const exitMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data.exit_date);
+    if (!exitMatch) {
+      errors.exit_date = "Enter a valid exit date.";
+    } else {
+      const [, ey, em, ed] = exitMatch;
+      const exitDate = new Date(Number(ey), Number(em) - 1, Number(ed));
+      if (exitDate.getFullYear() !== Number(ey) || exitDate.getMonth() !== Number(em) - 1 || exitDate.getDate() !== Number(ed)) {
+        errors.exit_date = "Enter a valid calendar date.";
+      } else if (data.joining_date) {
+        const joinMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data.joining_date);
+        if (joinMatch) {
+          const [, jy, jm, jd] = joinMatch;
+          const joinDate = new Date(Number(jy), Number(jm) - 1, Number(jd));
+          if (exitDate < joinDate) {
+            errors.exit_date = "Exit date cannot be earlier than joining date.";
+          }
+        }
+      }
+    }
+  }
   if (typeof data.is_active !== "boolean") errors.is_active = "Select a valid employment status.";
   return errors;
 }

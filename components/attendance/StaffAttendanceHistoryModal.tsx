@@ -90,6 +90,64 @@ function parseISODate(val: any): string {
   }
 }
 
+const STATUS_BADGE_CONFIG: Record<
+  string,
+  { label: string; className: string }
+> = {
+  PRESENT: {
+    label: "Present",
+    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  },
+  LATE: {
+    label: "Late",
+    className: "bg-amber-100 text-amber-800 border-amber-200",
+  },
+  HALF_DAY: {
+    label: "Half Day",
+    className: "bg-orange-100 text-orange-800 border-orange-200",
+  },
+  ABSENT: {
+    label: "Absent",
+    className: "bg-red-100 text-red-800 border-red-200",
+  },
+  LEAVE: {
+    label: "Leave",
+    className: "bg-blue-100 text-blue-800 border-blue-200",
+  },
+  HOLIDAY: {
+    label: "Holiday",
+    className: "bg-purple-100 text-purple-800 border-purple-200",
+  },
+  WEEK_OFF: {
+    label: "Week Off",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  MISSING_PUNCH: {
+    label: "Missing Punch",
+    className: "bg-rose-100 text-rose-800 border-rose-200",
+  },
+};
+
+function getStatusBadge(record: AttendanceRecord) {
+  const canonical = (record.status || "").toUpperCase();
+  if (STATUS_BADGE_CONFIG[canonical]) {
+    return STATUS_BADGE_CONFIG[canonical];
+  }
+  if (record.check_in && !record.check_out) {
+    return STATUS_BADGE_CONFIG.MISSING_PUNCH;
+  }
+  if (!record.is_present) {
+    return STATUS_BADGE_CONFIG.ABSENT;
+  }
+  if (record.is_half_day) {
+    return STATUS_BADGE_CONFIG.HALF_DAY;
+  }
+  if (record.is_late) {
+    return STATUS_BADGE_CONFIG.LATE;
+  }
+  return STATUS_BADGE_CONFIG.PRESENT;
+}
+
 export function StaffAttendanceHistoryModal({
   isOpen,
   onClose,
@@ -138,10 +196,22 @@ export function StaffAttendanceHistoryModal({
   }, [loadData]);
 
   const stats = useMemo(() => {
-    const present = records.filter((r) => r.is_present && !r.is_half_day).length;
-    const halfDay = records.filter((r) => r.is_half_day).length;
-    const absent = records.filter((r) => !r.is_present).length;
-    const missingPunch = records.filter((r) => r.check_in && !r.check_out).length;
+    const present = records.filter((r) => {
+      const s = (r.status || "").toUpperCase();
+      return s ? (s === "PRESENT" || s === "LATE") : (r.is_present && !r.is_half_day);
+    }).length;
+    const halfDay = records.filter((r) => {
+      const s = (r.status || "").toUpperCase();
+      return s ? s === "HALF_DAY" : r.is_half_day;
+    }).length;
+    const absent = records.filter((r) => {
+      const s = (r.status || "").toUpperCase();
+      return s ? (s === "ABSENT" || s === "LEAVE") : !r.is_present;
+    }).length;
+    const missingPunch = records.filter((r) => {
+      const s = (r.status || "").toUpperCase();
+      return s ? s === "MISSING_PUNCH" : Boolean(r.check_in && !r.check_out);
+    }).length;
     const total = records.length;
     const rate = total > 0 ? Math.round(((present + halfDay * 0.5) / total) * 100) : 0;
     return { present, halfDay, absent, missingPunch, total, rate };
@@ -149,16 +219,17 @@ export function StaffAttendanceHistoryModal({
 
   const filtered = useMemo(() => {
     return records.filter((r) => {
-      const isPresent = r.is_present && !r.is_half_day;
-      const isHalfDay = r.is_half_day;
-      const isAbsent = !r.is_present;
-      const isMissingPunch = Boolean(r.check_in && !r.check_out);
-
+      const canonical = (r.status || "").toUpperCase();
       let matchesStatus = true;
-      if (statusFilter === "present") matchesStatus = isPresent;
-      else if (statusFilter === "half-day") matchesStatus = isHalfDay;
-      else if (statusFilter === "absent") matchesStatus = isAbsent;
-      else if (statusFilter === "missing-punch") matchesStatus = isMissingPunch;
+      if (statusFilter === "present") {
+        matchesStatus = canonical ? (canonical === "PRESENT" || canonical === "LATE") : (r.is_present && !r.is_half_day);
+      } else if (statusFilter === "half-day") {
+        matchesStatus = canonical ? canonical === "HALF_DAY" : r.is_half_day;
+      } else if (statusFilter === "absent") {
+        matchesStatus = canonical ? (canonical === "ABSENT" || canonical === "LEAVE") : !r.is_present;
+      } else if (statusFilter === "missing-punch") {
+        matchesStatus = canonical ? canonical === "MISSING_PUNCH" : Boolean(r.check_in && !r.check_out);
+      }
 
       const q = search.toLowerCase().trim();
       const recDate = formatDateYYYYMMDD(r.attendance_date) || "";
@@ -330,19 +401,8 @@ export function StaffAttendanceHistoryModal({
             </div>
           ) : (
             filtered.map((record) => {
-              const status = !record.is_present
-                ? "absent"
-                : record.is_half_day
-                ? "half-day"
-                : "present";
-
-              const badgeColors = {
-                present: "bg-emerald-100 text-emerald-800 border-emerald-200",
-                "half-day": "bg-amber-100 text-amber-800 border-amber-200",
-                absent: "bg-red-100 text-red-800 border-red-200",
-              };
-
-              const isMissingPunch = Boolean(record.check_in && !record.check_out);
+              const badge = getStatusBadge(record);
+              const canonical = (record.status || "").toUpperCase();
 
               return (
                 <div
@@ -365,13 +425,11 @@ export function StaffAttendanceHistoryModal({
                           {parseISODate(record.attendance_date)}
                         </span>
                         <span
-                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
-                            badgeColors[status]
-                          }`}
+                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${badge.className}`}
                         >
-                          {status}
+                          {badge.label}
                         </span>
-                        {record.is_late && (
+                        {record.is_late && canonical !== "LATE" && (
                           <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
                             Late
                           </span>

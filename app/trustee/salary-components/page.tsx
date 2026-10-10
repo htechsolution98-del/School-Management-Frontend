@@ -54,10 +54,19 @@ function TypeBadge({ type }: { type: ComponentType }) {
 // ─── Dynamic Value Formatter ──────────────────────────────────────────────────
 
 function formatComponentDisplay(c: SalaryComponent): string {
-  const isPercent = (c.calc_type || "").toLowerCase() === "percentage";
+  const calcTypeLower = (c.calc_type || "").toLowerCase();
   const rawVal = c.value !== undefined && c.value !== null && c.value !== "" ? c.value : 0;
-  if (isPercent) {
+  if (calcTypeLower === "percentage") {
     return `${rawVal}% of ${c.calc_base?.trim() || "basic"}`;
+  }
+  if (calcTypeLower === "per day") {
+    return `₹${rawVal}/day (worked days)`;
+  }
+  if (calcTypeLower === "per hour") {
+    return `₹${rawVal}/hr (worked hours)`;
+  }
+  if (calcTypeLower === "formula") {
+    return `Formula: ${c.calc_base?.trim() || "N/A"}`;
   }
   const numVal = Number(rawVal);
   const formatted = isNaN(numVal) ? "0" : numVal.toLocaleString("en-IN");
@@ -127,7 +136,7 @@ export default function SalaryComponentsPage() {
   // Form state
   const [name, setName] = useState("");
   const [componentType, setComponentType] = useState<ComponentType>("earning");
-  const [calcType, setCalcType] = useState<"Fixed" | "Percentage" | "Formula">("Fixed");
+  const [calcType, setCalcType] = useState<"Fixed" | "Percentage" | "Formula" | "Per Day" | "Per Hour">("Fixed");
   const [calcBase, setCalcBase] = useState("");
   const [value, setValue] = useState("");
   const [formError, setFormError] = useState("");
@@ -165,7 +174,15 @@ export default function SalaryComponentsPage() {
       (c.component_type || (c.type?.toLowerCase() === "deduction" ? "deduction" : "earning")) as ComponentType
     );
     setCalcType(
-      c.calc_type === "Percentage" ? "Percentage" : c.calc_type === "Formula" ? "Formula" : "Fixed"
+      c.calc_type === "Percentage"
+        ? "Percentage"
+        : c.calc_type === "Formula"
+        ? "Formula"
+        : c.calc_type === "Per Day"
+        ? "Per Day"
+        : c.calc_type === "Per Hour"
+        ? "Per Hour"
+        : "Fixed"
     );
     setValue(c.value !== undefined && c.value !== null ? String(c.value) : "");
     setCalcBase(c.calc_base || "");
@@ -435,12 +452,14 @@ export default function SalaryComponentsPage() {
                 </label>
                 <select
                   value={calcType}
-                  onChange={(e) => setCalcType(e.target.value as "Fixed" | "Percentage" | "Formula")}
+                  onChange={(e) => setCalcType(e.target.value as "Fixed" | "Percentage" | "Formula" | "Per Day" | "Per Hour")}
                   className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all h-[42px]"
                 >
                   <option value="Fixed">Fixed Amount (₹)</option>
                   <option value="Percentage">Percentage (%)</option>
                   <option value="Formula">Formula Driven</option>
+                  <option value="Per Day">Per Day</option>
+                  <option value="Per Hour">Per Hour</option>
                 </select>
               </div>
             </div>
@@ -449,11 +468,25 @@ export default function SalaryComponentsPage() {
               {/* Default Value */}
               <div className="md:col-span-4">
                 <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-                  {calcType === "Percentage" ? "Percentage Rate (%)" : "Default Amount / Rate"}
+                  {calcType === "Percentage"
+                    ? "Percentage Rate (%)"
+                    : calcType === "Per Day"
+                    ? "Daily Rate (₹)"
+                    : calcType === "Per Hour"
+                    ? "Hourly Rate (₹)"
+                    : "Default Amount / Rate"}
                 </label>
                 <input
                   type="number"
-                  placeholder={calcType === "Percentage" ? "e.g. 12" : "e.g. 5000"}
+                  placeholder={
+                    calcType === "Percentage"
+                      ? "e.g. 12"
+                      : calcType === "Per Day"
+                      ? "e.g. 500"
+                      : calcType === "Per Hour"
+                      ? "e.g. 100"
+                      : "e.g. 5000"
+                  }
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
