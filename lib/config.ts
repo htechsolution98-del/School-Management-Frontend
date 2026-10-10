@@ -5,6 +5,7 @@ export const API_ENDPOINTS = {
   LOGIN: "/api-login/",
   REFRESH: "/refresh/",
   CURRENT_USER: "/me/",
+  CHANGE_PASSWORD: "/change-password/",
   SCHOOL: "/SchoolView/",
   STAFF: "/StaffView/",
   DEPARTMENTS: "/departments/",

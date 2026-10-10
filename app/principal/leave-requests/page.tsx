@@ -757,7 +757,7 @@ export default function PrincipalLeaveRequestsPage() {
                                 </Button>
                                 <Button
                                   variant="destructive"
-                                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
+                                  className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
                                   onClick={() => handleBulkAction(request.id, "REJECTED")}
                                   disabled={processingRequests[request.id] !== undefined}
                                 >
