@@ -405,8 +405,12 @@ export function StaffAttendanceCard({
           }
         }
 
+        const vToken = res.verification_token ?? res.token;
         if (pendingCoords) {
-          await markAttendance(pendingCoords);
+          await markAttendance({
+            ...pendingCoords,
+            ...(vToken ? { verification_token: vToken } : {}),
+          });
           setJustDone("in");
           setTimeout(() => setJustDone(null), 3000);
           await loadAll();

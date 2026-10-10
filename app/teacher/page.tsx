@@ -389,8 +389,12 @@ export default function TeacherDashboard() {
           localStorage.setItem(`face_verified_date_${username}`, new Date().toISOString().split("T")[0]);
         }
 
+        const vToken = res.verification_token ?? res.token;
         if (pendingCoords) {
-          await markAttendance(pendingCoords);
+          await markAttendance({
+            ...pendingCoords,
+            ...(vToken ? { verification_token: vToken } : {}),
+          });
           setJustDone("in");
           setTimeout(() => setJustDone(null), 3000);
           await loadAll();
