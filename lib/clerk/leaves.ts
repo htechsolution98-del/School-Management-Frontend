@@ -263,3 +263,53 @@ export async function deleteLeaveType(id: number): Promise<void> {
   }
 }
 
+// ==========================================
+// Approval & Cancellation API Helpers
+// ==========================================
+
+export async function approveLeaveRequest(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/${id}/approve/`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || err.detail || "Failed to approve leave request.");
+  }
+}
+
+export async function rejectLeaveRequest(id: number, reason: string): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/${id}/reject/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || err.detail || "Failed to reject leave request.");
+  }
+}
+
+export async function approveLeaveCancellation(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/${id}/approve_cancellation/`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || err.detail || "Failed to approve leave cancellation.");
+  }
+}
+
+export async function rejectLeaveCancellation(id: number, reason: string): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/${id}/reject_cancellation/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || err.detail || "Failed to reject leave cancellation.");
+  }
+}
+
+
+

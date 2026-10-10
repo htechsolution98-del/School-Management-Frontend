@@ -61,6 +61,8 @@ import {
   createLeaveRequest,
   updateLeaveRequest,
   deleteLeaveRequest,
+  withdrawLeaveRequest,
+  requestCancellation,
   type RemainingLeave,
   type MyLeaveRequest,
 } from "@/lib/teacher";
@@ -84,7 +86,14 @@ export default function MyLeavesPage() {
   const [leaveTypeId, setLeaveTypeId] = useState<string>("");
   const [reason, setReason] = useState("");
   const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDaySession, setHalfDaySession] = useState<"FIRST_HALF" | "SECOND_HALF">("FIRST_HALF");
   const [totalDays, setTotalDays] = useState(0);
+
+  // Cancellation Dialog State
+  const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
+  const [cancellingRequestId, setCancellingRequestId] = useState<number | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
 
   // Processing specific actions (e.g. canceling a request)
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -145,6 +154,7 @@ export default function MyLeavesPage() {
     setLeaveTypeId("");
     setReason("");
     setIsHalfDay(false);
+    setHalfDaySession("FIRST_HALF");
     setTotalDays(0);
     setIsDialogOpen(true);
   };
@@ -154,6 +164,7 @@ export default function MyLeavesPage() {
     setStartDate(req.start_date);
     setEndDate(req.end_date);
     setIsHalfDay(Number(req.total_days) === 0.5);
+    setHalfDaySession((req.half_day_session === "SECOND_HALF" ? "SECOND_HALF" : "FIRST_HALF") as any);
     
     // Find matching leave type ID from balances if possible
     const match = balances.find((b) => b.leave_type.toUpperCase() === String(req.leave_type).toUpperCase());
@@ -185,6 +196,8 @@ export default function MyLeavesPage() {
       start_date: startDate,
       end_date: isHalfDay ? startDate : endDate,
       total_days: totalDays,
+      is_half_day: isHalfDay,
+      half_day_session: isHalfDay ? halfDaySession : "FULL_DAY",
       reason,
       leave_type: Number(leaveTypeId),
       dynamic_leave_type: Number(leaveTypeId),
@@ -210,22 +223,47 @@ export default function MyLeavesPage() {
 
   const handleDeleteRequest = async (requestId: number) => {
     triggerConfirm(
-      "Cancel Leave Request?",
-      "Are you sure you want to cancel this leave request? This action cannot be undone.",
+      "Withdraw Leave Request?",
+      "Are you sure you want to withdraw this leave request? Your reserved balance will be restored immediately.",
       async () => {
         setDeletingId(requestId);
         try {
-          await deleteLeaveRequest(requestId);
-          toast.success("Leave request cancelled successfully");
+          await withdrawLeaveRequest(requestId);
+          toast.success("Leave request withdrawn and balance released successfully");
           fetchData();
-        } catch (err: any) {
-          console.error(err);
-          toast.error(err?.message || "Failed to cancel leave request");
+        } catch (withdrawErr: any) {
+          try {
+            await deleteLeaveRequest(requestId);
+            toast.success("Leave request cancelled successfully");
+            fetchData();
+          } catch (err: any) {
+            console.error(err);
+            toast.error(err?.message || "Failed to cancel leave request");
+          }
         } finally {
           setDeletingId(null);
         }
       }
     );
+  };
+
+  const handleRequestCancellationSubmit = async () => {
+    if (!cancellingRequestId || !cancellationReason.trim()) {
+      toast.error("Please enter a reason for cancellation");
+      return;
+    }
+    setIsSubmittingCancellation(true);
+    try {
+      await requestCancellation(cancellingRequestId, cancellationReason.trim());
+      toast.success("Cancellation request submitted for Principal review.");
+      setCancellationDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to submit cancellation request");
+    } finally {
+      setIsSubmittingCancellation(false);
+    }
   };
 
   // Safe getter for request status
@@ -692,8 +730,35 @@ export default function MyLeavesPage() {
                                     ) : (
                                       <Trash2 className="h-3.5 w-3.5" />
                                     )}
-                                    Cancel Request
+                                    Withdraw
                                   </Button>
+                                ) : reqStatus === "APPROVED" ? (
+                                  request.cancellation_status === "REQUESTED" ? (
+                                    <Badge variant="outline" className="text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-[11px] font-semibold">
+                                      Cancellation Pending
+                                    </Badge>
+                                  ) : request.cancellation_status === "APPROVED" ? (
+                                    <Badge variant="outline" className="text-zinc-500 bg-zinc-100 dark:bg-zinc-800 text-[11px]">
+                                      Cancelled
+                                    </Badge>
+                                  ) : request.cancellation_status === "REJECTED" ? (
+                                    <Badge variant="outline" className="text-rose-600 bg-rose-50 border-rose-200 text-[11px]">
+                                      Cancellation Denied
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setCancellingRequestId(request.id);
+                                        setCancellationReason("");
+                                        setCancellationDialogOpen(true);
+                                      }}
+                                      className="h-8 text-xs font-semibold rounded-lg text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                                    >
+                                      Request Cancellation
+                                    </Button>
+                                  )
                                 ) : (
                                   <span className="text-slate-400 text-xs">—</span>
                                 )}
@@ -783,8 +848,8 @@ export default function MyLeavesPage() {
                               <span className="italic">"{request.reason || "No reason specified"}"</span>
                             </div>
 
-                            {/* Actions (Cancel) - Only for pending requests */}
-                            {isPending && (
+                            {/* Actions (Withdraw or Request Cancellation) */}
+                            {isPending ? (
                               <div className="flex items-center gap-3 pt-2 border-t dark:border-zinc-800">
                                 <Button
                                   variant="destructive"
@@ -798,10 +863,39 @@ export default function MyLeavesPage() {
                                   ) : (
                                     <Trash2 className="h-3.5 w-3.5" />
                                   )}
-                                  Cancel Request
+                                  Withdraw Request
                                 </Button>
                               </div>
-                            )}
+                            ) : isApproved ? (
+                              <div className="flex items-center gap-3 pt-2 border-t dark:border-zinc-800">
+                                {request.cancellation_status === "REQUESTED" ? (
+                                  <Badge variant="outline" className="text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-[11px] font-semibold">
+                                    Cancellation Pending Approval
+                                  </Badge>
+                                ) : request.cancellation_status === "APPROVED" ? (
+                                  <Badge variant="outline" className="text-zinc-500 bg-zinc-100 dark:bg-zinc-800 text-[11px]">
+                                    Cancelled
+                                  </Badge>
+                                ) : request.cancellation_status === "REJECTED" ? (
+                                  <Badge variant="outline" className="text-rose-600 bg-rose-50 border-rose-200 text-[11px]">
+                                    Cancellation Denied
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setCancellingRequestId(request.id);
+                                      setCancellationReason("");
+                                      setCancellationDialogOpen(true);
+                                    }}
+                                    className="h-8 text-xs font-semibold rounded-lg text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                                  >
+                                    Request Cancellation
+                                  </Button>
+                                )}
+                              </div>
+                            ) : null}
                           </CardContent>
                         </Card>
                       </motion.div>
@@ -876,6 +970,21 @@ export default function MyLeavesPage() {
                 Half Day Request (0.5 Day)
               </Label>
             </div>
+
+            {isHalfDay && (
+              <div className="space-y-1.5 pl-6 pt-0.5">
+                <Label htmlFor="session-select" className="text-xs font-semibold">Half Day Session</Label>
+                <Select value={halfDaySession} onValueChange={(val: any) => setHalfDaySession(val)}>
+                  <SelectTrigger id="session-select" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
+                    <SelectValue placeholder="Select session" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIRST_HALF">First Half (Morning Session)</SelectItem>
+                    <SelectItem value="SECOND_HALF">Second Half (Afternoon Session)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {totalDays > 0 && (
               <div className="text-xs font-medium text-primary flex items-center gap-1.5 bg-primary/5 dark:bg-primary/20 p-2.5 rounded-lg border border-primary/20">
@@ -1030,6 +1139,52 @@ export default function MyLeavesPage() {
               className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-xs px-5"
             >
               Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Leave Cancellation Request Dialog Modal */}
+      <Dialog open={cancellationDialogOpen} onOpenChange={setCancellationDialogOpen}>
+        <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              Request Leave Cancellation
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Submit a formal request to cancel leave #{cancellingRequestId}. Once approved by the Principal, your leave balance will be restored and attendance records reverted.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-3">
+            <Label htmlFor="cancel-reason" className="text-xs font-semibold">Reason for Cancellation</Label>
+            <Textarea
+              id="cancel-reason"
+              value={cancellationReason}
+              onChange={(e) => setCancellationReason(e.target.value)}
+              placeholder="Please explain why you need to cancel this approved leave..."
+              rows={3}
+              className="text-sm rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 resize-none"
+            />
+          </div>
+
+          <DialogFooter className="pt-3 border-t dark:border-zinc-800 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancellationDialogOpen(false)}
+              className="rounded-lg text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleRequestCancellationSubmit}
+              disabled={isSubmittingCancellation || !cancellationReason.trim()}
+              className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5"
+            >
+              {isSubmittingCancellation && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Submit Cancellation
             </Button>
           </DialogFooter>
         </DialogContent>

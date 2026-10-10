@@ -17,6 +17,7 @@ import {
 } from "@/lib/hr-config";
 import { getLeaveTemplates, type LeaveTemplate } from "@/lib/clerk/leaves";
 import type { CreateStaffPayload, Staff, Department, AttendanceSetting, SalaryStructure } from "@/types";
+import { getUserRoles, getUserRole } from "@/lib/auth";
 import "../clerk-workspace.css";
 
 interface StaffFeature { id?: number; feature_id?: number; feature_name?: string }
@@ -45,11 +46,20 @@ export default function ClerkStaffDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
+    const roles = getUserRoles();
+    const primaryRole = getUserRole();
+    const canFetchAttendanceSettings =
+      roles.some((r) => r === "principal" || r === "admin" || r === "superadmin") ||
+      primaryRole === "principal" ||
+      primaryRole === "admin" ||
+      primaryRole === "superadmin";
+
     const results = await Promise.allSettled([
       getStaffList(),
       getDepartments(),
       getStaffCategories(),
-      getAttendanceSettings(),
+      canFetchAttendanceSettings ? getAttendanceSettings() : Promise.resolve([] as AttendanceSetting[]),
       getLeaveTemplates(),
       getSalaryStructures(),
     ]);
@@ -62,7 +72,7 @@ export default function ClerkStaffDashboard() {
       const filtered = raw.filter(item => ALLOWED_ROLES.some(role => String(item.feature_name || "").toUpperCase().trim().includes(role)));
       setFeatures(filtered.length ? filtered : raw);
     } else failures.push(message(results[2].reason, "Could not load staff roles."));
-    if (results[3].status === "fulfilled") setAttendanceSettings(results[3].value);
+    if (results[3].status === "fulfilled") setAttendanceSettings(results[3].value); else setAttendanceSettings([]);
     if (results[4].status === "fulfilled") setLeaveTemplates(results[4].value);
     if (results[5].status === "fulfilled") setSalaryStructures(results[5].value);
     setError(failures.join(" "));
