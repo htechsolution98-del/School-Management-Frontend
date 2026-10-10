@@ -68,6 +68,7 @@ const sidebarLinks = [
   { title: "Activity Logs", href: "/principal/activity-logs", icon: History },
   { title: "Staff Leave", href: "/principal/leave-requests", icon: CalendarCheck },
   { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
+  { title: "Support & Helpdesk", href: "/principal/support", icon: CalendarCheck },
   { title: "Account Settings", href: "/principal/settings", icon: Settings },
 ];
 
