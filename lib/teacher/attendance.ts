@@ -33,6 +33,7 @@ export async function getTodayAttendance(): Promise<TodayAttendance | null> {
 export async function markAttendance(payload: {
   latitude: number;
   longitude: number;
+  verification_token?: string;
 }): Promise<void> {
   const url = `${API_BASE_URL}/attendance/`;
   const response = await fetchWithAuth(url, {
