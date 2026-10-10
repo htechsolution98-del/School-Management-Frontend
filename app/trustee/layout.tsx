@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Users, LayoutDashboard, Layers, ReceiptText, CreditCard, Megaphone } from "lucide-react";
+import { Users, LayoutDashboard, Layers, ReceiptText, CreditCard, Megaphone, CalendarDays } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Staff", href: "/trustee", icon: Users },
@@ -10,6 +10,7 @@ const sidebarLinks = [
   { title: "Generate Salary", href: "/trustee/generate-salary", icon: ReceiptText },
   { title: "Subscription & Billing", href: "/trustee/subscription", icon: CreditCard },
   { title: "Announcements", href: "/trustee/announcements", icon: Megaphone },
+  { title: "Events & Holidays", href: "/trustee/events", icon: CalendarDays },
   // { title: "Overview", href: "/trustee/dashboard", icon: LayoutDashboard },
 ];
 

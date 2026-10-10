@@ -21,6 +21,7 @@ import {
   PhoneCall,
   SlidersHorizontal,
   Megaphone,
+  CalendarDays,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
@@ -92,6 +93,7 @@ const sidebarLinks = [
   { title: "Teacher Workload", href: "/clerk/teacher-workload", icon: SlidersHorizontal },
   { title: "Timetable", href: "/clerk/timetable", icon: Calendar },
   { title: "Announcements", href: "/clerk/announcements", icon: Megaphone },
+  { title: "Events & Holidays", href: "/clerk/events", icon: CalendarDays },
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },

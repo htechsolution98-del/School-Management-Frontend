@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Users, CreditCard, BookOpen, BookMarked, CalendarRange, Trophy, Megaphone } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, BookOpen, BookMarked, CalendarRange, Trophy, Megaphone, CalendarDays } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
@@ -13,6 +13,11 @@ const sidebarLinks = [
     title: "Announcements",
     href: "/student/announcements",
     icon: Megaphone,
+  },
+  {
+    title: "Events & Holidays",
+    href: "/student/events",
+    icon: CalendarDays,
   },
   {
     title: "Attendance",

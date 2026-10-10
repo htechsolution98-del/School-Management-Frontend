@@ -9,6 +9,7 @@ import {
   Layers,
   CreditCard,
   Megaphone,
+  CalendarDays,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -48,6 +49,11 @@ const sidebarLinks = [
     title: "Announcements", 
     href: "/fees/announcements", 
     icon: Megaphone,
+  },
+  { 
+    title: "Events & Holidays", 
+    href: "/fees/events", 
+    icon: CalendarDays,
   },
 ];
 

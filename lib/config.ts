@@ -52,6 +52,8 @@ export const API_ENDPOINTS = {
   DASHBOARD_COUNT: "/dashboard-count/",
   ACADEMIC_YEAR: "/main-academic-year/",
   ANNOUNCEMENT: "/announcement/",
+  EVENTS: "/events/",
+  HOLIDAYS: "/holidays/",
   PARENT_CHILDREN: "/parent/children/",
   TRUSTEE_ANALYTICS: "/trustee/analytics/",
   BOARD_MEETINGS: "/board-meetings/",
