@@ -18,29 +18,63 @@ function isTargetAudienceForUser(announcement: AnnouncementResponse, userRoles: 
     }
   }
 
-  const normUserRoles = userRoles.map((r) => r.toUpperCase());
-  const normTarget = (announcement.announcement_for || "").toUpperCase();
-  const isEveryone = String(announcement.is_everyone) === "true";
+  const normUserRoles = userRoles.map((r) => (r || "").toUpperCase().trim());
+  const normTarget = (announcement.announcement_for || "").toUpperCase().trim();
+  const isEveryone = String(announcement.is_everyone) === "true" || announcement.is_everyone === true;
 
-  // Staff roles include: teacher, clerk, assistant clerk, librarian, trustee, principal, superadmin
+  // Management always sees all announcements
+  if (
+    normUserRoles.includes("SUPER_ADMIN") ||
+    normUserRoles.includes("SUPERADMIN") ||
+    normUserRoles.includes("PRINCIPAL") ||
+    normUserRoles.includes("VICE PRINCIPAL") ||
+    normUserRoles.includes("TRUSTEE") ||
+    normUserRoles.includes("ADMIN(TRUSTEE)")
+  ) {
+    return true;
+  }
+
+  // If announcement is for everyone or target is ALL or blank -> visible to everyone
+  if (isEveryone || normTarget === "ALL" || !normTarget) {
+    return true;
+  }
+
+  // Staff category check
   const isStaffUser =
     normUserRoles.includes("TEACHER") ||
     normUserRoles.includes("CLERK") ||
     normUserRoles.includes("ASSISTANT CLERK") ||
     normUserRoles.includes("ASSISTANT_CLERK") ||
     normUserRoles.includes("LIBRARIAN") ||
-    normUserRoles.includes("TRUSTEE") ||
-    normUserRoles.includes("PRINCIPAL") ||
-    normUserRoles.includes("SUPER_ADMIN");
+    normUserRoles.includes("FEES") ||
+    normUserRoles.includes("FEES MANAGEMENT") ||
+    normUserRoles.includes("INVENTORY");
 
-  return (
-    isEveryone ||
-    normTarget === "ALL" ||
-    (normTarget === "TEACHER" && isStaffUser) ||
-    normUserRoles.includes(normTarget) ||
-    normUserRoles.includes("SUPER_ADMIN") ||
-    normUserRoles.includes("PRINCIPAL")
-  );
+  if (normTarget === "TEACHER" && (normUserRoles.includes("TEACHER") || isStaffUser)) {
+    return true;
+  }
+
+  if (normTarget === "CLERK" && (normUserRoles.includes("CLERK") || normUserRoles.includes("ASSISTANT CLERK") || normUserRoles.includes("ASSISTANT_CLERK"))) {
+    return true;
+  }
+
+  if (normTarget === "FEE-MANAGER" && (normUserRoles.includes("FEES") || normUserRoles.includes("FEES MANAGEMENT") || normUserRoles.includes("CLERK"))) {
+    return true;
+  }
+
+  if (normTarget === "PARENT" && (normUserRoles.includes("PARENT") || normUserRoles.includes("PARENTS"))) {
+    return true;
+  }
+
+  if (normTarget === "STUDENT" && normUserRoles.includes("STUDENT")) {
+    return true;
+  }
+
+  if (normTarget === "TRANSPORT" && (normUserRoles.includes("TRANSPORT") || normUserRoles.includes("TRANSPORTATION") || normUserRoles.includes("DRIVER"))) {
+    return true;
+  }
+
+  return normUserRoles.includes(normTarget);
 }
 
 export function useAnnouncementSocket() {
@@ -234,9 +268,14 @@ export function useAnnouncementSocket() {
           title: data.title ?? "School Announcement",
           description: data.description ?? "",
           announcement_for: data.announcement_for ?? "ALL",
-          is_everyone: data.is_everyone ?? "true",
+          is_everyone: data.is_everyone ?? true,
+          priority: data.priority ?? "NORMAL",
           created_at: data.created_at ?? new Date().toISOString(),
+          expires_at: data.expires_at,
           created_by: data.created_by,
+          created_by_name: data.created_by_name,
+          created_by_role: data.created_by_role,
+          can_manage: data.can_manage ?? false,
         };
 
         // Determine if target audience matches current user's roles
@@ -251,15 +290,24 @@ export function useAnnouncementSocket() {
         }
 
         if (isTargetAudienceForUser(announcement, userRoles)) {
-          // Play a gentle notification sound (optional/standard visual toast)
-          toast.info(`📢 ${announcement.title}`, {
-            description: announcement.description,
+          // Dispatch custom event for real-time reactive UI updates
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("announcement_received", { detail: announcement }));
+          }
+
+          const priorityBadge = announcement.priority === "URGENT" ? "🚨 " : announcement.priority === "IMPORTANT" ? "⚠️ " : "📢 ";
+          // Play notification toast
+          toast.info(`${priorityBadge}${announcement.title}`, {
+            description: announcement.description?.length > 90 ? `${announcement.description.slice(0, 90)}...` : announcement.description,
             duration: 8000,
           });
 
           // Prepend to notification list (limit to recent 50)
           setNotifications((prev) => {
-            const updated = [announcement, ...prev].slice(0, 50);
+            const exists = prev.some((p) => p.id === announcement.id);
+            const updated = exists
+              ? prev.map((p) => (p.id === announcement.id ? announcement : p))
+              : [announcement, ...prev].slice(0, 50);
             const readIds = getReadIds();
             const unread = updated.filter((n) => !readIds.includes(n.id)).length;
             setUnreadCount(unread);

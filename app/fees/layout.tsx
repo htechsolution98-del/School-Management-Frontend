@@ -8,6 +8,7 @@ import {
   Tags,
   Layers,
   CreditCard,
+  Megaphone,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -42,6 +43,11 @@ const sidebarLinks = [
     title: "Student Ledger", 
     href: "/fees/student-ledger", 
     icon: ReceiptText,
+  },
+  { 
+    title: "Announcements", 
+    href: "/fees/announcements", 
+    icon: Megaphone,
   },
 ];
 
