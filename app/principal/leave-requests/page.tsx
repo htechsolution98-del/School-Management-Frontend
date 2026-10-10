@@ -36,6 +36,8 @@ import {
   getAllLeaveRequests,
   changeLeaveDayStatus,
   approveAllLeaveDays,
+  approveLeaveCancellation,
+  rejectLeaveCancellation,
   type LeaveRequest,
   type LeaveDay,
 } from "@/lib/clerk";
@@ -230,6 +232,33 @@ export default function PrincipalLeaveRequestsPage() {
     }
   };
 
+  const handleApproveCancellation = async (requestId: number) => {
+    setProcessingRequests((prev) => ({ ...prev, [requestId]: "approving" }));
+    try {
+      await approveLeaveCancellation(requestId);
+      toast.success("Leave cancellation approved. Leave balance restored and attendance reverted.");
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to approve leave cancellation");
+    } finally {
+      setProcessingRequests((prev) => ({ ...prev, [requestId]: null }));
+    }
+  };
+
+  const handleRejectCancellation = async (requestId: number) => {
+    const reason = prompt("Enter reason for rejecting cancellation (optional):") || "Cancellation denied by administrator";
+    setProcessingRequests((prev) => ({ ...prev, [requestId]: "rejecting" }));
+    try {
+      await rejectLeaveCancellation(requestId, reason);
+      toast.success("Leave cancellation rejected.");
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reject leave cancellation");
+    } finally {
+      setProcessingRequests((prev) => ({ ...prev, [requestId]: null }));
+    }
+  };
+
   // Helper date formatting
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "N/A";
@@ -286,9 +315,10 @@ export default function PrincipalLeaveRequestsPage() {
 
   // Filter requests based on tab selection
   const filteredRequests = requests.filter((req) => {
+    if (activeTab === "cancellations") return (req as any).cancellation_status === "REQUESTED";
     const status = getRequestStatus(req);
     if (activeTab === "pending") return status === "PENDING";
-    if (activeTab === "approved") return status === "APPROVED";
+    if (activeTab === "approved") return status === "APPROVED" && (req as any).cancellation_status !== "REQUESTED";
     if (activeTab === "partial") return status === "PARTIAL";
     if (activeTab === "rejected") return status === "REJECTED";
     return true;
@@ -544,6 +574,14 @@ export default function PrincipalLeaveRequestsPage() {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="cancellations" className="px-5 py-2 text-sm font-semibold flex items-center gap-2 rounded-lg transition-all">
+              Cancellations
+              {!isLoading && (
+                <span className="ml-1 bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/60 dark:text-amber-300">
+                  {requests.filter((r) => (r as any).cancellation_status === "REQUESTED").length}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
           <span className="text-xs font-medium text-muted-foreground">
             Displaying {filteredRequests.length} matching requests
@@ -735,6 +773,49 @@ export default function PrincipalLeaveRequestsPage() {
                                     </>
                                   )}
                                 </Button>
+                              </div>
+                            )}
+
+                            {/* Direct Actions (Cancellation Request) */}
+                            {(request as any).cancellation_status === "REQUESTED" && (
+                              <div className="bg-amber-500/10 border border-amber-300 dark:border-amber-700/50 rounded-xl p-3.5 space-y-2 mt-2">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                                  <span>Cancellation Requested by Staff</span>
+                                </div>
+                                <p className="text-xs italic text-zinc-700 dark:text-zinc-300 pl-5">
+                                  "{(request as any).cancellation_reason || "No cancellation reason specified"}"
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 pt-1 pl-5">
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg"
+                                    onClick={() => handleApproveCancellation(request.id)}
+                                    disabled={processingRequests[request.id] !== undefined}
+                                  >
+                                    {processingRequests[request.id] === "approving" ? (
+                                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Check className="mr-1.5 h-3.5 w-3.5" />
+                                    )}
+                                    Approve Cancellation & Restore Balance
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-rose-300 text-rose-600 hover:bg-rose-50 text-xs rounded-lg"
+                                    onClick={() => handleRejectCancellation(request.id)}
+                                    disabled={processingRequests[request.id] !== undefined}
+                                  >
+                                    {processingRequests[request.id] === "rejecting" ? (
+                                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <X className="mr-1.5 h-3.5 w-3.5" />
+                                    )}
+                                    Reject Cancellation
+                                  </Button>
+                                </div>
                               </div>
                             )}
 

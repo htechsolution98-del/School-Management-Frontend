@@ -54,9 +54,65 @@ export interface LeaveCycle {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  is_closed?: boolean;
+  closed_at?: string;
+  closed_by?: number | null;
+  closed_by_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }
+
+export interface LeaveTransaction {
+  id: number;
+  school?: number;
+  staff: number;
+  staff_name?: string;
+  leave_type: number;
+  leave_type_name?: string;
+  leave_cycle: number;
+  leave_cycle_name?: string;
+  leave_request?: number | null;
+  transaction_type: string;
+  amount: number | string;
+  balance_after: number | string;
+  description: string;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  created_at: string;
+}
+
+export interface LeaveReportSummary {
+  cycle: {
+    id: number | null;
+    name: string;
+    is_closed: boolean;
+  };
+  totals: {
+    total_allocated: number;
+    total_carry_forward: number;
+    total_used: number;
+    total_pending: number;
+    total_available: number;
+  };
+  request_counts: {
+    pending: number;
+    approved: number;
+    rejected: number;
+    cancelled: number;
+    cancellation_requests: number;
+  };
+  staff_summary: Array<{
+    staff_id: number;
+    staff_name: string;
+    department: string | null;
+    allocated: number;
+    carry_forward: number;
+    used: number;
+    pending: number;
+    available: number;
+  }>;
+}
+
 
 export interface DynamicLeaveTemplate {
   id: number;
