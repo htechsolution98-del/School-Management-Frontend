@@ -737,7 +737,7 @@ export default function ClerkMyLeavesPage() {
                                   size="sm"
                                   onClick={() => handleDeleteRequest(request.id)}
                                   disabled={deletingId === request.id}
-                                  className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-xs"
+                                  className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-medium shadow-xs"
                                 >
                                   {deletingId === request.id ? (
                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -971,7 +971,7 @@ export default function ClerkMyLeavesPage() {
                 if (onConfirmAction) onConfirmAction();
                 setIsConfirmOpen(false);
               }}
-              className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-xs px-5"
+              className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-xs px-5"
             >
               Confirm
             </Button>

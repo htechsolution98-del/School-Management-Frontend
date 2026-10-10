@@ -1543,7 +1543,7 @@ export default function LeaveConfigPage() {
                 if (onConfirmAction) onConfirmAction();
                 setIsConfirmOpen(false);
               }}
-              className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-xs px-5"
+              className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-xs px-5"
             >
               Confirm
             </Button>

@@ -11,6 +11,7 @@ import { type AnnouncementResponse } from "@/lib/principal";
 import { getCurrentUserProfile } from "@/lib/current-user";
 import { ProfileDialog } from "@/components/profile/profile-dialog";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
+import { PageTutorialDialog } from "@/components/tutorial/page-tutorial-dialog";
 import type { CurrentUserProfile } from "@/types";
 
 export interface SidebarLink {
@@ -535,7 +536,10 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Page Tutorial Help Button */}
+            <PageTutorialDialog roleTitle={roleTitle} />
+
             {/* Notification Bell */}
             <div ref={notificationRef} className="relative">
               <button

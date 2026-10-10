@@ -699,7 +699,7 @@ export default function ClerkLeaveRequestsPage() {
                                       variant="destructive"
                                       onClick={() => handleBulkAction(request.id, "REJECTED")}
                                       disabled={processingRequests[request.id] !== undefined}
-                                      className="h-8 text-xs font-bold rounded-xl gap-1 bg-rose-600 hover:bg-rose-700 text-white shadow-2xs"
+                                      className="h-8 text-xs font-bold rounded-xl gap-1 bg-rose-600 hover:bg-rose-700 text-white hover:text-white shadow-2xs"
                                     >
                                       {processingRequests[request.id] === "rejecting" ? (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -859,7 +859,7 @@ export default function ClerkLeaveRequestsPage() {
                                 </Button>
                                 <Button
                                   variant="destructive"
-                                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
+                                  className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
                                   onClick={() => handleBulkAction(request.id, "REJECTED")}
                                   disabled={processingRequests[request.id] !== undefined}
                                 >

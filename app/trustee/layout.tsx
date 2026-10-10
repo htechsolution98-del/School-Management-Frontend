@@ -12,6 +12,7 @@ const sidebarLinks = [
   { title: "Announcements", href: "/trustee/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/trustee/events", icon: CalendarDays },
   { title: "Activity Logs", href: "/trustee/activity-logs", icon: History },
+  { title: "Support & Helpdesk", href: "/trustee/support", icon: Megaphone },
   { title: "Account Settings", href: "/trustee/settings", icon: Settings },
   // { title: "Overview", href: "/trustee/dashboard", icon: LayoutDashboard },
 ];

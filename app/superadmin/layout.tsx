@@ -2,13 +2,15 @@
 
 import React from "react";
 import { AdminShell } from "@/components/superadmin/admin-shell";
-import { Building2, LayoutDashboard , Sparkles , CreditCard, BadgePercent, History } from "lucide-react";
+import { Building2, LayoutDashboard, Sparkles, CreditCard, BadgePercent, History, Headphones, BookOpen } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/superadmin", icon: LayoutDashboard, exact: true },
   { title: "Manage Schools", href: "/superadmin/schools", icon: Building2 },
   { title: "Subscriptions", href: "/superadmin/subscriptions", icon: BadgePercent },
   { title: "Features", href: "/superadmin/fetures_select", icon: Sparkles },
+  { title: "Support Tickets", href: "/superadmin/support", icon: Headphones },
+  { title: "Tutorials", href: "/superadmin/tutorials", icon: BookOpen },
   { title: "Activity Logs", href: "/superadmin/activity-logs", icon: History },
   { title: "Razorpay", href: "/superadmin/razorpay", icon: CreditCard },
 ];
