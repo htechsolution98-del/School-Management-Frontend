@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Send,
   GraduationCap,
+  History,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -64,8 +65,10 @@ const sidebarLinks = [
   { title: "Published Results", href: "/principal/result/published", icon: Award },
   { title: "Announcements", href: "/principal/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/principal/events", icon: CalendarDays },
+  { title: "Activity Logs", href: "/principal/activity-logs", icon: History },
   { title: "Staff Leave", href: "/principal/leave-requests", icon: CalendarCheck },
   { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
+  { title: "Account Settings", href: "/principal/settings", icon: Settings },
 ];
 
 export default function PrincipalLayout({ children }: { children: React.ReactNode }) {

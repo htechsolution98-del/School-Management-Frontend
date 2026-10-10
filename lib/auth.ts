@@ -422,14 +422,31 @@ export function forceLogout(): void {
 }
 
 export async function logoutUser(): Promise<void> {
-
   try {
+    const token = getAccessToken();
+    let username = "";
+    let userId: any = null;
+    if (typeof window !== "undefined") {
+      username = localStorage.getItem("username") || "";
+      try {
+        const cu = JSON.parse(localStorage.getItem("current_user") || "{}");
+        if (cu?.id) userId = cu.id;
+        if (!username && cu?.username) username = cu.username;
+      } catch {}
+    }
 
     await apiFetch(`${API_BASE_URL}/logout/`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        username,
+        user_id: userId,
+      }),
       credentials: "include",
     });
-
   } catch {}
 
   clearAuthSession();

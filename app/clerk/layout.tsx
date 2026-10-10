@@ -97,6 +97,7 @@ const sidebarLinks = [
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },
+  { title: "Account Settings", href: "/clerk/settings", icon: Settings },
 ];
 
 export default function ClerkLayout({ children }: { children: React.ReactNode }) {
