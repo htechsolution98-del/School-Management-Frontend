@@ -38,6 +38,8 @@ export interface AttendanceRecord {
   is_missing_punch?: boolean;
   working_hours?: string | number | null;
   source?: string;
+  status?: string;
+  department_name?: string | null;
 }
 
 // ─── Student Attendance Types ─────────────────────────────────────────────────

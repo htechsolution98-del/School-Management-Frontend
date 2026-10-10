@@ -21,7 +21,7 @@ import { getUserRoles, getUserRole } from "@/lib/auth";
 import "../clerk-workspace.css";
 
 interface StaffFeature { id?: number; feature_id?: number; feature_name?: string }
-const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, attendance_setting: undefined, leave_template: undefined, salary_structure: undefined, address: "", date_of_birth: "", joining_date: "", salary: "", is_active: true };
+const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, attendance_setting: undefined, leave_template: undefined, salary_structure: undefined, address: "", date_of_birth: "", joining_date: "", exit_date: "", salary: "", is_active: true };
 const ALLOWED_ROLES = ["TEACHER", "CLERK", "ASSISTANT CLERK", "LIBRARIAN", "FEES MANAGEMENT", "PRINCIPAL", "VICE PRINCIPAL", "TRANSPORTATION", "INVENTORY"];
 const message = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 const title = (value: string) => value.toLowerCase().replace(/\b\w/g, character => character.toUpperCase());
@@ -100,6 +100,7 @@ export default function ClerkStaffDashboard() {
     { key: "mobile", header: "Mobile", search: member => member.mobile, camelCase: false },
     { key: "dob", header: "Date of birth", search: member => member.date_of_birth, render: member => formatDDMMYYYY(member.date_of_birth) },
     { key: "joining", header: "Joined", search: member => member.joining_date || member.created_at || "", render: member => formatDDMMYYYY(member.joining_date || member.created_at) },
+    { key: "exit", header: "Exit Date", search: member => member.exit_date || "", render: member => member.exit_date ? formatDDMMYYYY(member.exit_date) : "-" },
     { key: "salary", header: "Salary (INR)", search: member => member.salary, numeric: true, render: member => member.salary == null ? "-" : Number(member.salary).toLocaleString("en-IN", { minimumFractionDigits: 2 }) },
     { key: "shift", header: "Shift", search: member => attendanceSettings.find(s => s.id === member.attendance_setting)?.name || "-", camelCase: false },
     { key: "structure", header: "Structure", search: member => salaryStructures.find(s => s.id === member.salary_structure)?.name || "-", camelCase: false },
@@ -123,6 +124,7 @@ export default function ClerkStaffDashboard() {
       address: member.address || "",
       date_of_birth: toHTMLDate(member.date_of_birth),
       joining_date: toHTMLDate(member.joining_date),
+      exit_date: toHTMLDate(member.exit_date),
       salary: member.salary || "",
       is_active: !!member.is_active,
     } : { ...EMPTY_FORM });
@@ -138,6 +140,7 @@ export default function ClerkStaffDashboard() {
     busy.current = true; setSaving(true);
     try {
       const formattedJoiningDate = form.joining_date?.trim() ? toInputDate(form.joining_date.trim()) : (editing ? null : undefined);
+      const formattedExitDate = form.exit_date?.trim() ? toInputDate(form.exit_date.trim()) : (editing ? null : undefined);
       const payload = {
         ...form,
         name: form.name.trim(),
@@ -147,6 +150,7 @@ export default function ClerkStaffDashboard() {
         salary: form.salary.trim(),
         date_of_birth: toApiDate(form.date_of_birth),
         joining_date: formattedJoiningDate,
+        exit_date: formattedExitDate,
         attendance_setting: form.attendance_setting ? Number(form.attendance_setting) : null,
         leave_template: form.leave_template ? Number(form.leave_template) : null,
         salary_structure: form.salary_structure ? Number(form.salary_structure) : null,
@@ -240,7 +244,7 @@ export default function ClerkStaffDashboard() {
     {error && <p role="alert" className="hr-error">{error}</p>}
     {success && <p role="status" className="hr-success">{success}</p>}
     {!loading && (!roles.length || !departments.length) && <p className="hr-notice">{!departments.length ? <><Link href="/clerk/departments" className="underline">Create a department</Link> before adding staff. </> : null}{!roles.length ? "Staff roles are unavailable. Refresh or configure staff roles before saving." : ""}</p>}
-    {formOpen && <div id="staff-record-editor" className="animate-in fade-in slide-in-from-top-4 duration-300"><StaffRecordForm value={form} errors={errors} departments={departments} roles={roles} editing={!!editing} saving={saving} onClose={closeForm} onSubmit={save} onChange={(field, value) => { setForm(previous => ({ ...previous, [field]: value })); setErrors(previous => ({ ...previous, [field]: undefined })); }} /></div>}
+    {formOpen && <div id="staff-record-editor" className="animate-in fade-in slide-in-from-top-4 duration-300"><StaffRecordForm value={form} errors={errors} departments={departments} roles={roles} attendanceSettings={attendanceSettings} leaveTemplates={leaveTemplates} salaryStructures={salaryStructures} editing={!!editing} saving={saving} onClose={closeForm} onSubmit={save} onChange={(field, value) => { setForm(previous => ({ ...previous, [field]: value })); setErrors(previous => ({ ...previous, [field]: undefined })); }} /></div>}
     
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">

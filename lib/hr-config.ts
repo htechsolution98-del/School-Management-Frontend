@@ -409,3 +409,18 @@ export async function rejectAttendanceRegularization(
     "Failed to reject attendance regularization."
   );
 }
+
+export async function getPayrollPayslips(params?: {
+  payroll_run_id?: number;
+  staff_id?: number;
+}): Promise<PayrollPayslip[]> {
+  const query = new URLSearchParams();
+  if (params?.payroll_run_id) query.set("payroll_run_id", String(params.payroll_run_id));
+  if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+
+  const url = `${API_BASE_URL}${API_ENDPOINTS.PAYROLL_PAYSLIPS}${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await fetchWithAuth(url);
+  const data = await handleResponse<any>(res, "Failed to fetch payroll payslips.");
+  return normalizeList<PayrollPayslip>(data);
+}
+

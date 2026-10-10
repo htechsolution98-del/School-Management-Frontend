@@ -157,7 +157,7 @@ export interface LeaveBalance {
   updated_at?: string;
 }
 
-export type CalcType = "Fixed" | "Percentage" | "Formula";
+export type CalcType = "Fixed" | "Percentage" | "Formula" | "Per Day" | "Per Hour";
 export type ComponentTypeEnum = "Earning" | "Deduction";
 
 export interface DynamicSalaryComponent {

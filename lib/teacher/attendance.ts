@@ -75,6 +75,38 @@ export async function getAttendanceHistory(): Promise<AttendanceRecord[]> {
   return Array.isArray(data) ? data : (data.results ?? data.data ?? []);
 }
 
+export async function getStaffAttendance(params?: {
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  department?: string | number;
+  category?: string;
+  staff_id?: number;
+}): Promise<AttendanceRecord[]> {
+  const query = new URLSearchParams();
+  if (params?.date) query.set("date", params.date);
+  if (params?.start_date) query.set("start_date", params.start_date);
+  if (params?.end_date) query.set("end_date", params.end_date);
+  if (params?.department) query.set("department", String(params.department));
+  if (params?.category) query.set("category", params.category);
+  if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+
+  const url = `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE}${query.toString() ? `?${query.toString()}` : ""}`;
+  const response = await fetchWithAuth(url);
+
+  if (!response.ok) {
+    let message = "Failed to fetch staff attendance records.";
+    try {
+      const err = await response.json();
+      message = err?.detail || err?.message || message;
+    } catch { }
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+}
+
 // ─── Face verification & enrollment ──────────────────────────────────────────
 
 export async function checkFaceStatus(): Promise<{ enrolled: boolean }> {
