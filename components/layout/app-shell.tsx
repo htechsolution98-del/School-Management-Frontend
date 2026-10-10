@@ -723,6 +723,20 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                 </div>
                 <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                   <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Posted By</h4>
+                    <p className="mt-1 text-xs font-semibold text-slate-800">
+                      {selectedNotification.created_by_name || selectedNotification.created_by_role || "School Administration"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Priority</h4>
+                    <span className="mt-1 inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                      {selectedNotification.priority || "NORMAL"}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div>
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Target Audience</h4>
                     <span className="mt-1.5 inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-[#5826df]">
                       {selectedNotification.announcement_for ?? "ALL"}
@@ -758,8 +772,12 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
                 </div>
               </div>
               <div className="mt-6 flex justify-end">
-                <button onClick={() => setSelectedNotification(null)} className="rounded-xl bg-slate-100 px-5 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-200">
-                  Close
+                <button
+                  type="button"
+                  onClick={() => setSelectedNotification(null)}
+                  className="rounded-xl bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white shadow-md shadow-[#5826df]/25 px-6 py-2.5 text-xs font-bold transition-all active:scale-[0.98]"
+                >
+                  Close Notice
                 </button>
               </div>
             </motion.div>

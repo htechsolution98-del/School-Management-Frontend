@@ -4,20 +4,35 @@ import { apiFetch } from "./helpers";
 export interface AnnouncementPayload {
   title: string;
   description: string;
-  announcement_for?: "TEACHER" | "STUDENT" | "PARENT" | "ALL" | string;
+  announcement_for?: "ALL" | "TEACHER" | "STUDENT" | "PARENT" | "CLERK" | "LIBRARIAN" | "FEE-MANAGER" | "TRANSPORT" | string;
   is_everyone?: boolean | string;
+  priority?: "NORMAL" | "IMPORTANT" | "URGENT" | string;
   expires_at?: string | null;
+  target_class?: number | string | null;
+  target_division?: string | null;
+  target_student?: number | string | null;
 }
 
 export interface AnnouncementResponse {
   id: number;
+  school?: number;
   title: string;
   description: string;
   announcement_for?: string;
   is_everyone?: boolean | string;
+  priority?: "NORMAL" | "IMPORTANT" | "URGENT" | string;
   expires_at?: string;
   created_at: string;
-  created_by?: string;
+  created_by?: number | string;
+  created_by_name?: string;
+  created_by_role?: string;
+  is_created_by_me?: boolean;
+  can_manage?: boolean;
+  target_class?: number | string | null;
+  target_class_name?: string | null;
+  target_division?: string | null;
+  target_student?: number | string | null;
+  target_student_name?: string | null;
 }
 
 export async function getAnnouncements(): Promise<AnnouncementResponse[]> {

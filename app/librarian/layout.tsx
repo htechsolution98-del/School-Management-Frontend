@@ -1,11 +1,12 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Megaphone } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/librarian", icon: LayoutDashboard },
+  { title: "Announcements", href: "/librarian/announcements", icon: Megaphone },
 ];
 
 export default function LibrarianLayout({ children }: { children: React.ReactNode }) {
