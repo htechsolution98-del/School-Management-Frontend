@@ -16,6 +16,7 @@ import {
   CalendarCheck,
   CalendarRange,
   Loader2,
+  Settings,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getDashboardRoute } from "@/lib/auth";
@@ -36,6 +37,7 @@ const sidebarLinks = [
   { title: "My Leaves", href: "/teacher/leaves", icon: CalendarCheck },
   { title: "Attendance History", href: "/teacher/attendance", icon: ClipboardList },
   { title: "Exam Timetable", href: "/teacher/exams", icon: CalendarRange },
+  { title: "Account Settings", href: "/teacher/settings", icon: Settings },
 ];
 
 const ALLOWED_TEACHER_ROLES = ["teacher", "staff"];

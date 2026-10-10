@@ -10,6 +10,7 @@ import {
   CreditCard,
   Megaphone,
   CalendarDays,
+  Settings,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -54,6 +55,11 @@ const sidebarLinks = [
     title: "Events & Holidays", 
     href: "/fees/events", 
     icon: CalendarDays,
+  },
+  { 
+    title: "Account Settings", 
+    href: "/fees/settings", 
+    icon: Settings,
   },
 ];
 
