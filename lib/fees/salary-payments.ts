@@ -25,9 +25,20 @@ export async function generateSalary(
   );
   const data = await response.json();
   if (!response.ok) {
-    const errorMsg =
-      data?.message || data?.detail || "Failed to generate salary.";
-    const err: any = new Error(errorMsg);
+    let errorMsg = data?.message || data?.detail;
+    if (!errorMsg && Array.isArray(data?.non_field_errors) && data.non_field_errors.length > 0) {
+      errorMsg = data.non_field_errors[0];
+    }
+    if (!errorMsg && typeof data === "object" && data !== null) {
+      const firstVal = Object.values(data).flat()[0];
+      if (typeof firstVal === "string") {
+        errorMsg = firstVal;
+      }
+    }
+    if (!errorMsg) {
+      errorMsg = "Failed to generate salary.";
+    }
+    const err: any = new Error(String(errorMsg));
     err.data = data;
     throw err;
   }
