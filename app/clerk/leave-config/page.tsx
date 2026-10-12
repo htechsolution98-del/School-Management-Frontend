@@ -88,10 +88,10 @@ export default function LeaveConfigPage() {
   const [typeAllocationPeriod, setTypeAllocationPeriod] = useState<string>("Yearly");
   const [typeIsPaid, setTypeIsPaid] = useState(true);
   const [typeAllowEncashment, setTypeAllowEncashment] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   // Alias for backward compatibility if referenced elsewhere
-  const typeCategoryIds = selectedCategories;
-  const setTypeCategoryIds = setSelectedCategories;
+  const typeCategoryIds = selectedCategories.map(Number).filter((n) => !isNaN(n) && n > 0);
+  const setTypeCategoryIds = (ids: (string | number)[]) => setSelectedCategories(ids.map(String));
   const [typeCarryForward, setTypeCarryForward] = useState(false);
   const [maxCarryForward, setMaxCarryForward] = useState<number>(0);
 
@@ -152,41 +152,26 @@ export default function LeaveConfigPage() {
       .join(" ");
   };
 
-  // Available staff categories dynamically bound to dbCategories (SchoolFeatures) or the 9 predefined roles
+  // Available staff categories dynamically bound to PREDEFINED_STAFF_ROLES with DB feature IDs
   const availableCategories = useMemo(() => {
-    if (dbCategories && dbCategories.length > 0) {
-      const allowed = [
-        "TEACHER",
-        "CLERK",
-        "PRINCIPAL",
-        "LIBRARIAN",
-        "VICE PRINCIPAL",
-        "ASSISTANT CLERK",
-        "TRANSPORTATION",
-        "FEES MANAGEMENT",
-        "INVENTORY",
-      ];
-      const seenNames = new Set<string>();
-      const list: { id: number; name: string }[] = [];
-
-      for (const cat of dbCategories) {
+    return PREDEFINED_STAFF_ROLES.map((role) => {
+      const roleUpper = role.name.toUpperCase();
+      const match = (dbCategories || []).find((cat: any) => {
         const rawName = cat.feature_name || cat.name || cat.feature?.name || "";
-        const formatted = formatRoleLabel(rawName);
-        const upper = formatted.toUpperCase();
-        if (allowed.some((a) => upper.includes(a)) && !seenNames.has(formatted)) {
-          seenNames.add(formatted);
-          list.push({
-            id: Number(cat.id),
-            name: formatted,
-          });
-        }
-      }
+        const formatted = formatRoleLabel(rawName).toUpperCase();
+        return formatted === roleUpper;
+      });
 
-      if (list.length > 0) {
-        return list;
-      }
-    }
-    return PREDEFINED_STAFF_ROLES;
+      const resolvedId =
+        match && match.id != null && !isNaN(Number(match.id)) && Number(match.id) > 0
+          ? Number(match.id)
+          : role.id;
+
+      return {
+        id: resolvedId,
+        name: role.name,
+      };
+    });
   }, [dbCategories]);
 
   const allAvailableCategoryIds = useMemo(
@@ -312,28 +297,23 @@ export default function LeaveConfigPage() {
   };
 
   const isAllCategoriesSelected =
-    allAvailableCategoryIds.length > 0 &&
-    allAvailableCategoryIds.every((id) => selectedCategories.includes(id));
+    availableCategories.length > 0 &&
+    selectedCategories.length === availableCategories.length;
 
   const toggleCategory = (rawId: number | string) => {
-    const id = Number(rawId);
-    if (isNaN(id) || id <= 0) return;
+    const id = String(rawId);
+    if (!id || id === "NaN" || id === "undefined") return;
 
-    setSelectedCategories((prev) => {
-      const prevNumbers = Array.from(new Set(prev.map((c) => Number(c)).filter((c) => !isNaN(c) && c > 0)));
-      const next = prevNumbers.includes(id)
-        ? prevNumbers.filter((c) => c !== id)
-        : [...prevNumbers, id];
-      return Array.from(new Set(next));
-    });
+    setSelectedCategories((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
   };
 
   const toggleSelectAllCategories = () => {
-    if (isAllCategoriesSelected) {
+    if (selectedCategories.length === availableCategories.length && availableCategories.length > 0) {
       setSelectedCategories([]);
     } else {
-      // Replaces the array with exactly the 9 predefined unique category IDs, NOT concatenate
-      setSelectedCategories(Array.from(new Set(allAvailableCategoryIds)));
+      setSelectedCategories(availableCategories.map((r) => String(r.id)));
     }
   };
 
@@ -485,13 +465,13 @@ export default function LeaveConfigPage() {
       }
     });
 
-    const sanitizedUniqueIds = Array.from(new Set(extractedIds.map(Number)));
+    const sanitizedUniqueIds = Array.from(new Set(extractedIds.map(String)));
     setSelectedCategories(
       Array.from(
         new Set(
           sanitizedUniqueIds.length > 0
             ? sanitizedUniqueIds
-            : allAvailableCategoryIds.slice(0, 1)
+            : allAvailableCategoryIds.slice(0, 1).map(String)
         )
       )
     );
@@ -1361,7 +1341,7 @@ export default function LeaveConfigPage() {
                         type="checkbox"
                         className="h-4 w-4 rounded accent-primary pointer-events-none"
                         checked={isAllCategoriesSelected}
-                        onChange={() => {}}
+                        readOnly
                       />
                       <span>Select All Roles</span>
                     </div>
@@ -1371,13 +1351,22 @@ export default function LeaveConfigPage() {
                   </div>
 
                   {/* Individual Role Options */}
-                  {availableCategories.map((cat) => {
-                    const catId = Number(cat.id);
-                    const isChecked = selectedCategories.includes(catId);
+                  {availableCategories.map((role) => {
+                    const roleId = String(role.id);
+                    const isChecked = selectedCategories.includes(roleId);
 
                     return (
-                      <label
-                        key={`cat-option-${catId}`}
+                      <div
+                        key={`cat-option-${roleId}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleCategory(roleId)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleCategory(roleId);
+                          }
+                        }}
                         className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors text-sm select-none ${
                           isChecked
                             ? "bg-primary/8 dark:bg-primary/20 text-primary font-medium"
@@ -1386,13 +1375,13 @@ export default function LeaveConfigPage() {
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded accent-primary cursor-pointer"
+                          className="h-4 w-4 rounded accent-primary pointer-events-none"
                           checked={isChecked}
-                          onChange={() => toggleCategory(catId)}
+                          readOnly
                         />
                         <UserCheck className="h-3.5 w-3.5 text-primary/60 shrink-0" />
-                        <span>{cat.name}</span>
-                      </label>
+                        <span>{role.name}</span>
+                      </div>
                     );
                   })}
                 </div>

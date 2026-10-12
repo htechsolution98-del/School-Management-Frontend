@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
   Megaphone,
   CalendarDays,
+  BarChart3,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
@@ -76,6 +77,7 @@ const sidebarLinks = [
     href: "/clerk/att-desk",
     icon: CalendarCheck,
     subLinks: [
+      { title: "Staff Attendance", href: "/clerk/staff-attendance", icon: CalendarCheck },
       { title: "Absentee Calling Desk", href: "/clerk/absentee-desk", icon: PhoneCall },
       { title: "Attendance Zone", href: "/clerk/location-settings", icon: MapPin },
     ],
@@ -95,6 +97,7 @@ const sidebarLinks = [
   { title: "Announcements", href: "/clerk/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/clerk/events", icon: CalendarDays },
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
+  { title: "Leave Reports", href: "/clerk/leave-reports", icon: BarChart3 },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },
   { title: "Account Settings", href: "/clerk/settings", icon: Settings },

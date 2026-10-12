@@ -160,6 +160,41 @@ export function setRoleCookies(roles: string[], maxAge?: number | null) {
   setCookie("user_roles", JSON.stringify(normalized), maxAge);
 }
 
+export function getUserRoles(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("roles");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((r) => String(r).toLowerCase().trim()).filter(Boolean);
+      }
+    }
+  } catch {}
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)user_roles=([^;]*)/);
+    if (match) {
+      const parsed = JSON.parse(decodeURIComponent(match[1]));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((r) => String(r).toLowerCase().trim()).filter(Boolean);
+      }
+    }
+  } catch {}
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)user_role=([^;]*)/);
+    if (match) {
+      const r = decodeURIComponent(match[1]).toLowerCase().trim();
+      if (r) return [r];
+    }
+  } catch {}
+  return [];
+}
+
+export function getUserRole(): string {
+  const roles = getUserRoles();
+  return roles[0] || "";
+}
+
 export function clearAuthSession(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("access_token");
