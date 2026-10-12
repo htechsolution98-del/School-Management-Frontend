@@ -60,25 +60,24 @@ function LoginFormInner() {
     setError("");
 
     const identifier = username.trim();
-    const isEmail = identifier.includes("@");
-
-    // Non-email input is treated as a mobile number, so enforce the same
-    // exactly-10-digits rule the API applies before hitting the network.
-    if (!isEmail) {
-      const normalized = identifier.replace(/[\s()\-.]/g, "");
-      if (normalized && !new RegExp(`^[0-9]{${MOBILE_LENGTH}}$`).test(normalized)) {
-        setError(MOBILE_ERROR_MESSAGE);
-        return;
-      }
+    if (!identifier) {
+      setError("Please enter your mobile number, GR number, or username.");
+      return;
     }
+
+    const isEmail = identifier.includes("@");
+    const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
+    const is10DigitMobile = /^[0-9]{10}$/.test(digitsOnly);
 
     setIsLoading(true);
 
     const payload: LoginRequest = { password };
     if (isEmail) {
       payload.email = identifier;
+    } else if (is10DigitMobile) {
+      payload.mobile = digitsOnly;
     } else {
-      payload.mobile = identifier.replace(/[\s()\-.]/g, "");
+      payload.username = identifier;
     }
 
     try {
@@ -154,7 +153,7 @@ function LoginFormInner() {
             htmlFor="username"
             className="text-sm font-bold text-[#1D496C]"
           >
-            Username
+            Mobile, GR No, or Username
           </Label>
           <div className="relative">
             <User
@@ -165,7 +164,7 @@ function LoginFormInner() {
             <Input
               id="username"
               type="text"
-              placeholder="Enter your username"
+              placeholder="Enter 10-digit mobile, GR number, or username"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}

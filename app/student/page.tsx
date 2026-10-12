@@ -16,7 +16,13 @@ import {
   CreditCard,
   Layers,
   Coffee,
-  GraduationCap
+  GraduationCap,
+  Send,
+  Upload,
+  X,
+  Loader2,
+  AlertCircle,
+  Paperclip,
 } from "lucide-react";
 import { 
   getStudentHomework, 
@@ -24,6 +30,7 @@ import {
   getStudentAttendance, 
   getStudentSyllabus, 
   getStudentFees,
+  submitHomework,
   type HomeworkItem,
   type StudentExam,
   type StudentAttendanceRecord
@@ -88,6 +95,11 @@ export default function StudentDashboardPage() {
   const [syllabusItems, setSyllabusItems] = useState<any[]>([]);
   const [pendingFeeAmount, setPendingFeeAmount] = useState<number>(0);
   const [timetableList, setTimetableList] = useState<any[]>([]);
+  const [quickSubmitHw, setQuickSubmitHw] = useState<HomeworkItem | null>(null);
+  const [submittingFile, setSubmittingFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Default day to today's weekday
   const currentWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(new Date()).toLowerCase();
@@ -424,21 +436,36 @@ export default function StudentDashboardPage() {
           ) : (
             <div className="divide-y divide-zinc-100 flex-1 flex flex-col">
               {homeworkList.slice(0, 4).map((hw, idx) => (
-                <div key={idx} className="py-3 flex items-start justify-between gap-3 hover:bg-slate-50/60 rounded-xl px-2 transition-colors">
-                  <div>
+                <div key={idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 rounded-xl px-2.5 transition-colors">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
                         {hw.school_class_name || hw.division_name || "Homework"}
                       </span>
-                      <span className="text-xs font-bold text-slate-900">{hw.title}</span>
+                      <span className="text-xs font-bold text-slate-900 truncate">{hw.title}</span>
                     </div>
                     {hw.description && (
                       <p className="text-xs text-slate-500 mt-1 line-clamp-1">{hw.description}</p>
                     )}
                   </div>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-full shrink-0">
-                    Due: {hw.due_date || "Soon"}
-                  </span>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-full">
+                      Due: {hw.due_date || "Soon"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickSubmitHw(hw);
+                        setSubmittingFile(null);
+                        setSubmitError(null);
+                        setSubmitSuccess(false);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    >
+                      <Send size={12} />
+                      Submit Assignment
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -532,6 +559,153 @@ export default function StudentDashboardPage() {
           View Academic Results
         </Link>
       </motion.div>
+
+      {/* Quick Submit Assignment Modal */}
+      {quickSubmitHw && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setQuickSubmitHw(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full border border-slate-200/80 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/40">
+              <div>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
+                  {quickSubmitHw.school_class_name || "Assignment"} · {quickSubmitHw.division_name || ""}
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 mt-1">Submit Assignment</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickSubmitHw(null)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/70">
+                <h4 className="text-sm font-bold text-slate-800">{quickSubmitHw.title}</h4>
+                {quickSubmitHw.description && (
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed">
+                    {quickSubmitHw.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-600 mt-3 pt-3 border-t border-slate-200/50">
+                  <span className="flex items-center gap-1">
+                    <Clock size={12} className="text-indigo-500" />
+                    Due: <strong>{quickSubmitHw.due_date || "Soon"}</strong>
+                  </span>
+                  <span>Teacher: <strong>{quickSubmitHw.teacher_name}</strong></span>
+                </div>
+              </div>
+
+              {submitSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>Assignment submitted successfully!</span>
+                </div>
+              )}
+
+              {submitError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Attach Completed Assignment (PDF / Image)
+                </label>
+                <label className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/80 rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 block">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Upload size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-indigo-700">
+                      {submittingFile ? submittingFile.name : "Click to browse & upload assignment file"}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Supports PDF, PNG, JPG documents</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setSubmittingFile(e.target.files[0]);
+                        setSubmitError(null);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {submittingFile && (
+                <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-xs">
+                  <span className="font-bold text-slate-800 truncate">{submittingFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSubmittingFile(null)}
+                    className="text-rose-500 hover:text-rose-700 font-bold ml-2 shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setQuickSubmitHw(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  setIsSubmitting(true);
+                  setSubmitError(null);
+                  try {
+                    await submitHomework(quickSubmitHw.id, submittingFile ?? undefined);
+                    setSubmitSuccess(true);
+                    setTimeout(() => {
+                      setQuickSubmitHw(null);
+                      setSubmitSuccess(false);
+                      setSubmittingFile(null);
+                    }, 1500);
+                  } catch (err: any) {
+                    setSubmitError(err?.message || "Failed to submit assignment.");
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Submitting…
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    Submit Assignment
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
