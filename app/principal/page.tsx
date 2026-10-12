@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Users, GraduationCap, FileText, ClipboardList, X } from "lucide-react";
+import Link from "next/link";
+import { Users, GraduationCap, FileText, ClipboardList, X, Loader2, CalendarDays, Plus, ArrowRight } from "lucide-react";
 import { fetchDashboardCount, type DashboardCount, getAllStudents } from "@/lib/principal";
 import { fetchAdmissions } from "@/lib/clerk/admissions";
 import { getStaffList } from "@/lib/staff";
 import type { Staff } from "@/types";
-import { Loader2 } from "lucide-react";
 import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -83,6 +83,42 @@ export default function PrincipalDashboard() {
 
       {/* ─── Staff Attendance Widget ────────────────────────────────────────── */}
       <StaffAttendanceCard roleName="Principal / Leadership" />
+
+      {/* ─── Principal Personal Leave Quick Card ────────────────────────────── */}
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-sky-50/70 p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-200">
+            <CalendarDays className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-gray-900">Principal Leave Application</h3>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                Direct to Trustee
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mt-0.5">
+              Apply for leave directly to the Trustee Board (/trustee/leave-requests) for review and approval.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <Link
+            href="/principal/leaves?apply=true"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            Apply My Leave
+          </Link>
+          <Link
+            href="/principal/leaves"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition-all"
+          >
+            Leave History
+            <ArrowRight className="h-3.5 w-3.5 text-gray-400" />
+          </Link>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, idx) => {
