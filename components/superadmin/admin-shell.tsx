@@ -5,7 +5,12 @@ import { AppShell, type SidebarLink } from "@/components/layout/app-shell";
 
 export function AdminShell({ children, links }: { children: ReactNode; links: SidebarLink[] }) {
   return (
-    <AppShell links={links} roleTitle="Super Admin" userName="Super Admin">
+    <AppShell
+      links={links}
+      roleTitle="Super Admin"
+      userName="Super Admin"
+      headerTitle="VidyaSanchalan Platform"
+    >
       {children}
     </AppShell>
   );
