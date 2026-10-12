@@ -12,6 +12,7 @@ import { getCurrentUserProfile } from "@/lib/current-user";
 import { ProfileDialog } from "@/components/profile/profile-dialog";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { PageTutorialDialog } from "@/components/tutorial/page-tutorial-dialog";
+import { cn } from "@/lib/utils";
 import type { CurrentUserProfile } from "@/types";
 
 export interface SidebarLink {
@@ -33,6 +34,10 @@ export interface AppShellProps {
   onSignOut?: () => void;
   /** Optional custom title for the top header bar (defaults to current school name or Platform for Super Admin). */
   headerTitle?: string;
+  /** When true, removes the default outer padding from <main> */
+  noPadding?: boolean;
+  /** Custom class names to append or override on the <main> element */
+  mainClassName?: string;
 }
 
 const MIN_WIDTH = 72;
@@ -90,7 +95,17 @@ function findActive(links: SidebarLink[], pathname: string): SidebarLink | undef
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-export function AppShell({ children, links, roleTitle, userName, onSignOut, headerTitle }: AppShellProps) {
+export function 
+AppShell({
+  children,
+  links,
+  roleTitle,
+  userName,
+  onSignOut,
+  headerTitle,
+  noPadding,
+  mainClassName,
+}: AppShellProps) {
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
   const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
@@ -663,7 +678,13 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut, head
         {roleTitle === "Trustee" && <TrialBanner />}
 
         {/* Content Body */}
-        <main className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-5 bg-[#f4f6fb]">
+        <main
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto no-scrollbar bg-[#f4f6fb]",
+            (noPadding || roleTitle === "Teacher") ? "p-0" : "px-4 sm:px-6 py-5",
+            mainClassName
+          )}
+        >
           {children}
         </main>
       </div>

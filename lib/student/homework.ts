@@ -39,10 +39,38 @@ export async function submitHomework(
     body: formData,
   });
 
-  const data = await response.json();
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
 
   if (!response.ok) {
-    throw new Error(data?.detail || data?.message || "Failed to submit homework.");
+    let msg = "Failed to submit homework.";
+    if (data) {
+      if (typeof data === "string") {
+        msg = data;
+      } else if (data.detail) {
+        msg = data.detail;
+      } else if (data.message) {
+        msg = data.message;
+      } else if (data.error) {
+        msg = data.error;
+      } else if (data.file && Array.isArray(data.file)) {
+        msg = data.file.join(" ");
+      } else if (data.attachment && Array.isArray(data.attachment)) {
+        msg = data.attachment.join(" ");
+      } else if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
+        msg = data.non_field_errors.join(" ");
+      } else {
+        const firstKey = Object.keys(data)[0];
+        if (firstKey && Array.isArray(data[firstKey])) {
+          msg = `${firstKey}: ${data[firstKey].join(" ")}`;
+        }
+      }
+    }
+    throw new Error(msg);
   }
 
   return data;
