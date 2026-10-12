@@ -1,7 +1,8 @@
 // app/student/homework/page.tsx
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BookOpen,
   ChevronRight,
@@ -25,7 +26,9 @@ import {
   Award,
   MessageSquare,
   CheckSquare,
-  BookMarked,
+  Search,
+  Filter,
+  Check,
 } from "lucide-react";
 import {
   getStudentHomework,
@@ -36,21 +39,23 @@ import {
 } from "@/lib/student";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TabType = "today" | "all";
-type ViewType = "list" | "detail";
+type FilterTab = "all" | "pending" | "submitted" | "checked";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function isToday(dateStr: string): boolean {
+  if (!dateStr) return false;
   const today = new Date().toISOString().split("T")[0];
   return dateStr === today;
 }
 
 function isPastDue(dateStr: string): boolean {
+  if (!dateStr) return false;
   const today = new Date().toISOString().split("T")[0];
   return dateStr < today;
 }
 
 function formatDueDate(dateStr: string): string {
+  if (!dateStr) return "No due date";
   if (isToday(dateStr)) return "Due Today";
   if (isPastDue(dateStr)) return "Overdue";
   const diff = Math.ceil(
@@ -62,51 +67,60 @@ function formatDueDate(dateStr: string): string {
 }
 
 function formatDisplayDate(dateStr: string): string {
-  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  if (!dateStr) return "—";
+  try {
+    return new Date(dateStr + "T12:00:00").toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 function formatDateTime(isoStr: string): string {
-  return new Date(isoStr).toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  if (!isoStr) return "—";
+  try {
+    return new Date(isoStr).toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return isoStr;
+  }
 }
 
-function getDueBadgeStyle(dateStr: string): { bg: string; text: string } {
-  if (isPastDue(dateStr)) return { bg: "#fee2e2", text: "#dc2626" };
-  if (isToday(dateStr)) return { bg: "#fef3c7", text: "#d97706" };
-  return { bg: "#dbeafe", text: "#2563eb" };
+function getDueBadgeStyle(dateStr: string): { bg: string; text: string; border: string } {
+  if (isPastDue(dateStr)) return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" };
+  if (isToday(dateStr)) return { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" };
+  return { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" };
 }
 
 function getStatusConfig(status?: string | null) {
   const configs: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-    pending:   { label: "Pending",   bg: "#fef9c3", text: "#854d0e", dot: "#f59e0b" },
-    submitted: { label: "Submitted", bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
-    late:      { label: "Late",      bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
-    checked:   { label: "Checked",   bg: "#d1fae5", text: "#065f46", dot: "#10b981" },
+    pending:   { label: "Pending",   bg: "bg-amber-50 text-amber-800 border-amber-200", text: "#92400e", dot: "#f59e0b" },
+    submitted: { label: "Submitted", bg: "bg-sky-50 text-sky-800 border-sky-200",     text: "#075985", dot: "#0284c7" },
+    late:      { label: "Submitted Late", bg: "bg-rose-50 text-rose-800 border-rose-200", text: "#9f1239", dot: "#f43f5e" },
+    checked:   { label: "Evaluated", bg: "bg-emerald-50 text-emerald-800 border-emerald-200", text: "#065f46", dot: "#10b981" },
   };
   const key = String(status || "").toLowerCase();
-  return configs[key] || { label: "Submitted", bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" };
+  return configs[key] || { label: "Not Submitted", bg: "bg-slate-50 text-slate-700 border-slate-200", text: "#334155", dot: "#94a3b8" };
 }
 
-// Subject color palette — cycles through for variety
+// Subject color palette
 const SUBJECT_PALETTES = [
-  { color: "#6C63FF", bg: "#EEF0FF", border: "#D4D0FF" },
-  { color: "#10b981", bg: "#F0FDF4", border: "#A7F3D0" },
-  { color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
-  { color: "#EC4899", bg: "#FDF2F8", border: "#FBCFE8" },
-  { color: "#06B6D4", bg: "#ECFEFF", border: "#A5F3FC" },
-  { color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
-  { color: "#ef4444", bg: "#FEF2F2", border: "#FECACA" },
-  { color: "#14b8a6", bg: "#F0FDFA", border: "#99F6E4" },
+  { color: "#4F46E5", bg: "#EEF2FF", border: "#C7D2FE" },
+  { color: "#0284C7", bg: "#F0F9FF", border: "#BAE6FD" },
+  { color: "#10B981", bg: "#ECFDF5", border: "#A7F3D0" },
+  { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+  { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
+  { color: "#DB2777", bg: "#FDF2F8", border: "#FBCFE8" },
+  { color: "#0D9488", bg: "#F0FDFA", border: "#99F6E4" },
 ];
 
 function getPalette(index: number) {
@@ -114,23 +128,212 @@ function getPalette(index: number) {
 }
 
 function getSubjectInitial(title: string): string {
+  if (!title) return "HW";
   return title.trim().slice(0, 2).toUpperCase();
 }
 
-// ─── Skeleton Loader ──────────────────────────────────────────────────────────
-function SkeletonCard() {
+// ─── Quick Submit Modal ───────────────────────────────────────────────────────
+function QuickSubmitModal({
+  hw,
+  existingSubmission,
+  onClose,
+  onSubmitted,
+}: {
+  hw: HomeworkItem;
+  existingSubmission?: HomeworkSubmission;
+  onClose: () => void;
+  onSubmitted: (sub: HomeworkSubmission) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isAlreadySubmitted = !!existingSubmission;
+  const isChecked = existingSubmission?.status === "checked";
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
+    }
+    e.target.value = "";
+  };
+
+  const handleModalSubmit = async () => {
+    if (!selectedFile && !isAlreadySubmitted) {
+      setError("Please attach your homework document or image before submitting.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await submitHomework(hw.id, selectedFile ?? undefined);
+      onSubmitted(res);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit homework. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse">
-      <div className="flex flex-col sm:flex-row items-start gap-4">
-        <div className="w-12 h-12 bg-gray-100 rounded-xl flex-shrink-0" />
-        <div className="flex-1 space-y-2">
-          <div className="flex justify-between">
-            <div className="h-4 bg-gray-100 rounded w-32" />
-            <div className="h-5 bg-gray-100 rounded-full w-20" />
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl max-w-lg w-full border border-slate-200/80 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
+          <div>
+            <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
+              {hw.school_class_name} · {hw.division_name}
+            </span>
+            <h3 className="text-lg font-bold text-slate-900 mt-1">
+              {isAlreadySubmitted ? "Re-submit Homework" : "Submit Homework"}
+            </h3>
           </div>
-          <div className="h-3 bg-gray-100 rounded w-4/5" />
-          <div className="h-3 bg-gray-100 rounded w-3/5" />
-          <div className="h-5 bg-gray-100 rounded w-12" />
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/70">
+            <h4 className="text-sm font-bold text-slate-800">{hw.title}</h4>
+            {hw.description && (
+              <p className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed">
+                {hw.description}
+              </p>
+            )}
+            <div className="flex items-center gap-4 text-xs font-medium text-slate-600 mt-3 pt-3 border-t border-slate-200/50">
+              <span className="flex items-center gap-1">
+                <Clock size={12} className="text-indigo-500" />
+                Due: <strong>{formatDisplayDate(hw.due_date)}</strong>
+              </span>
+              <span>Teacher: <strong>{hw.teacher_name}</strong></span>
+            </div>
+          </div>
+
+          {isChecked && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-medium flex items-center gap-2">
+              <Award size={15} className="text-emerald-600 shrink-0" />
+              <span>This assignment has already been evaluated by your teacher.</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle size={15} className="text-rose-500 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Upload Drop Zone */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+              Attach Completed Assignment (PDF / Image) *
+            </label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/80 rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 text-indigo-600 flex items-center justify-center transition-colors">
+                <Upload size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-indigo-700">
+                  {selectedFile ? "Click to choose a different file" : "Click to browse & upload file"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Supports PDF, PNG, JPG, JPEG documents</p>
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+
+          {/* Selected File Card */}
+          {selectedFile && (
+            <div className="flex items-center gap-3 p-3 bg-indigo-50/80 rounded-2xl border border-indigo-100">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                {selectedFile.type.startsWith("image/") ? (
+                  <ImageIcon size={16} />
+                ) : (
+                  <FileType2 size={16} />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-800 truncate">{selectedFile.name}</p>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFile(null)}
+                className="w-7 h-7 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {isAlreadySubmitted && !selectedFile && existingSubmission?.attachment && (
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs flex items-center justify-between">
+              <span className="text-slate-600 font-medium truncate">Previously submitted file attached</span>
+              <a
+                href={existingSubmission.attachment}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 font-bold hover:underline shrink-0"
+              >
+                View File
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleModalSubmit}
+            disabled={submitting}
+            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Submitting…
+              </>
+            ) : (
+              <>
+                <Send size={14} />
+                {isAlreadySubmitted ? "Re-submit Assignment" : "Submit Assignment"}
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -142,26 +345,29 @@ function HomeworkCard({
   hw,
   palette,
   submission,
-  onClick,
+  onSelect,
+  onQuickSubmit,
 }: {
   hw: HomeworkItem;
   palette: ReturnType<typeof getPalette>;
   submission?: HomeworkSubmission;
-  onClick: () => void;
+  onSelect: () => void;
+  onQuickSubmit: (e: React.MouseEvent) => void;
 }) {
   const dueLabel = formatDueDate(hw.due_date);
   const dueBadge = getDueBadgeStyle(hw.due_date);
   const isSubmitted = !!submission;
+  const isChecked = submission?.status === "checked";
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-white rounded-2xl p-5 border border-gray-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200 group"
+    <div
+      onClick={onSelect}
+      className="w-full bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 hover:border-indigo-300 hover:shadow-md transition-all duration-200 group cursor-pointer flex flex-col justify-between gap-4"
     >
       <div className="flex items-start gap-4">
         {/* Subject Avatar */}
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold border"
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-sm font-extrabold border shadow-2xs"
           style={{
             backgroundColor: palette.bg,
             borderColor: palette.border,
@@ -171,97 +377,136 @@ function HomeworkCard({
           {getSubjectInitial(hw.title)}
         </div>
 
-        {/* Content */}
+        {/* Info */}
         <div className="flex-1 min-w-0">
-          {/* Title + Due Badge */}
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="font-semibold text-gray-900 text-sm leading-snug">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h3 className="font-extrabold text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition-colors">
               {hw.title}
             </h3>
             <span
-              className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: dueBadge.bg, color: dueBadge.text }}
+              className={`text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${dueBadge.bg} ${dueBadge.text} ${dueBadge.border}`}
             >
               {dueLabel}
             </span>
           </div>
 
-          {/* Description */}
-          <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 mb-2.5">
-            {hw.description}
+          <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 mb-3">
+            {hw.description || "No specific instructions provided."}
           </p>
 
-          {/* Footer meta */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Class */}
-            <span className="inline-flex items-center gap-1 text-xs text-gray-400 font-medium">
-              <BookOpen size={10} />
+          <div className="flex items-center gap-3 flex-wrap text-xs font-medium text-slate-500">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
+              <BookOpen size={12} className="text-indigo-500" />
               {hw.school_class_name} · {hw.division_name}
             </span>
 
-            {/* Attachment indicator */}
-            {hw.attachment && (
-              <span className="inline-flex items-center gap-1 text-xs text-indigo-500 font-medium">
-                <Paperclip size={10} />
-                Attachment
-              </span>
-            )}
+            <span>Teacher: <strong className="text-slate-800">{hw.teacher_name}</strong></span>
 
-            {/* Submission status badge */}
-            {isSubmitted && submission && (
-              <span
-                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ml-auto"
-                style={(() => {
-                  const cfg = getStatusConfig(submission.status);
-                  return { backgroundColor: cfg.bg, color: cfg.text };
-                })()}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: getStatusConfig(submission.status).dot }}
-                />
-                {getStatusConfig(submission.status).label}
+            {hw.attachment && (
+              <span className="inline-flex items-center gap-1 text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
+                <Paperclip size={11} />
+                Attachment
               </span>
             )}
           </div>
         </div>
-
-        {/* Arrow */}
-        <ChevronRight
-          size={16}
-          className="text-gray-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1"
-        />
       </div>
-    </button>
+
+      {/* Action Footer Bar with EXPLICIT SUBMIT BUTTON */}
+      <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {isSubmitted && submission ? (
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${getStatusConfig(submission.status).bg}`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: getStatusConfig(submission.status).dot }}
+              />
+              {getStatusConfig(submission.status).label}
+              {isChecked && submission.marks !== null && (
+                <span className="ml-1 font-extrabold text-emerald-700">
+                  ({submission.marks} Marks)
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Pending Submission
+            </span>
+          )}
+        </div>
+
+        {/* Dedicated Submit / View Action Buttons */}
+        <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={onQuickSubmit}
+            className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
+              isSubmitted
+                ? "bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200"
+                : "bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white shadow-indigo-200"
+            }`}
+          >
+            {isSubmitted ? (
+              <>
+                <RefreshCw size={13} />
+                Re-submit Assignment
+              </>
+            ) : (
+              <>
+                <Send size={13} />
+                Submit Assignment
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onSelect}
+            className="flex items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors border border-slate-200"
+            title="View Details"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-// ─── Summary Stats Bar ────────────────────────────────────────────────────────
+// ─── Stats Bar ────────────────────────────────────────────────────────────────
 function StatsBar({
   total,
-  submitted,
   pending,
+  submitted,
   checked,
 }: {
   total: number;
-  submitted: number;
   pending: number;
+  submitted: number;
   checked: number;
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {[
-        { label: "Total",     value: total,     bg: "bg-indigo-50",  text: "text-indigo-700",  border: "border-indigo-100" },
-        { label: "Pending",   value: pending,   bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-100"  },
-        { label: "Submitted", value: submitted, bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-100"   },
-        { label: "Checked",   value: checked,   bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-100"},
+        { label: "Total Assignments", value: total,     bg: "bg-indigo-50/70",  text: "text-indigo-700",  border: "border-indigo-100",  badge: "All" },
+        { label: "Pending",           value: pending,   bg: "bg-amber-50/70",   text: "text-amber-800",   border: "border-amber-200/70", badge: "To Do" },
+        { label: "Submitted",         value: submitted, bg: "bg-sky-50/70",     text: "text-sky-700",     border: "border-sky-100",     badge: "Submitted" },
+        { label: "Evaluated & Marked", value: checked,   bg: "bg-emerald-50/70", text: "text-emerald-700", border: "border-emerald-100", badge: "Marked" },
       ].map((s) => (
         <div
           key={s.label}
-          className={`${s.bg} ${s.border} border rounded-2xl p-3 text-center`}
+          className={`${s.bg} ${s.border} border rounded-3xl p-5 shadow-xs flex flex-col justify-between`}
         >
-          <p className={`text-xl font-bold ${s.text}`}>{s.value}</p>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">{s.label}</p>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.label}</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/80 border ${s.border} ${s.text}`}>
+              {s.badge}
+            </span>
+          </div>
+          <p className={`text-3xl font-black tracking-tight ${s.text}`}>{s.value}</p>
         </div>
       ))}
     </div>
@@ -276,6 +521,7 @@ function HomeworkListView({
   error,
   onRefresh,
   onSelect,
+  onQuickSubmit,
 }: {
   homeworkList: HomeworkItem[];
   submissions: HomeworkSubmission[];
@@ -283,8 +529,10 @@ function HomeworkListView({
   error: string | null;
   onRefresh: () => void;
   onSelect: (hw: HomeworkItem) => void;
+  onQuickSubmit: (hw: HomeworkItem) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<TabType>("today");
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const submissionMap = useMemo(() => {
     const map = new Map<number, HomeworkSubmission>();
@@ -292,167 +540,196 @@ function HomeworkListView({
     return map;
   }, [submissions]);
 
-  const todayList = homeworkList.filter((hw) => isToday(hw.due_date));
-  const allList   = homeworkList;
-  const displayList = activeTab === "today" ? todayList : allList;
-
   const stats = useMemo(() => {
     const submitted = submissions.filter((s) => s.status !== "pending").length;
     const checked   = submissions.filter((s) => s.status === "checked").length;
-    const pending   = homeworkList.length - submitted;
+    const pending   = Math.max(0, homeworkList.length - submitted);
     return { total: homeworkList.length, submitted, pending, checked };
   }, [homeworkList, submissions]);
 
-  const today = new Date().toLocaleDateString("en-IN", {
+  // Filter homework list based on tab & search
+  const filteredList = useMemo(() => {
+    let list = homeworkList;
+
+    if (activeTab === "pending") {
+      list = list.filter((hw) => !submissionMap.has(hw.id));
+    } else if (activeTab === "submitted") {
+      list = list.filter((hw) => {
+        const sub = submissionMap.get(hw.id);
+        return sub && sub.status !== "checked";
+      });
+    } else if (activeTab === "checked") {
+      list = list.filter((hw) => {
+        const sub = submissionMap.get(hw.id);
+        return sub && sub.status === "checked";
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (hw) =>
+          hw.title.toLowerCase().includes(q) ||
+          hw.description?.toLowerCase().includes(q) ||
+          hw.teacher_name?.toLowerCase().includes(q) ||
+          hw.school_class_name?.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [homeworkList, activeTab, searchQuery, submissionMap]);
+
+  const todayStr = new Date().toLocaleDateString("en-IN", {
+    weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Homework</h1>
-          <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1.5">
-            <Calendar size={13} />
-            {today}
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Student Homework Portal</span>
+            <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+              {homeworkList.length} Total
+            </span>
+          </h1>
+          <p className="text-xs text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+            <Calendar size={13} className="text-indigo-500" />
+            {todayStr}
           </p>
         </div>
+
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-2xs disabled:opacity-50 self-start sm:self-auto"
         >
-          <RefreshCw size={13} className={loading ? "animate-spin text-indigo-400" : ""} />
-          Refresh
+          <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : ""} />
+          Refresh Homework
         </button>
       </div>
 
-      {/* ── Stats ── */}
+      {/* Summary Metrics */}
       {!loading && !error && (
         <StatsBar
           total={stats.total}
-          submitted={stats.submitted}
           pending={stats.pending}
+          submitted={stats.submitted}
           checked={stats.checked}
         />
       )}
 
-      {/* ── Tab Card ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Tabs */}
-        <div className="flex border-b border-gray-100">
-          {(["today", "all"] as TabType[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-4 text-sm font-semibold relative transition-colors ${
-                activeTab === tab ? "text-indigo-600" : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              {tab === "today" ? "Today's Homework" : "All Homework"}
-              {/* Count badge */}
-              <span
-                className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab ? "bg-indigo-100 text-indigo-600" : "bg-gray-100 text-gray-400"
+      {/* Main Container */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {/* Filter Navigation & Search Bar */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl overflow-x-auto">
+            {[
+              { id: "all",       label: "All Assignments", count: homeworkList.length },
+              { id: "pending",   label: "Pending",         count: stats.pending },
+              { id: "submitted", label: "Submitted",       count: stats.submitted },
+              { id: "checked",   label: "Evaluated",       count: stats.checked },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id as FilterTab)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold capitalize transition-all shrink-0 flex items-center gap-1.5 ${
+                  activeTab === t.id
+                    ? "bg-white text-indigo-700 shadow-2xs border border-slate-200/60"
+                    : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                {tab === "today" ? todayList.length : allList.length}
-              </span>
-              {activeTab === tab && (
-                <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-indigo-600 rounded-full" />
-              )}
-            </button>
-          ))}
-        </div>
+                <span>{t.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                    activeTab === t.id ? "bg-indigo-100 text-indigo-700" : "bg-slate-200/80 text-slate-600"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              </button>
+            ))}
+          </div>
 
-        {/* Tab sub-header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50 bg-gray-50/50">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-            {activeTab === "today" ? "Due Today" : "All Assignments"}
-          </p>
-          <div className="flex items-center gap-1.5 text-indigo-500 text-xs font-semibold">
-            <Calendar size={12} />
-            {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          {/* Search Bar */}
+          <div className="relative min-w-[240px]">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search homework..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-indigo-400 focus:bg-white transition-all"
+            />
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-4 space-y-3">
+        {/* Content Area */}
+        <div className="p-4 sm:p-6 space-y-4">
           {/* Loading */}
-          {loading && [1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          {loading && (
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 size={28} className="animate-spin text-indigo-600" />
+              <p className="text-xs font-bold text-slate-600">Loading assignments & submissions…</p>
+            </div>
+          )}
 
           {/* Error */}
           {!loading && error && (
-            <div className="flex flex-col items-center gap-3 py-12">
-              <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
-                <AlertCircle size={22} className="text-red-400" />
+            <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center">
+                <AlertCircle size={24} />
               </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-gray-700">Failed to load</p>
-                <p className="text-xs text-gray-400 mt-1">{error}</p>
-              </div>
+              <p className="text-sm font-bold text-slate-800">Failed to load homework</p>
+              <p className="text-xs text-slate-400 max-w-sm">{error}</p>
               <button
                 onClick={onRefresh}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
+                className="mt-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
               >
-                <RefreshCw size={13} /> Try Again
+                Try Again
               </button>
             </div>
           )}
 
-          {/* Empty */}
-          {!loading && !error && displayList.length === 0 && (
-            <div className="flex flex-col items-center gap-3 py-12">
-              <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
-                <BookOpen size={24} className="text-indigo-300" />
+          {/* Empty State */}
+          {!loading && !error && filteredList.length === 0 && (
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="w-14 h-14 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center">
+                <BookOpen size={26} />
               </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-gray-600">
-                  {activeTab === "today" ? "No homework due today!" : "No homework assigned yet"}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {activeTab === "today"
-                    ? "Enjoy your day 🎉"
-                    : "Check back later"}
-                </p>
-              </div>
+              <p className="text-sm font-bold text-slate-800">No homework found</p>
+              <p className="text-xs text-slate-400 max-w-xs">
+                {searchQuery
+                  ? "No assignments matching your search query."
+                  : activeTab === "pending"
+                  ? "Great job! You have completed and submitted all assigned homework."
+                  : "No homework currently available in this category."}
+              </p>
             </div>
           )}
 
-          {/* Homework Cards */}
-          {!loading && !error && displayList.map((hw, idx) => (
-            <HomeworkCard
-              key={hw.id}
-              hw={hw}
-              palette={getPalette(idx)}
-              submission={submissionMap.get(hw.id)}
-              onClick={() => onSelect(hw)}
-            />
-          ))}
+          {/* List of Cards */}
+          {!loading &&
+            !error &&
+            filteredList.map((hw, idx) => (
+              <HomeworkCard
+                key={hw.id}
+                hw={hw}
+                palette={getPalette(idx)}
+                submission={submissionMap.get(hw.id)}
+                onSelect={() => onSelect(hw)}
+                onQuickSubmit={(e) => {
+                  e.stopPropagation();
+                  onQuickSubmit(hw);
+                }}
+              />
+            ))}
         </div>
-
-        {/* View All Footer */}
-        {!loading && !error && activeTab === "today" && todayList.length > 0 && (
-          <div className="px-4 pb-4">
-            <button
-              onClick={() => setActiveTab("all")}
-              className="w-full flex items-center justify-between bg-gradient-to-r from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 transition-all rounded-xl px-5 py-3.5 border border-indigo-100 group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                  <BookOpen size={15} className="text-indigo-600" />
-                </div>
-                <span className="text-sm font-semibold text-indigo-700">
-                  View All Homework ({allList.length})
-                </span>
-              </div>
-              <ChevronRight size={16} className="text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -477,7 +754,6 @@ function HomeworkDetailView({
   const [submitting, setSubmitting]     = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
   const [showSuccess, setShowSuccess]   = useState(false);
-  const [viewDesc, setViewDesc]         = useState(false);
   const [submission, setSubmission]     = useState<HomeworkSubmission | undefined>(existingSubmission);
 
   const dueLabel = formatDueDate(hw.due_date);
@@ -487,13 +763,16 @@ function HomeworkDetailView({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
+    if (file) {
+      setSelectedFile(file);
+      setSubmitError(null);
+    }
     e.target.value = "";
   };
 
   const handleSubmit = async () => {
     if (!selectedFile && !isAlreadySubmitted) {
-      setSubmitError("Please select/attach a completed homework file (PDF or Image) before submitting.");
+      setSubmitError("Please select/attach your completed homework file (PDF or Image) before submitting.");
       return;
     }
     setSubmitting(true);
@@ -504,7 +783,7 @@ function HomeworkDetailView({
       onSubmitted(result);
       setShowSuccess(true);
       setSelectedFile(null);
-      setTimeout(() => setShowSuccess(false), 4000);
+      setTimeout(() => setShowSuccess(false), 5000);
     } catch (err: any) {
       setSubmitError(err?.message || "Failed to submit. Please try again.");
     } finally {
@@ -513,51 +792,50 @@ function HomeworkDetailView({
   };
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* ── Back Nav ── */}
-      <div className="flex items-center gap-2 mb-6">
+    <div className="w-full space-y-6">
+      {/* ── Navigation Breadcrumb ── */}
+      <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 font-medium transition-colors group"
+          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-indigo-600 bg-white border border-slate-200/80 px-3.5 py-2 rounded-2xl shadow-2xs transition-all group"
         >
-          <div className="w-8 h-8 flex items-center justify-center rounded-xl bg-white border border-gray-200 group-hover:border-indigo-300 shadow-sm transition-all">
-            <ArrowLeft size={15} />
-          </div>
-          Back
+          <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+          Back to Homework List
         </button>
-        <span className="text-gray-300">/</span>
-        <span className="text-sm font-semibold text-gray-700 truncate max-w-xs">
+        <span className="text-slate-300">/</span>
+        <span className="text-xs font-bold text-slate-800 truncate max-w-sm">
           {hw.title}
         </span>
       </div>
 
       {/* ── Success Toast ── */}
       {showSuccess && (
-        <div className="mb-4 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold px-4 py-3 rounded-xl">
-          <CheckCircle2 size={17} className="text-emerald-500 flex-shrink-0" />
-          Homework submitted successfully! 🎉
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-4 rounded-2xl shadow-xs">
+          <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+          <span>Homework submitted successfully! Your teacher can now review and grade it. 🎉</span>
         </div>
       )}
 
       {/* ── Error Toast ── */}
       {submitError && (
-        <div className="mb-4 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3 rounded-xl">
-          <AlertCircle size={17} className="text-red-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-4 rounded-2xl shadow-xs">
+          <AlertCircle size={18} className="text-rose-500 shrink-0" />
           <span className="flex-1">{submitError}</span>
-          <button onClick={() => setSubmitError(null)} className="text-red-400 hover:text-red-600">
+          <button onClick={() => setSubmitError(null)} className="text-rose-400 hover:text-rose-600">
             <X size={15} />
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        {/* ── LEFT: Details ── */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Hero Card */}
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-start gap-4 mb-5">
+      {/* ── 2-Column Responsive Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ── LEFT COLUMN: Assignment Details (7 cols) ── */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Main Assignment Card */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-5">
+            <div className="flex items-start gap-4">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 text-lg font-bold border-2"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 text-base font-black border"
                 style={{
                   backgroundColor: palette.bg,
                   borderColor: palette.border,
@@ -567,135 +845,104 @@ function HomeworkDetailView({
                 {getSubjectInitial(hw.title)}
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-gray-900 leading-snug mb-2">
+                <h2 className="text-xl font-black text-slate-900 leading-snug">
                   {hw.title}
                 </h2>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <span
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                    style={{ backgroundColor: dueBadge.bg, color: dueBadge.text }}
+                    className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-0.5 rounded-full border ${dueBadge.bg} ${dueBadge.text} ${dueBadge.border}`}
                   >
                     <Clock size={11} />
                     {dueLabel}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                    <BookOpen size={11} />
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-0.5 rounded-full">
+                    <BookOpen size={11} className="text-indigo-500" />
                     {hw.school_class_name} · {hw.division_name}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Due date row */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+            {/* Dates Bar */}
+            <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-100">
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                  Due Date
-                </p>
-                <p className="text-sm font-bold text-gray-800">
-                  {formatDisplayDate(hw.due_date)}
-                </p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned On</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{formatDisplayDate(hw.assigned_date)}</p>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                  Assigned
-                </p>
-                <p className="text-sm font-bold text-gray-800">
-                  {formatDisplayDate(hw.assigned_date)}
-                </p>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Due Date</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{formatDisplayDate(hw.due_date)}</p>
               </div>
             </div>
-          </div>
 
-          {/* Description */}
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <FileText size={15} className="text-indigo-500" />
-              Description
-            </h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {hw.description}
-            </p>
-            <button
-              onClick={() => setViewDesc(!viewDesc)}
-              className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all border border-indigo-100"
-            >
-              {viewDesc ? <EyeOff size={12} /> : <Eye size={12} />}
-              {viewDesc ? "Hide Details" : "View More Details"}
-            </button>
-            {viewDesc && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-600 leading-relaxed">
-                <p className="font-semibold text-gray-700 mb-2">📋 Full Assignment Details</p>
-                <p>{hw.description}</p>
-                <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="font-semibold text-gray-500">Teacher:</span>{" "}
-                    {hw.teacher_name}
+            {/* Description / Instructions */}
+            <div>
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <FileText size={14} className="text-indigo-500" />
+                Assignment Instructions
+              </h3>
+              <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {hw.description || "No specific instructions provided for this homework."}
+              </div>
+            </div>
+
+            {/* Teacher's Attachment */}
+            {hw.attachment && (
+              <div>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Paperclip size={14} className="text-indigo-500" />
+                  Attachment from Teacher
+                </h3>
+                <a
+                  href={hw.attachment}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3.5 bg-indigo-50/50 hover:bg-indigo-50 rounded-2xl border border-indigo-100 hover:border-indigo-200 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
+                    <FileType2 size={18} />
                   </div>
-                  <div>
-                    <span className="font-semibold text-gray-500">Class:</span>{" "}
-                    {hw.school_class_name}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 truncate">
+                      View / Download Teacher Attachment
+                    </p>
+                    <p className="text-[11px] text-slate-400">Click to preview document</p>
                   </div>
-                </div>
+                  <Download size={16} className="text-slate-400 group-hover:text-indigo-600 shrink-0" />
+                </a>
               </div>
             )}
           </div>
 
-          {/* Teacher's Attachment */}
-          {hw.attachment && (
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                <Paperclip size={15} className="text-indigo-500" />
-                Attachment from Teacher
-              </h3>
-              <a
-                href={hw.attachment}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all group"
-              >
-                <div className="w-9 h-9 bg-red-50 border border-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileType2 size={17} className="text-red-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-700 group-hover:text-indigo-700 truncate">
-                    Download Attachment
-                  </p>
-                  <p className="text-xs text-gray-400">Tap to open / download</p>
-                </div>
-                <Download size={15} className="text-gray-400 group-hover:text-indigo-500" />
-              </a>
-            </div>
-          )}
-
-          {/* Feedback (if checked) */}
+          {/* Teacher's Feedback Card (If evaluated) */}
           {isChecked && submission && (
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-200 shadow-sm">
-              <h3 className="text-sm font-bold text-emerald-700 mb-4 flex items-center gap-2">
-                <Award size={15} className="text-emerald-600" />
-                Teacher's Feedback
-              </h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 rounded-3xl p-6 border border-emerald-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-2">
+                <Award size={18} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-emerald-900">Teacher's Evaluation & Feedback</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 {submission.marks !== null && (
-                  <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
-                    <p className="text-2xl font-bold text-emerald-600">{submission.marks}</p>
-                    <p className="text-xs text-gray-500 font-medium mt-0.5">Marks</p>
+                  <div className="bg-white rounded-2xl p-4 border border-emerald-100 text-center shadow-2xs">
+                    <p className="text-2xl font-black text-emerald-600">{submission.marks}</p>
+                    <p className="text-xs font-bold text-slate-500 mt-0.5">Marks Awarded</p>
                   </div>
                 )}
-                <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
-                  <p className="text-sm font-bold text-gray-700">
-                    {submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
+                <div className="bg-white rounded-2xl p-4 border border-emerald-100 text-center shadow-2xs">
+                  <p className="text-sm font-black text-emerald-700 capitalize mt-1">
+                    {submission.status}
                   </p>
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">Status</p>
+                  <p className="text-xs font-bold text-slate-500 mt-0.5">Status</p>
                 </div>
               </div>
+
               {submission.teacher_remark && (
-                <div className="bg-white rounded-xl p-3 border border-emerald-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <MessageSquare size={12} className="text-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-700">Remark</span>
-                  </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                <div className="bg-white rounded-2xl p-4 border border-emerald-100 space-y-1">
+                  <p className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                    <MessageSquare size={13} /> Remark
+                  </p>
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
                     {submission.teacher_remark}
                   </p>
                 </div>
@@ -704,161 +951,155 @@ function HomeworkDetailView({
           )}
         </div>
 
-        {/* ── RIGHT: Submit Panel ── */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Submission Status */}
+        {/* ── RIGHT COLUMN: Submit Panel (5 cols) ── */}
+        <div className="lg:col-span-5 space-y-5 lg:sticky lg:top-6">
+          {/* Submission Status Indicator */}
           {isAlreadySubmitted && submission && (
             <div
-              className="rounded-2xl p-5 border shadow-sm"
-              style={{
-                backgroundColor: getStatusConfig(submission.status).bg + "80",
-                borderColor: getStatusConfig(submission.status).dot + "40",
-              }}
+              className={`rounded-3xl p-5 border shadow-xs space-y-3 ${
+                getStatusConfig(submission.status).bg
+              }`}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <CheckSquare size={16} style={{ color: getStatusConfig(submission.status).dot }} />
-                <h3 className="text-sm font-bold" style={{ color: getStatusConfig(submission.status).text }}>
-                  Submission Status
-                </h3>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckSquare size={14} /> Submission Status
+                </span>
+                <span className="text-xs font-extrabold capitalize px-2.5 py-0.5 rounded-full bg-white/80 border">
+                  {getStatusConfig(submission.status).label}
+                </span>
               </div>
-              <span
-                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full mb-3"
-                style={{
-                  backgroundColor: "white",
-                  color: getStatusConfig(submission.status).text,
-                  border: `1.5px solid ${getStatusConfig(submission.status).dot}40`,
-                }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: getStatusConfig(submission.status).dot }}
-                />
-                {getStatusConfig(submission.status).label}
-              </span>
-              <p className="text-xs text-gray-500 font-medium">
+
+              <p className="text-xs font-medium opacity-80">
                 Submitted on {formatDateTime(submission.submitted_at)}
               </p>
+
               {submission.attachment && (
                 <a
                   href={submission.attachment}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold underline hover:opacity-80"
                 >
-                  <Paperclip size={11} />
-                  View submitted file
+                  <Paperclip size={12} />
+                  View your submitted file
                 </a>
               )}
             </div>
           )}
 
-          {/* Upload & Submit Card */}
-          {!isChecked && (
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-700 mb-1 flex items-center gap-2">
-                <Upload size={15} className="text-indigo-500" />
-                {isAlreadySubmitted ? "Re-submit Homework" : "Submit Homework"}
+          {/* Upload & Submit Card (Always visible!) */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <Upload size={16} className="text-indigo-600" />
+                {isAlreadySubmitted ? "Re-submit Assignment" : "Submit Assignment"}
               </h3>
-              <p className="text-xs text-gray-400 mb-4">
+              <p className="text-xs text-slate-400 mt-0.5">
                 {isAlreadySubmitted
-                  ? "You can update your submission with a new file."
-                  : "Upload your completed homework as a file (optional)"}
+                  ? "Upload a revised document to update your previous submission."
+                  : "Upload your completed homework document or image to submit."}
               </p>
-
-              {/* File Upload Button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-all text-indigo-700 text-sm font-semibold mb-3"
-              >
-                <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Paperclip size={14} className="text-indigo-600" />
-                </div>
-                {selectedFile ? "Change File" : "Attach File (PDF / Image)"}
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-
-              {/* Selected File Preview */}
-              {selectedFile && (
-                <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 mb-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {selectedFile.type.startsWith("image/") ? (
-                      <ImageIcon size={14} className="text-indigo-600" />
-                    ) : (
-                      <FileType2 size={14} className="text-indigo-600" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-700 truncate">
-                      {selectedFile.name}
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedFile(null)}
-                    className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors"
-                  >
-                    <X size={13} className="text-gray-400 hover:text-red-500" />
-                  </button>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                  submitting
-                    ? "bg-indigo-400 cursor-wait text-white"
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 hover:shadow-indigo-300 active:scale-95"
-                }`}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    Submitting…
-                  </>
-                ) : (
-                  <>
-                    <Send size={15} />
-                    {isAlreadySubmitted ? "Re-submit Homework" : "Submit Homework"}
-                  </>
-                )}
-              </button>
-
-              {!selectedFile && !isAlreadySubmitted && (
-                <p className="text-center text-xs text-amber-600/90 font-medium mt-2">
-                  📎 Please attach your completed assignment file (PDF/Image) to submit.
-                </p>
-              )}
             </div>
-          )}
 
-          {/* Info Card */}
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
-              Assignment Info
-            </h4>
-            <div className="space-y-2.5">
-              {[
-                { label: "Teacher",  value: hw.teacher_name },
-                { label: "Class",    value: `${hw.school_class_name} – ${hw.division_name}` },
-                { label: "Assigned", value: formatDisplayDate(hw.assigned_date) },
-                { label: "Due",      value: formatDisplayDate(hw.due_date) },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-start justify-between gap-2">
-                  <span className="text-xs text-gray-400 font-medium flex-shrink-0">{label}</span>
-                  <span className="text-xs font-semibold text-gray-700 text-right">{value}</span>
+            {/* Upload Area Button */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50 rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 text-indigo-600 flex items-center justify-center transition-colors">
+                <Upload size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-indigo-700">
+                  {selectedFile ? "Click to change selected file" : "Select Document (PDF / Image)"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">PDF, PNG, JPG accepted</p>
+              </div>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            {/* Selected File Details */}
+            {selectedFile && (
+              <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                  {selectedFile.type.startsWith("image/") ? (
+                    <ImageIcon size={16} />
+                  ) : (
+                    <FileType2 size={16} />
+                  )}
                 </div>
-              ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800 truncate">{selectedFile.name}</p>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="w-7 h-7 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* PROMINENT SUBMIT BUTTON */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className={`w-full py-3.5 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-md ${
+                submitting
+                  ? "bg-indigo-400 cursor-wait text-white"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 active:scale-95"
+              }`}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Submitting Assignment…
+                </>
+              ) : (
+                <>
+                  <Send size={15} />
+                  {isAlreadySubmitted ? "Re-submit Assignment" : "Submit Assignment"}
+                </>
+              )}
+            </button>
+
+            {!selectedFile && !isAlreadySubmitted && (
+              <p className="text-center text-[11px] text-amber-700/90 font-medium bg-amber-50 p-2 rounded-xl border border-amber-100">
+                📎 Please attach your assignment file above to submit.
+              </p>
+            )}
+          </div>
+
+          {/* Quick Info Box */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-3">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Summary Information
+            </h4>
+            <div className="divide-y divide-slate-100 text-xs">
+              <div className="py-2 flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Assigned By</span>
+                <span className="font-bold text-slate-800">{hw.teacher_name}</span>
+              </div>
+              <div className="py-2 flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Class / Division</span>
+                <span className="font-bold text-slate-800">{hw.school_class_name} ({hw.division_name})</span>
+              </div>
+              <div className="py-2 flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Due Date</span>
+                <span className="font-bold text-slate-800">{formatDisplayDate(hw.due_date)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -868,13 +1109,16 @@ function HomeworkDetailView({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function HomeworkPage() {
-  const [homeworkList, setHomeworkList]   = useState<HomeworkItem[]>([]);
-  const [submissions, setSubmissions]     = useState<HomeworkSubmission[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
-  const [selectedHw, setSelectedHw]       = useState<HomeworkItem | null>(null);
-  const [selectedIdx, setSelectedIdx]     = useState<number>(0);
+function HomeworkPageInner() {
+  const [homeworkList, setHomeworkList] = useState<HomeworkItem[]>([]);
+  const [submissions, setSubmissions]   = useState<HomeworkSubmission[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+
+  const [selectedHw, setSelectedHw]     = useState<HomeworkItem | null>(null);
+  const [selectedIdx, setSelectedIdx]   = useState<number>(0);
+  const [quickSubmitHw, setQuickSubmitHw] = useState<HomeworkItem | null>(null);
+  const searchParams = useSearchParams();
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -886,12 +1130,22 @@ export default function HomeworkPage() {
       ]);
       setHomeworkList(hw);
       setSubmissions(subs);
+
+      // Check URL search parameter id
+      const targetId = searchParams.get("id");
+      if (targetId) {
+        const foundIdx = hw.findIndex((item) => String(item.id) === String(targetId));
+        if (foundIdx >= 0) {
+          setSelectedIdx(foundIdx);
+          setSelectedHw(hw[foundIdx]);
+        }
+      }
     } catch (err: any) {
-      setError(err?.message || "Failed to load homework.");
+      setError(err?.message || "Failed to load homework assignments.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     loadAll();
@@ -917,7 +1171,7 @@ export default function HomeworkPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto overflow-x-hidden">
+    <div className="max-w-7xl mx-auto overflow-x-hidden p-2 sm:p-4">
       {selectedHw ? (
         <HomeworkDetailView
           hw={selectedHw}
@@ -934,8 +1188,31 @@ export default function HomeworkPage() {
           error={error}
           onRefresh={loadAll}
           onSelect={handleSelect}
+          onQuickSubmit={(hw) => setQuickSubmitHw(hw)}
+        />
+      )}
+
+      {/* Quick Submit Modal from list view */}
+      {quickSubmitHw && (
+        <QuickSubmitModal
+          hw={quickSubmitHw}
+          existingSubmission={submissionMap.get(quickSubmitHw.id)}
+          onClose={() => setQuickSubmitHw(null)}
+          onSubmitted={handleSubmitted}
         />
       )}
     </div>
+  );
+}
+
+export default function HomeworkPage() {
+  return (
+    <Suspense fallback={
+      <div className="py-20 flex items-center justify-center text-slate-400">
+        <Loader2 size={28} className="animate-spin text-indigo-600" />
+      </div>
+    }>
+      <HomeworkPageInner />
+    </Suspense>
   );
 }

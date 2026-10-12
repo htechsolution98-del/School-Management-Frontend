@@ -19,6 +19,10 @@ import {
   Filter,
   X,
   Check,
+  Calendar,
+  Users,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -440,6 +444,7 @@ function CreateHomeworkModal({
   assignments,
   onClose,
   onSubmit,
+  isSubmitting = false,
 }: {
   divisions: { id: number; name: string }[];
   assignments: TeacherAssignment[];
@@ -452,7 +457,9 @@ function CreateHomeworkModal({
     description: string;
     file: File | null;
   }) => void;
+  isSubmitting?: boolean;
 }) {
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const uniqueDivisions = useMemo(() => {
     if (assignments.length > 0) {
       const map = new Map<number, { id: number; name: string }>();
@@ -525,6 +532,7 @@ function CreateHomeworkModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!title.trim()) {
       toast.error("Please enter a homework title.");
       return;
@@ -535,6 +543,10 @@ function CreateHomeworkModal({
     }
     if (!dueDate) {
       toast.error("Please select a due date.");
+      return;
+    }
+    if (dueDate < todayStr) {
+      toast.error("Due date cannot be in the past or previous months.");
       return;
     }
     onSubmit({ divisionId, subjectName, title, dueDate, description, file });
@@ -694,6 +706,7 @@ function CreateHomeworkModal({
             <input
               type="date"
               required
+              min={todayStr}
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               style={{
@@ -749,6 +762,7 @@ function CreateHomeworkModal({
             <button
               type="button"
               onClick={onClose}
+              disabled={isSubmitting}
               style={{
                 flex: 1,
                 padding: "10px",
@@ -758,30 +772,43 @@ function CreateHomeworkModal({
                 fontSize: 13,
                 fontWeight: 600,
                 color: "#64748b",
-                cursor: "pointer",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                opacity: isSubmitting ? 0.6 : 1,
               }}
             >
               Cancel
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               style={{
                 flex: 2,
                 padding: "10px",
                 borderRadius: 8,
                 border: "none",
-                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                background: isSubmitting
+                  ? "#a5b4fc"
+                  : "linear-gradient(135deg,#6366f1,#8b5cf6)",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
+                boxShadow: isSubmitting ? "none" : "0 4px 12px rgba(99,102,241,0.25)",
               }}
             >
-              <Check size={15} /> Create Homework
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Creating Homework...
+                </>
+              ) : (
+                <>
+                  <Check size={15} /> Create Homework
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -809,6 +836,7 @@ export default function AllHomeworkPage() {
 
   const [markModal, setMarkModal] = useState<HomeworkSubmission | null>(null);
   const [createModal, setCreateModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Fetch homework list from API
   const fetchHomeworkList = useCallback(async () => {
@@ -949,6 +977,8 @@ export default function AllHomeworkPage() {
     description: string;
     file: File | null;
   }) => {
+    if (isCreating) return;
+    setIsCreating(true);
     try {
       const formattedDueDate = formatToDDMMYYYY(data.dueDate);
       const fullTitle =
@@ -972,6 +1002,8 @@ export default function AllHomeworkPage() {
       await fetchHomeworkList();
     } catch (err: any) {
       toast.error(err?.message || "Failed to create homework.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -1033,10 +1065,10 @@ export default function AllHomeworkPage() {
   return (
     <div
       style={{
-        minHeight: "100vh",
-        background: "#f8fafc",
+        minHeight: "100%",
+        background: "#f4f6fb",
         fontFamily: "'Inter', sans-serif",
-        padding: "20px 16px",
+        padding: "20px 24px",
         boxSizing: "border-box",
       }}
     >
@@ -1191,9 +1223,10 @@ export default function AllHomeworkPage() {
             <div
               style={{
                 background: "#fff",
-                borderRadius: 16,
-                border: "1.5px solid #f1f5f9",
-                padding: 24,
+                borderRadius: 20,
+                border: "1px solid #e2e8f0",
+                padding: "26px 28px",
+                boxShadow: "0 4px 20px -2px rgba(15, 23, 42, 0.05)",
               }}
             >
               {/* Header */}
@@ -1202,50 +1235,84 @@ export default function AllHomeworkPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   justifyContent: "space-between",
-                  marginBottom: 16,
+                  gap: 16,
+                  paddingBottom: 18,
+                  borderBottom: "1px solid #f1f5f9",
+                  marginBottom: 20,
                 }}
               >
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                    <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.01em" }}>
                       {selectedHw.title}
                     </h2>
                     <StatusBadge status={selectedHw.is_active ? "Active" : "Inactive"} />
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                    {selectedHw.school_class_name || "Class"} · {selectedHw.division_name || "Div"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#64748b" }}>
+                    <span
+                      style={{
+                        background: "#f1f5f9",
+                        padding: "3px 10px",
+                        borderRadius: 6,
+                        fontWeight: 600,
+                        color: "#475569",
+                        fontSize: 12,
+                      }}
+                    >
+                      {selectedHw.school_class_name || "Class"} · {selectedHw.division_name || "Div"}
+                    </span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => handleDeleteHw(selectedHw.id, selectedHw.title)}
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
+                    padding: "8px 14px",
+                    borderRadius: 10,
                     border: "1px solid #fee2e2",
-                    background: "#fff",
+                    background: "#fff5f5",
                     color: "#ef4444",
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
-                    gap: 5,
+                    gap: 6,
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#fee2e2";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#fff5f5";
                   }}
                 >
-                  <Trash2 size={13} /> Delete
+                  <Trash2 size={14} /> Delete
                 </button>
               </div>
 
               {/* Description & Attachment */}
               {selectedHw.description && (
-                <p style={{ margin: "0 0 14px", fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
-                  {selectedHw.description}
-                </p>
+                <div
+                  style={{
+                    margin: "0 0 18px",
+                    padding: "14px 16px",
+                    background: "#f8fafc",
+                    borderRadius: 12,
+                    border: "1px solid #f1f5f9",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+                    Instructions
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: "#334155", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                    {selectedHw.description}
+                  </p>
+                </div>
               )}
 
               {selectedHw.attachment && (
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 20 }}>
                   <a
                     href={selectedHw.attachment}
                     target="_blank"
@@ -1253,212 +1320,424 @@ export default function AllHomeworkPage() {
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: 6,
+                      gap: 8,
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "#6366f1",
-                      background: "#eef2ff",
-                      padding: "6px 12px",
-                      borderRadius: 8,
+                      color: "#4f46e5",
+                      background: "linear-gradient(135deg, #eef2ff, #ede9fe)",
+                      border: "1px solid #c7d2fe",
+                      padding: "8px 14px",
+                      borderRadius: 10,
                       textDecoration: "none",
+                      boxShadow: "0 2px 4px rgba(99, 102, 241, 0.08)",
+                      transition: "all 0.15s ease",
                     }}
                   >
-                    <Paperclip size={13} /> Attachment File
+                    <Paperclip size={14} /> View Attached Material
                   </a>
                 </div>
               )}
 
-              {/* Info Badges */}
+              {/* Info Metrics Cards */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 12,
+                  gap: 14,
                   marginBottom: 24,
-                  padding: 14,
-                  background: "#f8fafc",
-                  borderRadius: 12,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>DUE DATE</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", marginTop: 2 }}>
-                    {selectedHw.due_date}
+                {/* Due Date Card */}
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    background: "linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)",
+                    border: "1px solid #fecdd3",
+                    borderRadius: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 2px 6px rgba(225, 29, 72, 0.1)",
+                    }}
+                  >
+                    <Calendar size={18} color="#e11d48" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#9f1239", fontWeight: 700, letterSpacing: "0.04em" }}>
+                      DUE DATE
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#be123c", marginTop: 2 }}>
+                      {selectedHw.due_date}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>ASSIGNED DATE</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginTop: 2 }}>
-                    {selectedHw.assigned_date || selectedHw.created_at?.split("T")[0]}
+
+                {/* Assigned Date Card */}
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 2px 6px rgba(100, 116, 139, 0.1)",
+                    }}
+                  >
+                    <Clock size={18} color="#475569" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                      ASSIGNED DATE
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginTop: 2 }}>
+                      {selectedHw.assigned_date || selectedHw.created_at?.split("T")[0]}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>SUBMISSIONS</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#6366f1", marginTop: 2 }}>
-                    {submissions.length} Total
+
+                {/* Submissions Card */}
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    background: "linear-gradient(135deg, #eff6ff 0%, #ede9fe 100%)",
+                    border: "1px solid #c7d2fe",
+                    borderRadius: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 2px 6px rgba(99, 102, 241, 0.12)",
+                    }}
+                  >
+                    <Users size={18} color="#4f46e5" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#4338ca", fontWeight: 700, letterSpacing: "0.04em" }}>
+                      SUBMISSIONS
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#3730a3", marginTop: 2 }}>
+                      {submissions.length} Total
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Submissions Section */}
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 18 }}>
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 20 }}>
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: 14,
+                    flexWrap: "wrap",
+                    gap: 12,
+                    marginBottom: 16,
                   }}
                 >
-                  <div style={{ display: "flex", gap: 16 }}>
+                  {/* Tabs */}
+                  <div
+                    style={{
+                      display: "flex",
+                      background: "#f1f5f9",
+                      padding: 4,
+                      borderRadius: 10,
+                      gap: 4,
+                    }}
+                  >
                     <button
                       onClick={() => setActiveTab("submissions")}
                       style={{
-                        background: "none",
                         border: "none",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: activeTab === "submissions" ? "#6366f1" : "#94a3b8",
+                        background: activeTab === "submissions" ? "#fff" : "transparent",
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: activeTab === "submissions" ? 700 : 600,
+                        color: activeTab === "submissions" ? "#4f46e5" : "#64748b",
                         cursor: "pointer",
-                        paddingBottom: 4,
-                        borderBottom: activeTab === "submissions" ? "2px solid #6366f1" : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        boxShadow: activeTab === "submissions" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                        transition: "all 0.15s ease",
                       }}
                     >
-                      Submissions ({activeSubs.length})
+                      Submissions
+                      <span
+                        style={{
+                          background: activeTab === "submissions" ? "#eef2ff" : "#e2e8f0",
+                          color: activeTab === "submissions" ? "#4f46e5" : "#64748b",
+                          padding: "1px 7px",
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {activeSubs.length}
+                      </span>
                     </button>
                     <button
                       onClick={() => setActiveTab("pending")}
                       style={{
-                        background: "none",
                         border: "none",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: activeTab === "pending" ? "#6366f1" : "#94a3b8",
+                        background: activeTab === "pending" ? "#fff" : "transparent",
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: activeTab === "pending" ? 700 : 600,
+                        color: activeTab === "pending" ? "#4f46e5" : "#64748b",
                         cursor: "pointer",
-                        paddingBottom: 4,
-                        borderBottom: activeTab === "pending" ? "2px solid #6366f1" : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        boxShadow: activeTab === "pending" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                        transition: "all 0.15s ease",
                       }}
                     >
-                      Pending ({pendingSubs.length})
+                      Pending
+                      <span
+                        style={{
+                          background: activeTab === "pending" ? "#eef2ff" : "#e2e8f0",
+                          color: activeTab === "pending" ? "#4f46e5" : "#64748b",
+                          padding: "1px 7px",
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {pendingSubs.length}
+                      </span>
                     </button>
+                  </div>
+
+                  {/* Filter / Student Search */}
+                  <div style={{ position: "relative", minWidth: 200 }}>
+                    <Search
+                      size={14}
+                      color="#94a3b8"
+                      style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Filter student..."
+                      value={searchStudent}
+                      onChange={(e) => setSearchStudent(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px 7px 32px",
+                        borderRadius: 8,
+                        border: "1.5px solid #e2e8f0",
+                        fontSize: 12,
+                        outline: "none",
+                        background: "#fff",
+                        boxSizing: "border-box",
+                      }}
+                    />
                   </div>
                 </div>
 
                 {loadingSub ? (
-                  <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                  <div style={{ padding: 36, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    <Loader2 size={24} className="animate-spin" style={{ margin: "0 auto 8px", color: "#6366f1" }} />
                     Loading submissions...
                   </div>
                 ) : tabSubs.length === 0 ? (
-                  <div style={{ padding: 30, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                    No submissions found.
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "#94a3b8",
+                      background: "#f8fafc",
+                      borderRadius: 14,
+                      border: "1px dashed #e2e8f0",
+                    }}
+                  >
+                    <ClipboardList size={32} style={{ margin: "0 auto 8px", color: "#cbd5e1" }} />
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#64748b" }}>
+                      No {activeTab === "submissions" ? "submissions" : "pending students"} found.
+                    </p>
                   </div>
                 ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          STUDENT
-                        </th>
-                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          SUBMITTED AT
-                        </th>
-                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          SUBMITTED FILE
-                        </th>
-                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          STATUS
-                        </th>
-                        <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          MARKS
-                        </th>
-                        <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
-                          ACTION
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tabSubs.map((sub, idx) => (
-                        <tr key={sub.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                          <td style={{ padding: "12px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: "50%",
-                                  background: AVATAR_COLORS[idx % AVATAR_COLORS.length],
-                                  color: "#fff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {getInitials(sub.student_name)}
-                              </div>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                                {sub.student_name}
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px", fontSize: 12, color: "#64748b" }}>
-                            {formatToDDMMYYYY(sub.submitted_at || sub.submission_date) || "—"}
-                          </td>
-                          <td style={{ padding: "12px" }}>
-                            {(sub.file || sub.attachment) ? (
-                              <a
-                                href={sub.file || sub.attachment || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  padding: "4px 10px",
-                                  background: "#ede9fe",
-                                  color: "#6366f1",
-                                  borderRadius: 7,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  textDecoration: "none",
-                                  border: "1px solid #ddd6fe",
-                                }}
-                              >
-                                <Paperclip size={12} />
-                                View File
-                              </a>
-                            ) : (
-                              <span style={{ fontSize: 12, color: "#94a3b8" }}>No file</span>
-                            )}
-                          </td>
-                          <td style={{ padding: "12px" }}>
-                            <StatusBadge status={sub.status} />
-                          </td>
-                          <td style={{ padding: "12px", fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                            {sub.marks !== null ? `${sub.marks} / 100` : "—"}
-                          </td>
-                          <td style={{ padding: "12px", textAlign: "right" }}>
-                            <button
-                              onClick={() => setMarkModal(sub)}
-                              style={{
-                                padding: "5px 12px",
-                                borderRadius: 7,
-                                border: "1px solid #c7d2fe",
-                                background: "#eef2ff",
-                                color: "#4f46e5",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Grade / Remark
-                            </button>
-                          </td>
+                  <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                          <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            STUDENT
+                          </th>
+                          <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            SUBMITTED AT
+                          </th>
+                          <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            SUBMITTED FILE
+                          </th>
+                          <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            STATUS
+                          </th>
+                          <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            MARKS
+                          </th>
+                          <th style={{ padding: "12px 14px", textAlign: "right", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>
+                            ACTION
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {tabSubs.map((sub, idx) => (
+                          <tr
+                            key={sub.id}
+                            style={{
+                              borderBottom: idx === tabSubs.length - 1 ? "none" : "1px solid #f1f5f9",
+                              transition: "background 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#fafafa";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "#fff";
+                            }}
+                          >
+                            <td style={{ padding: "12px 14px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div
+                                  style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: "50%",
+                                    background: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                                    color: "#fff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {getInitials(sub.student_name)}
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                                  {sub.student_name}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 14px", fontSize: 12, color: "#64748b" }}>
+                              {formatToDDMMYYYY(sub.submitted_at || sub.submission_date) || "—"}
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              {(sub.file || sub.attachment) ? (
+                                <a
+                                  href={sub.file || sub.attachment || "#"}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    padding: "5px 11px",
+                                    background: "#ede9fe",
+                                    color: "#6366f1",
+                                    borderRadius: 8,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    textDecoration: "none",
+                                    border: "1px solid #ddd6fe",
+                                  }}
+                                >
+                                  <Paperclip size={12} />
+                                  View File
+                                </a>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "#94a3b8" }}>No file</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <StatusBadge status={sub.status} />
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              {sub.marks !== null ? (
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "3px 8px",
+                                    borderRadius: 6,
+                                    background: "#f1f5f9",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: "#334155",
+                                  }}
+                                >
+                                  {sub.marks} / 100
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                              <button
+                                onClick={() => setMarkModal(sub)}
+                                style={{
+                                  padding: "6px 14px",
+                                  borderRadius: 8,
+                                  border: "1px solid #c7d2fe",
+                                  background: "linear-gradient(135deg, #eef2ff, #ede9fe)",
+                                  color: "#4f46e5",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 4px rgba(99,102,241,0.06)",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#e0e7ff";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "linear-gradient(135deg, #eef2ff, #ede9fe)";
+                                }}
+                              >
+                                Grade / Remark
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -1473,6 +1752,7 @@ export default function AllHomeworkPage() {
           assignments={teacherAssignments}
           onClose={() => setCreateModal(false)}
           onSubmit={handleCreateSubmit}
+          isSubmitting={isCreating}
         />
       )}
 

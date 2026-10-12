@@ -3,14 +3,14 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Users, LayoutDashboard, CreditCard, Megaphone, CalendarDays, Settings, History, Package, BookOpen, GraduationCap } from "lucide-react";
+import { Users, LayoutDashboard, Layers, ReceiptText, CreditCard, Megaphone, CalendarDays, Settings, History, CalendarCheck } from "lucide-react";
 
 const sidebarLinks = [
-  { title: "Dashboard", href: "/trustee", icon: LayoutDashboard },
-  { title: "Staff Management", href: "/trustee/staff-management", icon: Users },
-  { title: "Inventory Stock Report", href: "/trustee/inventory-report", icon: Package },
-  { title: "Library Report", href: "/trustee/library-report", icon: BookOpen },
-  { title: "Student Management & Reports", href: "/trustee/student-report", icon: GraduationCap },
+  { title: "Staff", href: "/trustee", icon: Users },
+  { title: "Leave Approvals", href: "/trustee/leave-requests", icon: CalendarCheck },
+  { title: "Salary Components", href: "/trustee/salary-components", icon: Layers },
+  { title: "Staff Salary", href: "/trustee/staff-salary", icon: Users },
+  { title: "Generate Salary", href: "/trustee/generate-salary", icon: ReceiptText },
   { title: "Subscription & Billing", href: "/trustee/subscription", icon: CreditCard },
   { title: "Announcements", href: "/trustee/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/trustee/events", icon: CalendarDays },

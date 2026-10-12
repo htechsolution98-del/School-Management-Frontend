@@ -72,6 +72,64 @@ export async function getMyLeaveRequests(): Promise<MyLeaveRequest[]> {
   return response.json();
 }
 
+export interface DayBreakdownItem {
+  date: string;
+  day_name: string;
+  weight: number;
+  is_effective: boolean;
+  reason: string;
+  category: "WORKING_DAY" | "WEEKEND" | "HOLIDAY" | "HALF_DAY" | string;
+}
+
+export interface LeaveCalculationPreview {
+  start_date: string;
+  end_date: string;
+  total_effective_days: number;
+  calendar_days: number;
+  excluded_weekends: number;
+  excluded_holidays: number;
+  is_half_day: boolean;
+  half_day_session: string;
+  day_breakdown: DayBreakdownItem[];
+  balance: {
+    allocated: number;
+    carry_forward: number;
+    total_entitlement: number;
+    used: number;
+    pending: number;
+    available: number;
+  };
+  is_valid: boolean;
+  has_sufficient_balance: boolean;
+  overlapping: boolean;
+  overlapping_error?: string | null;
+  summary_message: string;
+  is_paid: boolean;
+}
+
+export async function calculateLeaveDays(payload: {
+  start_date: string;
+  end_date: string;
+  leave_type: number | string;
+  is_half_day?: boolean;
+  half_day_session?: string;
+}): Promise<LeaveCalculationPreview> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/calculate-leave-days/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let message = "Failed to calculate effective leave days.";
+    try {
+      const err = await response.json();
+      message = err?.error || err?.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<MyLeaveRequest> {
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/`, {
     method: "POST",

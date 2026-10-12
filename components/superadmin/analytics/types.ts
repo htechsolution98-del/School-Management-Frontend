@@ -42,6 +42,16 @@ export interface ModuleAdoptionItem {
   icon?: LucideIcon;
 }
 
+export interface ClassDistributionItem {
+  class_name: string;
+  students: number;
+}
+
+export type EnrollmentMonthData = EnrollmentPoint;
+export type SchoolComparisonData = SchoolComparisonItem;
+export type ModuleAdoptionData = ModuleAdoptionItem;
+export type DetailedSchoolTelemetry = SchoolDetailedStats;
+
 export interface FinancialMetrics {
   totalStudentFees: number;
   collectedStudentFees: number;

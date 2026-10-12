@@ -319,22 +319,22 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="w-full space-y-6 pb-12 font-sans bg-[#F7F8F5] min-h-screen text-[#202923]">
+    <div className="w-full space-y-6 pb-12 font-sans bg-[#F4F6FB] min-h-screen text-slate-900">
       {/* ================= 1. HEADER SECTION ================= */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E5EAE5] bg-white p-6 rounded-2xl shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white p-6 rounded-2xl shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-[#16834A]">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-indigo-600 shadow-2xs">
               <Sparkles className="h-3.5 w-3.5" />
             </span>
-            <span className="text-[11px] font-black uppercase tracking-wider text-[#16834A]">
+            <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600">
               Enterprise Intelligence Suite
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#202923]">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
             Superadmin Dashboard
           </h1>
-          <p className="mt-0.5 text-xs text-[#687568] font-medium">
+          <p className="mt-0.5 text-xs text-slate-500 font-medium">
             Platform Overview &amp; School Intelligence · Multi-tenant ERP telemetry &amp; analytics
           </p>
         </div>
@@ -355,7 +355,7 @@ export default function SuperAdminDashboard() {
                   if (s) setSelectedSchool(s);
                 }
               }}
-              className="rounded-xl border border-[#E5EAE5] bg-[#F7F8F5] px-3 py-2 text-xs font-bold text-[#202923] focus:border-[#16834A] focus:outline-none"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
             >
               <option value="ALL">All Registered Schools ({schools.length})</option>
               {schools.map((s) => (
@@ -371,7 +371,7 @@ export default function SuperAdminDashboard() {
             <select
               value={filters.academicYear}
               onChange={(e) => setFilters((prev) => ({ ...prev, academicYear: e.target.value }))}
-              className="rounded-xl border border-[#E5EAE5] bg-[#F7F8F5] px-3 py-2 text-xs font-bold text-[#202923] focus:border-[#16834A] focus:outline-none"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
             >
               <option value="ALL">All Academic Sessions</option>
               <option value="2026-2027">2026 – 2027 (Current)</option>
@@ -384,7 +384,7 @@ export default function SuperAdminDashboard() {
             <select
               value={filters.dateRange}
               onChange={(e) => setFilters((prev) => ({ ...prev, dateRange: e.target.value as any }))}
-              className="rounded-xl border border-[#E5EAE5] bg-[#F7F8F5] px-3 py-2 text-xs font-bold text-[#202923] focus:border-[#16834A] focus:outline-none"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
             >
               <option value="ALL">All Time</option>
               <option value="30D">Last 30 Days</option>
@@ -398,7 +398,7 @@ export default function SuperAdminDashboard() {
             type="button"
             onClick={loadDashboardData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#16834A] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#16834A]/90 transition-all disabled:opacity-50 active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-all disabled:opacity-50 active:scale-95"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -427,14 +427,15 @@ export default function SuperAdminDashboard() {
       )}
 
       {/* ================= 2. SIX KPI STATISTICS CARDS ================= */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-busy={loading}>
+      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" aria-busy={loading}>
         {/* KPI 1: Total Schools */}
         <KpiCard
           label="Total Schools"
           value={totalSchools}
           detail={`${activeSchools} active · ${inactiveSchools} inactive`}
           icon={Building2}
-          badge={{ text: "Platform", variant: "neutral" }}
+          badge={{ text: "Platform", variant: "primary" }}
+          colorScheme="indigo"
           loading={loading}
         />
 
@@ -445,6 +446,7 @@ export default function SuperAdminDashboard() {
           detail={`${activationRate}% active tenant coverage`}
           icon={CheckCircle2}
           badge={{ text: `${activationRate}%`, variant: "success" }}
+          colorScheme="emerald"
           progressPercent={activationRate}
           loading={loading}
         />
@@ -455,7 +457,8 @@ export default function SuperAdminDashboard() {
           value={totalStudents}
           detail={`${summary?.total_boys || 0} Boys · ${summary?.total_girls || 0} Girls`}
           icon={GraduationCap}
-          badge={{ text: "Enrolled", variant: "neutral" }}
+          badge={{ text: "Enrolled", variant: "info" }}
+          colorScheme="sky"
           loading={loading}
         />
 
@@ -465,7 +468,8 @@ export default function SuperAdminDashboard() {
           value={totalStaff}
           detail={`${teachersCount} teachers · ${summary?.active_staff || 0} active`}
           icon={Users}
-          badge={{ text: `${teachersCount} Tch`, variant: "neutral" }}
+          badge={{ text: `${teachersCount} Tch`, variant: "purple" }}
+          colorScheme="purple"
           loading={loading}
         />
 
@@ -476,7 +480,8 @@ export default function SuperAdminDashboard() {
           formattedValue={`₹${monthlyRevenue.toLocaleString("en-IN")}`}
           detail={`${financialMetrics?.activeSubscriptionsCount || 1} Paid · ${financialMetrics?.trialSubscriptionsCount || 1} Trial`}
           icon={CreditCard}
-          badge={{ text: "Monthly", variant: "success" }}
+          badge={{ text: "Monthly", variant: "warning" }}
+          colorScheme="amber"
           loading={loading}
           currency
         />
@@ -488,6 +493,7 @@ export default function SuperAdminDashboard() {
           detail={`Across ${features.length} platform services`}
           icon={Layers3}
           badge={{ text: `${features.length} Feat`, variant: "neutral" }}
+          colorScheme="rose"
           loading={loading}
         />
       </div>

@@ -11,15 +11,30 @@ interface DashboardLayoutProps {
   roleColor?: string;
   sidebarLinks: SidebarLink[];
   userName?: string;
+  noPadding?: boolean;
+  mainClassName?: string;
 }
 
 /**
  * Every role shares the single AppShell so the sidebar, header and active-pill
  * styling stay identical to the superadmin workspace.
  */
-export function DashboardLayout({ children, roleTitle, sidebarLinks, userName = "Admin" }: DashboardLayoutProps) {
+export function DashboardLayout({
+  children,
+  roleTitle,
+  sidebarLinks,
+  userName = "Admin",
+  noPadding,
+  mainClassName,
+}: DashboardLayoutProps) {
   return (
-    <AppShell links={sidebarLinks} roleTitle={roleTitle} userName={userName}>
+    <AppShell
+      links={sidebarLinks}
+      roleTitle={roleTitle}
+      userName={userName}
+      noPadding={noPadding}
+      mainClassName={mainClassName}
+    >
       {children}
     </AppShell>
   );
