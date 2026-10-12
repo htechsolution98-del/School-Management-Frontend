@@ -53,7 +53,7 @@ export function parseApiDate(value: unknown): Date | null {
     if (!isNaN(iso.getTime())) return iso;
   }
 
-  // dd-mm-yyyy [hh:mm[:ss[.ffffff]]] (API DATE_FORMAT)
+  // dd-mm-yyyy hh:mm:ss (API DATE_FORMAT)
   const dash = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (dash) {
     const [, day, month, year, hour, minute, second] = dash;
