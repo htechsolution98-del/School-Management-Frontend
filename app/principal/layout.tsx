@@ -28,6 +28,7 @@ import {
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/principal", icon: LayoutDashboard },
+  { title: "Staff Active / Deactive", href: "/principal/staff-status", icon: UserCheck },
   { title: "Academic Year", href: "/principal/academic-year", icon: Calendar },
   { title: "Result Dashboard", href: "/principal/result/dashboard", icon: BarChart3 },
   { title: "Result Weightage", href: "/principal/result/weightage", icon: Percent },

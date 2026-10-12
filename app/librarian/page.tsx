@@ -77,6 +77,8 @@ import {
   getReservations,
   cancelReservation,
   getLibraryStudents,
+  getLibraryStaff,
+  LibraryStaff,
 } from "@/lib/library";
 
 export default function LibrarianDashboard() {
@@ -92,6 +94,8 @@ export default function LibrarianDashboard() {
   const [racks, setRacks] = useState<Rack[]>([]);
   const [shelves, setShelves] = useState<Shelf[]>([]);
   const [students, setStudents] = useState<LibraryStudent[]>([]);
+  const [staffBorrowers, setStaffBorrowers] = useState<LibraryStaff[]>([]);
+  const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
   const [librarySettings, setLibrarySettings] = useState<LibrarySetting | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -192,6 +196,7 @@ export default function LibrarianDashboard() {
         racksData,
         shelvesData,
         studentsData,
+        staffData,
         settingsData,
       ] = await Promise.all([
         getBooks().catch(() => []),
@@ -203,6 +208,7 @@ export default function LibrarianDashboard() {
         getRacks().catch(() => []),
         getShelves().catch(() => []),
         getLibraryStudents().catch(() => []),
+        getLibraryStaff().catch(() => []),
         getLibrarySettings().catch(() => null),
       ]);
 
@@ -215,6 +221,7 @@ export default function LibrarianDashboard() {
       setRacks(racksData);
       setShelves(shelvesData);
       setStudents(studentsData);
+      setStaffBorrowers(staffData);
 
       if (settingsData) {
         setLibrarySettings(settingsData);
@@ -357,10 +364,10 @@ export default function LibrarianDashboard() {
     try {
       await issueBook({
         book: Number(issueForm.book),
-        student: Number(issueForm.student),
+        ...(borrowerType === "student" ? { student: Number(issueForm.student) } : { staff: Number(issueForm.student) }),
         due_date: issueForm.due_date || undefined,
       });
-      showToast("success", "Book successfully issued to student!");
+      showToast("success", `Book successfully issued to ${borrowerType}!`);
       setShowIssueModal(false);
       setIssueForm({ book: "", student: "", due_date: "" });
       await loadAllData();
@@ -928,7 +935,7 @@ export default function LibrarianDashboard() {
                     <thead className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">Book & Accession</th>
-                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Student / Staff</th>
                         <th className="px-4 py-3">Issued Date</th>
                         <th className="px-4 py-3">Due Date</th>
                         <th className="px-4 py-3">Renewals</th>
@@ -947,9 +954,9 @@ export default function LibrarianDashboard() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-medium text-slate-800">{loan.student_name}</div>
+                              <div className="font-medium text-slate-800">{loan.staff_name || loan.student_name}</div>
                               <div className="text-xs text-slate-400">
-                                GR: {loan.student_gr_no || "N/A"} • Class: {loan.student_class} {loan.student_division}
+                                {loan.staff ? `Staff #${loan.staff} • ${loan.staff_role || ""}` : `GR: ${loan.student_gr_no || "N/A"} • Class: ${loan.student_class || ""} ${loan.student_division || ""}`}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-slate-600">
@@ -1246,7 +1253,7 @@ export default function LibrarianDashboard() {
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">Max Books Per Student</Label>
+                  <Label className="text-xs font-semibold text-slate-700">Max Books Per Borrower (Student / Staff)</Label>
                   <Input
                     type="number"
                     min={1}
@@ -1363,7 +1370,7 @@ export default function LibrarianDashboard() {
                   <thead className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">Book</th>
-                      <th className="px-4 py-3">Student</th>
+                      <th className="px-4 py-3">Student / Staff</th>
                       <th className="px-4 py-3">Issue / Return Date</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Fine Charged</th>
@@ -1374,7 +1381,7 @@ export default function LibrarianDashboard() {
                     {historyLoans.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/50">
                         <td className="px-4 py-3 font-semibold text-slate-900">{item.book_title}</td>
-                        <td className="px-4 py-3">{item.student_name}</td>
+                        <td className="px-4 py-3">{item.staff_name || item.student_name}</td>
                         <td className="px-4 py-3 text-xs text-slate-600">
                           {new Date(item.book_issued_date).toLocaleDateString()} →{" "}
                           {item.actual_return_date ? new Date(item.actual_return_date).toLocaleDateString() : "N/A"}
@@ -1543,7 +1550,7 @@ export default function LibrarianDashboard() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-lg font-bold text-slate-900">Issue Book to Student</h2>
+              <h2 className="text-lg font-bold text-slate-900">Issue Book to Student / Staff</h2>
               <button onClick={() => setShowIssueModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
@@ -1570,15 +1577,17 @@ export default function LibrarianDashboard() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Select Student *</Label>
+                <Label className="text-xs font-semibold">Borrower type *</Label>
+                <select aria-label="Borrower type" value={borrowerType} onChange={event => { setBorrowerType(event.target.value as "student" | "staff"); setIssueForm({ ...issueForm, student: "" }); }} className="mb-3 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"><option value="student">Student</option><option value="staff">Staff</option></select>
+                <Label className="text-xs font-semibold">Select {borrowerType === "student" ? "Student" : "Staff"} *</Label>
                 <select
                   value={issueForm.student}
                   onChange={(e) => setIssueForm({ ...issueForm, student: e.target.value })}
                   required
                   className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm"
                 >
-                  <option value="">-- Choose student --</option>
-                  {students.map((s) => (
+                  <option value="">-- Choose {borrowerType} --</option>
+                  {borrowerType === "staff" ? staffBorrowers.map(member => <option key={member.id} value={member.id}>{member.name} (#{member.id}) — {member.category}</option>) : students.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} {s.surname} (GR: {s.gr_no || s.id}) - {s.school_class_name} {s.division}
                     </option>
@@ -1617,7 +1626,7 @@ export default function LibrarianDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Return & Inspect Book</h2>
                 <p className="text-xs text-slate-500">
-                  {showReturnModal.book_title} — {showReturnModal.student_name}
+                  {showReturnModal.book_title} — {showReturnModal.staff_name || showReturnModal.student_name}
                 </p>
               </div>
               <button onClick={() => setShowReturnModal(null)} className="text-slate-400 hover:text-slate-600">
@@ -1636,7 +1645,7 @@ export default function LibrarianDashboard() {
                   <option value="GOOD">Good Condition (No Damage)</option>
                   <option value="MINOR_DAMAGE">Minor Damage (Torn pages / cover)</option>
                   <option value="MAJOR_DAMAGE">Major Damage (Water / Unusable)</option>
-                  <option value="LOST">Lost Book (Student lost book)</option>
+                  <option value="LOST">Lost Book</option>
                 </select>
               </div>
 
