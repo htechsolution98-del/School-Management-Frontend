@@ -5,7 +5,7 @@ export interface TrusteeFinancials {
   total_fee_billed: number;
   total_fee_collected: number;
   pending_collections: number;
-  total_payroll_expenditure: number;
+  total_payroll_expenditure: number | null;
   total_assets_valuation: number;
 }
 

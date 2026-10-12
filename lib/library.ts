@@ -116,7 +116,11 @@ export interface BookIssued {
   book_copy?: number | null;
   accession_no?: string;
   barcode?: string;
-  student: number;
+  student: number | null;
+  staff?: number | null;
+  staff_name?: string | null;
+  staff_role?: string | null;
+  borrower_type?: "student" | "staff";
   book_title?: string;
   book_author?: string;
   book_category?: string;
@@ -186,7 +190,8 @@ export interface CreateBookPayload {
 
 export interface IssueBookPayload {
   book: number;
-  student: number;
+  student?: number;
+  staff?: number;
   due_date?: string;
 }
 
@@ -198,6 +203,14 @@ export interface LibraryStudent {
   roll_no?: string;
   school_class_name?: string;
   division?: string;
+}
+
+export interface LibraryStaff { id: number; name: string; category: string }
+
+export async function getLibraryStaff(): Promise<LibraryStaff[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}staff-borrowers/`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Unable to load staff borrowers.");
+  return response.json();
 }
 
 // ---------------- BOOK CATALOG ---------------- //
