@@ -31,6 +31,8 @@ export interface AppShellProps {
   userName?: string;
   /** Replaces the "Sign out" footer action (used by the CMS admin panel). */
   onSignOut?: () => void;
+  /** Optional custom title for the top header bar (defaults to current school name or Platform for Super Admin). */
+  headerTitle?: string;
 }
 
 const MIN_WIDTH = 72;
@@ -88,7 +90,7 @@ function findActive(links: SidebarLink[], pathname: string): SidebarLink | undef
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-export function AppShell({ children, links, roleTitle, userName, onSignOut }: AppShellProps) {
+export function AppShell({ children, links, roleTitle, userName, onSignOut, headerTitle }: AppShellProps) {
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
   const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
@@ -463,9 +465,16 @@ export function AppShell({ children, links, roleTitle, userName, onSignOut }: Ap
     );
   }
 
-  const currentSchoolDisplayName = profile?.school?.name || schoolName || "jujutsu kaisen";
-  const currentUserName = profile?.name || userName || "gojo";
-  const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "GO";
+  const isSuperAdminRole =
+    roleTitle === "Super Admin" ||
+    (profile?.roles || []).some((r) => String(r).toLowerCase().includes("super"));
+  const currentSchoolDisplayName =
+    headerTitle ||
+    (isSuperAdminRole
+      ? "VidyaSanchalan Platform"
+      : profile?.school?.name || schoolName || "VidyaSanchalan");
+  const currentUserName = profile?.name || userName || "Administrator";
+  const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "SA";
 
   return (
     <div

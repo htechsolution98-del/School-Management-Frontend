@@ -30,6 +30,8 @@ export interface SuperAdminAnalyticsSummary {
   total_boys: number;
   total_girls: number;
   other_gender: number;
+  rte_students?: number;
+  regular_students?: number;
   total_staff: number;
   active_staff: number;
   teachers_count: number;
@@ -55,11 +57,42 @@ export interface SuperAdminSchoolRow {
   total_staff: number;
   active_staff: number;
   enabled_features: number;
+  classes_count?: number;
+  subscription_status?: string;
+  subscription_plan?: string;
 }
 
 export interface SuperAdminAnalyticsResponse {
   summary: SuperAdminAnalyticsSummary;
   schools: SuperAdminSchoolRow[];
+  enrollment_trend?: {
+    month: string;
+    raw_date?: string;
+    admissions: number;
+    withdrawals: number;
+    total: number;
+  }[];
+  class_distribution?: {
+    class_name: string;
+    students: number;
+  }[];
+  financials?: {
+    total_student_fees: number;
+    collected_student_fees: number;
+    pending_student_fees: number;
+    subscription_monthly_projected: number;
+    subscription_annual_projected: number;
+    active_subscriptions: number;
+    trial_subscriptions: number;
+    expiring_soon: number;
+    expired_overdue: number;
+  };
+  status_distribution?: {
+    active: number;
+    inactive: number;
+    suspended: number;
+    activation_rate: number;
+  };
 }
 
 /**
@@ -192,6 +225,11 @@ export interface SchoolDetailedStats {
     name: string;
     is_enabled: boolean;
   }[];
+  fees?: {
+    total: number;
+    collected: number;
+    pending: number;
+  };
 }
 
 export type SchoolStudent = NonNullable<SchoolDetailedStats["students"]>[number];
