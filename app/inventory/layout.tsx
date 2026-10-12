@@ -10,12 +10,14 @@ import {
   Boxes,
   UserCheck,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  CalendarCheck,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
+  { title: "My Leaves", href: "/inventory/leaves", icon: CalendarCheck },
   { title: "Items Master", href: "/inventory/items", icon: Package },
   { title: "Categories & Variants", href: "/inventory/categories", icon: Tags },
   { title: "Pricing & Fee Mapping", href: "/inventory/pricing", icon: BadgePercent },

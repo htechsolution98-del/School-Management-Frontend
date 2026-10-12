@@ -22,6 +22,11 @@ const sidebarLinks = [
     exact: true,
   },
   { 
+    title: "My Leaves", 
+    href: "/fees/leaves", 
+    icon: CalendarDays,
+  },
+  { 
     title: "Academic Year", 
     href: "/fees/academic-year", 
     icon: Calendar,

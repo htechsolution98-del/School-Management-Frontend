@@ -42,7 +42,11 @@ import {
   type LeaveDay,
 } from "@/lib/clerk";
 
-export default function PrincipalLeaveRequestsPage() {
+interface PrincipalLeaveRequestsPageProps {
+  roleTitle?: string;
+}
+
+export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeaveRequestsPageProps = {}) {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -404,10 +408,12 @@ export default function PrincipalLeaveRequestsPage() {
             <div className="p-2 bg-primary/10 rounded-xl">
               <CalendarCheck className="h-8 w-8 text-primary" />
             </div>
-            Staff Leave Requests
+            {roleTitle ? `${roleTitle} — Leave Approvals` : "Staff Leave Requests"}
           </h1>
           <p className="text-muted-foreground mt-1.5 text-sm md:text-base">
-            Review, approve, or reject leave submissions from staff members.
+            {roleTitle
+              ? "Review, approve, or reject leave applications submitted by school staff and principal."
+              : "Review, approve, or reject leave submissions from staff members."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -633,6 +639,7 @@ export default function PrincipalLeaveRequestsPage() {
 
                     // Fallback helpers for request properties
                     const staffName = request.staff_name || (request as any).employee_name || (request as any).staff?.name || "Staff Member";
+                    const staffRole = (request as any).staff_category || (request as any).staff?.category || (request as any).category || (request as any).role || "";
                     const submissionDate = request.submission_date || (request as any).created_at || (request as any).date || "";
                     const leaveType = request.leave_type || (request as any).type || "CASUAL";
                     const reason = request.reason || (request as any).reason_for_leave || (request as any).description || "No reason specified";
@@ -682,9 +689,16 @@ export default function PrincipalLeaveRequestsPage() {
                                   {initials}
                                 </div>
                                 <div>
-                                  <h3 className="font-bold text-base text-zinc-950 dark:text-zinc-50 leading-tight capitalize">
-                                    {staffName}
-                                  </h3>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-base text-zinc-950 dark:text-zinc-50 leading-tight capitalize">
+                                      {staffName}
+                                    </h3>
+                                    {staffRole && (
+                                      <Badge variant="outline" className="text-[10px] font-extrabold uppercase px-1.5 py-0 rounded bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
+                                        {staffRole}
+                                      </Badge>
+                                    )}
+                                  </div>
                                   <p className="text-[11px] text-muted-foreground mt-0.5">
                                     Submitted: {formatDate(submissionDate)}
                                   </p>
