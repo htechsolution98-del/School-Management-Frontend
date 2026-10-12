@@ -890,7 +890,7 @@ export default function ProgressReportsPage() {
   }, [studentReportsMap]);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
       {/* Print Media Stylesheet to print ONLY the report card */}
       <style jsx global>{`
         @media print {

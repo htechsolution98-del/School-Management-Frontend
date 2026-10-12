@@ -111,7 +111,7 @@ export default function TeacherLayout({
   }
 
   return (
-    <DashboardLayout roleTitle="Teacher" sidebarLinks={sidebarLinks}>
+    <DashboardLayout roleTitle="Teacher" sidebarLinks={sidebarLinks} noPadding>
       {children}
     </DashboardLayout>
   );
