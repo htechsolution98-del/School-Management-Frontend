@@ -18,13 +18,15 @@ import {
   Loader2,
   Settings,
   Banknote,
+  Clock,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getDashboardRoute } from "@/lib/auth";
 import { getCurrentUserProfile } from "@/lib/current-user";
 
 const sidebarLinks = [
-  { title: "Dashboard & Attendance", href: "/teacher", icon: LayoutDashboard },
+  { title: "Dashboard", href: "/teacher", icon: LayoutDashboard },
+  { title: "My Attendance", href: "/teacher/my-attendance", icon: Clock },
   { title: "Student Attendance", href: "/teacher/student-attendance", icon: Users },
   { title: "Study Materials", href: "/teacher/study-materials", icon: FileText },
   { title: "Homework & Assignments", href: "/teacher/Homework", icon: BookOpen },

@@ -23,6 +23,7 @@ import {
   Megaphone,
   CalendarDays,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
@@ -99,6 +100,7 @@ const sidebarLinks = [
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },
   { title: "Leave Reports", href: "/clerk/leave-reports", icon: BarChart3 },
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
+  { title: "My Attendance", href: "/clerk/my-attendance", icon: ClipboardList },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },
   { title: "Account Settings", href: "/clerk/settings", icon: Settings },
 ];

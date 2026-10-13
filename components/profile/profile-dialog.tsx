@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, Building2, CalendarDays, Loader2, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Building2, CalendarDays, GraduationCap, Loader2, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
 
 import {
   Dialog,
@@ -87,6 +87,7 @@ export function ProfileDialog({
 
   const staff = profile?.staff_profile;
   const student = profile?.student_profile;
+  const parent = profile?.parent_profile;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,6 +172,29 @@ export function ProfileDialog({
                   <DetailRow icon={Building2} label="Class" value={student.school_class} />
                   <DetailRow icon={UserRound} label="Division" value={student.division} />
                   <DetailRow icon={CalendarDays} label="Date of birth" value={formatDate(student.date_of_birth)} />
+                </>
+              )}
+
+              {parent && (
+                <>
+                  <SectionTitle>Ward & Attendance Status</SectionTitle>
+                  <DetailRow icon={GraduationCap} label="Ward Name" value={parent.student_name} />
+                  <DetailRow icon={BadgeCheck} label="Ward GR number" value={parent.gr_no} />
+                  <DetailRow icon={Building2} label="Class & Division" value={`${parent.class_name || ""}${parent.division ? ` (${parent.division})` : ""}`} />
+                  {parent.latest_absence_notice && parent.latest_absence_notice.is_absent && (
+                    <div className="my-3 rounded-2xl border-2 border-rose-300 bg-rose-50/90 p-3.5 text-rose-950">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-rose-700">
+                        <AlertTriangle className="size-4 shrink-0 animate-pulse text-rose-600" />
+                        {parent.latest_absence_notice.title || "Absent Alert"}
+                      </div>
+                      <p className="mt-1 text-xs font-bold text-rose-900">
+                        {parent.latest_absence_notice.message}
+                      </p>
+                      <span className="mt-2 inline-block rounded-md bg-rose-200/80 px-2 py-0.5 text-[10px] font-black text-rose-900 uppercase">
+                        Status: Absent
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </div>

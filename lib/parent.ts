@@ -21,11 +21,31 @@ export interface ChildProfile {
   pending_fees: number;
   fee_status: string;
   notices: Array<{
-    id: number;
+    id: number | string;
     title: string;
     description: string;
     created_at: string;
+    notification_type?: string;
+    is_attendance?: boolean;
+    is_absent?: boolean;
   }>;
+  attendance_notifications?: Array<{
+    id: number | string;
+    title: string;
+    description?: string;
+    message?: string;
+    notification_type?: string;
+    created_at: string;
+    is_absent?: boolean;
+  }>;
+}
+
+export interface AttendanceNotificationItem {
+  id?: number | string;
+  title: string;
+  message: string;
+  notification_type: string;
+  created_at: string;
 }
 
 export interface ParentDueFee {
@@ -104,3 +124,19 @@ export async function getParentMonthlyReports(): Promise<any[]> {
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
+
+export async function getParentAttendanceNotifications(): Promise<AttendanceNotificationItem[]> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/attendance-notification/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+

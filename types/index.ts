@@ -59,6 +59,21 @@ export interface CurrentUserProfile {
     date_of_birth: string | null;
     school_class: string | null;
   } | null;
+  parent_profile?: {
+    id: number;
+    student_id: number;
+    student_name: string;
+    gr_no: string | null;
+    class_name: string | null;
+    division: string | null;
+    latest_absence_notice?: {
+      title: string | null;
+      message: string | null;
+      created_at: string | null;
+      is_absent: boolean;
+    } | null;
+    is_today_absent?: boolean;
+  } | null;
 }
 
 export * from "./superadmin";

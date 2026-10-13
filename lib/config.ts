@@ -71,6 +71,8 @@ export const API_ENDPOINTS = {
   LIBRARY_SHELVES: "/library-shelves/",
   BOOK_COPIES: "/book-copies/",
   BOOK_RESERVATIONS: "/book-reservations/",
+  LIBRARY_REPORTS: "/library-reports/",
+  LIBRARY_CLEARANCE: "/library-clearance/",
   STUDENTS: "/get-student/",
   SUBSCRIPTION_PLANS: "/subscription-plans/",
   SUBSCRIPTIONS: "/school-subscriptions/",
