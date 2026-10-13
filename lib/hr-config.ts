@@ -413,14 +413,30 @@ export async function rejectAttendanceRegularization(
 export async function getPayrollPayslips(params?: {
   payroll_run_id?: number;
   staff_id?: number;
+  mine?: boolean;
+  salary_month?: string;
 }): Promise<PayrollPayslip[]> {
   const query = new URLSearchParams();
   if (params?.payroll_run_id) query.set("payroll_run_id", String(params.payroll_run_id));
   if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+  if (params?.mine) query.set("mine", "true");
+  if (params?.salary_month) query.set("salary_month", params.salary_month);
 
   const url = `${API_BASE_URL}${API_ENDPOINTS.PAYROLL_PAYSLIPS}${query.toString() ? `?${query.toString()}` : ""}`;
   const res = await fetchWithAuth(url);
   const data = await handleResponse<any>(res, "Failed to fetch payroll payslips.");
   return normalizeList<PayrollPayslip>(data);
 }
+
+export async function getMyPayslips(salary_month?: string): Promise<PayrollPayslip[]> {
+  const query = new URLSearchParams();
+  query.set("mine", "true");
+  if (salary_month) query.set("salary_month", salary_month);
+
+  const url = `${API_BASE_URL}${API_ENDPOINTS.PAYROLL_PAYSLIPS}?${query.toString()}`;
+  const res = await fetchWithAuth(url);
+  const data = await handleResponse<any>(res, "Failed to fetch your personal payslips.");
+  return normalizeList<PayrollPayslip>(data);
+}
+
 

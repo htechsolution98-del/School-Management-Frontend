@@ -5,10 +5,7 @@ import {
   BarChart3,
   TrendingUp,
   TrendingDown,
-  Calendar,
-  Download,
   Printer,
-  Filter,
   RefreshCw,
   Search,
   DollarSign,
@@ -18,7 +15,7 @@ import {
   ShoppingBag,
   FileSpreadsheet
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { inventoryApi, showApiError } from "@/lib/inventory-client";
 
 export default function InventoryReportsPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "purchases" | "free" | "replacements">("overview");
@@ -36,7 +33,12 @@ export default function InventoryReportsPage() {
   // Helper for computing date ranges
   const getDateRangeParams = () => {
     const today = new Date();
-    const formatDate = (d: Date) => d.toISOString().split("T")[0];
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
 
     if (dateFilter === "today") {
       const d = formatDate(today);
@@ -79,7 +81,7 @@ export default function InventoryReportsPage() {
       setSalesRows(Array.isArray(salesRes.data) ? salesRes.data : salesRes.data.results || []);
 
       // 3. Purchases
-      const purRes = await inventoryApi.get("/purchases/", { params });
+      const purRes = await inventoryApi.get("/purchases/", { params: { ...params, status: "CONFIRMED" } });
       setPurchasesRows(Array.isArray(purRes.data) ? purRes.data : purRes.data.results || []);
 
       // 4. Replacements Summary
@@ -135,6 +137,57 @@ export default function InventoryReportsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const getExportData = () => {
+    if (activeTab === "sales") return { rows: filteredSales, filename: "sales_issues_report" };
+    if (activeTab === "purchases") return { rows: filteredPurchases, filename: "purchases_report" };
+    if (activeTab === "free") return { rows: freeItems, filename: "free_items_report" };
+    if (activeTab === "replacements") return { rows: filteredReplacements, filename: "replacements_report" };
+    return { rows: plSummary ? [plSummary] : [], filename: "inventory_profit_loss_summary" };
+  };
+
+  const exportExcel = async () => {
+    const { rows, filename } = getExportData();
+    if (!rows.length) return;
+    const { Workbook } = await import("exceljs");
+    const workbook = new Workbook();
+    const sheet = workbook.addWorksheet("Inventory report");
+    const columns = Object.keys(rows[0]);
+    sheet.addRow(columns);
+    rows.forEach((row) => sheet.addRow(columns.map((column) => {
+      const value = row[column];
+      return value && typeof value === "object" ? JSON.stringify(value) : value ?? "";
+    })));
+    sheet.getRow(1).font = { bold: true };
+    sheet.columns.forEach((column) => { column.width = Math.min(Math.max(column.header?.length || 12, 14), 32); });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = async () => {
+    const { rows, filename } = getExportData();
+    if (!rows.length) return;
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+    const pdf = new jsPDF({ orientation: "landscape" });
+    const columns = Object.keys(rows[0]);
+    autoTable(pdf, {
+      head: [columns],
+      body: rows.map((row) => columns.map((column) => {
+        const value = row[column];
+        return value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
+      })),
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229] },
+      margin: { top: 16 },
+    });
+    pdf.save(`${filename}_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   return (
@@ -326,18 +379,14 @@ export default function InventoryReportsPage() {
             </div>
 
             <button
-              onClick={() => {
-                if (activeTab === "sales") exportCSV(filteredSales, "sales_issues_report");
-                else if (activeTab === "purchases") exportCSV(filteredPurchases, "purchases_report");
-                else if (activeTab === "free") exportCSV(freeItems, "free_items_report");
-                else if (activeTab === "replacements") exportCSV(filteredReplacements, "replacements_report");
-                else window.print();
-              }}
+              onClick={() => exportCSV(getExportData().rows, getExportData().filename)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               Export CSV
             </button>
+            <button onClick={exportExcel} className="px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl">Excel</button>
+            <button onClick={exportPDF} className="px-3 py-1.5 text-xs font-semibold text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-xl">PDF</button>
             <button
               onClick={() => window.print()}
               className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 transition"

@@ -367,7 +367,7 @@ export default function StudentItemIssuePage() {
                   <select
                     required
                     value={singleItem}
-                    onChange={(e) => setSingleItem(e.target.value)}
+                onChange={(e) => { setSingleItem(e.target.value); setSingleSize(""); setSingleColor(""); }}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
                     {items.map((it) => (
@@ -401,12 +401,13 @@ export default function StudentItemIssuePage() {
                     Size Variant
                   </label>
                   <select
+                    required={!!selectedItemObj?.has_size}
                     value={singleSize}
                     onChange={(e) => setSingleSize(e.target.value)}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
-                    <option value="">Standard / None</option>
-                    {sizes.map((s) => (
+                    <option value="">{selectedItemObj?.has_size ? "Select size" : "Standard / None"}</option>
+                    {sizes.filter((s) => s.is_active).map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
@@ -417,12 +418,13 @@ export default function StudentItemIssuePage() {
                     Color Variant
                   </label>
                   <select
+                    required={!!selectedItemObj?.has_color}
                     value={singleColor}
                     onChange={(e) => setSingleColor(e.target.value)}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
-                    <option value="">Standard / None</option>
-                    {colors.map((c) => (
+                    <option value="">{selectedItemObj?.has_color ? "Select color" : "Standard / None"}</option>
+                    {colors.filter((c) => c.is_active).map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -562,7 +564,7 @@ export default function StudentItemIssuePage() {
               </label>
               <select
                 value={bulkItem}
-                onChange={(e) => setBulkItem(e.target.value)}
+                onChange={(e) => { setBulkItem(e.target.value); setBulkSize(""); setBulkColor(""); }}
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
               >
                 {items.map((it) => (
@@ -576,14 +578,23 @@ export default function StudentItemIssuePage() {
                 Size Variant
               </label>
               <select
+                required={!!bulkItemObj?.has_size}
                 value={bulkSize}
                 onChange={(e) => setBulkSize(e.target.value)}
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
               >
-                <option value="">Standard / None</option>
-                {sizes.map((s) => (
+                <option value="">{bulkItemObj?.has_size ? "Select size" : "Standard / None"}</option>
+                {sizes.filter((s) => s.is_active).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Variant</label>
+              <select required={!!bulkItemObj?.has_color} value={bulkColor} onChange={(e) => setBulkColor(e.target.value)} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                <option value="">{bulkItemObj?.has_color ? "Select color" : "Standard / None"}</option>
+                {colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
               </select>
             </div>
 

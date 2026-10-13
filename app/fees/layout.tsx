@@ -11,6 +11,7 @@ import {
   Megaphone,
   CalendarDays,
   Settings,
+  Banknote,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -25,6 +26,11 @@ const sidebarLinks = [
     title: "My Leaves", 
     href: "/fees/leaves", 
     icon: CalendarDays,
+  },
+  { 
+    title: "My Payslips", 
+    href: "/fees/payslips", 
+    icon: Banknote,
   },
   { 
     title: "Academic Year", 

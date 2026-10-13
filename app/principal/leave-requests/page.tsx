@@ -652,6 +652,10 @@ export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeave
 
                     const isPartial = reqStatus === "PARTIAL";
 
+                    const isTrusteeRole = (roleTitle || "").toLowerCase().includes("trustee");
+                    const isPrincipalApplicant = (staffRole || "").toLowerCase().includes("principal");
+                    const canActOnRequest = isTrusteeRole ? isPrincipalApplicant : !isPrincipalApplicant;
+
                     // Left border indicator based on status
                     const statusBorderColor = isApproved
                       ? "border-l-emerald-500 dark:border-l-emerald-600"
@@ -750,44 +754,55 @@ export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeave
 
                             {/* Direct Actions (Bulk) */}
                             {isPending && (
-                              <div className="flex flex-wrap items-center gap-3 pt-2">
-                                <Button
-                                  variant="default"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
-                                  onClick={() => handleBulkAction(request.id, "APPROVED")}
-                                  disabled={processingRequests[request.id] !== undefined}
-                                >
-                                  {processingRequests[request.id] === "approving" ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Approving...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Check className="mr-1.5 h-4 w-4" />
-                                      Approve Entire Request
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
-                                  onClick={() => handleBulkAction(request.id, "REJECTED")}
-                                  disabled={processingRequests[request.id] !== undefined}
-                                >
-                                  {processingRequests[request.id] === "rejecting" ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Rejecting...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <X className="mr-1.5 h-4 w-4" />
-                                      Reject Entire Request
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
+                              canActOnRequest ? (
+                                <div className="flex flex-wrap items-center gap-3 pt-2">
+                                  <Button
+                                    variant="default"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
+                                    onClick={() => handleBulkAction(request.id, "APPROVED")}
+                                    disabled={processingRequests[request.id] !== undefined}
+                                  >
+                                    {processingRequests[request.id] === "approving" ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Approving...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check className="mr-1.5 h-4 w-4" />
+                                        Approve Entire Request
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
+                                    onClick={() => handleBulkAction(request.id, "REJECTED")}
+                                    disabled={processingRequests[request.id] !== undefined}
+                                  >
+                                    {processingRequests[request.id] === "rejecting" ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Rejecting...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <X className="mr-1.5 h-4 w-4" />
+                                        Reject Entire Request
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 pt-2 text-xs text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800/80 px-3 py-1.5 rounded-lg border dark:border-zinc-700">
+                                  <Info className="h-4 w-4 text-slate-500 shrink-0" />
+                                  <span>
+                                    {isTrusteeRole
+                                      ? "Audit view only — Staff leaves are approved by the Principal. (Trustee approves Principal's leaves)."
+                                      : "Principal's leave requests are approved by Trustee / Management."}
+                                  </span>
+                                </div>
+                              )
                             )}
 
                             {/* Direct Actions (Cancellation Request) */}
@@ -862,7 +877,7 @@ export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeave
                                               <div className="flex items-center gap-2">
                                                 {getStatusBadgeSmall(day.status)}
                                                 
-                                                {isDayPending && (
+                                                {isDayPending && canActOnRequest && (
                                                   <div className="flex items-center gap-1.5">
                                                     <Button
                                                       size="xs"
