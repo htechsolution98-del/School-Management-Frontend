@@ -7,7 +7,7 @@ import {
   Loader2,
   X
 } from "lucide-react";
-import { inventoryApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function ReplacementsAndReturnsPage() {
   const [activeTab, setActiveTab] = useState<"replacements" | "returns">("replacements");
@@ -17,6 +17,7 @@ export default function ReplacementsAndReturnsPage() {
   const [sizes, setSizes] = useState<any[]>([]);
   const [colors, setColors] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Review Modal State
@@ -27,6 +28,12 @@ export default function ReplacementsAndReturnsPage() {
   const [chargedAmount, setChargedAmount] = useState("0.00");
   const [adminRemarks, setAdminRemarks] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    student: "", item: "", academic_year: "", current_size: "", requested_size: "",
+    current_color: "", requested_color: "", quantity: 1, reason: "WRONG_SIZE", description: "",
+  });
 
   // Return Modal State
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -48,21 +55,23 @@ export default function ReplacementsAndReturnsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [repRes, retRes, itemsRes, sizesRes, colorsRes, studsRes] = await Promise.all([
+      const [repRes, retRes, itemsRes, sizesRes, colorsRes, studsRes, yearsRes] = await Promise.all([
         inventoryApi.get("/replacements/"),
         inventoryApi.get("/returns/"),
         inventoryApi.get("/items/"),
         inventoryApi.get("/sizes/"),
         inventoryApi.get("/colors/"),
-        inventoryApi.get("/get-student/").catch(() => inventoryApi.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/get-student/`).catch(() => ({ data: [] }))),
+        coreApi.get("/get-student/").catch(() => ({ data: [] })),
+        coreApi.get("/academic-year/").catch(() => ({ data: [] })),
       ]);
 
       setReplacements(Array.isArray(repRes.data) ? repRes.data : repRes.data.results || []);
       setReturns(Array.isArray(retRes.data) ? retRes.data : retRes.data.results || []);
       const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
       setItems(its);
-      if (its.length > 0 && !returnForm.item) {
-        setReturnForm(prev => ({ ...prev, item: its[0].id }));
+      const returnableItems = its.filter((item: { is_returnable?: boolean }) => item.is_returnable);
+      if (returnableItems.length > 0 && !returnForm.item) {
+        setReturnForm(prev => ({ ...prev, item: returnableItems[0].id }));
       }
       setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
       setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
@@ -70,6 +79,11 @@ export default function ReplacementsAndReturnsPage() {
       setStudents(st);
       if (st.length > 0 && !returnForm.student) {
         setReturnForm(prev => ({ ...prev, student: st[0].id }));
+      }
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
+      setAcademicYears(years);
+      if (years.length > 0 && !requestForm.academic_year) {
+        setRequestForm(prev => ({ ...prev, academic_year: String(years[0].id) }));
       }
     } catch (err) {
       console.error("Error fetching replacements:", err);
@@ -141,6 +155,33 @@ export default function ReplacementsAndReturnsPage() {
     }
   };
 
+  const handleSaveRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingRequest(true);
+    try {
+      await inventoryApi.post("/replacements/", {
+        ...requestForm,
+        student: Number(requestForm.student),
+        item: Number(requestForm.item),
+        academic_year: Number(requestForm.academic_year),
+        current_size: requestForm.current_size ? Number(requestForm.current_size) : null,
+        requested_size: requestForm.requested_size ? Number(requestForm.requested_size) : null,
+        current_color: requestForm.current_color ? Number(requestForm.current_color) : null,
+        requested_color: requestForm.requested_color ? Number(requestForm.requested_color) : null,
+        quantity: Number(requestForm.quantity),
+      });
+      showSuccess("Replacement request recorded", "It is now pending review.");
+      setIsRequestModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      showApiError(err, "Failed to record replacement request.");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const selectedReturnItem = items.find((item) => item.id === Number(returnForm.item));
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -154,12 +195,17 @@ export default function ReplacementsAndReturnsPage() {
             Process damaged/size exchange requests with Free vs Chargeable pricing decisions, and handle returnable items.
           </p>
         </div>
-        <button
-          onClick={() => setIsReturnModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
-        >
-          <RotateCcw className="w-4 h-4" /> Record Student Return
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setIsRequestModalOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold shadow-sm">
+            <RefreshCw className="w-4 h-4" /> New Replacement Request
+          </button>
+          <button
+            onClick={() => setIsReturnModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+          >
+            <RotateCcw className="w-4 h-4" /> Record Student Return
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -328,6 +374,49 @@ export default function ReplacementsAndReturnsPage() {
         )}
       </div>
 
+      {isRequestModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleSaveRequest} className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Create Replacement Request</h2>
+              <button type="button" onClick={() => setIsRequestModalOpen(false)}><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select required value={requestForm.student} onChange={(e) => setRequestForm({ ...requestForm, student: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Select student</option>{students.map((s) => <option key={s.id} value={s.id}>{s.name} {s.surname} · {s.roll_no || s.gr_no}</option>)}
+              </select>
+              <select required value={requestForm.academic_year} onChange={(e) => setRequestForm({ ...requestForm, academic_year: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Select academic year</option>{academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
+              </select>
+              <select required value={requestForm.item} onChange={(e) => setRequestForm({ ...requestForm, item: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Select item</option>{items.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.item_name}</option>)}
+              </select>
+              <select required value={requestForm.reason} onChange={(e) => setRequestForm({ ...requestForm, reason: e.target.value })} className="rounded-lg border p-2">
+                <option value="WRONG_SIZE">Wrong size</option><option value="DAMAGED">Damaged</option><option value="LOST">Lost</option><option value="DEFECTIVE">Defective</option><option value="WORN_OUT">Worn out</option><option value="OTHER">Other</option>
+              </select>
+              <select value={requestForm.current_size} onChange={(e) => setRequestForm({ ...requestForm, current_size: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Current size (optional)</option>{sizes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <select value={requestForm.requested_size} onChange={(e) => setRequestForm({ ...requestForm, requested_size: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Requested size (optional)</option>{sizes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <select value={requestForm.current_color} onChange={(e) => setRequestForm({ ...requestForm, current_color: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Current color (optional)</option>{colors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <select value={requestForm.requested_color} onChange={(e) => setRequestForm({ ...requestForm, requested_color: e.target.value })} className="rounded-lg border p-2">
+                <option value="">Requested color (optional)</option>{colors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input type="number" min="1" required value={requestForm.quantity} onChange={(e) => setRequestForm({ ...requestForm, quantity: Number(e.target.value) })} className="rounded-lg border p-2" placeholder="Quantity" />
+              <textarea value={requestForm.description} onChange={(e) => setRequestForm({ ...requestForm, description: e.target.value })} className="rounded-lg border p-2 sm:col-span-2" rows={3} placeholder="Request details" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setIsRequestModalOpen(false)} className="rounded-lg border px-4 py-2">Cancel</button>
+              <button type="submit" disabled={submittingRequest} className="rounded-lg bg-[#5826df] px-4 py-2 text-white disabled:opacity-50">{submittingRequest ? "Saving…" : "Submit request"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Review Modal */}
       {isReviewModalOpen && selectedReplacement && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -471,15 +560,26 @@ export default function ReplacementsAndReturnsPage() {
                 <select
                   required
                   value={returnForm.item}
-                  onChange={(e) => setReturnForm({ ...returnForm, item: e.target.value })}
+                  onChange={(e) => setReturnForm({ ...returnForm, item: e.target.value, size: "", color: "" })}
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                 >
                   <option value="">Select Item</option>
-                  {items.map((it) => (
+                  {items.filter((it) => it.is_returnable).map((it) => (
                     <option key={it.id} value={it.id}>{it.item_name}</option>
                   ))}
                 </select>
               </div>
+
+              {selectedReturnItem?.has_size && (
+                <select required value={returnForm.size} onChange={(e) => setReturnForm({ ...returnForm, size: e.target.value })} className="w-full rounded-lg border p-2">
+                  <option value="">Select returned size</option>{sizes.filter((size) => size.is_active).map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
+                </select>
+              )}
+              {selectedReturnItem?.has_color && (
+                <select required value={returnForm.color} onChange={(e) => setReturnForm({ ...returnForm, color: e.target.value })} className="w-full rounded-lg border p-2">
+                  <option value="">Select returned color</option>{colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
+                </select>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

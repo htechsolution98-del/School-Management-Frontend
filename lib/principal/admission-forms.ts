@@ -89,11 +89,10 @@ export async function getPublishedFormLink(): Promise<{ form_link: string }> {
 
     const data = await response.json();
 
-    if (data.form_link && data.form_link.startsWith("/")) {
-      const baseUrl = API_BASE_URL.endsWith("/")
-        ? API_BASE_URL.slice(0, -1)
-        : API_BASE_URL;
-      data.form_link = `${baseUrl}${data.form_link}`;
+    if (data.unique_link && typeof window !== "undefined") {
+      data.form_link = new URL(`/form/${data.unique_link}`, window.location.origin).toString();
+    } else if (data.form_link && data.form_link.startsWith("/")) {
+      data.form_link = new URL(data.form_link, API_BASE_URL).toString();
     }
 
     return data;

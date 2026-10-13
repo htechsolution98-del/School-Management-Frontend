@@ -201,15 +201,27 @@ export interface PayrollPayslip {
   id: number;
   staff: number;
   staff_name?: string;
+  designation?: string;
+  department?: string;
+  staff_category?: string;
+  staff_email?: string;
+  staff_mobile?: string;
   payroll_run: number;
   salary_month?: string;
+  basic_salary?: number | string;
   present_days: number | string;
   paid_leaves: number | string;
   unpaid_leaves: number | string;
   gross_earnings: number | string;
   total_deductions: number | string;
   net_salary: number | string;
+  payment_status?: string;
+  payment_mode?: string;
+  payment_date?: string;
+  receipt_number?: string;
+  school_name?: string;
   component_breakdown: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }
+

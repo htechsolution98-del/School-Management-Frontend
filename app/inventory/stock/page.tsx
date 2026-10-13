@@ -15,9 +15,10 @@ import {
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
 export default function StockAndLedgerPage() {
-  const [activeTab, setActiveTab] = useState<"balances" | "ledger">("balances");
+  const [activeTab, setActiveTab] = useState<"balances" | "ledger" | "audit">("balances");
   const [items, setItems] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [sizes, setSizes] = useState<any[]>([]);
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -60,16 +61,18 @@ export default function StockAndLedgerPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [itemsRes, txnRes, sizesRes, colorsRes, yearsRes] = await Promise.all([
+      const [itemsRes, txnRes, sizesRes, colorsRes, yearsRes, auditRes] = await Promise.all([
         inventoryApi.get("/items/"),
         inventoryApi.get("/stock-transactions/"),
         inventoryApi.get("/sizes/"),
         inventoryApi.get("/colors/"),
         coreApi.get("/academic-year/").catch(() => ({ data: [] })),
+        inventoryApi.get("/audit-logs/"),
       ]);
 
       setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
       setTransactions(Array.isArray(txnRes.data) ? txnRes.data : txnRes.data.results || []);
+      setAuditLogs(Array.isArray(auditRes.data) ? auditRes.data : auditRes.data.results || []);
       setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
       setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
       const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
@@ -156,6 +159,14 @@ export default function StockAndLedgerPage() {
       t.remarks?.toLowerCase().includes(q)
     );
   });
+  const filteredAuditLogs = auditLogs.filter((entry) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return `${entry.user_name || ""} ${entry.action || ""} ${entry.entity_type || ""} ${entry.entity_id || ""} ${JSON.stringify(entry.new_values || {})}`.toLowerCase().includes(q);
+  });
+
+  const selectedOpeningItem = items.find((item) => item.id === Number(openingForm.item));
+  const selectedAdjustmentItem = items.find((item) => item.id === Number(adjustForm.item));
 
   return (
     <div className="space-y-6">
@@ -215,6 +226,14 @@ export default function StockAndLedgerPage() {
         >
           <History className="w-4 h-4" /> Movement Ledger ({transactions.length})
         </button>
+        <button
+          onClick={() => setActiveTab("audit")}
+          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === "audit" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}
+        >
+          <History className="w-4 h-4" /> Audit Trail ({auditLogs.length})
+        </button>
       </div>
 
       {/* Filter / Search Bar */}
@@ -238,12 +257,13 @@ export default function StockAndLedgerPage() {
           >
             <option value="all">All Movement Types</option>
             <option value="OPENING">Opening Stock</option>
-            <option value="PURCHASE_IN">Purchases (+)</option>
-            <option value="STUDENT_ISSUE">Student Issues (-)</option>
-            <option value="STUDENT_RETURN_GOOD">Returns (+)</option>
-            <option value="REPLACEMENT_ISSUE">Replacements (-)</option>
+            <option value="PURCHASE">Purchases (+)</option>
+            <option value="ISSUE">Student Issues (-)</option>
+            <option value="RETURN">Returns (+)</option>
             <option value="ADJUSTMENT_IN">Adjustment In (+)</option>
             <option value="ADJUSTMENT_OUT">Adjustment Out (-)</option>
+            <option value="DAMAGE">Damage (-)</option>
+            <option value="LOST">Lost (-)</option>
           </select>
         )}
       </div>
@@ -313,7 +333,7 @@ export default function StockAndLedgerPage() {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : activeTab === "ledger" ? (
           /* Ledger Table */
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -367,6 +387,23 @@ export default function StockAndLedgerPage() {
               </tbody>
             </table>
           </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                <tr><th className="py-3.5 px-4">Date</th><th className="py-3.5 px-4">User</th><th className="py-3.5 px-4">Action</th><th className="py-3.5 px-4">Entity</th><th className="py-3.5 px-4">Details</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {filteredAuditLogs.map((entry) => <tr key={entry.id}>
+                  <td className="py-3.5 px-4">{new Date(entry.created_at).toLocaleString()}</td>
+                  <td className="py-3.5 px-4">{entry.user_name || "System"}</td>
+                  <td className="py-3.5 px-4">{entry.action}</td>
+                  <td className="py-3.5 px-4">{entry.entity_type} #{entry.entity_id}</td>
+                  <td className="py-3.5 px-4 font-mono text-xs">{JSON.stringify(entry.new_values || {})}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -389,7 +426,7 @@ export default function StockAndLedgerPage() {
                 <select
                   required
                   value={openingForm.item}
-                  onChange={(e) => setOpeningForm({ ...openingForm, item: e.target.value })}
+                  onChange={(e) => setOpeningForm({ ...openingForm, item: e.target.value, size: "", color: "" })}
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="">Select Item</option>
@@ -402,30 +439,32 @@ export default function StockAndLedgerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Size Variant (Optional)
+                    Size Variant {selectedOpeningItem?.has_size ? "*" : "(Optional)"}
                   </label>
                   <select
+                    required={!!selectedOpeningItem?.has_size}
                     value={openingForm.size}
                     onChange={(e) => setOpeningForm({ ...openingForm, size: e.target.value })}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
-                    <option value="">None / Standard</option>
-                    {sizes.map((s) => (
+                    <option value="">{selectedOpeningItem?.has_size ? "Select size" : "None / Standard"}</option>
+                    {sizes.filter((s) => s.is_active).map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Color (Optional)
+                    Color {selectedOpeningItem?.has_color ? "*" : "(Optional)"}
                   </label>
                   <select
+                    required={!!selectedOpeningItem?.has_color}
                     value={openingForm.color}
                     onChange={(e) => setOpeningForm({ ...openingForm, color: e.target.value })}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
-                    <option value="">None / Standard</option>
-                    {colors.map((c) => (
+                    <option value="">{selectedOpeningItem?.has_color ? "Select color" : "None / Standard"}</option>
+                    {colors.filter((c) => c.is_active).map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -508,7 +547,7 @@ export default function StockAndLedgerPage() {
                 <select
                   required
                   value={adjustForm.item}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, item: e.target.value })}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, item: e.target.value, size: "", color: "" })}
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                 >
                   <option value="">Select Item</option>
@@ -516,6 +555,21 @@ export default function StockAndLedgerPage() {
                     <option key={it.id} value={it.id}>{it.item_name} (Current: {it.current_stock})</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Size Variant {selectedAdjustmentItem?.has_size ? "*" : "(Optional)"}</label>
+                  <select required={!!selectedAdjustmentItem?.has_size} value={adjustForm.size} onChange={(e) => setAdjustForm({ ...adjustForm, size: e.target.value })} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                    <option value="">{selectedAdjustmentItem?.has_size ? "Select size" : "None / Standard"}</option>{sizes.filter((size) => size.is_active).map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Variant {selectedAdjustmentItem?.has_color ? "*" : "(Optional)"}</label>
+                  <select required={!!selectedAdjustmentItem?.has_color} value={adjustForm.color} onChange={(e) => setAdjustForm({ ...adjustForm, color: e.target.value })} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                    <option value="">{selectedAdjustmentItem?.has_color ? "Select color" : "None / Standard"}</option>{colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

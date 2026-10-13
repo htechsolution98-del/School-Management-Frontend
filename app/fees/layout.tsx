@@ -33,6 +33,11 @@ const sidebarLinks = [
     icon: CalendarDays,
   },
   { 
+    title: "My Payslips", 
+    href: "/fees/payslips", 
+    icon: Banknote,
+  },
+  { 
     title: "Academic Year", 
     href: "/fees/academic-year", 
     icon: Calendar,

@@ -140,7 +140,7 @@ export function SalarySlipModal({
               <div>
                 <div className="flex items-center justify-center sm:justify-start gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xl tracking-tight">
                   <Building className="w-6 h-6" />
-                  <span>{schoolName}</span>
+                  <span>{payslip.school_name || schoolName}</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Official Staff Payroll & Compensation Statement
@@ -149,7 +149,7 @@ export function SalarySlipModal({
 
               <div className="text-center sm:text-right">
                 <span className="inline-block px-3 py-1 text-xs font-extrabold uppercase tracking-wider rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  Payslip #{payslip.id}
+                  {payslip.receipt_number || `Payslip #${payslip.id}`}
                 </span>
                 <div className="text-xs font-semibold text-slate-500 mt-1">
                   Salary Month: <span className="text-slate-800 dark:text-slate-200 font-bold">{formatMonthYear(payslip.salary_month)}</span>
@@ -172,16 +172,40 @@ export function SalarySlipModal({
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Payroll Run Ref</span>
+                <span className="text-slate-400 block font-medium">Designation / Role</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block capitalize">
+                  {payslip.designation || payslip.staff_category || "Staff"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block font-medium">Department</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                  {payslip.department || "General"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block font-medium">Payment Mode</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block uppercase font-mono">
+                  {payslip.payment_mode || "Direct / Cash"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block font-medium">Receipt Ref</span>
                 <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block font-mono">
-                  RUN-{payslip.payroll_run}
+                  {payslip.receipt_number || `SAL-${payslip.id}`}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block font-medium">Payment Date</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block font-mono">
+                  {payslip.payment_date ? new Date(payslip.payment_date).toLocaleDateString("en-IN") : (payslip.created_at ? new Date(payslip.created_at).toLocaleDateString("en-IN") : "—")}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Status</span>
                 <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Generated & Approved
+                  {payslip.payment_status === "paid" ? "Paid & Reconciled" : "Disbursed"}
                 </span>
               </div>
             </div>

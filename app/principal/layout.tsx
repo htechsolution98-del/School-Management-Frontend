@@ -24,6 +24,7 @@ import {
   Send,
   GraduationCap,
   History,
+  Banknote,
 } from "lucide-react";
 
 const sidebarLinks = [

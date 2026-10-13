@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
-  X
+  X,
+  Pencil
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
@@ -23,6 +24,7 @@ export default function PurchasesAndSuppliersPage() {
 
   // Supplier Modal
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState<number | null>(null);
   const [supplierFormData, setSupplierFormData] = useState({
     supplier_name: "",
     contact_person: "",
@@ -120,6 +122,9 @@ export default function PurchasesAndSuppliersPage() {
     setPurchaseForm(prev => {
       const newItems = [...prev.items];
       newItems[index] = { ...newItems[index], [field]: value };
+      if (field === "item") {
+        newItems[index] = { ...newItems[index], size: "", color: "" };
+      }
 
       // Recalculate row total
       const qty = Number(newItems[index].quantity) || 0;
@@ -180,9 +185,15 @@ export default function PurchasesAndSuppliersPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await inventoryApi.post("/suppliers/", supplierFormData);
-      showSuccess("Supplier registered successfully");
+      if (editingSupplierId !== null) {
+        await inventoryApi.patch(`/suppliers/${editingSupplierId}/`, supplierFormData);
+        showSuccess("Supplier updated successfully");
+      } else {
+        await inventoryApi.post("/suppliers/", supplierFormData);
+        showSuccess("Supplier registered successfully");
+      }
       setIsSupplierModalOpen(false);
+      setEditingSupplierId(null);
       setSupplierFormData({
         supplier_name: "",
         contact_person: "",
@@ -214,7 +225,11 @@ export default function PurchasesAndSuppliersPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsSupplierModalOpen(true)}
+            onClick={() => {
+              setEditingSupplierId(null);
+              setSupplierFormData({ supplier_name: "", contact_person: "", phone: "", email: "", address: "", gst_number: "" });
+              setIsSupplierModalOpen(true);
+            }}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
           >
             <Plus className="w-4 h-4 text-slate-500" /> Add Supplier
@@ -334,9 +349,30 @@ export default function PurchasesAndSuppliersPage() {
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-slate-900 dark:text-white text-base">{s.supplier_name}</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                      Active
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        {s.is_active ? "Active" : "Inactive"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSupplierId(s.id);
+                          setSupplierFormData({
+                            supplier_name: s.supplier_name || "",
+                            contact_person: s.contact_person || "",
+                            phone: s.phone || "",
+                            email: s.email || "",
+                            address: s.address || "",
+                            gst_number: s.gst_number || "",
+                          });
+                          setIsSupplierModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        aria-label={`Edit ${s.supplier_name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                    </div>
                   </div>
                   <div className="text-xs text-slate-500">Contact: {s.contact_person || "N/A"}</div>
                   <div className="text-xs text-slate-500">Phone: {s.phone || "N/A"}</div>
@@ -446,6 +482,9 @@ export default function PurchasesAndSuppliersPage() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {purchaseForm.items.map((row, idx) => (
                         <tr key={idx} className="bg-white dark:bg-slate-900">
+                          {(() => {
+                            const selectedItem = items.find((item) => item.id === Number(row.item));
+                            return <>
                           <td className="p-2">
                             <select
                               required
@@ -461,24 +500,26 @@ export default function PurchasesAndSuppliersPage() {
                           </td>
                           <td className="p-2">
                             <select
+                              required={!!selectedItem?.has_size}
                               value={row.size}
                               onChange={(e) => handleItemChange(idx, "size", e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                             >
-                              <option value="">None</option>
-                              {sizes.map((s) => (
+                              <option value="">{selectedItem?.has_size ? "Select" : "None"}</option>
+                              {sizes.filter((s) => s.is_active).map((s) => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
                               ))}
                             </select>
                           </td>
                           <td className="p-2">
                             <select
+                              required={!!selectedItem?.has_color}
                               value={row.color}
                               onChange={(e) => handleItemChange(idx, "color", e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                             >
-                              <option value="">None</option>
-                              {colors.map((c) => (
+                              <option value="">{selectedItem?.has_color ? "Select" : "None"}</option>
+                              {colors.filter((c) => c.is_active).map((c) => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                               ))}
                             </select>
@@ -518,6 +559,8 @@ export default function PurchasesAndSuppliersPage() {
                               </button>
                             )}
                           </td>
+                            </>;
+                          })()}
                         </tr>
                       ))}
                     </tbody>
@@ -555,14 +598,14 @@ export default function PurchasesAndSuppliersPage() {
         </div>
       )}
 
-      {/* New Supplier Modal */}
+      {/* Supplier Add/Edit Modal */}
       {isSupplierModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Add New Supplier</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingSupplierId !== null ? "Edit Supplier" : "Add New Supplier"}</h2>
               <button
-                onClick={() => setIsSupplierModalOpen(false)}
+                onClick={() => { setIsSupplierModalOpen(false); setEditingSupplierId(null); }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -627,7 +670,7 @@ export default function PurchasesAndSuppliersPage() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsSupplierModalOpen(false)}
+                  onClick={() => { setIsSupplierModalOpen(false); setEditingSupplierId(null); }}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel
@@ -638,7 +681,7 @@ export default function PurchasesAndSuppliersPage() {
                   className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
                 >
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Save Supplier
+                  {editingSupplierId !== null ? "Update Supplier" : "Save Supplier"}
                 </button>
               </div>
             </form>
