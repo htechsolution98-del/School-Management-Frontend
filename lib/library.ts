@@ -139,6 +139,12 @@ export interface BookIssued {
   damage_fees?: number | string;
   lost_fees?: number | string;
   total_fine?: number | string;
+  is_fine_paid?: boolean;
+  fine_paid_amount?: number | string;
+  fine_remaining?: number | string;
+  payment_method?: string | null;
+  payment_date?: string | null;
+  payment_receipt_no?: string | null;
   is_late: boolean;
   condition_on_return?: string;
   remarks?: string;
@@ -190,6 +196,8 @@ export interface CreateBookPayload {
 
 export interface IssueBookPayload {
   book: number;
+  book_copy?: number;
+  book_copy_id?: number;
   student?: number;
   staff?: number;
   due_date?: string;
@@ -245,6 +253,27 @@ export async function getPublicBooks(): Promise<Book[]> {
   return Array.isArray(data) ? data : data.results ?? [];
 }
 
+function extractApiErrorMessage(err: any, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  if (err.detail) return String(err.detail);
+  if (err.message) return String(err.message);
+  if (Array.isArray(err)) return err.map(String).join(" ");
+  if (typeof err === "object") {
+    const messages: string[] = [];
+    for (const [key, val] of Object.entries(err)) {
+      const fieldName = key === "non_field_errors" ? "" : `${key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}: `;
+      if (Array.isArray(val)) {
+        messages.push(`${fieldName}${val.join(" ")}`);
+      } else if (typeof val === "string") {
+        messages.push(`${fieldName}${val}`);
+      }
+    }
+    if (messages.length > 0) return messages.join(" | ");
+  }
+  return fallback;
+}
+
 export async function createBook(payload: CreateBookPayload): Promise<Book> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_MANAGE}`, {
     method: "POST",
@@ -256,7 +285,7 @@ export async function createBook(payload: CreateBookPayload): Promise<Book> {
     let errorMsg = "Failed to add book.";
     try {
       const err = await response.json();
-      errorMsg = err?.detail || err?.message || (Array.isArray(err) ? err[0] : Object.values(err)[0]) || errorMsg;
+      errorMsg = extractApiErrorMessage(err, errorMsg);
     } catch {}
     throw new Error(String(errorMsg));
   }
@@ -275,7 +304,7 @@ export async function updateBook(id: number, payload: Partial<CreateBookPayload>
     let errorMsg = "Failed to update book.";
     try {
       const err = await response.json();
-      errorMsg = err?.detail || err?.message || (Array.isArray(err) ? err[0] : Object.values(err)[0]) || errorMsg;
+      errorMsg = extractApiErrorMessage(err, errorMsg);
     } catch {}
     throw new Error(String(errorMsg));
   }
@@ -355,7 +384,14 @@ export async function returnBook(issuedId: number): Promise<BookIssued> {
 
 export async function returnBookWithCondition(
   issuedId: number,
-  payload: { condition: string; remarks?: string; damage_fee?: number; lost_fee?: number }
+  payload: {
+    condition: string;
+    remarks?: string;
+    damage_fee?: number;
+    lost_fee?: number;
+    pay_now?: boolean;
+    payment_method?: string;
+  }
 ): Promise<BookIssued> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}${issuedId}/return/`, {
     method: "POST",
@@ -365,6 +401,37 @@ export async function returnBookWithCondition(
 
   if (!response.ok) {
     let errorMsg = "Failed to finalize book return.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+
+  return response.json();
+}
+
+export interface FinePaymentResult {
+  detail: string;
+  receipt_no: string;
+  amount_paid: string;
+  remaining_due: string;
+  is_fine_paid: boolean;
+  record: BookIssued;
+}
+
+export async function payBookFine(
+  issuedId: number,
+  payload: { amount?: number; payment_method?: string }
+): Promise<FinePaymentResult> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}${issuedId}/pay-fine/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to process fine payment.";
     try {
       const err = await response.json();
       errorMsg = err?.detail || err?.message || errorMsg;
@@ -474,6 +541,65 @@ export async function generateBookCopies(payload: {
   return response.json();
 }
 
+export async function transferBookCopy(
+  copyId: number,
+  payload: { rack_id?: number | null; shelf_id?: number | null }
+): Promise<BookCopy> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}${copyId}/transfer/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to transfer copy.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+
+  return response.json();
+}
+
+export async function changeBookCopyStatus(
+  copyId: number,
+  payload: { status: string; remarks?: string }
+): Promise<BookCopy> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}${copyId}/change-status/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to update copy status.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+
+  return response.json();
+}
+
+export async function deleteBookCopy(copyId: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}${copyId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to dispose copy.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+}
+
 // ---------------- BOOK RESERVATIONS ---------------- //
 
 export async function getReservations(): Promise<BookReservation[]> {
@@ -521,6 +647,24 @@ export async function cancelReservation(reservationId: number): Promise<void> {
   }
 }
 
+export async function checkReservationExpiries(): Promise<{ detail: string; expired_count: number }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_RESERVATIONS}check-expiries/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to sweep reservation hold expiries.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+
+  return response.json();
+}
+
 // ---------------- MASTERS (CATEGORIES, AUTHORS, PUBLISHERS, RACKS, SHELVES) ---------------- //
 
 export async function getCategories(): Promise<BookCategory[]> {
@@ -551,6 +695,37 @@ export async function createCategory(payload: Partial<BookCategory>): Promise<Bo
   return response.json();
 }
 
+export async function updateCategory(id: number, payload: Partial<BookCategory>): Promise<BookCategory> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_CATEGORIES}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to update category";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.name?.[0] || err?.message || JSON.stringify(err);
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_CATEGORIES}${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to delete category";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+}
+
 export async function getAuthors(): Promise<Author[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}`, {
     method: "GET",
@@ -577,6 +752,37 @@ export async function createAuthor(payload: Partial<Author>): Promise<Author> {
     throw new Error(String(errorMsg));
   }
   return response.json();
+}
+
+export async function updateAuthor(id: number, payload: Partial<Author>): Promise<Author> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to update author";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.name?.[0] || err?.message || JSON.stringify(err);
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
+export async function deleteAuthor(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to delete author";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
 }
 
 export async function getPublishers(): Promise<Publisher[]> {
@@ -607,6 +813,37 @@ export async function createPublisher(payload: Partial<Publisher>): Promise<Publ
   return response.json();
 }
 
+export async function updatePublisher(id: number, payload: Partial<Publisher>): Promise<Publisher> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_PUBLISHERS}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to update publisher";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.name?.[0] || err?.message || JSON.stringify(err);
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
+export async function deletePublisher(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_PUBLISHERS}${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to delete publisher";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+}
+
 export async function getRacks(): Promise<Rack[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}`, {
     method: "GET",
@@ -633,6 +870,37 @@ export async function createRack(payload: Partial<Rack>): Promise<Rack> {
     throw new Error(String(errorMsg));
   }
   return response.json();
+}
+
+export async function updateRack(id: number, payload: Partial<Rack>): Promise<Rack> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to update rack";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.rack_code?.[0] || err?.rack_name?.[0] || err?.message || JSON.stringify(err);
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
+export async function deleteRack(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to delete rack";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
 }
 
 export async function getShelves(rackId?: number): Promise<Shelf[]> {
@@ -662,6 +930,37 @@ export async function createShelf(payload: Partial<Shelf>): Promise<Shelf> {
     throw new Error(String(errorMsg));
   }
   return response.json();
+}
+
+export async function updateShelf(id: number, payload: Partial<Shelf>): Promise<Shelf> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SHELVES}${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to update shelf";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.shelf_code?.[0] || err?.shelf_name?.[0] || err?.message || JSON.stringify(err);
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
+export async function deleteShelf(id: number): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SHELVES}${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to delete shelf";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
 }
 
 // ---------------- LIBRARY SETTINGS & RULES ---------------- //
@@ -735,6 +1034,175 @@ export async function getLibraryStudents(): Promise<LibraryStudent[]> {
     return [];
   }
 
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results ?? [];
+}
+
+// ---------------- LIBRARY CLEARANCE (SECTION 22) ---------------- //
+
+export interface StudentClearanceData {
+  student_id: number;
+  student_name: string;
+  gr_no: string;
+  roll_no: string;
+  class_name: string;
+  status: "APPROVED" | "PENDING";
+  is_cleared: boolean;
+  pending_reasons: string[];
+  active_issued_count: number;
+  pending_fine_amount: string;
+  issued_books: {
+    id: number;
+    title: string;
+    accession_no: string;
+    due_date: string;
+  }[];
+  unpaid_fine_records: {
+    id: number;
+    title: string;
+    total_fine: string;
+    paid_amount: string;
+    due_amount: string;
+    reason: string;
+  }[];
+}
+
+export interface PendingClearanceStudentSummary {
+  student_id: number;
+  student_name: string;
+  gr_no: string;
+  roll_no: string;
+  class_name: string;
+  active_books_count: number;
+  pending_fine_total: string;
+  status: "PENDING";
+}
+
+export async function getStudentClearance(studentId?: number): Promise<StudentClearanceData> {
+  const url = studentId
+    ? `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}?student_id=${studentId}`
+    : `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`;
+  const response = await fetchWithAuth(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to fetch student library clearance.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+
+  return response.json();
+}
+
+export async function getPendingClearanceStudents(): Promise<{
+  pending_clearance_students_count: number;
+  results: PendingClearanceStudentSummary[];
+}> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return { pending_clearance_students_count: 0, results: [] };
+  }
+
+  return response.json();
+}
+
+// ---------------- LIBRARY REPORTS & AUDIT (SECTION 20, 21, 23) ---------------- //
+
+export interface InventoryAuditData {
+  total_titles: number;
+  total_physical_copies: number;
+  available_copies: number;
+  issued_copies: number;
+  reserved_copies: number;
+  damaged_copies: number;
+  lost_copies: number;
+  under_repair_copies: number;
+  disposed_copies: number;
+  total_overdue_loans: number;
+  total_pending_fines: string;
+  total_collected_fines: string;
+  borrowers_with_pending_fines_count: number;
+}
+
+export async function getInventoryAudit(): Promise<InventoryAuditData> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}inventory-audit/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load inventory audit data.");
+  }
+
+  return response.json();
+}
+
+export async function getMostBorrowedReport(limit: number = 10): Promise<any[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}most_borrowed/?limit=${limit}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results ?? [];
+}
+
+export async function getCategoryTrendsReport(): Promise<any[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}category_trends/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results ?? [];
+}
+
+export async function getOverdueAndLateReport(): Promise<any> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}overdue_and_late/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return { currently_overdue: [], historical_late_rate: 0 };
+  return response.json();
+}
+
+export async function getFeeCollectionReport(): Promise<any> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}fee_collection/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return { total_fees_collected: "0", monthly_breakdown: [] };
+  return response.json();
+}
+
+export async function getStudentActivityReport(limit: number = 20): Promise<any[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}student_activity/?limit=${limit}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return [];
   const data = await response.json();
   return Array.isArray(data) ? data : data.results ?? [];
 }

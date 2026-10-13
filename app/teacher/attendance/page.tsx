@@ -1,180 +1,89 @@
 "use client";
 
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
 import {
   Calendar,
-  Clock,
   Search,
-  RefreshCw,
-  AlertCircle,
-  Loader2,
-  LogIn,
-  LogOut,
   CheckCircle2,
   XCircle,
-  MinusCircle,
-  TrendingUp,
-  Timer,
-  ChevronDown,
-  ChevronUp,
-  FileEdit,
+  Clock,
+  RefreshCw,
+  Download,
+  Edit3,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  UserCheck,
+  Users,
+  GraduationCap,
+  RotateCcw,
+  SlidersHorizontal,
   X,
   AlertTriangle,
-  Send,
-  ShieldAlert,
+  Loader2,
+  Save,
 } from "lucide-react";
-import { getAttendanceHistory } from "@/lib/teacher";
 import {
-  getAttendanceRegularizations,
-  createAttendanceRegularization,
-  type AttendanceRegularization,
-} from "@/lib/hr-config";
-import { getCurrentUserProfile } from "@/lib/current-user";
-import type { CurrentUserProfile } from "@/types";
+  getStudentAttendanceRecords,
+  getStudentsForAttendance,
+  updateSingleStudentAttendance,
+} from "@/lib/teacher/student-attendance";
+import { getAttendanceHistory } from "@/lib/teacher/attendance";
 import type { AttendanceRecord } from "@/types/teacher";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Avatar Palette ───────────────────────────────────────────────────────────
+const AVATAR_PALETTE = [
+  "#7c3aed", "#6366f1", "#2563eb", "#0284c7", "#0d9488",
+  "#059669", "#d97706", "#dc2626", "#e11d48", "#4f46e5",
+];
 
-function formatDateYYYYMMDD(val: any): string {
-  if (!val) return "";
-  if (typeof val === "string") {
-    const trimmed = val.trim();
-    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (match) return match[1];
-    const d = new Date(trimmed);
-    if (!isNaN(d.getTime())) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
+function getInitials(name?: string, surname?: string): string {
+  const f = (name || "").trim().charAt(0).toUpperCase();
+  const l = (surname || "").trim().charAt(0).toUpperCase();
+  return (f + l) || "ST";
+}
+
+function formatDateDisplay(dateStr?: string): string {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("T")[0].split("-");
+    if (parts.length === 3) {
+      const [y, m, d] = parts.map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        weekday: "short",
+      });
     }
-  } else if (val instanceof Date && !isNaN(val.getTime())) {
-    const year = val.getFullYear();
-    const month = String(val.getMonth() + 1).padStart(2, "0");
-    const day = String(val.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-  return "";
-}
-
-function getRecordDateStr(record?: any): string {
-  if (!record) return "";
-  return (
-    formatDateYYYYMMDD(record.attendance_date) ||
-    formatDateYYYYMMDD(record.date) ||
-    formatDateYYYYMMDD(record.date_time) ||
-    formatDateYYYYMMDD(record.check_in) ||
-    formatDateYYYYMMDD(record.created_at) ||
-    ""
-  );
-}
-
-function parseISOTime(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const ampm = h >= 12 ? "PM" : "AM";
-    return `${(h % 12 || 12).toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")} ${ampm}`;
-  } catch {
-    return "—";
-  }
-}
-
-function extractTimeHHMM(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    const h = d.getHours().toString().padStart(2, "0");
-    const m = d.getMinutes().toString().padStart(2, "0");
-    return `${h}:${m}`;
-  } catch {
-    return "";
-  }
-}
-
-function parseISODate(val: any): string {
-  if (!val) return "—";
-  const dateStr = formatDateYYYYMMDD(val);
-  if (!dateStr) return typeof val === "string" && val !== "Invalid Date" ? val : "—";
-  try {
-    const [y, m, d] = dateStr.split("-").map(Number);
-    const dateObj = new Date(Date.UTC(y, m - 1, d));
-    if (isNaN(dateObj.getTime())) return dateStr;
-    return dateObj.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      weekday: "short",
-      timeZone: "UTC",
-    });
+    return dateStr;
   } catch {
     return dateStr;
   }
 }
 
-function calcDuration(checkIn: string | null, checkOut: string | null): string {
-  if (!checkIn || !checkOut) return "—";
-  try {
-    const diff = Math.floor(
-      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000,
-    );
-    if (diff <= 0) return "—";
-    return `${Math.floor(diff / 60)
-      .toString()
-      .padStart(2, "0")}h ${(diff % 60).toString().padStart(2, "0")}m`;
-  } catch {
-    return "—";
-  }
-}
-
-function getStatus(r: AttendanceRecord): "present" | "half-day" | "absent" {
-  if (!r.is_present) return "absent";
-  if (r.is_half_day) return "half-day";
-  return "present";
-}
-
-const STATUS_CONFIG = {
-  present: { label: "Present", bg: "#d1fae5", text: "#065f46", dot: "#10b981" },
-  "half-day": {
-    label: "Half Day",
-    bg: "#fef9c3",
-    text: "#854d0e",
-    dot: "#f59e0b",
-  },
-  absent: { label: "Absent", bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
-};
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
+// ─── Stat Card (Matches Original Dashboard Outfit Theme) ───────────────────────
 function StatCard({
   icon: Icon,
   label,
   value,
   color,
-  delay,
+  delay = 0,
 }: {
   icon: any;
   label: string;
   value: string | number;
   color: string;
-  delay: number;
+  delay?: number;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="flex-1 min-w-0 bg-white rounded-xl border border-slate-100 px-3 py-3 flex items-center gap-3"
+      className="flex-1 min-w-0 bg-white rounded-xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-xs"
       style={{ boxShadow: "0 2px 10px -2px rgba(0,0,0,0.06)" }}
     >
       <div
@@ -184,7 +93,7 @@ function StatCard({
         <Icon className="w-4 h-4" style={{ color }} />
       </div>
       <div className="min-w-0">
-        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5 truncate">
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5 truncate">
           {label}
         </p>
         <p className="text-lg font-extrabold text-slate-900 leading-none">
@@ -195,274 +104,751 @@ function StatCard({
   );
 }
 
-// ─── Expanded Row ─────────────────────────────────────────────────────────────
+// ─── Gender Badge (Text-Only, No Emojis) ───────────────────────────────────────
+function GenderBadge({ gender }: { gender?: string }) {
+  const g = (gender || "").toLowerCase();
+  const isFemale = g.includes("female") || g === "f" || g.includes("girl");
+  const isMale = g.includes("male") || g === "m" || g.includes("boy");
 
-function ExpandedRow({
-  record,
-  onOpenCorrection,
-  existingReg,
-}: {
-  record: AttendanceRecord;
-  onOpenCorrection: (record: AttendanceRecord) => void;
-  existingReg?: AttendanceRegularization;
-}) {
-  const isMissingPunch = Boolean(record.check_in && !record.check_out);
-  const isLate = Boolean(record.is_late);
+  if (isFemale) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/80">
+        Female
+      </span>
+    );
+  }
+
+  if (isMale) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+        Male
+      </span>
+    );
+  }
 
   return (
-    <motion.tr
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <td colSpan={7} className="px-4 pb-3 pt-0">
-        <div
-          className="rounded-xl px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-          style={{ background: "#f8faff", border: "1px solid #e0e7ff" }}
-        >
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-            {[
-              { label: "Record ID", value: `#${record.id}` },
-              { label: "Category", value: record.category || "Staff" },
-              { label: "Staff ID", value: `#${record.staff}` },
-              {
-                label: "Date & Time",
-                value:
-                  record.date_time && !isNaN(new Date(record.date_time).getTime())
-                    ? new Date(record.date_time).toLocaleString("en-IN")
-                    : parseISODate(getRecordDateStr(record)),
-              },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                  {label}
-                </p>
-                <p className="text-xs font-semibold text-slate-700">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {existingReg ? (
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
-                existingReg.status === "Approved"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : existingReg.status === "Rejected"
-                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                  : "bg-amber-50 text-amber-700 border border-amber-200"
-              }`}>
-                {existingReg.status === "Approved" && <CheckCircle2 className="w-3.5 h-3.5" />}
-                {existingReg.status === "Rejected" && <XCircle className="w-3.5 h-3.5" />}
-                {existingReg.status === "Pending" && <Clock className="w-3.5 h-3.5" />}
-                Correction {existingReg.status}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpenCorrection(record)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
-                  isMissingPunch || isLate
-                    ? "bg-amber-600 hover:bg-amber-700 text-white"
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                }`}
-              >
-                <FileEdit className="w-3.5 h-3.5" />
-                Request Correction
-              </button>
-            )}
-          </div>
-        </div>
-      </td>
-    </motion.tr>
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+      {gender || "—"}
+    </span>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+function AttendanceStatusBadge({ isPresent }: { isPresent: boolean }) {
+  if (isPresent) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+        Present
+      </span>
+    );
+  }
 
-export default function AttendanceHistoryPage() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [regularizations, setRegularizations] = useState<AttendanceRegularization[]>([]);
-  const [profile, setProfile] = useState<CurrentUserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+      <XCircle className="w-3 h-3 text-rose-600" />
+      Absent
+    </span>
+  );
+}
 
-  // Correction Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
-  const [requestedCheckIn, setRequestedCheckIn] = useState("");
-  const [requestedCheckOut, setRequestedCheckOut] = useState("");
+// ─── Edit Student Attendance Modal ────────────────────────────────────────────
+function EditStudentAttendanceModal({
+  record,
+  onClose,
+  onSuccess,
+}: {
+  record: any;
+  onClose: () => void;
+  onSuccess: (updatedRecord: any) => void;
+}) {
+  const [status, setStatus] = useState<"present" | "absent">(
+    record.is_present ? "present" : "absent"
+  );
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const d = record.attendance_date || new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split("T")[0];
+    return d > today ? today : d;
+  });
   const [reason, setReason] = useState("");
-  const [submittingCorrection, setSubmittingCorrection] = useState(false);
-  const [modalError, setModalError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const studentName =
+    record.student_name ||
+    `${record.name || ""} ${record.surname || ""}`.trim() ||
+    "Student";
+  const initials = getInitials(record.name, record.surname);
 
-  const showToast = (msg: string, type: "success" | "error") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+  const handleSave = async () => {
+    if (attendanceDate > todayStr) {
+      setError("Cannot select or mark attendance for future dates.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await updateSingleStudentAttendance(
+        record.student_id || record.student,
+        status === "present",
+        status === "absent",
+        reason,
+        attendanceDate
+      );
+      const updated = {
+        ...record,
+        is_present: status === "present",
+        is_absent: status === "absent",
+        attendance_date: attendanceDate,
+      };
+      onSuccess(updated);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Failed to update attendance.");
+      setSaving(false);
+    }
   };
 
-  const load = useCallback(async () => {
+  return (
+    <div
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center font-bold text-xs text-white">
+              {initials}
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800">
+                Edit Attendance Record
+              </h3>
+              <p className="text-xs text-slate-400 font-medium">
+                {studentName} {record.gr_no ? `· GR: ${record.gr_no}` : ""}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">
+              {error}
+            </div>
+          )}
+
+          {/* Date Picker (Strict max={todayStr}) */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Attendance Date
+            </label>
+            <input
+              type="date"
+              max={todayStr}
+              value={attendanceDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && val > todayStr) return;
+                setAttendanceDate(val);
+              }}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 outline-none focus:border-violet-500 focus:bg-white transition-all"
+            />
+          </div>
+
+          {/* Status Selection Cards */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Select Status
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setStatus("present")}
+                className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                  status === "present"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-xs"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
+                    status === "present"
+                      ? "bg-emerald-500 text-white"
+                      : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-extrabold uppercase tracking-wide">
+                  Present
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatus("absent")}
+                className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                  status === "absent"
+                    ? "border-rose-500 bg-rose-50 text-rose-800 shadow-xs"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
+                    status === "absent"
+                      ? "bg-rose-500 text-white"
+                      : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  <XCircle className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-extrabold uppercase tracking-wide">
+                  Absent
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Reason / Remarks */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Reason / Remarks (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder={
+                status === "absent"
+                  ? "e.g., Sick leave, Family travel"
+                  : "e.g., Regular, Late arrival"
+              }
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 outline-none focus:border-violet-500 focus:bg-white transition-all"
+            />
+          </div>
+
+          {status === "absent" && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span>
+                Marking as Absent will automatically dispatch absence notifications to the parent profile.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-xs"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Updating…
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                Save Changes
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Student Detail / History Modal ───────────────────────────────────────────
+function StudentDetailModal({
+  studentId,
+  studentName,
+  allRecords,
+  onClose,
+}: {
+  studentId: number | string;
+  studentName: string;
+  allRecords: any[];
+  onClose: () => void;
+}) {
+  const history = useMemo(() => {
+    return allRecords.filter(
+      (r) => String(r.student_id || r.student) === String(studentId)
+    );
+  }, [allRecords, studentId]);
+
+  const presentCount = history.filter((r) => r.is_present).length;
+  const absentCount = history.filter((r) => r.is_absent).length;
+  const rate =
+    history.length > 0
+      ? Math.round((presentCount / history.length) * 100)
+      : 0;
+
+  return (
+    <div
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center font-bold text-xs text-white">
+              {getInitials(studentName)}
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800">
+                Attendance Timeline
+              </h3>
+              <p className="text-xs text-slate-400 font-medium">
+                {studentName} · {history.length} Records
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Stats Strip */}
+        <div className="px-6 py-3 bg-violet-50/30 border-b border-violet-100/50 grid grid-cols-3 gap-3 shrink-0 text-center">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Total Logged
+            </span>
+            <span className="text-sm font-extrabold text-slate-800">
+              {history.length} Days
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Present Rate
+            </span>
+            <span className="text-sm font-extrabold text-emerald-600">
+              {presentCount} ({rate}%)
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Absences
+            </span>
+            <span className="text-sm font-extrabold text-rose-600">
+              {absentCount} Days
+            </span>
+          </div>
+        </div>
+
+        {/* History List */}
+        <div className="p-6 overflow-y-auto space-y-2 flex-1">
+          {history.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs font-semibold">
+              No historical attendance logs recorded for this student.
+            </div>
+          ) : (
+            history.map((rec, i) => (
+              <div
+                key={rec.id || i}
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                      rec.is_present
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {rec.is_present ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">
+                      {formatDateDisplay(rec.attendance_date)}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Marked by: {rec.marked_by || "Class Teacher"}
+                    </div>
+                  </div>
+                </div>
+
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    rec.is_present
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  {rec.is_present ? "Present" : "Absent"}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-right shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Attendance History Page ─────────────────────────────────────────────
+export default function AttendanceHistoryPage() {
+  const [activeTab, setActiveTab] = useState<"students" | "staff">("students");
+
+  // Records state
+  const [records, setRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Divisions state
+  const [divisions, setDivisions] = useState<any[]>([]);
+  const [selectedDivisionId, setSelectedDivisionId] = useState<number | "all">("all");
+
+  // Filters state
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "present" | "absent">("all");
+  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
+  const [datePreset, setDatePreset] = useState<"all" | "today" | "yesterday" | "week" | "month" | "custom">("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "roll" | "name">("date_desc");
+
+  // Strict today ISO string (Disallow future dates)
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 10;
+
+  // Modals State
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<{ id: any; name: string } | null>(null);
+
+  // Staff punches state (for secondary tab)
+  const [staffRecords, setStaffRecords] = useState<AttendanceRecord[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+
+  // Load Data
+  const loadStudentAttendance = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [attData, regData] = await Promise.all([
-        getAttendanceHistory(),
-        getAttendanceRegularizations().catch(() => []),
+      const [attData, classData] = await Promise.all([
+        getStudentAttendanceRecords().catch(() => []),
+        getStudentsForAttendance().catch(() => null),
       ]);
-      setRecords(attData);
-      setRegularizations(regData);
+
+      setRecords(attData || []);
+      if (classData?.assigned_divisions && classData.assigned_divisions.length > 0) {
+        setDivisions(classData.assigned_divisions);
+      }
     } catch (err: any) {
-      setError(err?.message ?? "Failed to load attendance records.");
+      setError(err?.message || "Failed to load attendance records.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadStudentAttendance();
+  }, [loadStudentAttendance]);
+
+  // Load staff records when tab switched
+  useEffect(() => {
+    if (activeTab === "staff" && staffRecords.length === 0) {
+      setStaffLoading(true);
+      getAttendanceHistory()
+        .then((data) => setStaffRecords(data || []))
+        .catch(() => {})
+        .finally(() => setStaffLoading(false));
+    }
+  }, [activeTab, staffRecords.length]);
+
+  // Handle Preset Date changes
+  const handleDatePreset = (preset: "all" | "today" | "yesterday" | "week" | "month") => {
+    setDatePreset(preset);
+    const today = new Date();
+    const toISO = (d: Date) => d.toISOString().split("T")[0];
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+    } else if (preset === "today") {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === "yesterday") {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      setStartDate(toISO(y));
+      setEndDate(toISO(y));
+    } else if (preset === "week") {
+      const w = new Date(today);
+      w.setDate(w.getDate() - 7);
+      setStartDate(toISO(w));
+      setEndDate(todayStr);
+    } else if (preset === "month") {
+      const m = new Date(today);
+      m.setDate(m.getDate() - 30);
+      setStartDate(toISO(m));
+      setEndDate(todayStr);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setGenderFilter("all");
+    setDatePreset("all");
+    setStartDate("");
+    setEndDate("");
+    setSelectedDivisionId("all");
+    setSortBy("date_desc");
+  };
+
+  // Client Filter & Sort logic
+  const filteredRecords = useMemo(() => {
+    let result = [...records];
+
+    // Exclude any records with future dates
+    result = result.filter((r) => {
+      const d = (r.attendance_date || "").split("T")[0];
+      return !d || d <= todayStr;
+    });
+
+    // 1. Search Query
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((r) => {
+        const sName = (r.student_name || `${r.name || ""} ${r.surname || ""}`).toLowerCase();
+        const rNo = (r.roll_no || "").toString().toLowerCase();
+        const gNo = (r.gr_no || "").toString().toLowerCase();
+        const dateStr = (r.attendance_date || "").toLowerCase();
+        const divName = (r.division_name || r.division || "").toLowerCase();
+        return (
+          sName.includes(q) ||
+          rNo.includes(q) ||
+          gNo.includes(q) ||
+          dateStr.includes(q) ||
+          divName.includes(q)
+        );
+      });
+    }
+
+    // 2. Gender Filter
+    if (genderFilter !== "all") {
+      result = result.filter((r) => {
+        const g = (r.gender || "").toLowerCase();
+        if (genderFilter === "male") {
+          return g.includes("male") || g === "m" || g.includes("boy");
+        }
+        if (genderFilter === "female") {
+          return g.includes("female") || g === "f" || g.includes("girl");
+        }
+        return true;
+      });
+    }
+
+    // 3. Status Filter
+    if (statusFilter === "present") {
+      result = result.filter((r) => r.is_present);
+    } else if (statusFilter === "absent") {
+      result = result.filter((r) => r.is_absent);
+    }
+
+    // 4. Date Range
+    if (startDate && endDate) {
+      result = result.filter((r) => {
+        const d = (r.attendance_date || "").split("T")[0];
+        return d >= startDate && d <= endDate;
+      });
+    } else if (startDate) {
+      result = result.filter((r) => (r.attendance_date || "").split("T")[0] >= startDate);
+    } else if (endDate) {
+      result = result.filter((r) => (r.attendance_date || "").split("T")[0] <= endDate);
+    }
+
+    // 5. Division filter
+    if (selectedDivisionId !== "all") {
+      const selectedDivObj = divisions.find((d) => d.division_id === Number(selectedDivisionId));
+      if (selectedDivObj) {
+        const divNameQuery = selectedDivObj.division_name.toLowerCase();
+        result = result.filter((r) => {
+          const divStr = (r.division_name || r.division || "").toLowerCase();
+          return divStr.includes(divNameQuery) || String(r.division_id) === String(selectedDivisionId);
+        });
+      }
+    }
+
+    // 6. Sorting
+    result.sort((a, b) => {
+      if (sortBy === "date_desc") {
+        return (b.attendance_date || "").localeCompare(a.attendance_date || "");
+      }
+      if (sortBy === "date_asc") {
+        return (a.attendance_date || "").localeCompare(b.attendance_date || "");
+      }
+      if (sortBy === "roll") {
+        const rA = parseInt(a.roll_no || "99999", 10);
+        const rB = parseInt(b.roll_no || "99999", 10);
+        if (!isNaN(rA) && !isNaN(rB)) return rA - rB;
+        return (a.roll_no || "").localeCompare(b.roll_no || "");
+      }
+      if (sortBy === "name") {
+        const nA = (a.student_name || `${a.name || ""} ${a.surname || ""}`).trim();
+        const nB = (b.student_name || `${b.name || ""} ${b.surname || ""}`).trim();
+        return nA.localeCompare(nB);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [
+    records,
+    search,
+    genderFilter,
+    statusFilter,
+    startDate,
+    endDate,
+    selectedDivisionId,
+    divisions,
+    sortBy,
+    todayStr,
+  ]);
+
+  // Pagination Slice
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PER_PAGE));
+  const paginatedRecords = useMemo(() => {
+    const startIndex = (page - 1) * PER_PAGE;
+    return filteredRecords.slice(startIndex, startIndex + PER_PAGE);
+  }, [filteredRecords, page]);
 
   useEffect(() => {
-    let mounted = true;
-    getCurrentUserProfile()
-      .then((p) => {
-        if (mounted) setProfile(p);
-      })
-      .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    setPage(1);
+  }, [search, genderFilter, statusFilter, startDate, endDate, selectedDivisionId, sortBy]);
 
-  const regMap = useMemo(() => {
-    const map = new Map<string, AttendanceRegularization>();
-    for (const r of regularizations) {
-      const dStr = formatDateYYYYMMDD(r.attendance_date);
-      if (dStr) {
-        map.set(dStr, r);
-      }
-    }
-    return map;
-  }, [regularizations]);
-
+  // Metrics
   const stats = useMemo(() => {
-    const present = records.filter(
-      (r) => r.is_present && !r.is_half_day,
-    ).length;
-    const halfDay = records.filter((r) => r.is_half_day).length;
-    const absent = records.filter((r) => !r.is_present).length;
-    const missingPunch = records.filter((r) => r.check_in && !r.check_out).length;
-    const total = records.length;
-    const rate =
-      total > 0 ? Math.round(((present + halfDay * 0.5) / total) * 100) : 0;
-    return { present, halfDay, absent, missingPunch, total, rate };
-  }, [records]);
+    const total = filteredRecords.length;
+    const present = filteredRecords.filter((r) => r.is_present).length;
+    const absent = filteredRecords.filter((r) => r.is_absent).length;
+    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
 
-  const filtered = useMemo(() => {
-    return records.filter((r) => {
-      const status = getStatus(r);
-      const isMissingPunch = Boolean(r.check_in && !r.check_out);
-      let matchesStatus = statusFilter === "all" || status === statusFilter;
-      if (statusFilter === "missing-punch") {
-        matchesStatus = isMissingPunch;
-      }
-
-      const q = search.toLowerCase().trim();
-      const recDate = getRecordDateStr(r);
-      const matchesSearch =
-        !q ||
-        recDate.includes(q) ||
-        parseISODate(recDate).toLowerCase().includes(q) ||
-        r.name?.toLowerCase().includes(q);
-      return matchesStatus && matchesSearch;
+    const males = filteredRecords.filter((r) => {
+      const g = (r.gender || "").toLowerCase();
+      return g.includes("male") || g === "m" || g.includes("boy");
     });
-  }, [records, search, statusFilter]);
+    const malesPresent = males.filter((r) => r.is_present).length;
+    const malePct = males.length > 0 ? Math.round((malesPresent / males.length) * 100) : 0;
 
-  const handleOpenCorrection = (record: AttendanceRecord) => {
-    setSelectedRecord(record);
-    setRequestedCheckIn(extractTimeHHMM(record.check_in) || "09:00");
-    setRequestedCheckOut(extractTimeHHMM(record.check_out) || "17:00");
-    setReason("");
-    setModalError("");
-    setIsModalOpen(true);
+    const females = filteredRecords.filter((r) => {
+      const g = (r.gender || "").toLowerCase();
+      return g.includes("female") || g === "f" || g.includes("girl");
+    });
+    const femalesPresent = females.filter((r) => r.is_present).length;
+    const femalePct = females.length > 0 ? Math.round((femalesPresent / females.length) * 100) : 0;
+
+    return {
+      total,
+      present,
+      absent,
+      pct,
+      malesCount: males.length,
+      malePct,
+      femalesCount: females.length,
+      femalePct,
+    };
+  }, [filteredRecords]);
+
+  // Export CSV
+  const handleExportCSV = () => {
+    if (filteredRecords.length === 0) return;
+    const headers = [
+      "Roll No",
+      "GR No",
+      "Student Name",
+      "Gender",
+      "Class/Division",
+      "Attendance Date",
+      "Status",
+      "Marked By",
+    ];
+    const rows = filteredRecords.map((r) => [
+      r.roll_no || "",
+      r.gr_no || "",
+      `"${(r.student_name || `${r.name || ""} ${r.surname || ""}`).trim()}"`,
+      r.gender || "",
+      `"${r.division_name || ""}"`,
+      r.attendance_date || "",
+      r.is_present ? "Present" : "Absent",
+      `"${r.marked_by || ""}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `student_attendance_history_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const handleCloseCorrection = () => {
-    setIsModalOpen(false);
-    setSelectedRecord(null);
-    setReason("");
-    setModalError("");
-  };
-
-  const handleSubmitCorrection = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRecord) return;
-    if (!reason.trim()) {
-      setModalError("Please provide a reason for the regularization request.");
-      return;
-    }
-    if (!requestedCheckIn && !requestedCheckOut) {
-      setModalError("Please provide requested check-in and/or check-out times.");
-      return;
-    }
-
-    const formattedDate =
-      getRecordDateStr(selectedRecord) ||
-      formatDateYYYYMMDD(selectedRecord.attendance_date) ||
-      formatDateYYYYMMDD(new Date());
-
-    if (!formattedDate) {
-      setModalError("Unable to determine a valid attendance date for this record.");
-      return;
-    }
-
-    // Resolve staff ID from record or authenticated user profile
-    let staffId =
-      selectedRecord.staff ||
-      (selectedRecord as any).staff_id ||
-      profile?.staff_profile?.id;
-
-    if (!staffId) {
-      try {
-        const freshProfile = await getCurrentUserProfile();
-        setProfile(freshProfile);
-        staffId = freshProfile?.staff_profile?.id;
-      } catch {
-        // Fallback: will be resolved on the backend if available
-      }
-    }
-
-    setSubmittingCorrection(true);
-    setModalError("");
-    try {
-      await createAttendanceRegularization({
-        attendance_date: formattedDate,
-        requested_check_in: requestedCheckIn
-          ? requestedCheckIn.length === 5
-            ? `${requestedCheckIn}:00`
-            : requestedCheckIn
-          : null,
-        requested_check_out: requestedCheckOut
-          ? requestedCheckOut.length === 5
-            ? `${requestedCheckOut}:00`
-            : requestedCheckOut
-          : null,
-        reason: reason.trim(),
-        ...(staffId ? { staff: Number(staffId) } : {}),
-      });
-      showToast("Regularization request submitted to Principal for review!", "success");
-      handleCloseCorrection();
-      load();
-    } catch (err: any) {
-      setModalError(err instanceof Error ? err.message : "Failed to submit regularization request.");
-    } finally {
-      setSubmittingCorrection(false);
-    }
-  };
+  const hasActiveFilters = Boolean(
+    search ||
+    genderFilter !== "all" ||
+    statusFilter !== "all" ||
+    datePreset !== "all" ||
+    startDate ||
+    endDate ||
+    selectedDivisionId !== "all"
+  );
 
   return (
     <div
@@ -471,35 +857,11 @@ export default function AttendanceHistoryPage() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -16, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            className="fixed top-5 right-5 z-50 flex items-center gap-3 rounded-2xl px-5 py-3.5 shadow-2xl"
-            style={
-              toast.type === "success"
-                ? { background: "#052e16", color: "white", border: "1px solid #166534" }
-                : { background: "#450a0a", color: "white", border: "1px solid #991b1b" }
-            }
-          >
-            {toast.type === "success" ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
-            )}
-            <p className="text-xs font-bold">{toast.msg}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Header ── */}
+      {/* ── Top Header ── */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between gap-3"
+        className="flex items-center justify-between gap-3 flex-wrap"
       >
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 leading-tight">
@@ -509,541 +871,566 @@ export default function AttendanceHistoryPage() {
             View punches, monitor missing punch records, and request corrections
           </p>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-sm"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loading ? "animate-spin text-violet-400" : ""}`}
-          />
-          Refresh
-        </motion.button>
-      </motion.div>
 
-      {/* ── Stats Row ── */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.04 }}
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
-      >
-        <StatCard
-          icon={Calendar}
-          label="Total"
-          value={stats.total}
-          color="#7c3aed"
-          delay={0.06}
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Present"
-          value={stats.present}
-          color="#10b981"
-          delay={0.09}
-        />
-        <StatCard
-          icon={MinusCircle}
-          label="Half Day"
-          value={stats.halfDay}
-          color="#f59e0b"
-          delay={0.12}
-        />
-        <StatCard
-          icon={XCircle}
-          label="Absent"
-          value={stats.absent}
-          color="#ef4444"
-          delay={0.15}
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Missing Punch"
-          value={stats.missingPunch}
-          color="#f97316"
-          delay={0.18}
-        />
-      </motion.div>
-
-      {/* ── Table Card ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
-        className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
-        style={{ boxShadow: "0 2px 14px -4px rgba(0,0,0,0.06)" }}
-      >
-        {/* Filters */}
-        <div className="p-3 sm:p-4 border-b border-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search date or name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-violet-400 transition-colors"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[
-              { id: "all", label: "All" },
-              { id: "present", label: "Present" },
-              { id: "half-day", label: "Half Day" },
-              { id: "absent", label: "Absent" },
-              { id: "missing-punch", label: "Missing Punch" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  statusFilter === tab.id
-                    ? "bg-violet-600 text-white shadow-xs"
-                    : "text-slate-500 hover:bg-slate-100"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-20 gap-2">
-            <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
-            <span className="text-xs font-bold text-slate-400">Loading attendance...</span>
-          </div>
-        )}
-
-        {/* Error */}
-        {!loading && error && (
-          <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
-            <AlertCircle className="w-8 h-8 text-rose-500" />
-            <p className="text-sm font-bold text-slate-700">{error}</p>
-            <button
-              onClick={load}
-              className="mt-2 text-xs font-bold text-violet-600 hover:underline"
+        <div className="flex items-center gap-2 flex-wrap">
+          {divisions.length > 0 && (
+            <select
+              value={selectedDivisionId}
+              onChange={(e) =>
+                setSelectedDivisionId(
+                  e.target.value === "all" ? "all" : Number(e.target.value)
+                )
+              }
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-violet-500 cursor-pointer"
             >
-              Try Again
-            </button>
-          </div>
-        )}
+              <option value="all">All Divisions ({divisions.length})</option>
+              {divisions.map((d) => (
+                <option key={d.division_id} value={d.division_id}>
+                  {d.division_name}
+                </option>
+              ))}
+            </select>
+          )}
 
-        {/* Empty */}
-        {!loading && !error && filtered.length === 0 && (
-          <div className="flex flex-col items-center gap-3 py-12 px-6">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-slate-300" />
+          <button
+            onClick={handleExportCSV}
+            disabled={filteredRecords.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={loadStudentAttendance}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-sm cursor-pointer"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin text-violet-500" : ""}`}
+            />
+            Refresh
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* ── View Mode Tabs: Students (Default) vs Staff Punch ── */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
+        <button
+          onClick={() => setActiveTab("students")}
+          className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "students"
+              ? "bg-violet-600 text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900 bg-transparent"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Student Attendance History ({records.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("staff")}
+          className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "staff"
+              ? "bg-violet-600 text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900 bg-transparent"
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          My Staff Punch History
+        </button>
+      </div>
+
+      {activeTab === "students" ? (
+        <>
+          {/* ── Stats Row ── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.04 }}
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
+          >
+            <StatCard
+              icon={Calendar}
+              label="TOTAL"
+              value={stats.total}
+              color="#7c3aed"
+              delay={0.06}
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="PRESENT"
+              value={`${stats.present} (${stats.pct}%)`}
+              color="#10b981"
+              delay={0.09}
+            />
+            <StatCard
+              icon={Users}
+              label="BOYS"
+              value={`${stats.malesCount} (${stats.malePct}%)`}
+              color="#3b82f6"
+              delay={0.12}
+            />
+            <StatCard
+              icon={XCircle}
+              label="ABSENT"
+              value={`${stats.absent} (${stats.total > 0 ? 100 - stats.pct : 0}%)`}
+              color="#ef4444"
+              delay={0.15}
+            />
+            <StatCard
+              icon={UserCheck}
+              label="GIRLS"
+              value={`${stats.femalesCount} (${stats.femalePct}%)`}
+              color="#8b5cf6"
+              delay={0.18}
+            />
+          </motion.div>
+
+          {/* ── Table Card ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-xs"
+            style={{ boxShadow: "0 2px 14px -4px rgba(0,0,0,0.06)" }}
+          >
+            {/* Primary Filter Bar: Search + Status Tabs */}
+            <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search date or name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-violet-500 transition-colors"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Tabs */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "present", label: "Present" },
+                  { id: "absent", label: "Absent" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setStatusFilter(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      statusFilter === tab.id
+                        ? "bg-violet-600 text-white shadow-xs"
+                        : "text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-sm font-bold text-slate-600">No records found</p>
-              <p className="text-xs text-slate-400 mt-1">
-                {search || statusFilter !== "all"
-                  ? "Try adjusting your filters."
-                  : "No attendance records yet."}
-              </p>
+
+            {/* Secondary Filter Bar: Gender + Date Presets + Date Range + Sort */}
+            <div className="px-3 sm:px-4 py-3 bg-slate-50/60 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Gender Segmented Tabs (Never wraps awkwardly, NO emojis) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Gender:
+                  </span>
+                  <div className="bg-slate-100/80 p-1 rounded-xl inline-flex items-center gap-1">
+                    {[
+                      { id: "all", label: "All" },
+                      { id: "male", label: "Males" },
+                      { id: "female", label: "Females" },
+                    ].map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => setGenderFilter(g.id as any)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          genderFilter === g.id
+                            ? "bg-violet-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Date Presets */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Date:
+                  </span>
+                  <div className="bg-slate-100/80 p-1 rounded-xl inline-flex items-center gap-1">
+                    {[
+                      { key: "all", label: "All" },
+                      { key: "today", label: "Today" },
+                      { key: "yesterday", label: "Yesterday" },
+                      { key: "week", label: "7 Days" },
+                      { key: "month", label: "30 Days" },
+                    ].map((dp) => (
+                      <button
+                        key={dp.key}
+                        onClick={() => handleDatePreset(dp.key as any)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          datePreset === dp.key
+                            ? "bg-violet-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {dp.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Range, Sort & Reset */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs shadow-xs">
+                  <span className="text-slate-400 font-medium text-[11px]">Range:</span>
+                  <input
+                    type="date"
+                    max={endDate && endDate <= todayStr ? endDate : todayStr}
+                    value={startDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val && val > todayStr) return;
+                      setStartDate(val);
+                      setDatePreset("custom");
+                    }}
+                    className="font-semibold text-slate-700 outline-none text-xs bg-transparent"
+                  />
+                  <span className="text-slate-300">—</span>
+                  <input
+                    type="date"
+                    min={startDate || undefined}
+                    max={todayStr}
+                    value={endDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val && val > todayStr) return;
+                      setEndDate(val);
+                      setDatePreset("custom");
+                    }}
+                    className="font-semibold text-slate-700 outline-none text-xs bg-transparent"
+                  />
+                </div>
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-violet-500 cursor-pointer shadow-xs"
+                >
+                  <option value="date_desc">Newest First</option>
+                  <option value="date_asc">Oldest First</option>
+                  <option value="roll">Roll Number</option>
+                  <option value="name">Name (A-Z)</option>
+                </select>
+
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
+                    title="Reset filters"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Reset
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Table */}
-        {!loading && !error && filtered.length > 0 && (
-          <div className="w-full overflow-x-auto">
-            <table className="min-w-[860px] w-full">
-              <thead>
-                <tr style={{ background: "#f8faff" }}>
-                  {[
-                    "Date",
-                    "Check In",
-                    "Check Out",
-                    "Duration",
-                    "Status",
-                    "Correction",
-                    "",
-                  ].map((col) => (
-                    <th
-                      key={col}
-                      className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap"
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                <AnimatePresence initial={false}>
-                  {filtered.map((record, i) => {
-                    const status = getStatus(record);
-                    const sc = STATUS_CONFIG[status];
-                    const isExpanded = expandedId === record.id;
-                    const isMissingPunch = Boolean(record.check_in && !record.check_out);
-                    const isLate = Boolean(record.is_late);
-                    const recDateStr = getRecordDateStr(record);
-                    const existingReg =
-                      regMap.get(recDateStr) ||
-                      (record.attendance_date ? regMap.get(record.attendance_date) : undefined);
+            {/* Attendance Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-2.5">Roll No</th>
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-4 py-2.5">Gender</th>
+                    <th className="px-4 py-2.5">Class / Div</th>
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">Marked By</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center">
+                        <Loader2 className="w-6 h-6 text-violet-500 animate-spin mx-auto mb-2" />
+                        <div className="text-xs font-semibold text-slate-400">
+                          Loading attendance records…
+                        </div>
+                      </td>
+                    </tr>
+                  ) : paginatedRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center">
+                        <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <div className="text-sm font-bold text-slate-800">
+                          No records found
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {hasActiveFilters
+                            ? "No attendance records match your current filters."
+                            : "No attendance records logged yet."}
+                        </p>
+                        {hasActiveFilters && (
+                          <button
+                            onClick={handleResetFilters}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition-colors"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Reset Filters
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRecords.map((r, idx) => {
+                      const sName =
+                        r.student_name ||
+                        `${r.name || ""} ${r.surname || ""}`.trim() ||
+                        "Student";
+                      const initials = getInitials(r.name, r.surname);
+                      const avatarBg = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
 
-                    return (
-                      <React.Fragment key={`row-${record.id}-${i}`}>
-                        <motion.tr
-                          key={record.id}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: Math.min(i * 0.03, 0.24) }}
-                          className={`cursor-pointer hover:bg-slate-50/80 transition-colors ${
-                            isMissingPunch ? "bg-amber-50/20" : ""
-                          }`}
-                          onClick={() => setExpandedId(isExpanded ? null : record.id)}
+                      return (
+                        <tr
+                          key={r.id || idx}
+                          className="hover:bg-slate-50/70 transition-colors"
                         >
-                          {/* Date */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                                style={{ background: isMissingPunch ? "#fef3c7" : `${sc.dot}15` }}
-                              >
-                                <Calendar
-                                  className="w-3.5 h-3.5"
-                                  style={{ color: isMissingPunch ? "#d97706" : sc.dot }}
-                                />
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-slate-800">
-                                  {parseISODate(recDateStr || record.attendance_date)}
-                                </p>
-                                {isMissingPunch && (
-                                  <p className="text-[10px] font-extrabold text-amber-600 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" /> Punch-out missing
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Check In */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              {record.check_in ? (
-                                <>
-                                  <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center">
-                                    <LogIn className="w-3 h-3 text-emerald-500" />
-                                  </div>
-                                  <div>
-                                    <span className="text-xs font-bold text-slate-800 tabular-nums">
-                                      {parseISOTime(record.check_in)}
-                                    </span>
-                                    {isLate && (
-                                      <span className="ml-1.5 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
-                                        Late
-                                      </span>
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
-                                <span className="text-xs text-slate-300 font-semibold">—</span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Check Out */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              {record.check_out ? (
-                                <>
-                                  <div className="w-5 h-5 rounded-md bg-violet-50 flex items-center justify-center">
-                                    <LogOut className="w-3 h-3 text-violet-500" />
-                                  </div>
-                                  <span className="text-xs font-bold text-slate-800 tabular-nums">
-                                    {parseISOTime(record.check_out)}
-                                  </span>
-                                </>
-                              ) : record.check_in ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
-                                  <AlertCircle className="w-3 h-3" /> Not Checked Out
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-300 font-semibold">—</span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Duration */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              <Timer className="w-3 h-3 text-slate-400" />
-                              <span className="text-xs font-bold text-slate-700 tabular-nums">
-                                {calcDuration(record.check_in, record.check_out)}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full"
-                              style={{ background: sc.bg, color: sc.text }}
-                            >
-                              <span
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ background: sc.dot }}
-                              />
-                              {sc.label}
+                          <td className="px-4 py-2.5">
+                            <span className="font-mono text-xs font-bold text-slate-700">
+                              {r.roll_no || "—"}
                             </span>
                           </td>
 
-                          {/* Action: Correction */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {existingReg ? (
-                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl ${
-                                existingReg.status === "Approved"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : existingReg.status === "Rejected"
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}>
-                                {existingReg.status === "Approved" && <CheckCircle2 className="w-3 h-3" />}
-                                {existingReg.status === "Pending" && <Clock className="w-3 h-3" />}
-                                {existingReg.status === "Rejected" && <XCircle className="w-3 h-3" />}
-                                {existingReg.status}
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenCorrection(record);
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
-                                  isMissingPunch || isLate
-                                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200"
-                                    : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
-                                }`}
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] text-white shrink-0"
+                                style={{ background: avatarBg }}
                               >
-                                <FileEdit className="w-3.5 h-3.5" />
-                                Request Correction
-                              </button>
-                            )}
-                          </td>
-
-                          {/* Expand chevron */}
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            <div className="w-6 h-6 rounded-md bg-slate-50 flex items-center justify-center text-slate-400">
-                              {isExpanded ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              )}
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 leading-tight">
+                                  {sName}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  GR: {r.gr_no || "—"}
+                                </div>
+                              </div>
                             </div>
                           </td>
-                        </motion.tr>
 
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <ExpandedRow
-                              key={`exp-${record.id}`}
-                              record={record}
-                              onOpenCorrection={handleOpenCorrection}
-                              existingReg={existingReg}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </React.Fragment>
-                    );
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
-          </div>
-        )}
+                          <td className="px-4 py-2.5">
+                            <GenderBadge gender={r.gender} />
+                          </td>
 
-        {/* Footer */}
-        {!loading && !error && filtered.length > 0 && (
-          <div
-            className="px-4 py-3 border-t border-slate-50 flex items-center justify-between flex-wrap gap-2"
-            style={{ background: "#fafbff" }}
-          >
-            <p className="text-[10px] text-slate-400 font-semibold">
-              Showing{" "}
-              <span className="text-slate-600 font-bold">{filtered.length}</span>{" "}
-              of{" "}
-              <span className="text-slate-600 font-bold">{records.length}</span>{" "}
-              records
-            </p>
-            <div className="flex items-center gap-3">
-              {[
-                { color: "#10b981", label: "Present", val: stats.present },
-                { color: "#f59e0b", label: "Half", val: stats.halfDay },
-                { color: "#ef4444", label: "Absent", val: stats.absent },
-                { color: "#f97316", label: "Missing Punch", val: stats.missingPunch },
-              ].map(({ color, label, val }) => (
-                <span
-                  key={label}
-                  className="flex items-center gap-1 text-[10px] font-semibold text-slate-500"
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: color }}
-                  />
-                  {label}: {val}
-                </span>
-              ))}
+                          <td className="px-4 py-2.5">
+                            <span className="inline-flex px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[11px] font-bold border border-violet-100">
+                              {r.division_name || r.division || "—"}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-2.5 font-medium text-slate-700">
+                            {formatDateDisplay(r.attendance_date)}
+                          </td>
+
+                          <td className="px-4 py-2.5">
+                            <AttendanceStatusBadge isPresent={r.is_present} />
+                          </td>
+
+                          <td className="px-4 py-2.5 text-slate-500">
+                            {r.marked_by || "Class Teacher"}
+                          </td>
+
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => setEditingRecord(r)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/80 transition-colors cursor-pointer"
+                              >
+                                <Edit3 className="w-3 h-3" /> Edit
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setViewingStudent({
+                                    id: r.student_id || r.student,
+                                    name: sName,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3 h-3" /> History
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </motion.div>
 
-      {/* ── Attendance Correction Modal ── */}
-      <AnimatePresence>
-        {isModalOpen && selectedRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700">
-                    <FileEdit className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-800">
-                      Request Attendance Regularization
-                    </h3>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      Submit punch correction for Principal approval
-                    </p>
-                  </div>
+            {/* Pagination Footer */}
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <span className="text-slate-500">
+                  Showing {(page - 1) * PER_PAGE + 1}–
+                  {Math.min(page * PER_PAGE, filteredRecords.length)} of{" "}
+                  {filteredRecords.length} records
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer font-semibold"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 inline align-middle" /> Prev
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold cursor-pointer ${
+                        page === p
+                          ? "bg-violet-600 text-white"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer font-semibold"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5 inline align-middle" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCloseCorrection}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
-
-              {/* Modal Form */}
-              <form onSubmit={handleSubmitCorrection} className="p-6 space-y-4">
-                {/* Summary Box */}
-                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Selected Date
-                    </p>
-                    <p className="text-xs font-black text-slate-800">
-                      {parseISODate(getRecordDateStr(selectedRecord)) || "Today"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Current Punch Status
-                    </p>
-                    <p className="text-xs font-semibold text-slate-700">
-                      In: {parseISOTime(selectedRecord.check_in)} | Out: {parseISOTime(selectedRecord.check_out)}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedRecord.check_in && !selectedRecord.check_out && (
-                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-xs font-semibold text-amber-800">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Missing Check-Out detected. Please provide your requested check-out time.</span>
-                  </div>
-                )}
-
-                {/* Requested Times */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
-                      Requested Check-In
-                    </label>
-                    <input
-                      type="time"
-                      value={requestedCheckIn}
-                      onChange={(e) => setRequestedCheckIn(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
-                      Requested Check-Out
-                    </label>
-                    <input
-                      type="time"
-                      value={requestedCheckOut}
-                      onChange={(e) => setRequestedCheckOut(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Reason */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
-                    Reason for Correction <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="e.g. Biometric device offline on exit, school field duty, forgot punch-out..."
-                    value={reason}
-                    onChange={(e) => {
-                      setReason(e.target.value);
-                      setModalError("");
-                    }}
-                    required
-                    className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:outline-none transition-all resize-none placeholder:text-slate-400"
-                  />
-                </div>
-
-                {/* Error */}
-                {modalError && (
-                  <p className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    {modalError}
-                  </p>
-                )}
-
-                {/* Footer Buttons */}
-                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={handleCloseCorrection}
-                    disabled={submittingCorrection}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingCorrection}
-                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all disabled:opacity-50"
-                  >
-                    {submittingCorrection ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        Submit Request
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+            )}
+          </motion.div>
+        </>
+      ) : (
+        /* Tab 2: Teacher Personal Staff Punch History */
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-xs space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              Staff Biometric / Check-In Punch Logs
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Your personal teacher biometric check-in & check-out logs
+            </p>
           </div>
-        )}
-      </AnimatePresence>
+
+          {staffLoading ? (
+            <div className="py-12 text-center">
+              <Loader2 className="w-6 h-6 text-violet-500 animate-spin mx-auto mb-2" />
+              <div className="text-xs font-semibold text-slate-400">
+                Loading punch records…
+              </div>
+            </div>
+          ) : staffRecords.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <div className="text-sm font-bold text-slate-800">
+                No records found
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                No biometric or mobile punch records logged in the system yet.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Check In</th>
+                    <th className="px-4 py-2.5">Check Out</th>
+                    <th className="px-4 py-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {staffRecords.map((r, i) => (
+                    <tr key={r.id || i}>
+                      <td className="px-4 py-2.5 font-semibold text-slate-900">
+                        {formatDateDisplay(r.attendance_date || (r as any).date)}
+                      </td>
+                      <td className="px-4 py-2.5 font-semibold text-emerald-600">
+                        {r.check_in || "—"}
+                      </td>
+                      <td className="px-4 py-2.5 font-semibold text-rose-600">
+                        {r.check_out || "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                            r.is_present
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-rose-50 text-rose-700"
+                          }`}
+                        >
+                          {r.is_present ? "Present" : "Absent"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      {editingRecord && (
+        <EditStudentAttendanceModal
+          record={editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSuccess={(updated) => {
+            setRecords((prev) =>
+              prev.map((r) =>
+                String(r.id) === String(updated.id) ||
+                (String(r.student_id || r.student) ===
+                  String(updated.student_id || updated.student) &&
+                  r.attendance_date === updated.attendance_date)
+                  ? { ...r, ...updated }
+                  : r
+              )
+            );
+          }}
+        />
+      )}
+
+      {viewingStudent && (
+        <StudentDetailModal
+          studentId={viewingStudent.id}
+          studentName={viewingStudent.name}
+          allRecords={records}
+          onClose={() => setViewingStudent(null)}
+        />
+      )}
     </div>
   );
 }

@@ -70,7 +70,7 @@ const sidebarLinks = [
   { title: "Activity Logs", href: "/principal/activity-logs", icon: History },
   { title: "Staff Leave", href: "/principal/leave-requests", icon: CalendarCheck },
   { title: "My Leaves", href: "/principal/leaves", icon: CalendarDays },
-  { title: "My Payslips", href: "/principal/payslips", icon: Banknote },
+  { title: "My Attendance", href: "/principal/my-attendance", icon: Clock },
   { title: "Staff Attendance", href: "/principal/staff-attendance", icon: UserCheck },
   { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
   { title: "Support & Helpdesk", href: "/principal/support", icon: CalendarCheck },

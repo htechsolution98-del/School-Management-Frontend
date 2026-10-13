@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
@@ -19,13 +19,20 @@ import {
   Award,
   ChevronRight,
   ShieldAlert,
+  AlertTriangle,
+  BellRing,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { getWebSocketUrl } from "@/lib/config";
+import { registerPushSilently, listenToForegroundMessages } from "@/lib/firebase";
 import {
   ChildProfile,
   getParentChildren,
   getParentExamNotifications,
   getParentMonthlyReports,
+  getParentAttendanceNotifications,
+  AttendanceNotificationItem,
 } from "@/lib/parent";
 
 export default function ParentDashboard() {
@@ -33,32 +40,120 @@ export default function ParentDashboard() {
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [examNotices, setExamNotices] = useState<any[]>([]);
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
+  const [attendanceAlerts, setAttendanceAlerts] = useState<AttendanceNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [kids, exams, reports] = await Promise.all([
+      const [kids, exams, reports, attAlerts] = await Promise.all([
         getParentChildren().catch(() => []),
         getParentExamNotifications().catch(() => []),
         getParentMonthlyReports().catch(() => []),
+        getParentAttendanceNotifications().catch(() => []),
       ]);
 
       setChildren(kids);
       setExamNotices(exams);
       setMonthlyReports(reports);
+      setAttendanceAlerts(attAlerts);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+  // Connect to live attendance WebSocket
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    let socket: WebSocket | null = null;
+    try {
+      const wsUrl = getWebSocketUrl("ws/attendance/");
+      socket = new WebSocket(wsUrl);
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.title || data.message) {
+            const isAbsent = data.is_absent || (data.message || "").toLowerCase().includes("absent");
+            if (isAbsent) {
+              toast.error(`⚠️ Attendance Alert: ${data.message || "Student marked absent"}`, {
+                description: data.title ? data.title.toUpperCase() : "Attendance Notice",
+                duration: 10000,
+              });
+            } else {
+              toast.info(`📋 Attendance Update: ${data.message}`, {
+                description: data.title ? data.title.toUpperCase() : "Attendance Notice",
+                duration: 6000,
+              });
+            }
+            // Auto refresh the dashboard data
+            loadData();
+          }
+        } catch (err) {
+          console.warn("Failed to parse attendance ws packet:", err);
+        }
+      };
+    } catch (wsErr) {
+      console.warn("Attendance WS setup error:", wsErr);
+    }
+
+    return () => {
+      if (socket) socket.close();
+    };
+  }, [loadData]);
+
+  // Automatically listen for real-time absence alerts in the parent's profile
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Silently register device token in background if already allowed (never prompt parents)
+    if ("Notification" in window && Notification.permission === "granted") {
+      registerPushSilently().catch(() => {});
+    }
+
+    const unsub = listenToForegroundMessages(() => {
+      loadData();
+    });
+
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [loadData]);
 
   const activeChild: ChildProfile | undefined = children[selectedChildIndex];
+
+  // Check if active child has any recent absence notifications
+  const latestAbsentNotice = useMemo(() => {
+    if (!activeChild) return null;
+    const notices = activeChild.notices || [];
+    const fromChildNotices = notices.find(
+      (n) => n.is_absent || (n.description || "").toLowerCase().includes("absent") || (n.title || "").toLowerCase().includes("absent")
+    );
+    if (fromChildNotices) return fromChildNotices;
+
+    const fromAttAlerts = attendanceAlerts.find(
+      (a) => (a.message || "").toLowerCase().includes("absent") || (a.title || "").toLowerCase().includes("absent")
+    );
+    if (fromAttAlerts) {
+      return {
+        id: fromAttAlerts.id || "att_alert",
+        title: fromAttAlerts.title,
+        description: fromAttAlerts.message,
+        created_at: fromAttAlerts.created_at,
+        is_absent: true,
+      };
+    }
+    return null;
+  }, [activeChild, attendanceAlerts]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -86,6 +181,7 @@ export default function ParentDashboard() {
           </Button>
         </div>
       </div>
+
 
       {loading ? (
         <div className="py-24 text-center">
@@ -125,6 +221,49 @@ export default function ParentDashboard() {
 
           {activeChild && (
             <div className="space-y-6">
+              {/* Absent Warning Banner if marked absent */}
+              {latestAbsentNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-3xl border-2 border-rose-300 bg-gradient-to-r from-rose-50 via-red-50/60 to-orange-50 p-5 shadow-sm text-rose-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                >
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className="p-3 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-200 shrink-0">
+                      <AlertTriangle className="h-6 w-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-200/90 text-rose-900 text-[10px] font-black uppercase tracking-wider">
+                          Attendance Notification
+                        </span>
+                        <span className="text-xs text-rose-600 font-semibold">
+                          {latestAbsentNotice.created_at
+                            ? new Date(latestAbsentNotice.created_at).toLocaleString(undefined, {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Today"}
+                        </span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-rose-950 mt-1">
+                        {activeChild.name} {activeChild.surname} was marked ABSENT
+                      </h4>
+                      <p className="text-xs sm:text-sm font-semibold text-rose-800 mt-0.5">
+                        {latestAbsentNotice.description || "Your child's attendance has been marked as Absent."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <span className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3.5 py-1.5 rounded-xl shadow-2xs">
+                      Status: Absent
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Dynamic Stats Grid */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
@@ -161,13 +300,13 @@ export default function ParentDashboard() {
                     border: activeChild.pending_fees > 0 ? "border-amber-100" : "border-violet-100",
                   },
                   {
-                    label: "School Notices",
-                    value: activeChild.notices?.length || 0,
-                    sub: "Recent updates & bulletins",
-                    icon: Bell,
-                    color: "text-orange-600",
-                    bg: "bg-orange-50",
-                    border: "border-orange-100",
+                    label: "School Notices & Alerts",
+                    value: (activeChild.notices?.length || attendanceAlerts.length || 0),
+                    sub: latestAbsentNotice ? "⚠️ Active absence alert" : "Recent updates & bulletins",
+                    icon: latestAbsentNotice ? AlertTriangle : Bell,
+                    color: latestAbsentNotice ? "text-rose-600" : "text-orange-600",
+                    bg: latestAbsentNotice ? "bg-rose-50" : "bg-orange-50",
+                    border: latestAbsentNotice ? "border-rose-200" : "border-orange-100",
                   },
                 ].map((stat, idx) => {
                   const Icon = stat.icon;
@@ -359,31 +498,81 @@ export default function ParentDashboard() {
                 {/* Recent Announcements & Notices */}
                 <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-                    <h3 className="font-bold text-gray-900 text-base">School Announcements</h3>
-                    <span className="text-xs text-gray-400 font-medium">Broadcast Feed</span>
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-indigo-600" />
+                      <h3 className="font-bold text-gray-900 text-base">Notices & Attendance Alerts</h3>
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium">Real-time Feed</span>
                   </div>
 
                   {activeChild.notices && activeChild.notices.length > 0 ? (
                     <ul className="space-y-3">
-                      {activeChild.notices.map((notice) => (
-                        <li
-                          key={notice.id}
-                          className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="h-2.5 w-2.5 rounded-full bg-indigo-600 mt-1.5 shrink-0" />
-                          <div className="flex-1 space-y-0.5">
-                            <p className="text-sm font-bold text-gray-900">{notice.title}</p>
-                            <p className="text-xs text-gray-600 line-clamp-2">{notice.description}</p>
-                            <p className="text-[11px] text-gray-400 pt-1">
-                              {new Date(notice.created_at).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </p>
-                          </div>
-                        </li>
-                      ))}
+                      {activeChild.notices.map((notice) => {
+                        const isAbsent = notice.is_absent || (notice.description || "").toLowerCase().includes("absent");
+                        const isAttendance = notice.is_attendance || (notice.notification_type === "ATTENDANCE");
+                        return (
+                          <li
+                            key={notice.id}
+                            className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all ${
+                              isAbsent
+                                ? "bg-rose-50/70 border-rose-200 shadow-2xs"
+                                : isAttendance
+                                ? "bg-amber-50/50 border-amber-200"
+                                : "bg-slate-50/70 border-slate-100 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                                isAbsent
+                                  ? "bg-rose-100 text-rose-700 font-bold"
+                                  : isAttendance
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-indigo-100 text-indigo-700"
+                              }`}
+                            >
+                              {isAbsent ? (
+                                <AlertTriangle className="h-4 w-4 text-rose-600" />
+                              ) : isAttendance ? (
+                                <Calendar className="h-4 w-4 text-amber-600" />
+                              ) : (
+                                <Bell className="h-4 w-4 text-indigo-600" />
+                              )}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-bold text-gray-900">{notice.title}</span>
+                                {isAbsent ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-extrabold uppercase tracking-wide">
+                                    Absent Alert
+                                  </span>
+                                ) : isAttendance ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wide">
+                                    Attendance
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wide">
+                                    Notice
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-xs ${isAbsent ? "text-rose-900 font-medium" : "text-gray-600"}`}>
+                                {notice.description}
+                              </p>
+                              <p className="text-[11px] text-gray-400 pt-0.5">
+                                {notice.created_at
+                                  ? new Date(notice.created_at).toLocaleString("en-IN", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : "Today"}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <div className="py-12 text-center">

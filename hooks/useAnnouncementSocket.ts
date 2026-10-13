@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { getWebSocketUrl } from "@/lib/config";
+import { getWebSocketUrl, API_BASE_URL } from "@/lib/config";
 import { getAnnouncements, type AnnouncementResponse } from "@/lib/principal";
-import { forceLogout, getAccessToken } from "@/lib/auth";
+import { forceLogout, getAccessToken, fetchWithAuth } from "@/lib/auth";
 
 const LOCAL_STORAGE_KEY = "announcement_notifications";
 const READ_IDS_KEY = "read_announcement_ids";
@@ -129,8 +129,35 @@ export function useAnnouncementSocket() {
         const freshList = await getAnnouncements();
         // Filter by user role target audience
         const filtered = freshList.filter((ann) => isTargetAudienceForUser(ann, userRoles));
-        // Sort: newest first
-        const sorted = filtered.sort((a, b) => {
+
+        // For parent users, also fetch student attendance notifications
+        let parentAttNotices: AnnouncementResponse[] = [];
+        const isParentRole = userRoles.some((r) =>
+          ["parent", "parents"].includes((r || "").toLowerCase().trim())
+        );
+        if (isParentRole) {
+          try {
+            const attRes = await fetchWithAuth(`${API_BASE_URL}/attendance-notification/`);
+            if (attRes.ok) {
+              const attData = await attRes.json();
+              if (Array.isArray(attData)) {
+                parentAttNotices = attData.map((a: any, idx: number) => ({
+                  id: typeof a.id === "number" ? a.id : (Number(a.id) || (idx + 990000)),
+                  title: a.title ? a.title.toUpperCase() : "ATTENDANCE NOTIFICATION",
+                  description: a.message,
+                  created_at: a.created_at,
+                  announcement_for: "PARENT",
+                }));
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // Merge & Sort: newest first
+        const combined = [...parentAttNotices, ...filtered];
+        const sorted = combined.sort((a, b) => {
           return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
         });
 

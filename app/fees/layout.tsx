@@ -11,7 +11,7 @@ import {
   Megaphone,
   CalendarDays,
   Settings,
-  Banknote,
+  Clock,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -21,6 +21,11 @@ const sidebarLinks = [
     href: "/fees", 
     icon: LayoutDashboard,
     exact: true,
+  },
+  { 
+    title: "My Attendance", 
+    href: "/fees/attendance", 
+    icon: Clock,
   },
   { 
     title: "My Leaves", 

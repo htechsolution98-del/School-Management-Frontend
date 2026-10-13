@@ -8,7 +8,6 @@ import { fetchDashboardCount, type DashboardCount, getAllStudents } from "@/lib/
 import { fetchAdmissions } from "@/lib/clerk/admissions";
 import { getStaffList } from "@/lib/staff";
 import type { Staff } from "@/types";
-import { StaffAttendanceCard } from "@/components/attendance/StaffAttendanceCard";
 
 const ROLE_COLORS: Record<string, string> = {
   TEACHER: "bg-blue-100 text-blue-700",
@@ -81,8 +80,6 @@ export default function PrincipalDashboard() {
         <p className="text-sm text-gray-500 mt-1">Overview of school activities and administration.</p>
       </div>
 
-      {/* ─── Staff Attendance Widget ────────────────────────────────────────── */}
-      <StaffAttendanceCard roleName="Principal / Leadership" />
 
       {/* ─── Principal Personal Leave Quick Card ────────────────────────────── */}
       <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-sky-50/70 p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
