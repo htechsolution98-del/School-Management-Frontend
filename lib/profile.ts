@@ -27,6 +27,22 @@ export interface StudentProfileInfo {
   school_class?: string;
 }
 
+export interface ParentProfileInfo {
+  id: number;
+  student_id: number;
+  student_name: string;
+  gr_no?: string | null;
+  class_name?: string | null;
+  division?: string | null;
+  latest_absence_notice?: {
+    title?: string | null;
+    message?: string | null;
+    created_at?: string | null;
+    is_absent: boolean;
+  } | null;
+  is_today_absent?: boolean;
+}
+
 export interface UserProfileResponse {
   id: number;
   username: string;
@@ -45,6 +61,7 @@ export interface UserProfileResponse {
   modules?: string[];
   staff_profile?: StaffProfileInfo | null;
   student_profile?: StudentProfileInfo | null;
+  parent_profile?: ParentProfileInfo | null;
 }
 
 export interface ChangePasswordPayload {

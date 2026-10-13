@@ -320,6 +320,52 @@ export function AccountSettingsHub({
                       )}
                     </>
                   )}
+
+                  {/* Parent Ward Details & Absence Alert if Available */}
+                  {profile?.parent_profile && (
+                    <>
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                        <span className="text-slate-500 flex items-center gap-2 font-medium">
+                          <GraduationCap className="w-3.5 h-3.5 text-slate-400" /> Linked Ward
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-zinc-200">
+                          {profile.parent_profile.student_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                        <span className="text-slate-500 flex items-center gap-2 font-medium">
+                          <IdCard className="w-3.5 h-3.5 text-slate-400" /> Ward GR No.
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-zinc-200 font-mono">
+                          {profile.parent_profile.gr_no || "N/A"}
+                        </span>
+                      </div>
+                      {profile.parent_profile.class_name && (
+                        <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                          <span className="text-slate-500 flex items-center gap-2 font-medium">
+                            <Layers className="w-3.5 h-3.5 text-slate-400" /> Class & Div
+                          </span>
+                          <span className="font-bold text-slate-800 dark:text-zinc-200">
+                            {profile.parent_profile.class_name} {profile.parent_profile.division ? `(${profile.parent_profile.division})` : ""}
+                          </span>
+                        </div>
+                      )}
+                      {profile.parent_profile.latest_absence_notice && profile.parent_profile.latest_absence_notice.is_absent && (
+                        <div className="mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950">
+                          <div className="flex items-center gap-1.5 text-xs font-black uppercase text-rose-700">
+                            <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" />
+                            {profile.parent_profile.latest_absence_notice.title || "Absent Alert"}
+                          </div>
+                          <p className="mt-1 text-xs font-semibold text-rose-800">
+                            {profile.parent_profile.latest_absence_notice.message}
+                          </p>
+                          <span className="mt-2 inline-block rounded-md bg-rose-200/80 px-2 py-0.5 text-[10px] font-black text-rose-900 uppercase">
+                            Status: Absent
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

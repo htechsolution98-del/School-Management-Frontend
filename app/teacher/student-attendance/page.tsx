@@ -20,11 +20,15 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
+  Edit3,
+  Pencil,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getStudentsForAttendance,
   submitStudentAttendance,
   getStudentAttendanceRecords,
+  updateSingleStudentAttendance,
 } from "@/lib/teacher";
 import type { StudentAttendanceListResponse } from "@/types/teacher";
 
@@ -549,6 +553,7 @@ function ConfirmModal({
   onConfirm,
   onCancel,
   saving,
+  isEditMode,
 }: {
   presentCount: number;
   absentCount: number;
@@ -557,6 +562,7 @@ function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
   saving: boolean;
+  isEditMode?: boolean;
 }) {
   const unmarked = totalStudents - presentCount - absentCount;
   const today    = formatDate(new Date());
@@ -632,7 +638,7 @@ function ConfirmModal({
                 color: "#1e1b4b",
               }}
             >
-              Save Attendance?
+              {isEditMode ? "Update Attendance?" : "Save Attendance?"}
             </h2>
             <p
               style={{
@@ -664,8 +670,8 @@ function ConfirmModal({
               gap: 6,
             }}
           >
-            <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
-              📅 {today}
+            <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Calendar size={14} style={{ color: "#6b7280" }} /> {today}
             </span>
             <span
               style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed" }}
@@ -736,7 +742,7 @@ function ConfirmModal({
                 marginBottom: 16,
               }}
             >
-              <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
+              <AlertTriangle size={15} style={{ color: "#d97706", flexShrink: 0 }} />
               <p
                 style={{
                   margin: 0,
@@ -839,7 +845,7 @@ function ConfirmModal({
               ) : (
                 <>
                   <CheckCircle2 size={14} />
-                  Yes, Save Attendance
+                  {isEditMode ? "Yes, Update Attendance" : "Yes, Save Attendance"}
                 </>
               )}
             </button>
@@ -861,6 +867,7 @@ function StudentListView({
   selectedDivisionId,
   onSelectDivision,
   onViewStudent,
+  onEditStudent,
 }: {
   students: Student[];
   divisionName: string;
@@ -870,6 +877,7 @@ function StudentListView({
   selectedDivisionId?: number | null;
   onSelectDivision?: (divId: number) => void;
   onViewStudent?: (student: Student) => void;
+  onEditStudent?: (student: Student) => void;
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage]     = useState(1);
@@ -919,7 +927,7 @@ function StudentListView({
       {isAlreadyMarkedToday && (
         <div
           style={{
-            background: "#d1fae5",
+            background: "#ecfdf5",
             border: "1px solid #10b981",
             borderRadius: 12,
             padding: "12px 18px",
@@ -929,11 +937,35 @@ function StudentListView({
             fontWeight: 600,
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
           }}
         >
-          <CheckCircle2 size={16} color="#10b981" />
-          <span>Attendance for today has already been submitted successfully.</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 size={16} color="#10b981" />
+            <span>Attendance for today has been recorded. You can edit individual students or update the entire class anytime.</span>
+          </div>
+          <button
+            onClick={onMarkAttendance}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 14px",
+              borderRadius: 8,
+              background: "#059669",
+              border: "none",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              boxShadow: "0 2px 6px rgba(5,150,105,0.3)",
+            }}
+          >
+            <Edit3 size={13} /> Edit Class Attendance
+          </button>
         </div>
       )}
       {/* Page header */}
@@ -1009,33 +1041,68 @@ function StudentListView({
             <Calendar size={13} color="#7c3aed" />
             {today}
           </button>
-          <button
-            onClick={isAlreadyMarkedToday ? undefined : onMarkAttendance}
-            disabled={isAlreadyMarkedToday}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "8px 18px",
-              borderRadius: 10,
-              border: "none",
-              background: isAlreadyMarkedToday
-                ? "#9ca3af"
-                : "linear-gradient(135deg,#7c3aed,#4f46e5)",
-              color: "#fff",
-              fontSize: 13,
-              cursor: isAlreadyMarkedToday ? "not-allowed" : "pointer",
-              fontWeight: 700,
-              fontFamily: "inherit",
-              boxShadow: isAlreadyMarkedToday
-                ? "none"
-                : "0 4px 14px rgba(124,58,237,0.32)",
-              opacity: isAlreadyMarkedToday ? 0.7 : 1,
-            }}
-          >
-            <CheckCircle2 size={14} />
-            {isAlreadyMarkedToday ? "Attendance Submitted" : "Mark Attendance"}
-          </button>
+          {isAlreadyMarkedToday ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  background: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  color: "#059669",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                <CheckCircle2 size={13} color="#10b981" /> Submitted
+              </span>
+              <button
+                onClick={onMarkAttendance}
+                title="Edit attendance for all students"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg,#7c3aed,#4f46e5)",
+                  color: "#fff",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  boxShadow: "0 4px 14px rgba(124,58,237,0.32)",
+                }}
+              >
+                <Edit3 size={14} /> Edit Attendance
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onMarkAttendance}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "8px 18px",
+                borderRadius: 10,
+                border: "none",
+                background: "linear-gradient(135deg,#7c3aed,#4f46e5)",
+                color: "#fff",
+                fontSize: 13,
+                cursor: "pointer",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                boxShadow: "0 4px 14px rgba(124,58,237,0.32)",
+              }}
+            >
+              <CheckCircle2 size={14} /> Mark Attendance
+            </button>
+          )}
         </div>
       </div>
 
@@ -1200,25 +1267,48 @@ function StudentListView({
                     <StatusBadge status={s.todayStatus} />
                   </td>
                   <td style={S.tdBase}>
-                    <button
-                      onClick={() => onViewStudent?.(s)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        padding: "5px 14px",
-                        borderRadius: 7,
-                        border: "1px solid #ede9fe",
-                        background: "#f8f7ff",
-                        color: "#7c3aed",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      <Eye size={12} /> View
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={() => onEditStudent?.(s)}
+                        title="Edit this student's attendance"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "5px 12px",
+                          borderRadius: 7,
+                          border: "1px solid #c7d2fe",
+                          background: "#eef2ff",
+                          color: "#4f46e5",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <Edit3 size={12} /> Edit
+                      </button>
+                      <button
+                        onClick={() => onViewStudent?.(s)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "5px 12px",
+                          borderRadius: 7,
+                          border: "1px solid #ede9fe",
+                          background: "#f8f7ff",
+                          color: "#7c3aed",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <Eye size={12} /> View
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1298,16 +1388,28 @@ function MarkAttendanceView({
   onBack,
   localStorageKey,
   onMarkedSuccess,
+  isEditMode,
 }: {
   students: Student[];
   divisionName: string;
   onBack: () => void;
   localStorageKey: string;
   onMarkedSuccess: () => void;
+  isEditMode?: boolean;
 }) {
+  const initialAttendance = useMemo(() => {
+    const initial: Record<string, AttendanceStatus> = {};
+    students.forEach((s) => {
+      if (s.todayStatus === "present" || s.todayStatus === "absent") {
+        initial[s.id] = s.todayStatus;
+      }
+    });
+    return initial;
+  }, [students]);
+
   const [attendance, setAttendance] = useState<
     Record<string, AttendanceStatus>
-  >({});
+  >(initialAttendance);
   const [search, setSearch]             = useState("");
   const [saved, setSaved]               = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
@@ -1420,6 +1522,7 @@ function MarkAttendanceView({
           onConfirm={handleConfirm}
           onCancel={() => setShowConfirm(false)}
           saving={saving}
+          isEditMode={isEditMode}
         />
       )}
 
@@ -1444,10 +1547,10 @@ function MarkAttendanceView({
               fontFamily: "inherit",
             }}
           >
-            Mark Attendance
+            {isEditMode ? "Edit Student Attendance" : "Mark Attendance"}
           </h1>
           <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 3 }}>
-            {divisionName} · {today}
+            {divisionName} · {today} {isEditMode && "· Edit Mode"}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1950,16 +2053,443 @@ function MarkAttendanceView({
               ) : saved ? (
                 <>
                   <CheckCircle2 size={13} />
-                  Saved!
+                  {isEditMode ? "Updated!" : "Saved!"}
                 </>
               ) : (
                 <>
                   <Save size={13} />
-                  Save Attendance
+                  {isEditMode ? "Update Attendance" : "Save Attendance"}
                 </>
               )}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EditStudentAttendanceModal ─────────────────────────────────────────────
+
+function EditStudentAttendanceModal({
+  student,
+  divisionName,
+  onClose,
+  onSuccess,
+}: {
+  student: Student;
+  divisionName: string;
+  onClose: () => void;
+  onSuccess: (updatedStatus: "present" | "absent") => void;
+}) {
+  const [status, setStatus] = useState<"present" | "absent">(
+    student.todayStatus === "absent" ? "absent" : "present"
+  );
+  const [reason, setReason] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateSingleStudentAttendance(
+        student.id,
+        status === "present",
+        status === "absent",
+        reason,
+        attendanceDate
+      );
+      toast.success(
+        `Attendance for ${student.name} updated to ${status === "present" ? "Present" : "Absent"} successfully!`
+      );
+      onSuccess(status);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Failed to update student attendance.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.55)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          boxShadow: "0 24px 48px rgba(0,0,0,0.18)",
+          width: "100%",
+          maxWidth: 480,
+          overflow: "hidden",
+          border: "1px solid #ede9fe",
+          fontFamily: "'Sora', sans-serif",
+          animation: "popIn 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "20px 24px",
+            background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Avatar initials={student.initials} color="#fff" size={42} />
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#fff" }}>
+                  Edit Attendance
+                </h3>
+                <span
+                  style={{
+                    background: "rgba(255,255,255,0.25)",
+                    padding: "2px 8px",
+                    borderRadius: 12,
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  {divisionName}
+                </span>
+              </div>
+              <p style={{ margin: "3px 0 0", fontSize: 12, opacity: 0.9 }}>
+                {student.name} · GR: {student.grNo} {student.rollNo ? `· Roll: ${student.rollNo}` : ""}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.2)",
+              border: "none",
+              color: "#fff",
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "22px 24px" }}>
+          {error && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: 10,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontSize: 12,
+                color: "#dc2626",
+                fontWeight: 600,
+              }}
+            >
+              <AlertTriangle size={15} color="#dc2626" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Date Picker Row */}
+          <div style={{ marginBottom: 18 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#7c3aed",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: 6,
+              }}
+            >
+              Attendance Date
+            </label>
+            <input
+              type="date"
+              max={new Date().toISOString().split("T")[0]}
+              value={attendanceDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                const today = new Date().toISOString().split("T")[0];
+                if (val && val > today) return;
+                setAttendanceDate(val);
+              }}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                borderRadius: 10,
+                border: "1.5px solid #ede9fe",
+                background: "#faf9ff",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#1e1b4b",
+                fontFamily: "inherit",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Status Selection Cards */}
+          <div style={{ marginBottom: 18 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#7c3aed",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: 8,
+              }}
+            >
+              Select Status
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {/* Present Option */}
+              <button
+                type="button"
+                onClick={() => setStatus("present")}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "14px",
+                  borderRadius: 12,
+                  border: status === "present" ? "2.5px solid #10b981" : "1.5px solid #d1fae5",
+                  background: status === "present" ? "#d1fae5" : "#f0fdf4",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  boxShadow: status === "present" ? "0 4px 14px rgba(16,185,129,0.25)" : "none",
+                }}
+              >
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    background: status === "present" ? "#10b981" : "#a7f3d0",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <CheckCircle2 size={18} />
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: status === "present" ? "#065f46" : "#047857",
+                  }}
+                >
+                  PRESENT
+                </span>
+                <span style={{ fontSize: 11, color: "#059669", marginTop: 2 }}>
+                  Student is in school
+                </span>
+              </button>
+
+              {/* Absent Option */}
+              <button
+                type="button"
+                onClick={() => setStatus("absent")}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "14px",
+                  borderRadius: 12,
+                  border: status === "absent" ? "2.5px solid #ef4444" : "1.5px solid #fee2e2",
+                  background: status === "absent" ? "#fee2e2" : "#fef2f2",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  boxShadow: status === "absent" ? "0 4px 14px rgba(239,68,68,0.25)" : "none",
+                }}
+              >
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    background: status === "absent" ? "#ef4444" : "#fca5a5",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <XCircle size={18} />
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: status === "absent" ? "#991b1b" : "#b91c1c",
+                  }}
+                >
+                  ABSENT
+                </span>
+                <span style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>
+                  Not in attendance
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Reason / Remarks */}
+          <div style={{ marginBottom: 20 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#7c3aed",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: 6,
+              }}
+            >
+              Reason / Remarks (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder={status === "absent" ? "e.g., Sick leave, Family travel" : "e.g., Late arrival, Regular"}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1.5px solid #ede9fe",
+                background: "#faf9ff",
+                fontSize: 13,
+                color: "#1e1b4b",
+                fontFamily: "inherit",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Notification notice for absent */}
+          {status === "absent" && (
+            <div
+              style={{
+                padding: "10px 14px",
+                background: "#fff1f2",
+                border: "1px solid #fecdd3",
+                borderRadius: 10,
+                fontSize: 11,
+                color: "#9f1239",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <AlertTriangle size={14} color="#e11d48" style={{ flexShrink: 0 }} />
+              <span>Marking as Absent will automatically send an absence alert directly to the parent's profile.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div
+          style={{
+            padding: "14px 24px",
+            borderTop: "1px solid #f5f3ff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 10,
+            background: "#faf9ff",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              padding: "9px 18px",
+              borderRadius: 10,
+              border: "1.5px solid #ede9fe",
+              background: "#fff",
+              color: "#6b7280",
+              fontSize: 13,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "9px 22px",
+              borderRadius: 10,
+              border: "none",
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: saving ? "default" : "pointer",
+              fontFamily: "inherit",
+              boxShadow: "0 4px 14px rgba(124,58,237,0.3)",
+            }}
+          >
+            {saving ? (
+              <>
+                <Loader2 size={14} style={{ animation: "spin 0.9s linear infinite" }} />
+                Updating…
+              </>
+            ) : (
+              <>
+                <Save size={14} />
+                Save Changes
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -2165,6 +2695,7 @@ export default function StudentAttendancePage() {
   const [selectedDivId, setSelectedDivId] = useState<number | null>(null);
   const [rawAttendanceRecords, setRawAttendanceRecords] = useState<any[]>([]);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const [isAlreadyMarkedToday, setIsAlreadyMarkedToday] = useState(false);
   const todayDateStr = useMemo(() => new Date().toISOString().split("T")[0], []);
@@ -2254,6 +2785,17 @@ export default function StudentAttendancePage() {
     fetchStudents(divId);
   };
 
+  const handleStudentAttendanceUpdated = (studentId: string, newStatus: "present" | "absent") => {
+    setStudents((prev) =>
+      prev.map((s) => (s.id === studentId ? { ...s, todayStatus: newStatus } : s))
+    );
+    setIsAlreadyMarkedToday(true);
+    if (typeof window !== "undefined" && localStorageKey) {
+      localStorage.setItem(localStorageKey, "true");
+    }
+    getStudentAttendanceRecords().then(setRawAttendanceRecords).catch(() => {});
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
@@ -2278,6 +2820,7 @@ export default function StudentAttendancePage() {
             selectedDivisionId={selectedDivId}
             onSelectDivision={handleSelectDivision}
             onViewStudent={(st) => setViewingStudent(st)}
+            onEditStudent={(st) => setEditingStudent(st)}
           />
           {viewingStudent && (
             <StudentViewModal
@@ -2287,6 +2830,16 @@ export default function StudentAttendancePage() {
               onClose={() => setViewingStudent(null)}
             />
           )}
+          {editingStudent && (
+            <EditStudentAttendanceModal
+              student={editingStudent}
+              divisionName={divisionName}
+              onClose={() => setEditingStudent(null)}
+              onSuccess={(newStatus) => {
+                handleStudentAttendanceUpdated(editingStudent.id, newStatus);
+              }}
+            />
+          )}
         </>
       ) : (
         <MarkAttendanceView
@@ -2294,7 +2847,11 @@ export default function StudentAttendancePage() {
           divisionName={divisionName}
           onBack={() => setView("list")}
           localStorageKey={localStorageKey}
-          onMarkedSuccess={() => setIsAlreadyMarkedToday(true)}
+          isEditMode={isAlreadyMarkedToday}
+          onMarkedSuccess={() => {
+            setIsAlreadyMarkedToday(true);
+            fetchStudents(selectedDivId ?? undefined);
+          }}
         />
       )}
     </>

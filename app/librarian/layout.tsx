@@ -1,11 +1,21 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Megaphone, CalendarDays, Settings, CalendarCheck } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  Megaphone,
+  CalendarDays,
+  Settings,
+  CalendarCheck,
+  ClipboardList,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/librarian", icon: LayoutDashboard },
+  { title: "Library Management", href: "/librarian/library", icon: BookOpen },
+  { title: "My Attendance", href: "/librarian/attendance", icon: ClipboardList },
   { title: "My Leaves", href: "/librarian/leaves", icon: CalendarCheck },
   { title: "Announcements", href: "/librarian/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/librarian/events", icon: CalendarDays },
