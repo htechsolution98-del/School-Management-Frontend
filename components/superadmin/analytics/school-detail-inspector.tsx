@@ -89,15 +89,15 @@ export function SchoolDetailInspector({
     return null;
   }
 
-  const metrics = details?.summary_metrics;
+  const metrics = details?.summary_metrics || details?.metrics;
   const classes = details?.classes || [];
   const staff = details?.staff || [];
-  const modules = details?.modules || [];
-  const fees = details?.fees_summary;
+  const modules = details?.modules || details?.features || [];
+  const fees = details?.fees_summary || details?.fees;
 
   const studentTeacherRatio =
-    metrics && metrics.teachers_count > 0
-      ? `${Math.round(metrics.total_students / metrics.teachers_count)}:1`
+    metrics && Number(metrics.teachers_count) > 0
+      ? `${Math.round(Number(metrics.total_students || 0) / Number(metrics.teachers_count))}:1`
       : "—";
 
   return (
@@ -212,10 +212,10 @@ export function SchoolDetailInspector({
                   </div>
                 </div>
                 <p className="text-2xl font-black text-slate-900 tabular-nums">
-                  {metrics?.total_students.toLocaleString("en-IN") || 0}
+                  {(metrics?.total_students ?? 0).toLocaleString("en-IN")}
                 </p>
                 <p className="mt-0.5 text-[11px] font-bold text-sky-700">
-                  {metrics?.total_boys || 0} Boys · {metrics?.total_girls || 0} Girls
+                  {metrics?.total_boys ?? 0} Boys · {metrics?.total_girls ?? 0} Girls
                 </p>
               </div>
 
@@ -230,10 +230,10 @@ export function SchoolDetailInspector({
                   </div>
                 </div>
                 <p className="text-2xl font-black text-slate-900 tabular-nums">
-                  {metrics?.total_staff.toLocaleString("en-IN") || 0}
+                  {(metrics?.total_staff ?? 0).toLocaleString("en-IN")}
                 </p>
                 <p className="mt-0.5 text-[11px] font-bold text-purple-700">
-                  {metrics?.teachers_count || 0} Teachers · {metrics?.active_staff || 0} Active
+                  {metrics?.teachers_count ?? 0} Teachers · {metrics?.active_staff ?? 0} Active
                 </p>
               </div>
 

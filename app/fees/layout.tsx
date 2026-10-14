@@ -12,6 +12,7 @@ import {
   CalendarDays,
   Settings,
   Clock,
+  Banknote,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 

@@ -230,6 +230,9 @@ export interface SchoolDetailedStats {
     collected: number;
     pending: number;
   };
+  summary_metrics?: SchoolDetailedStats["metrics"];
+  modules?: SchoolDetailedStats["features"];
+  fees_summary?: SchoolDetailedStats["fees"];
 }
 
 export type SchoolStudent = NonNullable<SchoolDetailedStats["students"]>[number];

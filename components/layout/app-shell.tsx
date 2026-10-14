@@ -49,7 +49,7 @@ const DEFAULT_WIDTH = 248;
 const ROLE_ALLOWED_MAP: Record<string, string[]> = {
   "Super Admin": ["super_admin", "superadmin"],
   Trustee: ["admin(trustee)", "trustee", "super_admin", "superadmin"],
-  Principal: ["principal", "super_admin", "superadmin"],
+  Principal: ["principal", "super_admin", "superadmin", "admin(trustee)", "trustee"],
   Clerk: [
     "clerk",
     "fees_clerk",
@@ -59,10 +59,12 @@ const ROLE_ALLOWED_MAP: Record<string, string[]> = {
     "principal",
     "super_admin",
     "superadmin",
+    "admin(trustee)",
+    "trustee",
   ],
-  Teacher: ["teacher", "principal", "super_admin", "superadmin"],
-  Librarian: ["librarian", "principal", "super_admin", "superadmin"],
-  Inventory: ["inventory", "principal", "super_admin", "superadmin"],
+  Teacher: ["teacher", "principal", "super_admin", "superadmin", "admin(trustee)", "trustee"],
+  Librarian: ["librarian", "principal", "super_admin", "superadmin", "admin(trustee)", "trustee"],
+  Inventory: ["inventory", "principal", "super_admin", "superadmin", "admin(trustee)", "trustee"],
   Fees: [
     "fees management",
     "fees",
@@ -74,6 +76,8 @@ const ROLE_ALLOWED_MAP: Record<string, string[]> = {
     "principal",
     "super_admin",
     "superadmin",
+    "admin(trustee)",
+    "trustee",
   ],
   Student: ["student", "principal", "super_admin", "superadmin"],
   Parent: ["parents", "parent", "principal", "super_admin", "superadmin"],
