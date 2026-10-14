@@ -15,6 +15,7 @@ import {
   GraduationCap,
   FileText,
   UserCheck,
+  UserPlus,
   LifeBuoy,
   Banknote,
   Layers,
@@ -29,6 +30,8 @@ const sidebarLinks = [
     icon: Users,
     subLinks: [
       { title: "Staff Directory & Reports", href: "/trustee/staff-management", icon: Users },
+      { title: "+ Add / Manage Staff", href: "/trustee/staff", icon: UserPlus },
+      { title: "Departments", href: "/trustee/departments", icon: Layers },
       { title: "Staff Active / Deactive", href: "/trustee/staff-status", icon: UserCheck },
       { title: "Leave & Approvals", href: "/trustee/leave-requests", icon: CalendarCheck },
     ],

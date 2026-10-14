@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Eye, Printer, RefreshCw, Users } from "lucide-react";
+import { Download, Eye, Printer, RefreshCw, UserPlus, Users } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -103,7 +104,27 @@ export default function TrusteeStaffManagementPage() {
     renderActions={row => <Button variant="outline" size="sm" disabled={loading || exporting} onClick={() => { setDetail(null); setDetailError(""); setSelected(String(row.id)); }}><Eye className="mr-1 h-4 w-4" />View report</Button>} />;
   const detailed = detail?.staff.results[0];
   return <div className="mx-auto max-w-[1600px] space-y-6">
-    <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-6 text-white"><div><p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-100"><Users className="h-4 w-4" />Trustee · Read-only oversight</p><h1 className="text-2xl font-bold">Staff Management Dashboard</h1><p className="mt-2 text-sm text-teal-100">People, attendance, leave and authorized payroll reports for {report?.school || "your school"}.</p></div><Button variant="outline" disabled={loading || exporting} onClick={() => setRefresh(r => r + 1)} className="bg-white text-teal-900"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button></header>
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-6 text-white">
+      <div>
+        <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-100">
+          <Users className="h-4 w-4" />Trustee · Staff Oversight & Management
+        </p>
+        <h1 className="text-2xl font-bold">Staff Management Dashboard</h1>
+        <p className="mt-2 text-sm text-teal-100">
+          People, attendance, leave and authorized payroll reports for {report?.school || "your school"}.
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <Link href="/trustee/staff">
+          <Button className="bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-semibold shadow-md transition-all">
+            <UserPlus className="mr-2 h-4 w-4" />+ Add Staff Member
+          </Button>
+        </Link>
+        <Button variant="outline" disabled={loading || exporting} onClick={() => setRefresh(r => r + 1)} className="bg-white text-teal-900">
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh
+        </Button>
+      </div>
+    </header>
     <form onSubmit={event => { event.preventDefault(); apply(); }} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 xl:grid-cols-4">
       <label className="text-xs font-medium">Academic year<select className={control} value={draft.academic_year} onChange={event => setDraft({ ...draft, academic_year: event.target.value })}><option value="">Calendar year / selected dates</option>{report?.options.academic_years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}</select></label>
       <label className="text-xs font-medium">Department<select className={control} value={draft.department} onChange={event => setDraft({ ...draft, department: event.target.value })}><option value="">All departments</option>{report?.options.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
