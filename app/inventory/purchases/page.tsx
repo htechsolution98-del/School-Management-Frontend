@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
+const isValidIndianMobileNumber = (value: string): boolean =>
+  value === "" || /^[6-9][0-9]{9}$/.test(value);
+
 export default function PurchasesAndSuppliersPage() {
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">("purchases");
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -183,13 +186,22 @@ export default function PurchasesAndSuppliersPage() {
 
   const handleSaveSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidIndianMobileNumber(supplierFormData.phone)) {
+      showApiError(
+        new Error("Enter exactly 10 digits for an Indian mobile number, starting with 6–9."),
+        "Invalid phone number."
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const payload = { ...supplierFormData, phone: supplierFormData.phone };
       if (editingSupplierId !== null) {
-        await inventoryApi.patch(`/suppliers/${editingSupplierId}/`, supplierFormData);
+        await inventoryApi.patch(`/suppliers/${editingSupplierId}/`, payload);
         showSuccess("Supplier updated successfully");
       } else {
-        await inventoryApi.post("/suppliers/", supplierFormData);
+        await inventoryApi.post("/suppliers/", payload);
         showSuccess("Supplier registered successfully");
       }
       setIsSupplierModalOpen(false);
@@ -645,10 +657,19 @@ export default function PurchasesAndSuppliersPage() {
                     Phone Number
                   </label>
                   <input
-                    type="text"
-                    placeholder="+91 98765 43210"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    placeholder="10-digit mobile number"
                     value={supplierFormData.phone}
-                    onChange={(e) => setSupplierFormData({ ...supplierFormData, phone: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^[0-9]*$/.test(value) && value.length <= 10) {
+                        setSupplierFormData({ ...supplierFormData, phone: value });
+                      }
+                    }}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>

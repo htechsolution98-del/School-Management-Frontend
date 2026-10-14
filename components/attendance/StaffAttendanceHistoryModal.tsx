@@ -22,11 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { getAttendanceHistory } from "@/lib/teacher/attendance";
-import {
-  getAttendanceRegularizations,
-  createAttendanceRegularization,
-  type AttendanceRegularization,
-} from "@/lib/hr-config";
+import { createAttendanceRegularization } from "@/lib/hr-config";
 import { getCurrentUserProfile } from "@/lib/current-user";
 import type { CurrentUserProfile } from "@/types";
 import type { AttendanceRecord } from "@/types/teacher";
@@ -35,6 +31,7 @@ interface StaffAttendanceHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   staffName?: string;
+  staffId?: number;
   roleName?: string;
 }
 
@@ -152,10 +149,10 @@ export function StaffAttendanceHistoryModal({
   isOpen,
   onClose,
   staffName,
+  staffId,
   roleName = "Staff",
 }: StaffAttendanceHistoryModalProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [regularizations, setRegularizations] = useState<AttendanceRegularization[]>([]);
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,20 +173,18 @@ export function StaffAttendanceHistoryModal({
     setLoading(true);
     setError(null);
     try {
-      const [attData, regData, userProfile] = await Promise.all([
-        getAttendanceHistory(),
-        getAttendanceRegularizations().catch(() => []),
+      const [attData, userProfile] = await Promise.all([
+        getAttendanceHistory(staffId ? { staff_id: staffId } : undefined),
         getCurrentUserProfile().catch(() => null),
       ]);
-      setRecords(attData);
-      setRegularizations(regData);
+      setRecords(staffId ? attData.filter((record) => record.staff === staffId) : attData);
       if (userProfile) setProfile(userProfile);
     } catch (err: any) {
       setError(err?.message || "Failed to load attendance history.");
     } finally {
       setLoading(false);
     }
-  }, [isOpen]);
+  }, [isOpen, staffId]);
 
   useEffect(() => {
     loadData();
@@ -456,6 +451,13 @@ export function StaffAttendanceHistoryModal({
                             {record.working_hours}h
                           </span>
                         ) : null}
+                      </div>
+                      <div className="mt-1 text-[10px] text-slate-400">
+                        GPS in: {record.check_in_latitude != null && record.check_in_longitude != null
+                          ? `${record.check_in_latitude}, ${record.check_in_longitude}` : "not recorded"}
+                        <span className="mx-2">?</span>
+                        GPS out: {record.check_out_latitude != null && record.check_out_longitude != null
+                          ? `${record.check_out_latitude}, ${record.check_out_longitude}` : "not recorded"}
                       </div>
                     </div>
                   </div>

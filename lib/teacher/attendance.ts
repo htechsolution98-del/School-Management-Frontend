@@ -58,8 +58,10 @@ export async function markAttendance(payload: {
 
 // ─── Get all attendance records (history) ────────────────────────────────────
 
-export async function getAttendanceHistory(): Promise<AttendanceRecord[]> {
-  const url = `${API_BASE_URL}/attendance/`;
+export async function getAttendanceHistory(params?: { staff_id?: number }): Promise<AttendanceRecord[]> {
+  const query = new URLSearchParams();
+  if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+  const url = `${API_BASE_URL}/attendance/${query.toString() ? `?${query.toString()}` : ""}`;
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
@@ -73,6 +75,30 @@ export async function getAttendanceHistory(): Promise<AttendanceRecord[]> {
 
   const data = await response.json();
   return Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+}
+
+export interface AttendanceCalendarStatus {
+  date: string;
+  is_sunday_week_off: boolean;
+  entries: Array<{
+    classification: "HOLIDAY" | "WEEK_OFF";
+    reason?: string | null;
+    target_audience?: string | null;
+  }>;
+}
+
+export async function getAttendanceCalendarStatus(date: string): Promise<AttendanceCalendarStatus> {
+  const query = new URLSearchParams({ date });
+  const response = await fetchWithAuth(`${API_BASE_URL}/attendance/calendar-status/?${query.toString()}`);
+  if (!response.ok) {
+    let message = "Failed to fetch the school attendance calendar.";
+    try {
+      const error = await response.json();
+      message = error?.detail || error?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return response.json();
 }
 
 export async function getStaffAttendance(params?: {
@@ -111,16 +137,17 @@ export async function getStaffAttendance(params?: {
 
 export async function checkFaceStatus(): Promise<{ enrolled: boolean }> {
   const url = `${API_BASE_URL}${API_ENDPOINTS.FACE_VERIFY}`;
-  try {
-    const response = await fetchWithAuth(url);
-    if (!response.ok) {
-      return { enrolled: false };
-    }
-    const data = await response.json();
-    return { enrolled: data?.enrolled ?? data?.is_enrolled ?? false };
-  } catch {
-    return { enrolled: false };
+  const response = await fetchWithAuth(url);
+  if (!response.ok) {
+    let message = "Failed to check face enrollment status.";
+    try {
+      const error = await response.json();
+      message = error?.detail || error?.error || error?.message || message;
+    } catch { }
+    throw new Error(message);
   }
+  const data = await response.json();
+  return { enrolled: data?.enrolled ?? data?.is_enrolled ?? false };
 }
 
 function dataURLtoFile(dataurl: string, filename: string): File {

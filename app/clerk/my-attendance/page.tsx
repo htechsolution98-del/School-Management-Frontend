@@ -24,6 +24,18 @@ import {
   getAttendanceHistory,
 } from "@/lib/teacher/attendance";
 import type { TodayAttendance, AttendanceRecord } from "@/types/teacher";
+import { StaffBiometricCaptureDialog } from "@/components/attendance/StaffBiometricCaptureDialog";
+
+function getDeviceLocation(): Promise<{ latitude: number; longitude: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolocation is not available in this browser."));
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      () => reject(new Error("Location access is required. Enable GPS permission and try again.")),
+      { timeout: 12000, enableHighAccuracy: true },
+    );
+  });
+}
 
 function fmtApiTime(timeStr: string | null | undefined): string {
   if (!timeStr) return "--:-- --";
@@ -81,16 +93,19 @@ export default function ClerkPersonalAttendancePage() {
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pendingAction, setPendingAction] = useState<"in" | "out" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
+  const showToast = useCallback((type: "success" | "error", message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4500);
-  };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -99,19 +114,13 @@ export default function ClerkPersonalAttendancePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [today, historyList] = await Promise.all([
-        getTodayAttendance().catch(() => null),
-        getAttendanceHistory().catch(() => []),
-      ]);
-      setTodayData(today);
-      setHistory(historyList);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const [todayResult, historyResult] = await Promise.allSettled([getTodayAttendance(), getAttendanceHistory()]);
+    if (todayResult.status === "fulfilled") setTodayData(todayResult.value);
+    else { setTodayData(null); showToast("error", todayResult.reason instanceof Error ? todayResult.reason.message : "Could not load today's attendance status."); }
+    if (historyResult.status === "fulfilled") setHistory(historyResult.value);
+    else { setHistory([]); showToast("error", historyResult.reason instanceof Error ? historyResult.reason.message : "Could not load attendance history."); }
+    setLoading(false);
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
@@ -120,32 +129,20 @@ export default function ClerkPersonalAttendancePage() {
   const handlePunch = async () => {
     setActionLoading(true);
     try {
-      let lat = 0;
-      let lng = 0;
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 8000,
-              enableHighAccuracy: true,
-            });
-          });
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        } catch {}
+      const coords = await getDeviceLocation();
+      const action = todayData?.checked_in ? "out" : "in";
+      if (todayData?.biometric_required) {
+        setPendingCoords(coords);
+        setPendingAction(action);
+        setShowFaceModal(true);
+        return;
       }
-
-      await markAttendance({ latitude: lat, longitude: lng });
-      showToast(
-        "success",
-        todayData?.checked_in ? "Punch Out recorded successfully!" : "Punch In recorded successfully!"
-      );
+      await markAttendance(coords);
+      showToast("success", todayData?.checked_in ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
       await loadData();
-    } catch (err: any) {
-      showToast("error", err?.message || "Failed to mark attendance.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (err: unknown) {
+      showToast("error", err instanceof Error ? err.message : "Failed to mark attendance.");
+    } finally { setActionLoading(false); }
   };
 
   const isCheckedIn = !!todayData?.checked_in;
@@ -345,6 +342,7 @@ export default function ClerkPersonalAttendancePage() {
                     <th className="py-3 px-4">Check In</th>
                     <th className="py-3 px-4">Check Out</th>
                     <th className="py-3 px-4">Duration</th>
+                    <th className="py-3 px-4">Punch GPS</th>
                     <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
@@ -357,6 +355,11 @@ export default function ClerkPersonalAttendancePage() {
                       <td className="py-3 px-4 text-emerald-700 font-mono">{fmtApiTime(r.check_in)}</td>
                       <td className="py-3 px-4 text-rose-700 font-mono">{fmtApiTime(r.check_out)}</td>
                       <td className="py-3 px-4">{calcDuration(r.check_in || null, r.check_out || null)}</td>
+                      <td className="py-3 px-4 text-[11px] text-gray-500">
+                        {r.check_in_latitude != null && r.check_in_longitude != null ? `In: ${r.check_in_latitude}, ${r.check_in_longitude}` : "In: not recorded"}
+                        <br />
+                        {r.check_out_latitude != null && r.check_out_longitude != null ? `Out: ${r.check_out_latitude}, ${r.check_out_longitude}` : "Out: not recorded"}
+                      </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
                           {r.status}
@@ -370,6 +373,20 @@ export default function ClerkPersonalAttendancePage() {
           )}
         </div>
       )}
+      <StaffBiometricCaptureDialog
+        isOpen={showFaceModal}
+        actionLabel={pendingAction === "out" ? "Check Out" : "Check In"}
+        onClose={() => { setShowFaceModal(false); setPendingCoords(null); setPendingAction(null); }}
+        onVerified={async (verificationToken) => {
+          if (!pendingCoords || !pendingAction) throw new Error("Attendance action expired. Please try again.");
+          await markAttendance({ ...pendingCoords, verification_token: verificationToken });
+          showToast("success", pendingAction === "out" ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
+          setShowFaceModal(false);
+          setPendingCoords(null);
+          setPendingAction(null);
+          await loadData();
+        }}
+      />
     </div>
   );
 }

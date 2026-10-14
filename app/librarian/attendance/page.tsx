@@ -27,6 +27,18 @@ import {
   getAttendanceHistory,
 } from "@/lib/teacher/attendance";
 import type { TodayAttendance, AttendanceRecord } from "@/types/teacher";
+import { StaffBiometricCaptureDialog } from "@/components/attendance/StaffBiometricCaptureDialog";
+
+function getDeviceLocation(): Promise<{ latitude: number; longitude: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolocation is not available in this browser."));
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      () => reject(new Error("Location access is required. Enable GPS permission and try again.")),
+      { timeout: 12000, enableHighAccuracy: true },
+    );
+  });
+}
 
 function fmtApiTime(timeStr: string | null | undefined): string {
   if (!timeStr) return "--:-- --";
@@ -84,16 +96,19 @@ export default function LibrarianAttendancePage() {
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pendingAction, setPendingAction] = useState<"in" | "out" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
+  const showToast = useCallback((type: "success" | "error", message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4500);
-  };
+  }, []);
 
   // Clock tick
   useEffect(() => {
@@ -103,19 +118,13 @@ export default function LibrarianAttendancePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [today, historyList] = await Promise.all([
-        getTodayAttendance().catch(() => null),
-        getAttendanceHistory().catch(() => []),
-      ]);
-      setTodayData(today);
-      setHistory(historyList);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const [todayResult, historyResult] = await Promise.allSettled([getTodayAttendance(), getAttendanceHistory()]);
+    if (todayResult.status === "fulfilled") setTodayData(todayResult.value);
+    else { setTodayData(null); showToast("error", todayResult.reason instanceof Error ? todayResult.reason.message : "Could not load today's attendance status."); }
+    if (historyResult.status === "fulfilled") setHistory(historyResult.value);
+    else { setHistory([]); showToast("error", historyResult.reason instanceof Error ? historyResult.reason.message : "Could not load attendance history."); }
+    setLoading(false);
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
@@ -124,31 +133,20 @@ export default function LibrarianAttendancePage() {
   const handlePunch = async () => {
     setActionLoading(true);
     try {
-      let lat = 0;
-      let lng = 0;
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 8000,
-              enableHighAccuracy: true,
-            });
-          });
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        } catch {
-          // fallback to 0 if permission denied
-        }
+      const coords = await getDeviceLocation();
+      const action = todayData?.checked_in ? "out" : "in";
+      if (todayData?.biometric_required) {
+        setPendingCoords(coords);
+        setPendingAction(action);
+        setShowFaceModal(true);
+        return;
       }
-
-      await markAttendance({ latitude: lat, longitude: lng });
+      await markAttendance(coords);
       showToast("success", todayData?.checked_in ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
       await loadData();
-    } catch (err: any) {
-      showToast("error", err?.message || "Failed to mark attendance.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (err: unknown) {
+      showToast("error", err instanceof Error ? err.message : "Failed to mark attendance.");
+    } finally { setActionLoading(false); }
   };
 
   const isCheckedIn = !!todayData?.checked_in;
@@ -398,6 +396,7 @@ export default function LibrarianAttendancePage() {
                     <th className="py-3 px-4">Check In</th>
                     <th className="py-3 px-4">Check Out</th>
                     <th className="py-3 px-4">Duration</th>
+                    <th className="py-3 px-4">Punch GPS</th>
                     <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
@@ -415,6 +414,11 @@ export default function LibrarianAttendancePage() {
                       </td>
                       <td className="py-3 px-4 text-gray-700">
                         {calcDuration(record.check_in || null, record.check_out || null)}
+                      </td>
+                      <td className="py-3 px-4 text-[11px] text-gray-500">
+                        {record.check_in_latitude != null && record.check_in_longitude != null ? `In: ${record.check_in_latitude}, ${record.check_in_longitude}` : "In: not recorded"}
+                        <br />
+                        {record.check_out_latitude != null && record.check_out_longitude != null ? `Out: ${record.check_out_latitude}, ${record.check_out_longitude}` : "Out: not recorded"}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -437,6 +441,20 @@ export default function LibrarianAttendancePage() {
           )}
         </div>
       )}
+      <StaffBiometricCaptureDialog
+        isOpen={showFaceModal}
+        actionLabel={pendingAction === "out" ? "Check Out" : "Check In"}
+        onClose={() => { setShowFaceModal(false); setPendingCoords(null); setPendingAction(null); }}
+        onVerified={async (verificationToken) => {
+          if (!pendingCoords || !pendingAction) throw new Error("Attendance action expired. Please try again.");
+          await markAttendance({ ...pendingCoords, verification_token: verificationToken });
+          showToast("success", pendingAction === "out" ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
+          setShowFaceModal(false);
+          setPendingCoords(null);
+          setPendingAction(null);
+          await loadData();
+        }}
+      />
     </div>
   );
 }

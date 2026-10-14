@@ -26,8 +26,9 @@ import {
   X,
   FileSpreadsheet,
 } from "lucide-react";
-import { getStaffAttendance } from "@/lib/teacher/attendance";
-import { getDepartments } from "@/lib/staff";
+import { getStaffAttendance, getAttendanceCalendarStatus } from "@/lib/teacher/attendance";
+import { getDepartments, getStaffList } from "@/lib/staff";
+import { getAllLeaveRequests, type LeaveRequest } from "@/lib/clerk/leaves";
 import { StaffAttendanceHistoryModal } from "@/components/attendance/StaffAttendanceHistoryModal";
 import type { AttendanceRecord } from "@/types/teacher";
 
@@ -153,6 +154,7 @@ export function StaffAttendanceRegister({
   const [inspectRecord, setInspectRecord] = useState<AttendanceRecord | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
   const [historyModalStaffName, setHistoryModalStaffName] = useState<string>("");
+  const [historyModalStaffId, setHistoryModalStaffId] = useState<number | undefined>();
 
   // Load departments
   useEffect(() => {
@@ -186,14 +188,86 @@ export function StaffAttendanceRegister({
         params.department = selectedDepartment;
       }
 
-      const data = await getStaffAttendance(params);
-      setRecords(data);
+      const [attendance, staffRoster, leaveRequests, calendarStatus] = await Promise.all([
+        getStaffAttendance(params),
+        getStaffList(),
+        getAllLeaveRequests(),
+        getAttendanceCalendarStatus(selectedDate),
+      ]);
+      const departmentNames = new Map(
+        departments.map((department) => [department.id, department.name]),
+      );
+      const attendanceByStaff = new Map(attendance.map((record) => [record.staff, record]));
+      const rosterRows: AttendanceRecord[] = staffRoster
+        .filter((staff) => {
+          const joiningDate = staff.joining_date;
+          const exitDate = staff.exit_date;
+          const employedOnSelectedDate =
+            (!joiningDate || joiningDate <= selectedDate) &&
+            (!exitDate || exitDate >= selectedDate) &&
+            (staff.is_active || Boolean(exitDate));
+          const categoryMatches =
+            selectedCategory === "ALL" ||
+            String(staff.category || "OTHER").trim().toUpperCase() === selectedCategory;
+          const departmentMatches =
+            selectedDepartment === "ALL" ||
+            departmentNames.get(Number(staff.department)) === selectedDepartment;
+          return employedOnSelectedDate && categoryMatches && departmentMatches;
+        })
+        .map((staff) => {
+          const recordedAttendance = attendanceByStaff.get(staff.id);
+          if (recordedAttendance) return recordedAttendance;
+
+          const approvedLeave = leaveRequests.some((request: LeaveRequest) => {
+            if (request.staff !== staff.id) return false;
+            const leaveDays = request.leave_days || request.days || [];
+            const selectedLeaveDay = leaveDays.find((day) => day.date === selectedDate);
+            if (selectedLeaveDay) return String(selectedLeaveDay.status || "").toUpperCase() === "APPROVED";
+            if (leaveDays.length > 0) return false;
+            const requestApproved = String(request.status || "").toUpperCase() === "APPROVED";
+            return requestApproved && request.start_date <= selectedDate && request.end_date >= selectedDate;
+          });
+          const category = String(staff.category || "").trim().toUpperCase();
+          const applicableCalendarEntry = calendarStatus.entries.find((entry) => {
+            const audience = String(entry.target_audience || "ALL").trim().toUpperCase();
+            if (audience === "ALL" || audience === "STAFF") return true;
+            return audience === "TEACHER" && category.includes("TEACHER");
+          });
+          const noPunchStatus = applicableCalendarEntry?.classification ||
+            (calendarStatus.is_sunday_week_off ? "WEEK_OFF" : (approvedLeave ? "LEAVE" : "ABSENT"));
+
+          return {
+            id: -staff.id,
+            school: staff.school || 0,
+            staff: staff.id,
+            attendance_date: selectedDate,
+            date_time: "",
+            name: staff.name || `Staff #${staff.id}`,
+            category: String(staff.category || "OTHER"),
+            is_present: false,
+            is_half_day: false,
+            check_in: null,
+            check_out: null,
+            is_late: false,
+            is_early_exit: false,
+            working_hours: null,
+            source: applicableCalendarEntry?.reason || (calendarStatus.is_sunday_week_off ? "Sunday" : (approvedLeave ? "Approved Leave" : "No Punch")),
+            status: noPunchStatus,
+            department_name: departmentNames.get(Number(staff.department)) || null,
+            check_in_latitude: null,
+            check_in_longitude: null,
+            check_out_latitude: null,
+            check_out_longitude: null,
+            is_roster_placeholder: true,
+          };
+        });
+      setRecords(rosterRows);
     } catch (err: any) {
       setError(err?.message || "Failed to load staff attendance roll call.");
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedCategory, selectedDepartment]);
+  }, [selectedDate, selectedCategory, selectedDepartment, departments]);
 
   useEffect(() => {
     fetchAttendance();
@@ -245,10 +319,17 @@ export function StaffAttendanceRegister({
     });
 
     const total = records.length;
-    const presentRate = total > 0 ? Math.round(((present + late + halfDay * 0.5) / total) * 100) : 0;
+    const attendanceExpected = records.filter((record) => {
+      const status = resolveStatus(record);
+      return status !== "LEAVE" && status !== "HOLIDAY" && status !== "WEEK_OFF";
+    }).length;
+    const presentRate = attendanceExpected > 0
+      ? Math.round(((present + late + halfDay * 0.5) / attendanceExpected) * 100)
+      : 0;
 
     return {
       total,
+      attendanceExpected,
       present,
       late,
       halfDay,
@@ -601,6 +682,7 @@ export function StaffAttendanceRegister({
                   <th className="py-3.5 px-4">Punch In</th>
                   <th className="py-3.5 px-4">Punch Out</th>
                   <th className="py-3.5 px-4">Working Hours</th>
+                  <th className="py-3.5 px-4">Punch GPS</th>
                   <th className="py-3.5 px-4">Source</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -691,6 +773,14 @@ export function StaffAttendanceRegister({
                         </span>
                       </td>
 
+                      {/* Recorded GPS coordinates */}
+                      <td className="py-3.5 px-4 text-[10px] text-slate-500 whitespace-nowrap">
+                        <div>In: {record.check_in_latitude != null && record.check_in_longitude != null
+                          ? `${record.check_in_latitude}, ${record.check_in_longitude}` : "not recorded"}</div>
+                        <div>Out: {record.check_out_latitude != null && record.check_out_longitude != null
+                          ? `${record.check_out_latitude}, ${record.check_out_longitude}` : "not recorded"}</div>
+                      </td>
+
                       {/* Source */}
                       <td className="py-3.5 px-4">
                         <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
@@ -701,22 +791,27 @@ export function StaffAttendanceRegister({
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => setInspectRecord(record)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition"
-                            title="Inspect Punch Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setHistoryModalStaffName(record.name || `Staff #${record.staff}`);
-                              setHistoryModalOpen(true);
-                            }}
-                            className="px-2.5 py-1 text-xs font-medium rounded-lg text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 transition"
-                          >
-                            History
-                          </button>
+                          {!record.is_roster_placeholder && (
+                            <>
+                              <button
+                                onClick={() => setInspectRecord(record)}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition"
+                                title="Inspect Punch Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setHistoryModalStaffName(record.name || `Staff #${record.staff}`);
+                                  setHistoryModalStaffId(record.staff);
+                                  setHistoryModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 text-xs font-medium rounded-lg text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 transition"
+                              >
+                                History
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -832,6 +927,7 @@ export function StaffAttendanceRegister({
                     const name = inspectRecord.name || "";
                     setInspectRecord(null);
                     setHistoryModalStaffName(name);
+                    setHistoryModalStaffId(inspectRecord.staff);
                     setHistoryModalOpen(true);
                   }}
                   className="px-4 py-2 text-xs font-medium rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 transition"
@@ -855,6 +951,7 @@ export function StaffAttendanceRegister({
         isOpen={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
         staffName={historyModalStaffName}
+        staffId={historyModalStaffId}
         roleName={roleTitle}
       />
     </div>

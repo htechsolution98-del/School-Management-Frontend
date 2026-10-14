@@ -51,6 +51,7 @@ import {
 } from "@/lib/hr-config";
 import type { AttendanceSetting } from "@/types";
 import type { LocationSettingsRecord } from "@/types/clerk";
+import { getUserRole, getUserRoles } from "@/lib/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -875,10 +876,12 @@ function LocationForm({
   initialData,
   onSaved,
   onCancel,
+  canManageAttendanceSettings,
 }: {
   initialData?: LocationSettingsRecord | null;
   onSaved: (data: any) => void;
   onCancel?: () => void;
+  canManageAttendanceSettings: boolean;
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -893,6 +896,7 @@ function LocationForm({
     half_day_time: initialData?.half_day_time || "13:00:00",
     grace_period_mins: String((initialData as any)?.grace_period_mins ?? 15),
     half_day_threshold_mins: String((initialData as any)?.half_day_threshold_mins ?? 120),
+    biometric_required: Boolean((initialData as any)?.biometric_required ?? false),
   });
 
   const setVal = (key: string, val: string) =>
@@ -913,25 +917,27 @@ function LocationForm({
     try {
       await saveLocationSettings(form);
 
-      // Also persist to dynamic AttendanceSetting
-      const existingSettings = await getAttendanceSettings().catch(() => []);
-      const primarySetting = existingSettings.length > 0 ? existingSettings[0] : null;
+      if (canManageAttendanceSettings) {
+        const existingSettings = await getAttendanceSettings();
+        const primarySetting = existingSettings[0];
 
-      const dynamicPayload = {
-        name: form.shift_name.trim() || "General Shift",
-        check_in_time: form.start_time,
-        check_out_time: form.end_time,
-        grace_period_mins: Number(form.grace_period_mins) || 15,
-        half_day_threshold_mins: Number(form.half_day_threshold_mins) || 120,
-        geo_radius_meters: Number(form.radius) || 100,
-        geo_required: true,
-        is_active: true,
-      };
+        const dynamicPayload = {
+          name: form.shift_name.trim() || "General Shift",
+          check_in_time: form.start_time,
+          check_out_time: form.end_time,
+          grace_period_mins: Number(form.grace_period_mins) || 15,
+          half_day_threshold_mins: Number(form.half_day_threshold_mins) || 120,
+          geo_radius_meters: Number(form.radius) || 100,
+          geo_required: true,
+          biometric_required: form.biometric_required,
+          is_active: true,
+        };
 
-      if (primarySetting?.id) {
-        await updateAttendanceSetting(primarySetting.id, dynamicPayload).catch(() => {});
-      } else {
-        await createAttendanceSetting(dynamicPayload).catch(() => {});
+        if (primarySetting?.id) {
+          await updateAttendanceSetting(primarySetting.id, dynamicPayload);
+        } else {
+          await createAttendanceSetting(dynamicPayload);
+        }
       }
 
       toast.success("Attendance zone & policy settings saved successfully!");
@@ -1117,6 +1123,21 @@ function LocationForm({
                   />
                   <p className="text-[11px] text-muted-foreground">School opening hour</p>
                 </div>
+
+                {canManageAttendanceSettings && (
+                  <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-sm dark:border-indigo-900 dark:bg-indigo-950/30">
+                    <input
+                      type="checkbox"
+                      checked={form.biometric_required}
+                      onChange={(e) => setForm((current) => ({ ...current, biometric_required: e.target.checked }))}
+                      className="mt-0.5 h-4 w-4 accent-indigo-600"
+                    />
+                    <span>
+                      <span className="block font-semibold text-slate-800 dark:text-zinc-100">Require face verification for staff punches</span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">Staff must enroll and verify their face for check-in and check-out.</span>
+                    </span>
+                  </label>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
@@ -1306,6 +1327,11 @@ function LocationForm({
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function LocationSettingsPage() {
+  const attendanceAdminRoles = ["principal", "vice principal", "admin", "superadmin", "super_admin", "trustee", "hr", "hr_admin", "attendance_admin"];
+  const currentRoles = getUserRoles();
+  const canManageAttendanceSettings =
+    currentRoles.some((role) => attendanceAdminRoles.includes(role)) ||
+    attendanceAdminRoles.includes(getUserRole());
   const [pageState, setPageState] = useState<"loading" | "view" | "empty" | "form">("loading");
   const [existingData, setExistingData] = useState<LocationSettingsRecord | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -1316,7 +1342,7 @@ export default function LocationSettingsPage() {
     try {
       const [data, attendanceList] = await Promise.all([
         getLocationSettings(),
-        getAttendanceSettings().catch(() => []),
+        getAttendanceSettings(),
       ]);
       const primaryAttendance = attendanceList.length > 0 ? attendanceList[0] : null;
 
@@ -1339,6 +1365,7 @@ export default function LocationSettingsPage() {
           shift_name: primaryAttendance?.name || "General Shift",
           grace_period_mins: primaryAttendance?.grace_period_mins ?? 15,
           half_day_threshold_mins: primaryAttendance?.half_day_threshold_mins ?? 120,
+          biometric_required: primaryAttendance?.biometric_required ?? false,
           attendance_setting_id: primaryAttendance?.id,
         };
         setExistingData(mergedData as any);
@@ -1483,6 +1510,7 @@ export default function LocationSettingsPage() {
       {pageState === "form" && (
         <LocationForm
           initialData={existingData}
+          canManageAttendanceSettings={canManageAttendanceSettings}
           onSaved={(savedData) => {
             setExistingData(savedData);
             setPageState("view");
