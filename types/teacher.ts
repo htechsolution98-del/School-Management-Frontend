@@ -8,6 +8,7 @@ export interface TodayAttendance {
   check_out: string | null;
   is_present: boolean;
   is_half_day: boolean;
+  biometric_required?: boolean;
 }
 
 export interface AttendanceLocationSettings {
@@ -40,6 +41,12 @@ export interface AttendanceRecord {
   source?: string;
   status?: string;
   department_name?: string | null;
+  check_in_latitude?: string | number | null;
+  check_in_longitude?: string | number | null;
+  check_out_latitude?: string | number | null;
+  check_out_longitude?: string | number | null;
+  /** Synthetic register row for an employed staff member with no punch that day. */
+  is_roster_placeholder?: boolean;
 }
 
 // ─── Student Attendance Types ─────────────────────────────────────────────────

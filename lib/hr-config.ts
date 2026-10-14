@@ -65,11 +65,13 @@ async function handleResponse<T>(res: Response, fallbackError: string): Promise<
 export async function getAttendanceSettings(): Promise<AttendanceSetting[]> {
   const roles = getUserRoles();
   const primaryRole = getUserRole();
+  const attendanceAdminRoles = [
+    "principal", "vice principal", "admin", "superadmin", "super_admin",
+    "trustee", "hr", "hr_admin", "attendance_admin",
+  ];
   const isAllowed =
-    roles.some((r) => r === "principal" || r === "admin" || r === "superadmin") ||
-    primaryRole === "principal" ||
-    primaryRole === "admin" ||
-    primaryRole === "superadmin";
+    roles.some((r) => attendanceAdminRoles.includes(r)) ||
+    attendanceAdminRoles.includes(primaryRole);
 
   // Clerks do not have permission to view or manage attendance settings (HTTP 403)
   if (!isAllowed && (roles.includes("clerk") || primaryRole === "clerk")) {

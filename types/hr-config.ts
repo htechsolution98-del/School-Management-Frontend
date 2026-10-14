@@ -7,6 +7,7 @@ export interface AttendanceSetting {
   grace_period_mins: number;
   half_day_threshold_mins: number;
   geo_required: boolean;
+  biometric_required: boolean;
   geo_radius_meters: number | string;
   is_active: boolean;
   created_at?: string;

@@ -24,6 +24,7 @@ import {
   CalendarDays,
   BarChart3,
   ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
@@ -79,6 +80,7 @@ const sidebarLinks = [
     icon: CalendarCheck,
     subLinks: [
       { title: "Staff Attendance", href: "/clerk/staff-attendance", icon: CalendarCheck },
+      { title: "Attendance Exceptions (Read Only)", href: "/clerk/attendance-exceptions", icon: ShieldCheck },
       { title: "Absentee Calling Desk", href: "/clerk/absentee-desk", icon: PhoneCall },
       { title: "Attendance Zone", href: "/clerk/location-settings", icon: MapPin },
     ],

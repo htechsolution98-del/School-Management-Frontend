@@ -102,6 +102,7 @@ export interface Department {
 
 export interface Staff {
   id: number;
+  school?: number;
   name: string | null;
   email: string | null;
   mobile: string | null;
