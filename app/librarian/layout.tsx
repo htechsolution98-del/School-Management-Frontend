@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   Banknote,
   ClipboardList,
+  Banknote,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 

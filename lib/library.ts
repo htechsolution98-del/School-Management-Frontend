@@ -203,13 +203,29 @@ export interface IssueBookPayload {
   due_date?: string;
 }
 
+export interface BulkIssueBookPayload {
+  book: number;
+  students?: number[];
+  staff?: number[];
+  due_date?: string;
+}
+
+export interface BulkIssueResponse {
+  message: string;
+  issued_count: number;
+  remaining_copies: number;
+  results: BookIssued[];
+}
+
 export interface LibraryStudent {
   id: number;
   name: string;
   surname?: string;
   gr_no?: string;
   roll_no?: string;
+  class_name?: string;
   school_class_name?: string;
+  school_class?: number | string;
   division?: string;
 }
 
@@ -368,11 +384,40 @@ export async function issueBook(payload: IssueBookPayload): Promise<BookIssued> 
 
   if (!response.ok) {
     let errorMsg = "Failed to issue book.";
+    let errBody: any = null;
     try {
-      const err = await response.json();
-      errorMsg = err?.detail || err?.message || (Array.isArray(err) ? err[0] : Object.values(err)[0]) || errorMsg;
+      errBody = await response.json();
+      errorMsg = errBody?.detail || errBody?.message || (Array.isArray(errBody) ? errBody[0] : Object.values(errBody)[0]) || errorMsg;
     } catch {}
-    throw new Error(String(errorMsg));
+    const errObj = new Error(String(errorMsg)) as any;
+    errObj.fieldErrors = errBody;
+    throw errObj;
+  }
+
+  return response.json();
+}
+
+export async function bulkIssueBooks(payload: BulkIssueBookPayload): Promise<BulkIssueResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}bulk-issue/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = "Failed to issue books in bulk.";
+    let errBody: any = null;
+    try {
+      errBody = await response.json();
+      if (errBody?.non_field_errors && Array.isArray(errBody.non_field_errors)) {
+        errorMsg = errBody.non_field_errors.join(" ");
+      } else {
+        errorMsg = errBody?.detail || errBody?.message || (Array.isArray(errBody) ? errBody[0] : Object.values(errBody)[0]) || errorMsg;
+      }
+    } catch {}
+    const errObj = new Error(String(errorMsg)) as any;
+    errObj.fieldErrors = errBody;
+    throw errObj;
   }
 
   return response.json();
