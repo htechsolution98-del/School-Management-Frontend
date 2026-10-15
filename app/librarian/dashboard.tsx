@@ -418,8 +418,9 @@ export default function LibrarianDashboard() {
                 {mostBorrowed.slice(0, 5).map((item, idx) => {
                   const maxBorrow = mostBorrowed[0]?.times_issued || 1;
                   const pct = Math.round(((item.times_issued || 0) / maxBorrow) * 100);
+                  const itemKey = item.book_id ?? item.id ?? `borrowed-${idx}`;
                   return (
-                    <div key={item.id} className="space-y-1 text-xs">
+                    <div key={itemKey} className="space-y-1 text-xs">
                       <div className="flex justify-between items-center">
                         <div className="font-semibold text-slate-900 line-clamp-1 max-w-[200px]">
                           #{idx + 1} {item.title}
@@ -464,14 +465,19 @@ export default function LibrarianDashboard() {
               <div className="py-10 text-center text-slate-400 text-xs">No category data recorded.</div>
             ) : (
               <div className="space-y-3.5">
-                {categoryTrends.slice(0, 5).map((cat) => {
-                  const maxCount = categoryTrends[0]?.total_books || 1;
-                  const pct = Math.round(((cat.total_books || 0) / maxCount) * 100);
+                {categoryTrends.slice(0, 5).map((cat, idx) => {
+                  const maxCount = categoryTrends[0]?.total_books || categoryTrends[0]?.times_issued || 1;
+                  const loanCount = cat.times_issued ?? cat.total_loans ?? 0;
+                  const pct = Math.round(((cat.total_books || loanCount || 0) / maxCount) * 100);
+                  const catKey = cat.category || `cat-${idx}`;
                   return (
-                    <div key={cat.category} className="space-y-1 text-xs">
+                    <div key={catKey} className="space-y-1 text-xs">
                       <div className="flex justify-between items-center">
-                        <span className="font-semibold text-slate-800">{cat.category}</span>
-                        <span className="font-bold text-purple-700">{cat.total_books} books ({cat.total_loans} loans)</span>
+                        <span className="font-semibold text-slate-800">{cat.category || "General"}</span>
+                        <span className="font-bold text-purple-700">
+                          {cat.total_books ? `${cat.total_books} books ` : ""}
+                          {loanCount > 0 ? `(${loanCount} loans)` : ""}
+                        </span>
                       </div>
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                         <div
@@ -575,13 +581,13 @@ export default function LibrarianDashboard() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
-              {overdueLoans.slice(0, 4).map((loan) => {
+              {overdueLoans.slice(0, 4).map((loan, idx) => {
                 const overdueDays = Math.max(
                   1,
                   Math.floor((Date.now() - new Date(loan.due_date).getTime()) / (1000 * 60 * 60 * 24))
                 );
                 return (
-                  <div key={loan.id} className="py-3 flex items-center justify-between gap-3">
+                  <div key={loan.id ?? `overdue-${idx}`} className="py-3 flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
                       <div className="font-bold text-slate-900 line-clamp-1">{loan.book_title}</div>
                       <div className="text-slate-500">
@@ -633,8 +639,8 @@ export default function LibrarianDashboard() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
-              {availableHolds.slice(0, 4).map((hold) => (
-                <div key={hold.id} className="py-3 flex items-center justify-between gap-3">
+              {availableHolds.slice(0, 4).map((hold, idx) => (
+                <div key={hold.id ?? `hold-${idx}`} className="py-3 flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="font-bold text-slate-900 line-clamp-1">{hold.book_title}</div>
                     <div className="text-slate-500">Reserved for: <strong>{hold.student_name}</strong></div>
@@ -684,8 +690,8 @@ export default function LibrarianDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {recentTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/50">
+                {recentTransactions.map((tx, idx) => (
+                  <tr key={tx.id ?? `tx-${idx}`} className="hover:bg-slate-50/50">
                     <td className="py-3 px-4 font-semibold text-slate-900 max-w-[220px] truncate">
                       {tx.book_title}
                     </td>

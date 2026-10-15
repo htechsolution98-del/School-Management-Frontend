@@ -6193,9 +6193,13 @@ export default function LibrarianDashboard() {
                       <select
                         value={copy.status}
                         onChange={(e) => handleChangeCopyStatus(copy.id, e.target.value)}
-                        className="h-7 text-[11px] rounded border border-slate-200 bg-white px-2 font-medium"
+                        disabled={copy.status === "ISSUED" || copy.status === "RESERVED"}
+                        className="h-7 text-[11px] rounded border border-slate-200 bg-white px-2 font-medium disabled:bg-slate-100 disabled:text-slate-500"
+                        title={copy.status === "ISSUED" ? "Cannot change status while book is issued on loan" : ""}
                       >
                         <option value="AVAILABLE">Available</option>
+                        <option value="ISSUED">Issued (On Loan)</option>
+                        <option value="RESERVED">Reserved</option>
                         <option value="UNDER_REPAIR">Under Repair</option>
                         <option value="DAMAGED">Damaged</option>
                         <option value="LOST">Lost</option>
