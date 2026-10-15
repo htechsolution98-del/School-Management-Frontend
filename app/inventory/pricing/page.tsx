@@ -28,6 +28,7 @@ export default function PricingAndFeeMappingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [costLoading, setCostLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     item: "",
@@ -89,6 +90,48 @@ export default function PricingAndFeeMappingPage() {
     }
   };
 
+  const fetchItemPurchaseCost = async (itemId: string | number) => {
+    if (!itemId) return;
+    setCostLoading(true);
+    try {
+      // 1. Check existing item in items state
+      const found = items.find((it) => String(it.id) === String(itemId));
+      let cost = found?.last_purchase_cost || found?.active_pricing?.purchase_cost;
+
+      // 2. If not found or "0.00", query stock transactions for the latest purchase
+      if (!cost || Number(cost) === 0) {
+        const res = await inventoryApi.get(`/stock-transactions/?item=${itemId}&transaction_type=PURCHASE`);
+        const txns = Array.isArray(res.data) ? res.data : res.data.results || [];
+        if (txns.length > 0 && txns[0].unit_purchase_cost) {
+          cost = String(txns[0].unit_purchase_cost);
+        }
+      }
+
+      // 3. Auto-populate purchase cost if a valid positive number was found
+      if (cost && Number(cost) > 0) {
+        const formatted = Number(cost).toFixed(2);
+        setFormData((prev) => ({
+          ...prev,
+          purchase_cost: formatted,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch item purchase cost:", err);
+    } finally {
+      setCostLoading(false);
+    }
+  };
+
+  const handleItemSelect = (selectedId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      item: selectedId,
+    }));
+    if (selectedId) {
+      fetchItemPurchaseCost(selectedId);
+    }
+  };
+
   const handleOpenModal = (itemPricing: any = null) => {
     if (itemPricing) {
       setEditingId(itemPricing.id);
@@ -106,8 +149,9 @@ export default function PricingAndFeeMappingPage() {
       });
     } else {
       setEditingId(null);
+      const defaultItemId = items.length > 0 ? items[0].id : "";
       setFormData({
-        item: items.length > 0 ? items[0].id : "",
+        item: defaultItemId,
         academic_year: yearFilter || (academicYears.length > 0 ? academicYears[0].id : ""),
         school_class: "",
         purchase_cost: "0.00",
@@ -118,6 +162,9 @@ export default function PricingAndFeeMappingPage() {
         effective_to: "",
         is_active: true,
       });
+      if (defaultItemId) {
+        fetchItemPurchaseCost(defaultItemId);
+      }
     }
     setIsModalOpen(true);
   };
@@ -352,7 +399,7 @@ export default function PricingAndFeeMappingPage() {
                   <select
                     required
                     value={formData.item}
-                    onChange={(e) => setFormData({ ...formData, item: e.target.value })}
+                    onChange={(e) => handleItemSelect(e.target.value)}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   >
                     <option value="">Select Item</option>
@@ -485,9 +532,16 @@ export default function PricingAndFeeMappingPage() {
               {/* Price Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    School Purchase Cost (₹) <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      School Purchase Cost (₹) <span className="text-red-500">*</span>
+                    </label>
+                    {costLoading && (
+                      <span className="text-[10px] text-blue-500 flex items-center gap-1 font-medium">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Auto-fetching cost...
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     step="0.01"
@@ -498,7 +552,7 @@ export default function PricingAndFeeMappingPage() {
                     onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value })}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
-                  <span className="text-[10px] text-slate-400">Used for inventory valuation & Profit/Loss reports.</span>
+                  <span className="text-[10px] text-slate-400">Auto-filled from purchase history or pricing. Adjustable if needed.</span>
                 </div>
 
                 <div>

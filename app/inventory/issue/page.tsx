@@ -127,10 +127,165 @@ export default function StudentItemIssuePage() {
   const selectedItemObj = items.find((it) => it.id === Number(singleItem));
   const bulkItemObj = items.find((it) => it.id === Number(bulkItem));
 
+  // Variant Stock Matrix state
+  const [singleVariantMatrix, setSingleVariantMatrix] = useState<any[]>([]);
+  const [singleVariantLoading, setSingleVariantLoading] = useState(false);
+  const [bulkVariantMatrix, setBulkVariantMatrix] = useState<any[]>([]);
+  const [bulkVariantLoading, setBulkVariantLoading] = useState(false);
+
+  useEffect(() => {
+    if (singleItem) {
+      fetchSingleItemVariantStock(singleItem);
+    } else {
+      setSingleVariantMatrix([]);
+    }
+  }, [singleItem]);
+
+  useEffect(() => {
+    if (bulkItem) {
+      fetchBulkItemVariantStock(bulkItem);
+    } else {
+      setBulkVariantMatrix([]);
+    }
+  }, [bulkItem]);
+
+  const fetchSingleItemVariantStock = async (itemId: string | number) => {
+    setSingleVariantLoading(true);
+    try {
+      const res = await inventoryApi.get(`/items/${itemId}/variant-stock/`);
+      const matrix = res.data?.variant_stock_matrix || [];
+      setSingleVariantMatrix(matrix);
+    } catch (err) {
+      console.error("Failed to load variant stock matrix:", err);
+      const found = items.find((it) => it.id === Number(itemId));
+      if (found?.variant_stock_matrix) {
+        setSingleVariantMatrix(found.variant_stock_matrix);
+      } else {
+        setSingleVariantMatrix([]);
+      }
+    } finally {
+      setSingleVariantLoading(false);
+    }
+  };
+
+  const fetchBulkItemVariantStock = async (itemId: string | number) => {
+    setBulkVariantLoading(true);
+    try {
+      const res = await inventoryApi.get(`/items/${itemId}/variant-stock/`);
+      const matrix = res.data?.variant_stock_matrix || [];
+      setBulkVariantMatrix(matrix);
+    } catch (err) {
+      console.error("Failed to load bulk variant stock matrix:", err);
+      const found = items.find((it) => it.id === Number(itemId));
+      if (found?.variant_stock_matrix) {
+        setBulkVariantMatrix(found.variant_stock_matrix);
+      } else {
+        setBulkVariantMatrix([]);
+      }
+    } finally {
+      setBulkVariantLoading(false);
+    }
+  };
+
+  const getSelectedVariantStock = (
+    matrix: any[],
+    selectedSize: string,
+    selectedColor: string,
+    itemObj: any
+  ): number => {
+    if (!itemObj) return 0;
+    if (!itemObj.has_size && !itemObj.has_color) {
+      return itemObj.current_stock ?? 0;
+    }
+    const sId = selectedSize ? Number(selectedSize) : null;
+    const cId = selectedColor ? Number(selectedColor) : null;
+
+    if (itemObj.has_size && itemObj.has_color) {
+      if (sId !== null && cId !== null) {
+        const entry = matrix.find((m) => m.size_id === sId && m.color_id === cId);
+        return entry ? entry.available_stock : 0;
+      }
+      if (sId !== null) {
+        return matrix
+          .filter((m) => m.size_id === sId)
+          .reduce((acc, m) => acc + (m.available_stock || 0), 0);
+      }
+      if (cId !== null) {
+        return matrix
+          .filter((m) => m.color_id === cId)
+          .reduce((acc, m) => acc + (m.available_stock || 0), 0);
+      }
+      return itemObj.current_stock ?? 0;
+    }
+
+    if (itemObj.has_size) {
+      if (sId !== null) {
+        const entry = matrix.find((m) => m.size_id === sId);
+        return entry ? entry.available_stock : 0;
+      }
+      return itemObj.current_stock ?? 0;
+    }
+
+    if (itemObj.has_color) {
+      if (cId !== null) {
+        const entry = matrix.find((m) => m.color_id === cId);
+        return entry ? entry.available_stock : 0;
+      }
+      return itemObj.current_stock ?? 0;
+    }
+
+    return itemObj.current_stock ?? 0;
+  };
+
+  const isOptionDisabled = (
+    matrix: any[],
+    targetType: "size" | "color",
+    targetId: number,
+    otherSelectedId: string,
+    itemHasOther: boolean
+  ): { disabled: boolean; stock: number } => {
+    if (matrix.length === 0) return { disabled: false, stock: 0 };
+    const otherId = otherSelectedId ? Number(otherSelectedId) : null;
+
+    if (itemHasOther && otherId !== null) {
+      const entry = matrix.find((m) =>
+        targetType === "size"
+          ? m.size_id === targetId && m.color_id === otherId
+          : m.color_id === targetId && m.size_id === otherId
+      );
+      const stock = entry ? entry.available_stock : 0;
+      return { disabled: stock <= 0, stock };
+    }
+
+    const totalStock = matrix
+      .filter((m) => (targetType === "size" ? m.size_id === targetId : m.color_id === targetId))
+      .reduce((sum, m) => sum + (m.available_stock || 0), 0);
+
+    return { disabled: totalStock <= 0, stock: totalStock };
+  };
+
+  const currentSingleStock = getSelectedVariantStock(
+    singleVariantMatrix,
+    singleSize,
+    singleColor,
+    selectedItemObj
+  );
+
+  const currentBulkStock = getSelectedVariantStock(
+    bulkVariantMatrix,
+    bulkSize,
+    bulkColor,
+    bulkItemObj
+  );
+
   const handleSingleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) {
       showWarning("Select Student", "Please select a student to issue the item.");
+      return;
+    }
+    if (!academicYears || academicYears.length === 0) {
+      showWarning("Academic Year Missing", "No active academic year found for this school. Please configure an academic year first.");
       return;
     }
     setSingleSubmitting(true);
@@ -138,7 +293,7 @@ export default function StudentItemIssuePage() {
       const payload = {
         student: selectedStudent.id,
         item: Number(singleItem),
-        academic_year: academicYears.length > 0 ? academicYears[0].id : 1,
+        academic_year: Number(academicYears[0].id),
         quantity: Number(singleQty),
         size: singleSize ? Number(singleSize) : null,
         color: singleColor ? Number(singleColor) : null,
@@ -162,11 +317,15 @@ export default function StudentItemIssuePage() {
       showWarning("Select Students", "Please select at least one student.");
       return;
     }
+    if (!academicYears || academicYears.length === 0) {
+      showWarning("Academic Year Missing", "No active academic year found for this school. Please configure an academic year first.");
+      return;
+    }
     const totalReq = selectedStudentIds.length * bulkQtyPerStudent;
-    const available = bulkItemObj ? bulkItemObj.current_stock : 0;
+    const available = currentBulkStock;
 
     if (available < totalReq) {
-      showWarning("Insufficient Stock", `Available: ${available} units, Required: ${totalReq} units.`);
+      showWarning("Insufficient Stock", `Available: ${available} units, Required: ${totalReq} units (${selectedStudentIds.length} students x ${bulkQtyPerStudent} qty).`);
       return;
     }
 
@@ -174,7 +333,7 @@ export default function StudentItemIssuePage() {
     try {
       const payload = {
         item: Number(bulkItem),
-        academic_year: academicYears.length > 0 ? academicYears[0].id : 1,
+        academic_year: Number(academicYears[0].id),
         student_ids: selectedStudentIds,
         quantity_per_student: bulkQtyPerStudent,
         size: bulkSize ? Number(bulkSize) : null,
@@ -244,6 +403,16 @@ export default function StudentItemIssuePage() {
           <Plus className="w-4 h-4" /> Generate Class Entitlements
         </button>
       </div>
+
+      {/* Warning if no academic year is configured */}
+      {!loading && academicYears.length === 0 && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 flex items-center gap-3 text-amber-800 dark:text-amber-200 text-sm">
+          <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div>
+            <span className="font-semibold">Academic Year Required:</span> No academic year is configured for this school. Please create or activate an Academic Year before issuing inventory items.
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
@@ -407,9 +576,20 @@ export default function StudentItemIssuePage() {
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
                     <option value="">{selectedItemObj?.has_size ? "Select size" : "Standard / None"}</option>
-                    {sizes.filter((s) => s.is_active).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
+                    {sizes.filter((s) => s.is_active).map((s) => {
+                      const { disabled, stock } = isOptionDisabled(
+                        singleVariantMatrix,
+                        "size",
+                        s.id,
+                        singleColor,
+                        !!selectedItemObj?.has_color
+                      );
+                      return (
+                        <option key={s.id} value={s.id} disabled={disabled}>
+                          {s.name} {disabled ? "(Out of stock)" : `(${stock} available)`}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -424,9 +604,20 @@ export default function StudentItemIssuePage() {
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
                     <option value="">{selectedItemObj?.has_color ? "Select color" : "Standard / None"}</option>
-                    {colors.filter((c) => c.is_active).map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                    {colors.filter((c) => c.is_active).map((c) => {
+                      const { disabled, stock } = isOptionDisabled(
+                        singleVariantMatrix,
+                        "color",
+                        c.id,
+                        singleSize,
+                        !!selectedItemObj?.has_size
+                      );
+                      return (
+                        <option key={c.id} value={c.id} disabled={disabled}>
+                          {c.name} {disabled ? "(Out of stock)" : `(${stock} available)`}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -437,18 +628,28 @@ export default function StudentItemIssuePage() {
                   <input
                     type="number"
                     min="1"
+                    max={Math.max(1, currentSingleStock)}
                     required
                     value={singleQty}
                     onChange={(e) => setSingleQty(Number(e.target.value))}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   />
+                  <p className={`text-[11px] mt-1 ${currentSingleStock < singleQty || currentSingleStock <= 0 ? "text-red-500 font-medium" : "text-slate-400"}`}>
+                    {singleVariantLoading ? (
+                      "Checking variant stock..."
+                    ) : currentSingleStock <= 0 ? (
+                      "Selected variant is out of stock (0 available)"
+                    ) : (
+                      `Max available: ${currentSingleStock} ${selectedItemObj?.unit || "units"}`
+                    )}
+                  </p>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end">
                 <button
                   type="submit"
-                  disabled={singleSubmitting || !selectedStudent}
+                  disabled={singleSubmitting || !selectedStudent || academicYears.length === 0 || currentSingleStock < singleQty || currentSingleStock <= 0}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
                 >
                   {singleSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -468,12 +669,21 @@ export default function StudentItemIssuePage() {
             {selectedItemObj ? (
               <div className="space-y-3">
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
-                  <div className="text-xs text-slate-500">Available Stock:</div>
-                  <div className={`text-2xl font-bold mt-1 ${
-                    selectedItemObj.current_stock < singleQty ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"
-                  }`}>
-                    {selectedItemObj.current_stock} {selectedItemObj.unit}
+                  <div className="text-xs text-slate-500">
+                    {selectedItemObj.has_size || selectedItemObj.has_color
+                      ? "Selected Variant Stock:"
+                      : "Available Stock:"}
                   </div>
+                  <div className={`text-2xl font-bold mt-1 ${
+                    currentSingleStock < singleQty || currentSingleStock <= 0 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"
+                  }`}>
+                    {currentSingleStock} {selectedItemObj.unit}
+                  </div>
+                  {(selectedItemObj.has_size || selectedItemObj.has_color) && (
+                    <div className="text-xs text-slate-400 mt-1">
+                      Catalog Total: {selectedItemObj.current_stock} {selectedItemObj.unit}
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-xs space-y-1.5 text-slate-600 dark:text-slate-300">
@@ -491,10 +701,14 @@ export default function StudentItemIssuePage() {
                   </div>
                 </div>
 
-                {selectedItemObj.current_stock < singleQty && (
+                {(currentSingleStock < singleQty || currentSingleStock <= 0) && (
                   <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/50 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>Insufficient inventory stock to issue {singleQty} units! Restock via purchase first.</span>
+                    <span>
+                      {currentSingleStock <= 0
+                        ? "The selected variant is out of stock! Restock via purchase or adjustment first."
+                        : `Insufficient inventory stock to issue ${singleQty} units (only ${currentSingleStock} available)!`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -522,13 +736,15 @@ export default function StudentItemIssuePage() {
             {bulkItemObj && (
               <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="text-right">
-                  <div className="text-[10px] uppercase font-bold text-slate-400">Available Stock</div>
-                  <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{bulkItemObj.current_stock} units</div>
+                  <div className="text-[10px] uppercase font-bold text-slate-400">
+                    {bulkItemObj.has_size || bulkItemObj.has_color ? "Variant Stock" : "Available Stock"}
+                  </div>
+                  <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{currentBulkStock} units</div>
                 </div>
                 <div className="text-right pl-3 border-l border-slate-200 dark:border-slate-800">
                   <div className="text-[10px] uppercase font-bold text-slate-400">Selected Req</div>
                   <div className={`text-lg font-bold ${
-                    (selectedStudentIds.length * bulkQtyPerStudent) > bulkItemObj.current_stock
+                    (selectedStudentIds.length * bulkQtyPerStudent) > currentBulkStock
                       ? "text-red-600"
                       : "text-blue-600"
                   }`}>
@@ -584,17 +800,46 @@ export default function StudentItemIssuePage() {
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
               >
                 <option value="">{bulkItemObj?.has_size ? "Select size" : "Standard / None"}</option>
-                {sizes.filter((s) => s.is_active).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                {sizes.filter((s) => s.is_active).map((s) => {
+                  const { disabled, stock } = isOptionDisabled(
+                    bulkVariantMatrix,
+                    "size",
+                    s.id,
+                    bulkColor,
+                    !!bulkItemObj?.has_color
+                  );
+                  return (
+                    <option key={s.id} value={s.id} disabled={disabled}>
+                      {s.name} {disabled ? "(Out of stock)" : `(${stock} available)`}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Variant</label>
-              <select required={!!bulkItemObj?.has_color} value={bulkColor} onChange={(e) => setBulkColor(e.target.value)} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+              <select
+                required={!!bulkItemObj?.has_color}
+                value={bulkColor}
+                onChange={(e) => setBulkColor(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              >
                 <option value="">{bulkItemObj?.has_color ? "Select color" : "Standard / None"}</option>
-                {colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
+                {colors.filter((color) => color.is_active).map((color) => {
+                  const { disabled, stock } = isOptionDisabled(
+                    bulkVariantMatrix,
+                    "color",
+                    color.id,
+                    bulkSize,
+                    !!bulkItemObj?.has_size
+                  );
+                  return (
+                    <option key={color.id} value={color.id} disabled={disabled}>
+                      {color.name} {disabled ? "(Out of stock)" : `(${stock} available)`}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -605,6 +850,7 @@ export default function StudentItemIssuePage() {
               <input
                 type="number"
                 min="1"
+                max={Math.max(1, Math.floor(currentBulkStock / Math.max(1, selectedStudentIds.length || 1)))}
                 value={bulkQtyPerStudent}
                 onChange={(e) => setBulkQtyPerStudent(Number(e.target.value))}
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
@@ -692,7 +938,7 @@ export default function StudentItemIssuePage() {
             <button
               type="button"
               onClick={handleBulkIssue}
-              disabled={bulkSubmitting || selectedStudentIds.length === 0}
+              disabled={bulkSubmitting || selectedStudentIds.length === 0 || academicYears.length === 0 || currentBulkStock < (selectedStudentIds.length * bulkQtyPerStudent) || currentBulkStock <= 0}
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
             >
               {bulkSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

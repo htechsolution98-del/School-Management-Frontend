@@ -55,6 +55,7 @@ import {
   createLeaveType,
   updateLeaveType,
   deleteLeaveType,
+  bulkManageLeaveTypes,
   type LeaveTemplate,
   type LeaveTypeRecord,
 } from "@/lib/clerk";
@@ -509,79 +510,24 @@ export default function LeaveConfigPage() {
         max_carry_forward: typeCarryForward ? maxCarryForward : 0,
       };
 
-      if (editingType) {
-        // Edit mode: update existing records with PUT/PATCH
-        const group = editingGroupRecords && editingGroupRecords.length > 0 ? editingGroupRecords : [editingType];
-        
-        // 1. Existing categories still selected -> update via PATCH
-        const remainingRecords = group.filter((r) => typeCategoryIds.includes(Number(r.category)));
-        const updatePromises = remainingRecords.map((r) =>
-          updateLeaveType(r.id, {
-            ...basePayload,
-            category: r.category,
-          })
-        );
+      const bulkPayload = {
+        ...basePayload,
+        category_ids: typeCategoryIds,
+        existing_type_ids: editingType
+          ? ((editingGroupRecords && editingGroupRecords.length > 0)
+              ? editingGroupRecords.map((r) => r.id)
+              : [editingType.id])
+          : undefined,
+      };
 
-        // 2. Categories in original group that were unselected -> delete
-        const removedRecords = group.filter((r) => !typeCategoryIds.includes(Number(r.category)));
-        const deletePromises = removedRecords.map((r) => deleteLeaveType(r.id));
-
-        // 3. New categories selected that were not in original group -> create
-        const existingCatIds = group.map((r) => Number(r.category));
-        const newCatIds = typeCategoryIds.filter((id) => !existingCatIds.includes(id));
-        const createPromises = newCatIds.map((catId) =>
-          createLeaveType({
-            ...basePayload,
-            category: catId,
-          })
-        );
-
-        await Promise.all([...updatePromises, ...deletePromises, ...createPromises]);
-        toast.success("Leave type updated successfully");
-        setIsTypeDialogOpen(false);
-        fetchData();
-      } else {
-        // Create mode: one record per selected category
-        const results = await Promise.allSettled(
-          typeCategoryIds.map((catId) =>
-            createLeaveType({
-              ...basePayload,
-              category: catId,
-            })
-          )
-        );
-
-        const succeeded = results.filter((r) => r.status === "fulfilled").length;
-        const failed = results
-          .map((r, i) => ({ result: r, catId: typeCategoryIds[i] }))
-          .filter(({ result }) => result.status === "rejected");
-
-        if (succeeded > 0) {
-          toast.success(`Leave type created for ${succeeded} category(s)`);
-        }
-
-        if (failed.length > 0) {
-          failed.forEach(({ result, catId }) => {
-            const err = (result as PromiseRejectedResult).reason;
-            const msg: string = err?.message || "";
-            const catName = getCategoryName(catId);
-            if (
-              msg.toLowerCase().includes("unique set") ||
-              msg.toLowerCase().includes("unique") ||
-              msg.toLowerCase().includes("already exists")
-            ) {
-              toast.warning(`"${typeName.toUpperCase()}" already exists for ${catName} — skipped`);
-            } else {
-              toast.error(`Failed for ${catName}: ${msg || "Unknown error"}`);
-            }
-          });
-        }
-
-        if (succeeded > 0) {
-          setIsTypeDialogOpen(false);
-          fetchData();
-        }
-      }
+      await bulkManageLeaveTypes(bulkPayload);
+      toast.success(
+        editingType
+          ? "Leave type updated successfully."
+          : `Leave type saved successfully for all ${typeCategoryIds.length} categories.`
+      );
+      setIsTypeDialogOpen(false);
+      fetchData();
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message || "Failed to save leave type");
@@ -600,34 +546,30 @@ export default function LeaveConfigPage() {
     setAddCatSubmitting(true);
     const first = existingRecords[0];
     try {
-      const results = await Promise.allSettled(
-        newCatIds.map((catId) =>
-          createLeaveType({
-            name: first.name || typeName,
-            leave_type: typeName,
-            code: first.code,
-            leave_template: first.leave_template,
-            leave_num: first.leave_num,
-            allocation_count: first.allocation_count ?? first.leave_num,
-            allocation_period: first.allocation_period || "Yearly",
-            is_paid: first.is_paid !== false,
-            allow_encashment: !!first.allow_encashment,
-            category: catId,
-            is_carry_forward: first.is_carry_forward,
-            carry_forward: first.carry_forward ?? first.is_carry_forward,
-            max_carry_forward: first.max_carry_forward ?? 0,
-          })
-        )
-      );
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (succeeded > 0) toast.success(`Added ${succeeded} category(s) to "${typeName}"`);
-      if (failed > 0) toast.warning(`${failed} category(s) already exist or failed — skipped`);
-      if (succeeded > 0) {
-        setAddCatForType(null);
-        setAddCatSelectedIds([]);
-        fetchData();
-      }
+      const allCategoryIds = [
+        ...existingRecords.map((r) => Number(r.category)),
+        ...newCatIds,
+      ];
+      await bulkManageLeaveTypes({
+        leave_template: first.leave_template,
+        name: first.name || typeName,
+        leave_type: typeName,
+        code: first.code || undefined,
+        leave_num: first.leave_num,
+        allocation_count: first.allocation_count ?? first.leave_num,
+        allocation_period: first.allocation_period || "Yearly",
+        is_paid: first.is_paid !== false,
+        allow_encashment: !!first.allow_encashment,
+        is_carry_forward: first.is_carry_forward,
+        carry_forward: first.carry_forward ?? first.is_carry_forward,
+        max_carry_forward: first.max_carry_forward ?? 0,
+        category_ids: allCategoryIds,
+        existing_type_ids: existingRecords.map((r) => r.id),
+      });
+      toast.success(`Categories added to "${typeName}" successfully.`);
+      setAddCatForType(null);
+      setAddCatSelectedIds([]);
+      fetchData();
     } catch (err: any) {
       toast.error(err?.message || "Failed to add categories");
     } finally {

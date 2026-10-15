@@ -339,8 +339,8 @@ export default function InventoryReportsPage() {
 
       {/* Navigation Tabs and Search / Export */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-200 px-6 pt-3 pb-3 gap-4">
-          <div className="flex gap-2 overflow-x-auto w-full sm:w-auto">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-slate-200 px-6 py-4 gap-4">
+          <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 xl:pb-0">
             {[
               { id: "overview", label: "P&L Summary", icon: DollarSign },
               { id: "sales", label: `Sales & Issues (${salesRows.length})`, icon: TrendingUp },
@@ -353,43 +353,53 @@ export default function InventoryReportsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition ${
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 transition-all ${
                     activeTab === tab.id
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
-                      : "text-slate-600 hover:bg-slate-100"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            <div className="relative flex-1 sm:w-64">
+          <div className="flex flex-wrap items-center gap-2.5 justify-start xl:justify-end shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search report..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
               />
             </div>
 
             <button
               onClick={() => exportCSV(getExportData().rows, getExportData().filename)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition whitespace-nowrap"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               Export CSV
             </button>
-            <button onClick={exportExcel} className="px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl">Excel</button>
-            <button onClick={exportPDF} className="px-3 py-1.5 text-xs font-semibold text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-xl">PDF</button>
+            <button
+              onClick={exportExcel}
+              className="px-3 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition whitespace-nowrap"
+            >
+              Excel
+            </button>
+            <button
+              onClick={exportPDF}
+              className="px-3 py-2 text-xs font-semibold text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-xl transition whitespace-nowrap"
+            >
+              PDF
+            </button>
             <button
               onClick={() => window.print()}
-              className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 transition"
+              className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 transition"
               title="Print Report"
             >
               <Printer className="w-4 h-4" />

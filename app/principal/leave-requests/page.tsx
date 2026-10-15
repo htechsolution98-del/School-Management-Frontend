@@ -151,26 +151,7 @@ export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeave
   const handleBulkAction = async (requestId: number, action: "APPROVED" | "REJECTED") => {
     setProcessingRequests((prev) => ({ ...prev, [requestId]: action === "APPROVED" ? "approving" : "rejecting" }));
     try {
-      try {
-        await approveAllLeaveDays(requestId, action);
-      } catch (bulkErr: any) {
-        console.warn("Bulk action endpoint failed, falling back to day-by-day status update", bulkErr);
-        
-        // Find the request from local state to get its days list
-        const req = requests.find((r) => r && r.id === requestId);
-        const daysList = req ? (req.days || (req as any).leave_days || (req as any).dates || (req as any).request_days || []) : [];
-        
-        if (daysList.length > 0) {
-          // Update all days in parallel
-          await Promise.all(
-            daysList.map((day: any) => changeLeaveDayStatus(day.id, action))
-          );
-        } else {
-          // If no days are found in the list, throw the original bulk error
-          throw bulkErr;
-        }
-      }
-      
+      await approveAllLeaveDays(requestId, action);
       toast.success(`Leave request ${action.toLowerCase()} successfully`);
       
       // Update local state immediately
@@ -191,8 +172,11 @@ export default function PrincipalLeaveRequestsPage({ roleTitle }: PrincipalLeave
         })
       );
     } catch (err: any) {
-      console.error(err);
-      toast.error(err?.message || `Failed to update status to ${action}`);
+      console.error("Bulk action failed:", err);
+      const actionName = action === "APPROVED" ? "Bulk approval" : "Bulk rejection";
+      toast.error(
+        err?.message || `${actionName} failed. Please try again or check network.`
+      );
     } finally {
       setProcessingRequests((prev) => ({ ...prev, [requestId]: null }));
     }

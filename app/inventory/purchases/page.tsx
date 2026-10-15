@@ -8,7 +8,10 @@ import {
   FileText,
   Loader2,
   X,
-  Pencil
+  Pencil,
+  Search,
+  Calendar,
+  Eye,
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 
@@ -24,6 +27,15 @@ export default function PurchasesAndSuppliersPage() {
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  // Details Modal state
+  const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   // Supplier Modal
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -87,6 +99,22 @@ export default function PurchasesAndSuppliersPage() {
       setLoading(false);
     }
   };
+
+  const filteredPurchases = purchases.filter((p) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const invMatch = (p.invoice_number || "").toLowerCase().includes(q);
+      const suppMatch = (p.supplier_name || "").toLowerCase().includes(q);
+      if (!invMatch && !suppMatch) return false;
+    }
+    if (fromDate) {
+      if (!p.purchase_date || p.purchase_date < fromDate) return false;
+    }
+    if (toDate) {
+      if (!p.purchase_date || p.purchase_date > toDate) return false;
+    }
+    return true;
+  });
 
   const handleOpenPurchaseModal = () => {
     setPurchaseForm({
@@ -265,7 +293,7 @@ export default function PurchasesAndSuppliersPage() {
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <FileText className="w-4 h-4" /> Purchase Invoices ({purchases.length})
+          <FileText className="w-4 h-4" /> Purchase Invoices ({filteredPurchases.length}{filteredPurchases.length !== purchases.length ? ` / ${purchases.length}` : ""})
         </button>
 
         <button
@@ -287,63 +315,148 @@ export default function PurchasesAndSuppliersPage() {
             <Loader2 className="w-8 h-8 animate-spin mr-2" /> Loading records...
           </div>
         ) : activeTab === "purchases" ? (
-          purchases.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
-              <Truck className="w-12 h-12 mx-auto mb-3 opacity-40" />
-              <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No Purchase Invoices Found</div>
-              <p className="text-xs mt-1">Record supplier purchase bills to add physical stock to items.</p>
+          <div>
+            {/* Filter & Search Bar */}
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by invoice number or supplier name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              {/* Date Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span>From:</span>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <span>To:</span>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                {(searchQuery || fromDate || toDate) && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFromDate("");
+                      setToDate("");
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Clear search and date filters"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3.5 px-4">Invoice #</th>
-                    <th className="py-3.5 px-4">Supplier</th>
-                    <th className="py-3.5 px-4">Date</th>
-                    <th className="py-3.5 px-4">Academic Year</th>
-                    <th className="py-3.5 px-4">Items Count</th>
-                    <th className="py-3.5 px-4">Grand Total</th>
-                    <th className="py-3.5 px-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {purchases.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-white">
-                        {p.invoice_number}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
-                        {p.supplier_name || "Direct / Internal"}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-500">
-                        {p.purchase_date}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                        {p.academic_year_name}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-300">
-                        {p.items ? p.items.length : 0} items
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        ₹{Number(p.grand_total).toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                          p.status === "CONFIRMED"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                        }`}>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          {p.status}
-                        </span>
-                      </td>
+
+            {purchases.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Truck className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No Purchase Invoices Found</div>
+                <p className="text-xs mt-1">Record supplier purchase bills to add physical stock to items.</p>
+              </div>
+            ) : filteredPurchases.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Search className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No Matching Invoices Found</div>
+                <p className="text-xs mt-1">No invoices match your search query or date range filters.</p>
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Invoice #</th>
+                      <th className="py-3.5 px-4">Supplier</th>
+                      <th className="py-3.5 px-4">Date</th>
+                      <th className="py-3.5 px-4">Academic Year</th>
+                      <th className="py-3.5 px-4">Items Count</th>
+                      <th className="py-3.5 px-4">Grand Total</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredPurchases.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-white">
+                          {p.invoice_number}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
+                          {p.supplier_name || "Direct / Internal"}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-500">
+                          {p.purchase_date}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                          {p.academic_year_name}
+                        </td>
+                        <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-300">
+                          {p.items ? p.items.length : 0} items
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                          ₹{Number(p.grand_total).toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                            p.status === "CONFIRMED"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                          }`}>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedPurchase(p);
+                              setIsDetailsModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm"
+                            title="View purchase breakdown"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         ) : (
           /* Suppliers Directory */
           suppliers.length === 0 ? (
@@ -706,6 +819,142 @@ export default function PurchasesAndSuppliersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Invoice Details Modal */}
+      {isDetailsModalOpen && selectedPurchase && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Invoice #{selectedPurchase.invoice_number}
+                  </h2>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    selectedPurchase.status === "CONFIRMED"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                  }`}>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {selectedPurchase.status}
+                  </span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                    selectedPurchase.payment_status === "PAID"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  }`}>
+                    {selectedPurchase.payment_status}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  <span><strong>Supplier:</strong> {selectedPurchase.supplier_name || "Direct / Internal"}</span>
+                  <span><strong>Date:</strong> {selectedPurchase.purchase_date}</span>
+                  {selectedPurchase.academic_year_name && (
+                    <span><strong>Academic Year:</strong> {selectedPurchase.academic_year_name}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsDetailsModalOpen(false); setSelectedPurchase(null); }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Line Items */}
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {selectedPurchase.notes && (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">Notes:</span> {selectedPurchase.notes}
+                </div>
+              )}
+
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-2.5 px-3">Item Name</th>
+                      <th className="py-2.5 px-3">Variant</th>
+                      <th className="py-2.5 px-3 text-center">Qty</th>
+                      <th className="py-2.5 px-3 text-right">Unit Cost (₹)</th>
+                      <th className="py-2.5 px-3 text-right">Subtotal (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                    {!selectedPurchase.items || selectedPurchase.items.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-slate-400">
+                          No line items found for this invoice.
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedPurchase.items.map((it: any, idx: number) => {
+                        const variantLabels = [];
+                        if (it.size_name) variantLabels.push(`Size: ${it.size_name}`);
+                        if (it.color_name) variantLabels.push(`Color: ${it.color_name}`);
+                        const variantText = variantLabels.length > 0 ? variantLabels.join(" | ") : "Standard / None";
+
+                        return (
+                          <tr key={it.id || idx} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30">
+                            <td className="py-2.5 px-3">
+                              <div className="font-semibold text-slate-900 dark:text-white">
+                                {it.item_name || `Item #${it.item}`}
+                              </div>
+                              {it.item_code && (
+                                <div className="text-[10px] font-mono text-slate-400">
+                                  {it.item_code}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                              <span className="inline-block px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px]">
+                                {variantText}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-semibold text-slate-800 dark:text-slate-200">
+                              {it.quantity}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-600 dark:text-slate-300">
+                              ₹{Number(it.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
+                              ₹{Number(it.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-4 px-6 bg-slate-50/50 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-xs text-slate-500">
+                {selectedPurchase.items?.length || 0} Line item{(selectedPurchase.items?.length || 0) === 1 ? "" : "s"}
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 block">Grand Total</span>
+                  <span className="text-xl font-bold text-slate-900 dark:text-white">
+                    ₹{Number(selectedPurchase.grand_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setIsDetailsModalOpen(false); setSelectedPurchase(null); }}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

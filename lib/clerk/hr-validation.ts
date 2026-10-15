@@ -18,7 +18,15 @@ export function parseDepartments(input: string, existing: Pick<Department, "name
   return { names, error: "" };
 }
 
-export function validateStaffRecord(data: CreateStaffPayload, staff: Staff[], departments: Department[], roleIds: string[], editingId?: number, today = new Date()): StaffErrors {
+export function validateStaffRecord(
+  data: CreateStaffPayload,
+  staff: Staff[],
+  departments: Department[],
+  roleIds: string[],
+  editingId?: number,
+  today = new Date(),
+  roles?: { id: string; label: string }[]
+): StaffErrors {
   const errors: StaffErrors = {};
   const trimmedName = (data.name || "").trim();
   if (!trimmedName || trimmedName.length < 2) {
@@ -48,7 +56,20 @@ export function validateStaffRecord(data: CreateStaffPayload, staff: Staff[], de
   if (normMobile && others.some(member => normalizePhone(member.mobile || "") === normMobile)) {
     errors.mobile = "This mobile number is already assigned to a staff member.";
   }
-  if (!departments.some(item => item.id === data.department)) errors.department = "Select an available department.";
+
+  const selectedRole = roles?.find(r => String(r.id) === String(data.category));
+  const isClerk = selectedRole
+    ? selectedRole.label.toLowerCase().includes("clerk")
+    : (typeof data.category === "string" && data.category.toLowerCase().includes("clerk"));
+
+  if (!isClerk) {
+    if (!departments.some(item => item.id === data.department)) {
+      errors.department = "Select an available department.";
+    }
+  } else if (data.department && !departments.some(item => item.id === data.department)) {
+    errors.department = "Select an available department.";
+  }
+
   if (!roleIds.includes(String(data.category))) errors.category = "Select an available role.";
   if (!data.address.trim()) errors.address = "Enter the staff member's address.";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data.date_of_birth);

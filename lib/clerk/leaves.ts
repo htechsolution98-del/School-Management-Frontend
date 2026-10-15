@@ -263,6 +263,43 @@ export async function deleteLeaveType(id: number): Promise<void> {
   }
 }
 
+export interface BulkManageLeaveTypesPayload {
+  leave_template: number;
+  category_ids: number[];
+  name: string;
+  leave_type?: string;
+  code?: string;
+  leave_num: number;
+  allocation_count?: number;
+  allocation_period?: string;
+  is_paid?: boolean;
+  allow_encashment?: boolean;
+  is_carry_forward?: boolean;
+  carry_forward?: boolean;
+  max_carry_forward?: number;
+  existing_type_ids?: number[];
+}
+
+export async function bulkManageLeaveTypes(
+  payload: BulkManageLeaveTypesPayload
+): Promise<LeaveTypeRecord[]> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/leave-types/bulk-manage/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let message = "Failed to save leave types.";
+    try {
+      const err = await response.json();
+      message = err?.error || err?.detail || err?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+
 // ==========================================
 // Approval & Cancellation API Helpers
 // ==========================================
