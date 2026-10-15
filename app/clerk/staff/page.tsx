@@ -134,7 +134,7 @@ export default function ClerkStaffDashboard() {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy.current) return;
-    const fieldErrors = validateStaffRecord(form, staff, departments, roles.map(item => item.id), editing?.id);
+    const fieldErrors = validateStaffRecord(form, staff, departments, roles.map(item => item.id), editing?.id, undefined, roles);
     setErrors(fieldErrors); setError(""); setSuccess("");
     if (Object.keys(fieldErrors).length) { document.getElementById(`staff-${Object.keys(fieldErrors)[0]}`)?.focus(); return; }
     busy.current = true; setSaving(true);
@@ -151,6 +151,7 @@ export default function ClerkStaffDashboard() {
         date_of_birth: toApiDate(form.date_of_birth),
         joining_date: formattedJoiningDate,
         exit_date: formattedExitDate,
+        department: form.department ? Number(form.department) : null,
         attendance_setting: form.attendance_setting ? Number(form.attendance_setting) : null,
         leave_template: form.leave_template ? Number(form.leave_template) : null,
         salary_structure: form.salary_structure ? Number(form.salary_structure) : null,

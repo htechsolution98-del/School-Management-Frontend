@@ -128,7 +128,7 @@ export interface CreateStaffPayload {
   email: string;
   mobile: string;
   category: StaffCategory | string;
-  department?: number;
+  department?: number | null;
   designation?: string;
   attendance_setting?: number | null;
   leave_template?: number | null;

@@ -8,7 +8,6 @@ import {
   CalendarDays,
   Settings,
   CalendarCheck,
-  Banknote,
   ClipboardList,
   Banknote,
 } from "lucide-react";
