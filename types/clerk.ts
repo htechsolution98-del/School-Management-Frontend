@@ -8,9 +8,12 @@ export interface SchoolClass {
 export interface Division {
   id?: number;
   SchoolClass: number | null;
+  school_class?: number | null;
+  class_id?: number | null;
   class_name?: string;
   division: string;
   capacity: number | null;
+  student_capacity?: number | null;
   created_at?: string | null;
 }
 
