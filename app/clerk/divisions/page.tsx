@@ -186,6 +186,12 @@ export default function DivisionsPage() {
       return;
     }
 
+    const numClassId = parseInt(selectedClassId, 10);
+    if (isNaN(numClassId)) {
+      toast.error("Please select a valid class");
+      return;
+    }
+
     const numCapacity = parseInt(capacity, 10);
     if (isNaN(numCapacity) || numCapacity <= 0 || !Number.isInteger(parseFloat(capacity))) {
       toast.error("Capacity must be a positive integer");
@@ -195,9 +201,12 @@ export default function DivisionsPage() {
     setIsSaving(true);
     try {
       const payload: Division = {
-        SchoolClass: parseInt(selectedClassId),
+        SchoolClass: numClassId,
+        school_class: numClassId,
+        class_id: numClassId,
         division: trimmedDivision,
         capacity: numCapacity,
+        student_capacity: numCapacity,
       };
 
       await saveDivision(payload);
@@ -257,9 +266,16 @@ export default function DivisionsPage() {
 
     setIsUpdating(true);
     try {
+      const numClass =
+        editTarget.SchoolClass !== null && editTarget.SchoolClass !== undefined
+          ? parseInt(String(editTarget.SchoolClass), 10)
+          : null;
+
       await updateDivision(editTarget.id, {
         capacity: num,
-        SchoolClass: editTarget.SchoolClass,
+        student_capacity: num,
+        SchoolClass: numClass,
+        school_class: numClass,
         division: editTarget.division,
       });
       toast.success(

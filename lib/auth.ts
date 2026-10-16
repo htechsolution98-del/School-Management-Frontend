@@ -23,6 +23,44 @@ const COOKIE_SAME_SITE = "SameSite=Lax";
  */
 export const API_ERROR_TOAST_ID = "api-error";
 
+export function extractErrorMessage(data: unknown, fallback = "Request failed"): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const msg = extractErrorMessage(item, "");
+      if (msg && msg !== "[object Object]") {
+        return msg;
+      }
+    }
+    return fallback;
+  }
+
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (typeof obj.message === "string" && obj.message) return obj.message;
+    if (typeof obj.detail === "string" && obj.detail) return obj.detail;
+    if (typeof obj.error === "string" && obj.error) return obj.error;
+
+    for (const [key, val] of Object.entries(obj)) {
+      if (typeof val === "string") {
+        return key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${val}` : val;
+      }
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === "string") {
+        const text = val.join(" ");
+        return key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${text}` : text;
+      }
+      const nested = extractErrorMessage(val, "");
+      if (nested && nested !== "[object Object]") {
+        return nested;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const { headers, body, ...rest } = init;
   const isFormData = body instanceof FormData;
@@ -50,22 +88,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
         });
       } else {
         const errData = await response.clone().json();
-        let errorDesc = "Request failed";
-        
-        if (errData.message) {
-          errorDesc = String(errData.message);
-        } else if (errData.detail) {
-          errorDesc = String(errData.detail);
-        } else if (errData.error) {
-          errorDesc = String(errData.error);
-        } else if (typeof errData === "object" && errData !== null) {
-           // It might be a DRF field-level error object e.g. {"email": ["already exists"]}
-           const firstKey = Object.keys(errData)[0];
-           if (firstKey) {
-             const firstVal = errData[firstKey];
-             errorDesc = Array.isArray(firstVal) ? String(firstVal[0]) : String(firstVal);
-           }
-        }
+        const errorDesc = extractErrorMessage(errData, "Request failed");
         
         if (!errorDesc.includes("Refresh token is required")) {
           toast.error("Error", { id: API_ERROR_TOAST_ID, description: errorDesc });
