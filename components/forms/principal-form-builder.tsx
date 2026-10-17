@@ -36,6 +36,7 @@ import {
   getMainAcademicYear,
   type SchoolClass,
 } from "@/lib/principal";
+import { extractErrorMessage } from "@/lib/auth";
 import {
   createConfiguredField,
   DOCUMENT_FIELD_TEMPLATES,
@@ -200,9 +201,17 @@ function toPayloadFields(
       const validOptions = isSelect
         ? field.options.filter((option) => option.label && option.value)
         : [];
+
+      // Backend FormField choices: 'text', 'number', 'date', 'select', 'checkbox', 'radio'
+      // Map 'email', 'tel', 'textarea' or other non-backend types to 'text'
+      const backendFieldType: BuilderFieldType =
+        field.type === "email" || field.type === "tel" || field.type === "textarea"
+          ? "text"
+          : field.type;
+
       return {
         label: field.label.trim(),
-        field_type: field.type,
+        field_type: backendFieldType,
         required: field.required,
         is_required: field.required,
         order: index + 1,
@@ -620,7 +629,11 @@ export default function PrincipalFormBuilder({
       setCreatedForm(response);
       onSuccess?.(response);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to create admission form");
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : extractErrorMessage(error, "Failed to create admission form")
+      );
     } finally {
       setIsSubmitting(false);
     }
