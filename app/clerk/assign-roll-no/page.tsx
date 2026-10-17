@@ -57,8 +57,11 @@ export default function AssignRollNoPage() {
 
   // Filters
   const [selectedClassId, setSelectedClassId] = useState<string>("");
-  const [selectedDivFilter, setSelectedDivFilter] = useState<string>("ALL");
+  const [selectedDivFilter, setSelectedDivFilter] = useState<string>("");
   const [sortMode, setSortMode] = useState<SortMode>("NAME_ASC");
+
+  const isDivisionSelected = Boolean(selectedDivFilter && selectedDivFilter.trim() !== "" && selectedDivFilter !== "ALL");
+  const isSelectionValid = Boolean(selectedClassId && isDivisionSelected);
 
   // Fetch initial classes & divisions
   const loadInitialData = async () => {
@@ -86,9 +89,18 @@ export default function AssignRollNoPage() {
     loadInitialData();
   }, []);
 
+  const handleClassChange = (newClassId: string | null) => {
+    setSelectedClassId(newClassId || "");
+    setSelectedDivFilter("");
+    setStudents([]);
+  };
+
   // Fetch Students whenever Class or Division selection changes
   const loadStudents = async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !isDivisionSelected) {
+      setStudents([]);
+      return;
+    }
     setIsLoading(true);
     try {
       const data = await fetchStudentsByClassAndDivision(selectedClassId, selectedDivFilter);
@@ -106,8 +118,10 @@ export default function AssignRollNoPage() {
   };
 
   useEffect(() => {
-    if (selectedClassId) {
+    if (selectedClassId && isDivisionSelected) {
       loadStudents();
+    } else {
+      setStudents([]);
     }
   }, [selectedClassId, selectedDivFilter]);
 
@@ -204,20 +218,23 @@ export default function AssignRollNoPage() {
 
   // ⚡ Auto-Generate Unique Roll Numbers (1 to N per division) based on current sort order
   const handleAutoGenerate = () => {
+    if (!selectedClassId) {
+      toast.error("Please select a class before assigning roll numbers.");
+      return;
+    }
+    if (!isDivisionSelected) {
+      toast.error("Please select a division before assigning roll numbers.");
+      return;
+    }
     if (processedStudents.length === 0) {
-      toast.error("No students found to generate roll numbers.");
+      toast.error("No students found in this division to generate roll numbers.");
       return;
     }
 
-    // Create a map of student ID to assigned sequential roll number per division
+    // Assign sequential roll numbers (1 to N) for this division based on current sort order
     const rollMap = new Map<number, string>();
-    const divCounters = new Map<string, number>();
-
-    processedStudents.forEach((st) => {
-      const divKey = (st.division || "ALL").trim().toUpperCase();
-      const current = (divCounters.get(divKey) || 0) + 1;
-      divCounters.set(divKey, current);
-      rollMap.set(st.id, String(current));
+    processedStudents.forEach((st, idx) => {
+      rollMap.set(st.id, String(idx + 1));
     });
 
     setStudents((prev) =>
@@ -235,7 +252,7 @@ export default function AssignRollNoPage() {
     );
 
     toast.success(
-      `⚡ Auto-generated sequential Roll Numbers (starting from 1 per division) based on ${
+      `⚡ Auto-generated sequential Roll Numbers (1 to ${processedStudents.length}) for Division ${selectedDivFilter} based on ${
         sortMode === "NAME_ASC" ? "Alphabetical Order" : "GR Number"
       }!`
     );
@@ -255,9 +272,17 @@ export default function AssignRollNoPage() {
 
   // Save all modified roll numbers to backend
   const handleSave = async () => {
+    if (!selectedClassId) {
+      toast.error("Please select a class before saving roll numbers.");
+      return;
+    }
+    if (!isDivisionSelected) {
+      toast.error("Please select a division before assigning roll numbers.");
+      return;
+    }
     if (hasDuplicates) {
       toast.error(
-        `Duplicate Roll Number(s) detected in the same division! Each student in the same division must have a unique Roll Number.`
+        `Duplicate Roll Number(s) detected in Division ${selectedDivFilter}! Each student in the same division must have a unique Roll Number.`
       );
       return;
     }
@@ -276,7 +301,7 @@ export default function AssignRollNoPage() {
         roll_no: s.tempRollNo.trim() ? s.tempRollNo.trim() : null,
       }));
 
-      const res = await bulkSaveRollNumbers(payload);
+      const res = await bulkSaveRollNumbers(payload, selectedDivFilter);
       toast.success(`🎉 ${res.message || "Roll numbers saved successfully!"}`);
 
       // Refresh student list from server
@@ -296,7 +321,7 @@ export default function AssignRollNoPage() {
     }
 
     const classNameStr = currentClassObj?.school_class || "Class";
-    const divStr = selectedDivFilter === "ALL" ? "All_Divisions" : `Div_${selectedDivFilter}`;
+    const divStr = selectedDivFilter ? `Div_${selectedDivFilter}` : "No_Division";
 
     const headers = ["Roll No", "GR Number", "Student Name", "Class", "Division", "Mobile"];
     const rows = processedStudents.map((s) => [
@@ -393,9 +418,7 @@ export default function AssignRollNoPage() {
           <CardContent className="space-y-3">
             <Select
               value={selectedClassId}
-              onValueChange={(val) => {
-                if (val) setSelectedClassId(val);
-              }}
+              onValueChange={handleClassChange}
             >
               <SelectTrigger className="w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-bold text-xs">
                 <SelectValue placeholder="Select Class...">
@@ -442,21 +465,42 @@ export default function AssignRollNoPage() {
               {/* Select Division */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-                  <Layers className="h-3.5 w-3.5 text-indigo-600" /> Division:
+                  <Layers className="h-3.5 w-3.5 text-indigo-600" /> Division: <span className="text-red-500">*</span>
                 </label>
-                <Select value={selectedDivFilter} onValueChange={(val) => setSelectedDivFilter(val || "ALL")}>
-                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs">
-                    <SelectValue placeholder="All Divisions" />
+                <Select
+                  value={selectedDivFilter}
+                  onValueChange={(val) => setSelectedDivFilter(val || "")}
+                  disabled={!selectedClassId || divNames.length === 0}
+                >
+                  <SelectTrigger
+                    className={`w-full h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/60 font-medium text-xs transition-colors ${
+                      !isDivisionSelected
+                        ? "border-amber-400 dark:border-amber-600 ring-1 ring-amber-400/40"
+                        : "border-slate-200 dark:border-zinc-700"
+                    }`}
+                  >
+                    <SelectValue placeholder={!selectedClassId ? "Select a class first..." : divNames.length === 0 ? "No divisions created" : "Select Division (Required)..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Divisions</SelectItem>
-                    {divNames.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        Division {d}
+                    {divNames.length === 0 ? (
+                      <SelectItem value="__none__" disabled>
+                        No divisions found for this class
                       </SelectItem>
-                    ))}
+                    ) : (
+                      divNames.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          Division {d}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {!isDivisionSelected && selectedClassId && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    Please select a division before assigning roll numbers.
+                  </p>
+                )}
               </div>
 
               {/* Sort Order */}
@@ -497,8 +541,13 @@ export default function AssignRollNoPage() {
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <Button
                   onClick={handleAutoGenerate}
-                  disabled={isLoading || students.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl gap-2 h-9 px-4 shadow-sm"
+                  disabled={isLoading || !isSelectionValid || students.length === 0}
+                  title={!isDivisionSelected ? "Please select a division before assigning roll numbers." : undefined}
+                  className={`font-bold text-xs rounded-xl gap-2 h-9 px-4 shadow-sm transition-all ${
+                    !isSelectionValid || students.length === 0
+                      ? "bg-slate-200 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
                 >
                   <Sparkles className="h-4 w-4 text-amber-300" />
                   Auto-Generate Roll Nos
@@ -507,13 +556,12 @@ export default function AssignRollNoPage() {
                 <Button
                   size="sm"
                   onClick={handleSave}
-                  disabled={isSaving || modifiedCount === 0 || hasDuplicates}
-                  className={`rounded-xl text-xs gap-1.5 font-bold h-9 px-4 shadow-sm ${
-                    hasDuplicates
+                  disabled={isSaving || !isSelectionValid || modifiedCount === 0 || hasDuplicates}
+                  title={!isDivisionSelected ? "Please select a division before assigning roll numbers." : undefined}
+                  className={`rounded-xl text-xs gap-1.5 font-bold h-9 px-4 shadow-sm transition-all ${
+                    hasDuplicates || !isSelectionValid || modifiedCount === 0
                       ? "bg-zinc-300 text-zinc-600 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500"
-                      : modifiedCount > 0
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "bg-slate-200 text-slate-500 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
                   }`}
                 >
                   {isSaving ? (
@@ -539,7 +587,7 @@ export default function AssignRollNoPage() {
             </CardTitle>
             <CardDescription className="text-xs">
               Showing students for {currentClassObj?.school_class || "selected class"}{" "}
-              {selectedDivFilter !== "ALL" ? `(Division ${selectedDivFilter})` : "(All Divisions)"}
+              {isDivisionSelected ? `(Division ${selectedDivFilter})` : "(No division selected)"}
             </CardDescription>
           </div>
 
@@ -568,7 +616,23 @@ export default function AssignRollNoPage() {
         </CardHeader>
 
         <CardContent className="p-0 overflow-hidden">
-          {isLoading ? (
+          {!isSelectionValid ? (
+            <div className="py-16 text-center space-y-3 p-6">
+              <div className="h-12 w-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
+                  {!selectedClassId ? "Please Select a Class" : "Please Select a Division"}
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  {!selectedClassId
+                    ? "Choose a class above to view available divisions and students."
+                    : "Division selection is required before generating or assigning roll numbers. Please choose a division above."}
+                </p>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="py-16 text-center">
               <Loader2 className="h-7 w-7 text-indigo-600 animate-spin mx-auto mb-2" />
               <p className="text-xs text-muted-foreground font-medium">Loading student roster...</p>
@@ -576,9 +640,11 @@ export default function AssignRollNoPage() {
           ) : processedStudents.length === 0 ? (
             <div className="py-14 text-center space-y-2 p-4">
               <Users className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">No students found for the selected Class/Division filter</p>
+              <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                No students found in Division {selectedDivFilter}
+              </p>
               <p className="text-[11px] text-slate-400">
-                Please select another class or adjust your search filter.
+                Students must first be assigned to this division under &quot;Assign Division&quot; before assigning roll numbers.
               </p>
             </div>
           ) : (

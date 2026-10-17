@@ -59,7 +59,13 @@ export async function readAdmissionWorkbook(file: File, form: AdmissionConfig): 
     errors.push(...Object.values(validateAdmissionValues(fields, values)));
     for (const key of admissionIdentityKeys(form, values)) {
       const previous = seen.get(key);
-      if (previous && !errors.some(error => error.startsWith("Duplicate"))) errors.push(`Duplicate student in row ${previous}`);
+      if (previous && !errors.some(error => error.startsWith("Duplicate"))) {
+        if (key.startsWith("aadhaar:")) {
+          errors.push(`Duplicate Aadhaar number in row ${previous}`);
+        } else {
+          errors.push(`Duplicate student in row ${previous}`);
+        }
+      }
       if (!previous) seen.set(key, rowNumber);
     }
     rows.push({ rowNumber, values, errors, status: errors.length ? "invalid" : "ready", documents: {} });
