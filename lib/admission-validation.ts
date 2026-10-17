@@ -22,6 +22,7 @@ export const isBirthField = (field: AdmissionField) => field.map_to_student_fiel
 export const isClassField = (field: AdmissionField) => field.map_to_student_field === "school_class" || /^(applying for |admission |school )?(class|standard|grade)\b/i.test(field.label);
 export const isPhoneField = (field: AdmissionField) => field.field_type === "tel" || /mobile|phone|contact.number|whatsapp/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isEmailField = (field: AdmissionField) => field.field_type === "email" || /email|e-mail/i.test(`${field.label} ${field.map_to_student_field || ""}`);
+export const AADHAAR_DUPLICATE_ERROR = "A student with this Aadhaar number already exists.";
 export const isAadhaarAdmissionField = (field: AdmissionField) => /aadh?aar|aadhar/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isUdiseAdmissionField = (field: AdmissionField) => /udise|udisecode|udise_code/i.test(`${field.label} ${field.map_to_student_field || ""}`);
 export const isAbcAdmissionField = (field: AdmissionField) => /\b(abc|abc_id|apaar|apaar_id)\b/i.test(`${field.label} ${field.map_to_student_field || ""}`);

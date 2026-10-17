@@ -46,19 +46,27 @@ export async function fetchStudentsByClassAndDivision(
 }
 
 export async function bulkSaveRollNumbers(
-  assignments: { student_id?: number; admission_number?: string; roll_no: string | null }[]
+  assignments: { student_id?: number; admission_number?: string; roll_no: string | null }[],
+  division: string
 ): Promise<{ message: string; updated_count: number }> {
+  if (!division || division.trim() === "" || division.trim().toUpperCase() === "ALL") {
+    throw new Error("Division is required to assign roll numbers.");
+  }
+
   const response = await fetchWithAuth(`${API_BASE_URL}/assign-roll-numbers/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ assignments }),
+    body: JSON.stringify({ assignments, division: division.trim() }),
   });
 
   if (!response.ok) {
     let message = "Failed to save roll numbers.";
     try {
       const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const fieldErrors = Object.values(err || {})
+        .flat()
+        .filter((value): value is string => typeof value === "string");
+      message = err?.detail || err?.message || err?.error || fieldErrors[0] || message;
     } catch {}
     throw new Error(message);
   }

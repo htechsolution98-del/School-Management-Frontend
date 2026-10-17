@@ -31,7 +31,6 @@ const sidebarLinks = [
     subLinks: [
       { title: "Staff Directory & Reports", href: "/trustee/staff-management", icon: Users },
       { title: "+ Add / Manage Staff", href: "/trustee/staff", icon: UserPlus },
-      { title: "Staff Active / Deactive", href: "/trustee/staff-status", icon: UserCheck },
       { title: "Leave & Approvals", href: "/trustee/leave-requests", icon: CalendarCheck },
     ],
   },

@@ -50,7 +50,8 @@ import { toast } from "sonner";
 
 import { AdmissionFieldInput } from "@/components/clerk/admission-field";
 import { BulkAdmissionImport } from "@/components/clerk/bulk-admission-import";
-import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
+import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, isAadhaarAdmissionField, AADHAAR_DUPLICATE_ERROR, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
+import { checkAadhaarUnique } from "@/lib/student-profile-validation";
 import { submitAdmission } from "@/lib/clerk/admission-submit";
 import "../clerk-workspace.css";
 
@@ -560,6 +561,20 @@ export default function ManualAdmissionPage() {
     });
 
     if (errorMsg) setErrorMsg("");
+
+    if (isAadhaarAdmissionField(field)) {
+      const clean = String(processedValue || "").replace(/[\s-]/g, "").trim();
+      if (/^\d{12}$/.test(clean)) {
+        checkAadhaarUnique(clean).then((res) => {
+          if (!res.isUnique) {
+            setFieldErrors((prev) => ({
+              ...prev,
+              [field.id]: res.message || AADHAAR_DUPLICATE_ERROR,
+            }));
+          }
+        });
+      }
+    }
   };
 
   const handleFileChange = (docFieldId: number, file: File | null): boolean => {
@@ -642,6 +657,25 @@ export default function ManualAdmissionPage() {
       }
     }
 
+    // Check Aadhaar uniqueness across all fields
+    for (const sec of activeForm.sections || []) {
+      for (const f of sec.fields || []) {
+        if (isAadhaarAdmissionField(f) && dynamicValues[f.id]) {
+          const rawAadhaar = String(dynamicValues[f.id]).replace(/[\s-]/g, "").trim();
+          if (rawAadhaar && /^\d{12}$/.test(rawAadhaar)) {
+            const uniqueCheck = await checkAadhaarUnique(rawAadhaar);
+            if (!uniqueCheck.isUnique) {
+              const msg = uniqueCheck.message || AADHAAR_DUPLICATE_ERROR;
+              newErrors[f.id] = msg;
+              if (firstErrorFieldId === null) {
+                firstErrorFieldId = f.id;
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setFieldErrors(newErrors);
       setErrorMsg("Please fix the highlighted errors before submitting.");
@@ -703,8 +737,20 @@ export default function ManualAdmissionPage() {
         });
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Something went wrong during submission.");
-      toast.error(err.message || "Submission failed.");
+      const msg = err.message || "Something went wrong during submission.";
+      if (/aadhaar/i.test(msg) && /already exists/i.test(msg)) {
+        const aadhaarField = admissionFields(activeForm).find(isAadhaarAdmissionField);
+        if (aadhaarField) {
+          setFieldErrors((prev) => ({ ...prev, [aadhaarField.id]: AADHAAR_DUPLICATE_ERROR }));
+          const el = document.getElementById(`field-input-${aadhaarField.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.focus();
+          }
+        }
+      }
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       submissionLock.current = false;
       setSubmitting(false);
