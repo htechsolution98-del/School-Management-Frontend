@@ -19,7 +19,7 @@ function Input({ className, type, suppressHydrationWarning = true, ...props }: R
         min={props.min != null ? String(props.min) : undefined}
         max={props.max != null ? String(props.max) : undefined}
         aria-label={props["aria-label"]}
-        aria-invalid={props["aria-invalid"]}
+        aria-invalid={props["aria-invalid"] === true || props["aria-invalid"] === "true" ? true : undefined}
         aria-describedby={props["aria-describedby"]}
         onChange={(val: string) => {
           if (props.onChange) {
