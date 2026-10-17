@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, Printer, RefreshCw, UserPlus, Users } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getStaffReport, type StaffReport, type StaffReportRow } from "@/lib/trustee-staff-report";
 
@@ -132,8 +133,8 @@ export default function TrusteeStaffManagementPage() {
       <label className="text-xs font-medium">Staff category<select className={control} value={draft.category} onChange={event => setDraft({ ...draft, category: event.target.value })}><option value="">All categories</option>{report?.options.categories.map(c => <option key={c}>{c}</option>)}</select></label>
       <label className="text-xs font-medium">Employment status<select className={control} value={draft.employment_status} onChange={event => setDraft({ ...draft, employment_status: event.target.value })}><option value="">All statuses</option>{["active", "inactive", "exited", "not_exited"].map(state => <option key={state} value={state}>{human(state)}</option>)}</select></label>
       <label className="text-xs font-medium">Individual staff<select className={control} value={draft.staff} onChange={event => setDraft({ ...draft, staff: event.target.value })}><option value="">All staff</option>{report?.options.staff.map(m => <option key={m.id} value={m.id}>#{m.id} · {m.name}</option>)}</select></label>
-      <label className="text-xs font-medium">Activity from<input className={control} type="date" value={draft.from_date} onChange={event => setDraft({ ...draft, from_date: event.target.value })} /></label>
-      <label className="text-xs font-medium">Activity to<input className={control} type="date" value={draft.to_date} onChange={event => setDraft({ ...draft, to_date: event.target.value })} /></label>
+      <label className="text-xs font-medium">Activity from<DatePicker className="w-full" value={draft.from_date} onChange={date => setDraft({ ...draft, from_date: date })} disableFuture={true} /></label>
+      <label className="text-xs font-medium">Activity to<DatePicker className="w-full" value={draft.to_date} onChange={date => setDraft({ ...draft, to_date: date })} min={draft.from_date || undefined} disableFuture={true} /></label>
       <label className="text-xs font-medium sm:col-span-2">Search staff<input className={control} placeholder="Staff ID, name, designation or category" value={draft.search} onChange={event => setDraft({ ...draft, search: event.target.value })} /></label>
       <label className="text-xs font-medium">Staff sorting<select className={control} value={draft.ordering} onChange={event => setDraft({ ...draft, ordering: event.target.value })}>{["name", "joining_date", "department", "attendance_percentage"].flatMap(key => [<option key={key} value={key}>{human(key)} ↑</option>, <option key={`-${key}`} value={`-${key}`}>{human(key)} ↓</option>])}</select></label>
       <div className="flex items-end gap-2"><Button type="submit" disabled={loading || exporting}>Apply filters</Button><Button type="button" variant="outline" disabled={loading || exporting} onClick={() => { setDraft(defaults); apply(defaults); }}>Reset</Button></div>

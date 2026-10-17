@@ -202,6 +202,27 @@
   background-color: rgba(40, 94, 137, 0.6);
 }
 
+/* School list sleek scrollbar */
+.school-list-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: #CBD5E1 transparent !important;
+}
+.school-list-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+.school-list-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.school-list-scroll::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1 !important;
+  border-radius: 9999px !important;
+}
+.school-list-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #94A3B8 !important;
+}
+
 /* Hide scrollbars utility while retaining scroll functionality */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */

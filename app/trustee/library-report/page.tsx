@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Download, RefreshCw } from "lucide-react";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { getTrusteeLibraryReport, type TrusteeLibraryReport, type LibraryStockRow, type LibraryCopyRow, type LibraryLoanRow, type LibraryBorrowerRow, type LibraryDailyRow } from "@/lib/trustee-library-report";
 
 const money = (value: string | number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(value));
@@ -93,8 +94,8 @@ export default function LibraryReportPage() {
   return <div className="mx-auto max-w-[1600px] space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-6 text-white"><div><p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-100"><BookOpen className="h-4 w-4" />Trustee library oversight</p><h1 className="text-2xl font-bold">Library Report</h1><p className="mt-2 text-sm text-teal-100">Books, circulation, overdue loans and stock valuation for {report?.school || "your school"}.</p></div><Button variant="outline" disabled={loading} onClick={() => setRefresh(value => value + 1)} className="bg-white text-teal-900"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button></div>
     <form onSubmit={event => { event.preventDefault(); setPage(1); setApplied({ ...draft }); }} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 xl:grid-cols-4">
-      <label className="space-y-1 text-xs font-medium">Issued from<input type="date" value={draft.from_date} onChange={event => setDraft({ ...draft, from_date: event.target.value })} className={control} /></label>
-      <label className="space-y-1 text-xs font-medium">Issued to<input type="date" value={draft.to_date} onChange={event => setDraft({ ...draft, to_date: event.target.value })} className={control} /></label>
+      <label className="space-y-1 text-xs font-medium">Issued from<DatePicker value={draft.from_date} onChange={date => setDraft({ ...draft, from_date: date })} className="w-full" disableFuture={true} /></label>
+      <label className="space-y-1 text-xs font-medium">Issued to<DatePicker value={draft.to_date} onChange={date => setDraft({ ...draft, to_date: date })} min={draft.from_date || undefined} className="w-full" disableFuture={true} /></label>
       <label className="space-y-1 text-xs font-medium">Book<select value={draft.book} onChange={event => setDraft({ ...draft, book: event.target.value })} className={control}><option value="">All books</option>{report?.options.books.map(book => <option key={book.id} value={book.id}>{book.title}</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium">Category<select value={draft.category} onChange={event => setDraft({ ...draft, category: event.target.value })} className={control}><option value="">All categories</option>{report?.options.categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium">Title / author / ISBN<input value={draft.search} onChange={event => setDraft({ ...draft, search: event.target.value })} className={control} /></label>

@@ -38,9 +38,9 @@ export function DemographicsChart({
   const otherStroke = totalStudents > 0 ? (otherGender / totalStudents) * circumference : 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between">
-      <div>
-        <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between h-full">
+      <div className="flex-1 flex flex-col">
+        <div className="shrink-0 flex items-center justify-between gap-3 mb-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600 shadow-2xs">
@@ -201,7 +201,7 @@ export function DemographicsChart({
         )}
       </div>
 
-      <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+      <div className="shrink-0 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
         <span>Cross-institutional demographic balance</span>
         <span className="font-bold text-slate-900">{totalStudents} Total Enrolled</span>
       </div>

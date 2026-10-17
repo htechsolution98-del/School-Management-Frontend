@@ -343,7 +343,7 @@ export async function deleteSchool(id: number): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to delete school.");
+    throw await apiValidationError(response, "Failed to delete school.");
   }
 }
 

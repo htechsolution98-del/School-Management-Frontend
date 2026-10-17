@@ -88,6 +88,7 @@ export interface SchoolInvoice {
   school_name: string;
   school_code: string;
   subscription?: number;
+  plan_name?: string;
   invoice_number: string;
   billing_model: "FLAT" | "PER_STUDENT";
   billing_cycle: string;
@@ -253,6 +254,7 @@ export async function checkoutCalculate(payload: {
   school_id?: number;
   plan_id?: number;
   billing_cycle?: string;
+  months_count?: number;
   custom_student_count?: number;
   discount_amount?: number;
 }) {
@@ -262,6 +264,64 @@ export async function checkoutCalculate(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to calculate checkout billing");
+  return res.json();
+}
+
+export async function createRazorpayOrder(payload: {
+  school_id?: number;
+  plan_id?: number;
+  billing_cycle?: string;
+  months_count?: number;
+}): Promise<{
+  order_id: string;
+  amount: number;
+  currency: string;
+  key: string;
+  payment_id: string;
+  invoice_number: string;
+  months_count: number;
+  current_due_date: string;
+  new_due_date: string;
+  expanded_days: number;
+}> {
+  const res = await fetch(
+    `${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PAYMENTS}create-razorpay-order/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || "Failed to create Razorpay payment order");
+  }
+  return res.json();
+}
+
+export async function verifyRazorpayPayment(payload: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<{
+  message: string;
+  new_due_date: string;
+  days_left: number;
+  months_added: number;
+  invoice_number: string;
+}> {
+  const res = await fetch(
+    `${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PAYMENTS}verify-razorpay-payment/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || "Failed to verify Razorpay payment");
+  }
   return res.json();
 }
 
@@ -298,13 +358,13 @@ export async function generateSchoolInvoice(subscriptionId: number) {
 
 export async function recordSubscriptionPayment(
   subscriptionId: number,
-
   payload: {
     plan_id?: number;
     amount?: number;
     payment_method?: string;
     payment_reference?: string;
     billing_cycle?: string;
+    months_count?: number;
     next_due_date?: string;
     discount_amount?: number;
     notes?: string;
@@ -384,6 +444,15 @@ export async function markInvoicePaid(invoiceId: number, payload?: { payment_met
   return res.json();
 }
 
+export async function deleteSchoolInvoice(invoiceId: number) {
+  const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.INVOICES}${invoiceId}/`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to remove pending invoice");
+  return true;
+}
+
 export async function getSubscriptionPayments(): Promise<SubscriptionPayment[]> {
   const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PAYMENTS}`, {
     headers: getAuthHeaders(),
@@ -418,4 +487,51 @@ export async function updateSaaSGlobalSettings(settingsDict: Record<string, stri
   });
   if (!res.ok) throw new Error("Failed to update global SaaS settings");
   return res.json();
+}
+
+/**
+ * Safely parses any date format (DD-MM-YYYY, YYYY-MM-DD, ISO-8601).
+ * DRF uses DD-MM-YYYY which standard Date() cannot parse in V8.
+ */
+export function parseDateSafe(dateStr?: string | null): Date | null {
+  if (!dateStr) return null;
+  const str = String(dateStr).trim();
+  if (/^\d{1,2}-\d{1,2}-\d{4}/.test(str)) {
+    const parts = str.split("T")[0].split(" ")[0].split("-");
+    const day = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const year = Number(parts[2]);
+    const d = new Date(year, month, day);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function formatDateSafe(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  const d = parseDateSafe(dateStr);
+  if (!d) return String(dateStr);
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function formatDateTimeSafe(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  const str = String(dateStr).trim();
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(str)) {
+    return formatDateSafe(str);
+  }
+  const d = parseDateSafe(dateStr);
+  if (!d) return String(dateStr);
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

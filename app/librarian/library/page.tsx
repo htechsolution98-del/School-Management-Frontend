@@ -51,6 +51,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Book,
   BookIssued,
@@ -5982,12 +5983,10 @@ export default function LibrarianDashboard() {
               {/* STEP 3: DUE DATE */}
               <div className="space-y-1">
                 <Label className="text-xs font-semibold">Custom Due Date (Optional)</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   min={new Date().toISOString().split("T")[0]}
                   value={issueForm.due_date}
-                  onChange={(e) => {
-                    const val = e.target.value;
+                  onChange={(val) => {
                     setIssueForm({ ...issueForm, due_date: val });
                     const todayStr = new Date().toISOString().split("T")[0];
                     if (val && val < todayStr) {
