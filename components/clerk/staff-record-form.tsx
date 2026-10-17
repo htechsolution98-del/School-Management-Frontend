@@ -21,6 +21,8 @@ export function StaffRecordForm({
   salaryStructures = [],
   editing,
   saving,
+  readOnly = false,
+  onEdit,
   onSubmit,
   onClose,
 }: {
@@ -34,6 +36,8 @@ export function StaffRecordForm({
   salaryStructures?: SalaryStructure[];
   editing: boolean;
   saving: boolean;
+  readOnly?: boolean;
+  onEdit?: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onClose: () => void;
 }) {
@@ -46,10 +50,43 @@ export function StaffRecordForm({
   const isDepartmentRequired = !isClerk;
   const attrs = (field: keyof CreateStaffPayload) => ({ id: `staff-${field}`, "aria-invalid": !!errors[field], "aria-describedby": errors[field] ? `staff-${field}-error` : undefined });
   const error = (field: keyof CreateStaffPayload) => errors[field] && <p id={`staff-${field}-error`} className="hr-field-error">{errors[field]}</p>;
+
+  const handleExitDateChange = (date: string) => {
+    onChange("exit_date", date);
+    if (!date || !date.trim()) {
+      onChange("is_active", true);
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const parts = date.split("-");
+      if (parts.length === 3) {
+        const exitD = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (exitD <= today) {
+          onChange("is_active", false);
+        } else {
+          onChange("is_active", true);
+        }
+      }
+    }
+  };
+
   return <section className="hr-panel hr-staff-form">
-    <div className="hr-panel-heading"><div><h2>{editing ? "Edit staff record" : "Add a staff member"}</h2><p>Personal details, employment information, and policy assignments. All marked fields are required.</p></div><Button type="button" variant="ghost" size="icon" aria-label="Close staff form" disabled={saving} onClick={onClose}><X size={17} /></Button></div>
+    <div className="hr-panel-heading">
+      <div>
+        <h2>{readOnly ? "View staff record" : editing ? "Edit staff record" : "Add a staff member"}</h2>
+        <p>{readOnly ? "Viewing details of inactive / past staff member. This record is read-only." : "Personal details, employment information, and policy assignments. All marked fields are required."}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        {readOnly && onEdit && (
+          <Button type="button" variant="outline" size="sm" onClick={onEdit} className="text-xs">
+            Edit record
+          </Button>
+        )}
+        <Button type="button" variant="ghost" size="icon" aria-label="Close staff form" disabled={saving} onClick={onClose}><X size={17} /></Button>
+      </div>
+    </div>
     <form onSubmit={onSubmit} noValidate>
-      <fieldset disabled={saving} className="space-y-6">
+      <fieldset disabled={saving || readOnly} className="space-y-6">
         {Object.keys(errors).length > 0 && <p role="alert" className="hr-error">Please correct the highlighted fields before saving.</p>}
         <div className="hr-form-section"><div><span>01</span><h3>Personal information</h3><p>Basic identity and contact details.</p></div><div className="hr-form-fields">
           <div><label htmlFor="staff-name">Full name</label><Input {...attrs("name")} value={value.name} minLength={2} maxLength={100} autoComplete="name" placeholder="e.g. Neha Patel (min. 2 characters)" onChange={e => onChange("name", e.target.value)} required />{error("name")}</div>
@@ -62,7 +99,7 @@ export function StaffRecordForm({
           <div><label htmlFor="staff-department">Department {isDepartmentRequired && <span className="text-red-500">*</span>}</label><select {...attrs("department")} value={value.department ?? ""} onChange={e => onChange("department", e.target.value ? Number(e.target.value) : undefined)} required={isDepartmentRequired}><option value="">Select department{isDepartmentRequired ? "" : " (Optional)"}</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("department")}</div>
           <div><label htmlFor="staff-category">Role</label><select {...attrs("category")} value={value.category} onChange={e => onChange("category", e.target.value)} required><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}</select>{error("category")}</div>
           <div><label htmlFor="staff-joining_date">Joining date</label><DatePicker {...attrs("joining_date")} value={value.joining_date ?? ""} onChange={date => onChange("joining_date", date)} className="w-full" />{error("joining_date")}</div>
-          <div><label htmlFor="staff-exit_date">Exit date (Last working date)</label><DatePicker {...attrs("exit_date")} value={value.exit_date ?? ""} onChange={date => onChange("exit_date", date)} className="w-full" />{error("exit_date")}</div>
+          <div><label htmlFor="staff-exit_date">Exit date (Last working date)</label><DatePicker {...attrs("exit_date")} value={value.exit_date ?? ""} onChange={handleExitDateChange} className="w-full" />{error("exit_date")}</div>
           <div><label htmlFor="staff-salary">Monthly salary (INR)</label><Input {...attrs("salary")} type="number" min="0" max="99999999.99" step="0.01" inputMode="decimal" value={value.salary} placeholder="0.00" onChange={e => onChange("salary", e.target.value)} required />{error("salary")}</div>
           <div><label htmlFor="staff-is_active">Employment status</label><select {...attrs("is_active")} value={String(value.is_active)} onChange={e => onChange("is_active", e.target.value === "true")}><option value="true">Active</option><option value="false">Inactive</option></select>{error("is_active")}</div>
           <div>
@@ -114,7 +151,16 @@ export function StaffRecordForm({
             {error("salary_structure")}
           </div>
         </div></div>
-        <div className="hr-form-footer"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" className="office-primary">{saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}{saving ? "Saving..." : editing ? "Save changes" : "Create staff member"}</Button></div>
+        <div className="hr-form-footer">
+          {readOnly ? (
+            <Button type="button" variant="outline" onClick={onClose}>Close</Button>
+          ) : (
+            <>
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" className="office-primary">{saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}{saving ? "Saving..." : editing ? "Save changes" : "Create staff member"}</Button>
+            </>
+          )}
+        </div>
       </fieldset>
     </form>
   </section>;

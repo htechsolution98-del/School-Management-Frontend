@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/providers/confirm-provider";
 import { getStudentProfile, updateStudentProfile } from "@/lib/clerk/student-profiles";
-import { governmentIDsSchema, maskAadhaar } from "@/lib/student-profile-validation";
+import { governmentIDsSchema, maskAadhaar, checkAadhaarUnique, AADHAAR_DUPLICATE_ERROR } from "@/lib/student-profile-validation";
 import type { StudentProfileData } from "@/types/student-profile";
 import { SchoolProfileFieldEditor } from "./school-profile-field-editor";
 import { StudentDocuments } from "./student-documents";
@@ -601,6 +601,16 @@ function GovernmentIDs({
       );
       return;
     }
+    const cleanAadhaar = (parsed.data.aadhar_number || "").replace(/[\s-]/g, "").trim();
+    if (cleanAadhaar && /^[0-9]{12}$/.test(cleanAadhaar)) {
+      const uniqueCheck = await checkAadhaarUnique(cleanAadhaar, student.id);
+      if (!uniqueCheck.isUnique) {
+        const errorMsg = uniqueCheck.message || AADHAAR_DUPLICATE_ERROR;
+        setErrors({ aadhar_number: errorMsg });
+        toast.error(errorMsg);
+        return;
+      }
+    }
     savingRef.current = true;
     setSaving(true);
     setErrors({});
@@ -614,7 +624,11 @@ function GovernmentIDs({
       toast.success("Government & education IDs saved.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to save IDs.";
-      setErrors({ form: message });
+      if (/aadhaar/i.test(message) && /already exists/i.test(message)) {
+        setErrors({ aadhar_number: AADHAAR_DUPLICATE_ERROR });
+      } else {
+        setErrors({ form: message });
+      }
       toast.error(message);
     } finally {
       savingRef.current = false;

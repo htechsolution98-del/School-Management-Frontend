@@ -27,7 +27,7 @@ import {
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/principal/helpers"
 import Link from "next/link"
-import { aadhaarSchema, AADHAAR_ERROR } from "@/lib/student-profile-validation"
+import { aadhaarSchema, AADHAAR_ERROR, AADHAAR_DUPLICATE_ERROR, checkAadhaarUnique } from "@/lib/student-profile-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -163,6 +163,14 @@ export function StudentProfileDrawer({
     if (!student) return
 
     if (!aadhaarSchema.safeParse(formData.aadhar_number).success) { toast.error(AADHAAR_ERROR); return }
+    const cleanAadhaar = formData.aadhar_number.replace(/[\s-]/g, "").trim()
+    if (cleanAadhaar && /^[0-9]{12}$/.test(cleanAadhaar)) {
+      const uniqueCheck = await checkAadhaarUnique(cleanAadhaar, student.id)
+      if (!uniqueCheck.isUnique) {
+        toast.error(uniqueCheck.message || AADHAAR_DUPLICATE_ERROR)
+        return
+      }
+    }
     setIsSaving(true)
     try {
       const payload = {
