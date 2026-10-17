@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Download, Package, RefreshCw } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { getTrusteeInventoryReport, type InventoryStockReport, type StockReportRow, type StockMovement, type DailyStockRow } from "@/lib/trustee-inventory-report";
 
 const currency = (value: string | number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value));
@@ -93,8 +94,8 @@ export default function TrusteeInventoryReportPage() {
       <Button variant="outline" disabled={loading} onClick={() => setRefresh(value => value + 1)} className="bg-white text-teal-900"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
     </div>
     <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 xl:grid-cols-4" onSubmit={event => { event.preventDefault(); setPage(1); setApplied({ ...draft }); }}>
-      <label className="space-y-1 text-xs font-medium">From date<input aria-label="From date" type="date" value={draft.from_date} onChange={event => setDraft({ ...draft, from_date: event.target.value })} className={selectClass} /></label>
-      <label className="space-y-1 text-xs font-medium">To date<input aria-label="To date" type="date" value={draft.to_date} onChange={event => setDraft({ ...draft, to_date: event.target.value })} className={selectClass} /></label>
+      <label className="space-y-1 text-xs font-medium">From date<DatePicker className="w-full" value={draft.from_date} onChange={date => setDraft({ ...draft, from_date: date })} aria-label="From date" disableFuture={true} /></label>
+      <label className="space-y-1 text-xs font-medium">To date<DatePicker className="w-full" value={draft.to_date} onChange={date => setDraft({ ...draft, to_date: date })} aria-label="To date" min={draft.from_date || undefined} disableFuture={true} /></label>
       <label className="space-y-1 text-xs font-medium">Item<select value={draft.item} onChange={event => setDraft({ ...draft, item: event.target.value })} className={selectClass}><option value="">All items</option>{report?.options.items.map(item => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium">Category<select value={draft.category} onChange={event => setDraft({ ...draft, category: event.target.value })} className={selectClass}><option value="">All categories</option>{report?.options.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium">Current stock status<select value={draft.stock_status} onChange={event => setDraft({ ...draft, stock_status: event.target.value })} className={selectClass}><option value="">All statuses</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

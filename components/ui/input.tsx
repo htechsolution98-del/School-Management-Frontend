@@ -1,8 +1,41 @@
-import * as React from "react"
+"use client";
 
+import * as React from "react"
 import { cn } from "@/lib/utils"
+import { DatePicker } from "@/components/ui/date-picker"
 
 function Input({ className, type, suppressHydrationWarning = true, ...props }: React.ComponentProps<"input">) {
+  if (type === "date") {
+    const stringVal = props.value != null ? String(props.value) : "";
+    return (
+      <DatePicker
+        id={props.id}
+        name={props.name}
+        className={className}
+        disabled={props.disabled}
+        required={props.required}
+        placeholder={props.placeholder || "DD/MM/YYYY"}
+        value={stringVal}
+        min={props.min != null ? String(props.min) : undefined}
+        max={props.max != null ? String(props.max) : undefined}
+        aria-label={props["aria-label"]}
+        aria-invalid={props["aria-invalid"] === true || props["aria-invalid"] === "true" ? true : undefined}
+        aria-describedby={props["aria-describedby"]}
+        onChange={(val: string) => {
+          if (props.onChange) {
+            const syntheticEvent = {
+              target: { value: val, name: props.name, id: props.id },
+              currentTarget: { value: val, name: props.name, id: props.id },
+              preventDefault() {},
+              stopPropagation() {},
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            props.onChange(syntheticEvent);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <input
       type={type}

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BookOpen,
   Sparkles,
@@ -24,6 +25,10 @@ import {
   ArrowDown,
   Loader2,
   Check,
+  Clock,
+  ListChecks,
+  Sliders,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -43,6 +48,7 @@ import {
 
 const ROLES_LIST = [
   { key: "CLERK", label: "Clerk", color: "from-blue-600 to-cyan-600", badgeBg: "bg-blue-100 text-blue-800" },
+  { key: "LIBRARIAN", label: "Librarian", color: "from-teal-600 to-emerald-600", badgeBg: "bg-teal-100 text-teal-800" },
   { key: "PRINCIPAL", label: "Principal", color: "from-purple-600 to-indigo-600", badgeBg: "bg-purple-100 text-purple-800" },
   { key: "TEACHER", label: "Teacher", color: "from-emerald-600 to-teal-600", badgeBg: "bg-emerald-100 text-emerald-800" },
   { key: "TRUSTEE", label: "Trustee", color: "from-amber-600 to-orange-600", badgeBg: "bg-amber-100 text-amber-800" },
@@ -50,9 +56,26 @@ const ROLES_LIST = [
   { key: "INVENTORY", label: "Inventory", color: "from-violet-600 to-purple-600", badgeBg: "bg-violet-100 text-violet-800" },
 ];
 
-export default function SuperAdminTutorialsPage() {
-  const [selectedRole, setSelectedRole] = useState<string>("CLERK");
-  const [selectedPath, setSelectedPath] = useState<string>("/clerk");
+function SuperAdminTutorialsPageContent() {
+  const searchParams = useSearchParams();
+  const queryRole = searchParams.get("role");
+  const queryPath = searchParams.get("path");
+
+  const [selectedRole, setSelectedRole] = useState<string>(
+    queryRole ? normalizeTutorialRole(queryRole) : "CLERK"
+  );
+  const [selectedPath, setSelectedPath] = useState<string>(
+    queryPath ? normalizePath(queryPath) : "/clerk"
+  );
+
+  useEffect(() => {
+    if (queryRole) {
+      setSelectedRole(normalizeTutorialRole(queryRole));
+    }
+    if (queryPath) {
+      setSelectedPath(normalizePath(queryPath));
+    }
+  }, [queryRole, queryPath]);
   const [searchFilter, setSearchFilter] = useState("");
   const [allSavedTutorials, setAllSavedTutorials] = useState<PageTutorialData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,6 +133,7 @@ export default function SuperAdminTutorialsPage() {
     if (saved) {
       setFormData({
         ...saved,
+        show_video: typeof saved.show_video === "boolean" ? saved.show_video : Boolean(saved.video_url),
         steps: Array.isArray(saved.steps) ? [...saved.steps] : [],
         dummy_data: Array.isArray(saved.dummy_data) ? [...saved.dummy_data] : [],
         tips: Array.isArray(saved.tips) ? [...saved.tips] : [],
@@ -121,6 +145,7 @@ export default function SuperAdminTutorialsPage() {
         id: undefined,
         role: roleKey,
         route_path: normPath,
+        show_video: typeof def.show_video === "boolean" ? def.show_video : Boolean(def.video_url),
         steps: [...def.steps],
         dummy_data: [...def.dummy_data],
         tips: [...def.tips],
@@ -158,6 +183,9 @@ export default function SuperAdminTutorialsPage() {
       title: `Step ${nextNum}: New Action`,
       description: "Describe what the user should do on this step.",
       dummy_example: "",
+      reading_time: "1 min read",
+      checklist: [],
+      options: [],
     };
     setFormData((prev) => ({
       ...prev,
@@ -259,6 +287,7 @@ export default function SuperAdminTutorialsPage() {
         ...formData,
         role: selectedRole,
         route_path: selectedPath,
+        show_video: formData.show_video !== false && Boolean(formData.video_url?.trim()),
       });
 
       toast.success("Page tutorial saved successfully!", {
@@ -271,6 +300,35 @@ export default function SuperAdminTutorialsPage() {
       console.error(err);
       toast.error("Error saving tutorial", {
         description: err.message || "Failed to save tutorial",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteVideoSection = async () => {
+    if (!confirm(`Are you sure you want to delete the video tutorial section for ${selectedPath}? This will completely remove the video card from this screen.`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = {
+        ...formData,
+        role: selectedRole,
+        route_path: selectedPath,
+        show_video: false,
+        video_url: "",
+      };
+      setFormData(updated);
+      await saveTutorial(updated);
+      toast.success("Video section deleted and saved for this screen!", {
+        description: `The video card has been removed from ${selectedPath}.`,
+      });
+      await loadTutorialsList();
+    } catch (err: any) {
+      console.error("Error deleting video section:", err);
+      toast.error("Failed to delete video section", {
+        description: err.message || "Unknown error",
       });
     } finally {
       setSaving(false);
@@ -611,26 +669,124 @@ export default function SuperAdminTutorialsPage() {
                     />
                   </div>
 
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-2">
-                      <Video className="w-4 h-4 text-rose-500" />
-                      Video Tutorial URL (Optional YouTube / Vimeo / Drive link)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.video_url || ""}
-                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                      placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-[#5826df]/30"
-                    />
-                    {formData.video_url && getEmbedUrl(formData.video_url) && (
-                      <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video max-w-md">
-                        <iframe
-                          src={getEmbedUrl(formData.video_url)!}
-                          title="Preview"
-                          className="w-full h-full"
-                          allowFullScreen
-                        />
+                  <div className="space-y-3 md:col-span-2 p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Video className="w-4 h-4 text-rose-500" />
+                        <span className="text-xs font-bold text-slate-800">
+                          Video Tutorial Section
+                        </span>
+                        {formData.show_video !== false && formData.video_url?.trim() ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            Active Video Configured
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600">
+                            Section Deleted / Disabled
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Toggle button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextState = formData.show_video === false;
+                            setFormData({
+                              ...formData,
+                              show_video: nextState,
+                            });
+                            toast.info(
+                              nextState
+                                ? "Video section enabled. Add a video URL below."
+                                : "Video section disabled for this screen."
+                            );
+                          }}
+                          className={`text-xs font-bold px-3 py-1 rounded-lg border transition-all cursor-pointer ${
+                            formData.show_video !== false
+                              ? "bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
+                              : "bg-[#5826df] border-[#5826df] text-white"
+                          }`}
+                        >
+                          {formData.show_video !== false ? "Disable Section" : "Enable Section"}
+                        </button>
+
+                        {/* Delete Video Section button */}
+                        <button
+                          type="button"
+                          onClick={handleDeleteVideoSection}
+                          disabled={saving || (!formData.video_url && formData.show_video === false)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                          title="Delete video tutorial and completely remove the video card on this page immediately"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Video Section</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {formData.show_video !== false ? (
+                      <div className="space-y-2 pt-1">
+                        <label className="text-[11px] font-semibold text-slate-600 block">
+                          Video URL (YouTube / Vimeo / MP4 link):
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={formData.video_url || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                video_url: e.target.value,
+                                show_video: true,
+                              })
+                            }
+                            placeholder="e.g. https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                            className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-[#5826df]/30"
+                          />
+                          {formData.video_url && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, video_url: "", show_video: false });
+                                toast.info("Video URL cleared and section deleted.");
+                              }}
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 bg-white cursor-pointer"
+                              title="Clear video URL"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        {formData.video_url && getEmbedUrl(formData.video_url) ? (
+                          <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video max-w-md shadow-sm">
+                            <iframe
+                              src={getEmbedUrl(formData.video_url)!}
+                              title="Preview"
+                              className="w-full h-full"
+                              allowFullScreen
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">
+                            Enter any YouTube or Vimeo video link. The tutorial drawer will automatically embed it with instant playback.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200/70 text-amber-900 text-xs flex items-center justify-between">
+                        <span>
+                          The video section is deleted/disabled for this screen. The tutorial drawer will only show step-by-step instructions.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, show_video: true })}
+                          className="font-bold text-[#5826df] hover:underline text-xs shrink-0 ml-2 cursor-pointer"
+                        >
+                          + Restore Video Section
+                        </button>
                       </div>
                     )}
                   </div>
@@ -732,6 +888,56 @@ export default function SuperAdminTutorialsPage() {
                           placeholder="e.g. Select Class 8-A and click 'Fetch Roster'"
                           className="w-full px-3 py-1 rounded-lg border border-amber-200 bg-amber-50/50 text-xs font-mono text-amber-950 outline-none focus:ring-2 focus:ring-amber-400/40"
                         />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            Reading Time:
+                          </label>
+                          <input
+                            type="text"
+                            value={st.reading_time || ""}
+                            onChange={(e) => handleUpdateStep(idx, "reading_time", e.target.value)}
+                            placeholder="e.g. 1 min read"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 outline-none focus:ring-2 focus:ring-[#5826df]/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1">
+                            <ListChecks className="w-3 h-3 text-blue-600" />
+                            Verification Checklist (1/line):
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={(st.checklist || []).join("\n")}
+                            onChange={(e) => {
+                              const items = e.target.value.split("\n").filter((l) => l.trim().length > 0);
+                              handleUpdateStep(idx, "checklist", items);
+                            }}
+                            placeholder="Verify last attending class&#10;Check conduct and remarks"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50/30 text-xs text-blue-950 outline-none focus:ring-2 focus:ring-blue-400/30 resize-y"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-700 uppercase flex items-center gap-1">
+                            <Sliders className="w-3 h-3 text-emerald-600" />
+                            Available Actions (1/line):
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={(st.options || []).join("\n")}
+                            onChange={(e) => {
+                              const items = e.target.value.split("\n").filter((l) => l.trim().length > 0);
+                              handleUpdateStep(idx, "options", items);
+                            }}
+                            placeholder="Generate Leaving Certificate&#10;Generate Transfer Certificate"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50/30 text-xs text-emerald-950 outline-none focus:ring-2 focus:ring-emerald-400/30 resize-y"
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -902,26 +1108,38 @@ export default function SuperAdminTutorialsPage() {
                 </div>
 
                 <div className="p-5 space-y-4 bg-slate-50/50">
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                    Step-by-Step Instructions:
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-[#5826df]" />
+                    <span>Step-by-Step Instructions (1. 2. 3. Format):</span>
                   </h4>
-                  <div className="space-y-2.5">
-                    {(formData.steps || []).map((st, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#5826df] text-white font-black text-xs">
-                          {st.step || i + 1}
-                        </span>
-                        <div>
-                          <p className="font-bold text-xs text-slate-900">{st.title}</p>
-                          <p className="text-xs text-slate-600 mt-0.5">{st.description}</p>
-                          {st.dummy_example && (
-                            <span className="mt-1.5 inline-block text-[10px] font-mono bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md border border-amber-200">
-                              Example: {st.dummy_example}
-                            </span>
-                          )}
+                  <div className="space-y-3">
+                    {(formData.steps || []).map((st, i) => {
+                      const stepNum = st.step || i + 1;
+                      const cleanTitle = st.title.replace(/^Step\s*\d+[:.]?\s*/i, "");
+
+                      return (
+                        <div key={i} className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5826df] to-[#7f4efb] text-white font-black text-sm shadow-sm shadow-indigo-600/30">
+                            {stepNum}.
+                          </span>
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <p className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                              <span className="text-[#5826df]">{stepNum}.</span>
+                              <span>{cleanTitle}</span>
+                            </p>
+                            <p className="text-xs text-slate-600 leading-relaxed">{st.description}</p>
+                            {st.dummy_example && (
+                              <div className="mt-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-950 text-xs">
+                                <span className="font-black text-amber-800 uppercase text-[10px] tracking-wide block mb-0.5">
+                                  Sample Example:
+                                </span>
+                                <span className="font-mono text-xs font-semibold">{st.dummy_example}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {formData.dummy_data && formData.dummy_data.length > 0 && (
@@ -946,5 +1164,20 @@ export default function SuperAdminTutorialsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SuperAdminTutorialsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-400 space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-[#5826df]" />
+          <p className="text-xs font-semibold">Loading Tutorial Studio...</p>
+        </div>
+      }
+    >
+      <SuperAdminTutorialsPageContent />
+    </Suspense>
   );
 }

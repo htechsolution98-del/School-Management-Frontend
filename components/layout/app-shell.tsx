@@ -566,7 +566,15 @@ AppShell({
 
           <div className="flex items-center gap-2.5">
             {/* Page Tutorial Help Button */}
-            <PageTutorialDialog roleTitle={roleTitle} />
+            <PageTutorialDialog
+              roleTitle={roleTitle}
+              isSuperAdmin={
+                roleTitle === "Super Admin" ||
+                (profile?.roles || (profile?.role ? [profile.role] : [])).some((r) =>
+                  ["super_admin", "superadmin", "super-admin"].includes(String(r).toLowerCase().trim())
+                )
+              }
+            />
 
             {/* Notification Bell */}
             <div ref={notificationRef} className="relative">

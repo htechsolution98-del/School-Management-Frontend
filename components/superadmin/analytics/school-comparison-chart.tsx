@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Building2, ArrowUpRight } from "lucide-react";
 import type { SchoolComparisonData } from "./types";
 
@@ -18,6 +18,17 @@ export function SchoolComparisonChart({
   loading = false,
 }: SchoolComparisonChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const selectedItemRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll selected school into view
+  useEffect(() => {
+    if (selectedSchoolId && selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [selectedSchoolId]);
 
   // Determine scaling max value for relative bar widths
   const maxVal = useMemo(() => {
@@ -27,10 +38,10 @@ export function SchoolComparisonChart({
   }, [data]);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between">
-      <div>
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between h-full">
+      {/* Header */}
+      <div className="shrink-0 mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
@@ -59,110 +70,112 @@ export function SchoolComparisonChart({
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Bar chart content */}
-        {loading ? (
-          <div className="flex h-56 items-center justify-center text-xs text-slate-500">
-            Loading school comparison…
-          </div>
-        ) : data.length === 0 ? (
-          <div className="flex h-56 items-center justify-center text-xs text-slate-500">
-            No school comparison data available.
-          </div>
-        ) : (
-          <div className="mt-6 space-y-4">
-            {data.map((item, idx) => {
-              const isSelected = selectedSchoolId === item.id;
-              const isHovered = hoveredIdx === idx;
+      {/* Bar chart content / Scrollable School List */}
+      {loading ? (
+        <div className="flex flex-1 min-h-[160px] items-center justify-center text-xs text-slate-500">
+          Loading school comparison…
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex flex-1 min-h-[160px] items-center justify-center text-xs text-slate-500">
+          No school comparison data available.
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1.5 space-y-3 school-list-scroll">
+          {data.map((item, idx) => {
+            const isSelected = selectedSchoolId === item.id;
+            const isHovered = hoveredIdx === idx;
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => onSelectSchool?.(item.id)}
-                  onMouseEnter={() => setHoveredIdx(idx)}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                  className={`group rounded-xl p-3 border transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
-                      : isHovered
-                      ? "border-slate-200 bg-slate-50"
-                      : "border-transparent bg-transparent"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                        {item.name}
+            return (
+              <div
+                key={item.id}
+                ref={isSelected ? selectedItemRef : null}
+                onClick={() => onSelectSchool?.(item.id)}
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                className={`group rounded-xl p-3 border transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-indigo-600 bg-indigo-50/40 shadow-xs"
+                    : isHovered
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-transparent bg-transparent"
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                      {item.name}
+                    </span>
+                    {isSelected && (
+                      <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-2xs">
+                        Selected
                       </span>
-                      {isSelected && (
-                        <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-2xs">
-                          Selected
-                        </span>
-                      )}
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 group-hover:text-indigo-600">
+                    Inspect <ArrowUpRight className="h-3 w-3" />
+                  </span>
+                </div>
+
+                {/* Grouped Bars */}
+                <div className="space-y-1.5">
+                  {/* Students Bar */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
+                      Students
+                    </span>
+                    <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
+                      <div
+                        className="h-full rounded-full bg-sky-500 transition-all duration-300"
+                        style={{ width: `${Math.max((item.students / maxVal) * 100, 2)}%` }}
+                      />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 group-hover:text-indigo-600">
-                      Inspect <ArrowUpRight className="h-3 w-3" />
+                    <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
+                      {item.students}
                     </span>
                   </div>
 
-                  {/* Grouped Bars */}
-                  <div className="space-y-1.5">
-                    {/* Students Bar */}
-                    <div className="flex items-center gap-2">
-                      <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
-                        Students
-                      </span>
-                      <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
-                        <div
-                          className="h-full rounded-full bg-sky-500 transition-all duration-300"
-                          style={{ width: `${Math.max((item.students / maxVal) * 100, 2)}%` }}
-                        />
-                      </div>
-                      <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
-                        {item.students}
-                      </span>
+                  {/* Staff Bar */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
+                      Staff
+                    </span>
+                    <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
+                      <div
+                        className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                        style={{ width: `${Math.max((item.staff / maxVal) * 100, 2)}%` }}
+                      />
                     </div>
+                    <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
+                      {item.staff}
+                    </span>
+                  </div>
 
-                    {/* Staff Bar */}
-                    <div className="flex items-center gap-2">
-                      <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
-                        Staff
-                      </span>
-                      <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
-                        <div
-                          className="h-full rounded-full bg-purple-500 transition-all duration-300"
-                          style={{ width: `${Math.max((item.staff / maxVal) * 100, 2)}%` }}
-                        />
-                      </div>
-                      <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
-                        {item.staff}
-                      </span>
+                  {/* Classes Bar */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
+                      Classes
+                    </span>
+                    <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
+                      <div
+                        className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+                        style={{ width: `${Math.max((item.classes / maxVal) * 100, 2)}%` }}
+                      />
                     </div>
-
-                    {/* Classes Bar */}
-                    <div className="flex items-center gap-2">
-                      <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500">
-                        Classes
-                      </span>
-                      <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden border border-slate-200/60">
-                        <div
-                          className="h-full rounded-full bg-indigo-600 transition-all duration-300"
-                          style={{ width: `${Math.max((item.classes / maxVal) * 100, 2)}%` }}
-                        />
-                      </div>
-                      <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
-                        {item.classes}
-                      </span>
-                    </div>
+                    <span className="w-10 text-right text-[11px] font-extrabold text-slate-900 tabular-nums">
+                      {item.classes}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+      {/* Footer */}
+      <div className="shrink-0 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
         <span>Click any school row to filter and inspect detailed telemetry</span>
         <span className="font-bold text-indigo-600">{data.length} registered schools</span>
       </div>
