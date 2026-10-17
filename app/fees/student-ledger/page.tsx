@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import ReceiptModal from "./ReceiptModal";
 import ReceiptHistoryModal from "./ReceiptHistoryModal";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Users,
   IndianRupee,
@@ -470,11 +471,10 @@ const CreateFeeModal = ({
           error={errors.due_date}
           required
         >
-          <input
-            type="date"
-            className={inputClass}
+          <DatePicker
             value={form.due_date}
-            onChange={(e) => update("due_date", e.target.value)}
+            onChange={(val) => update("due_date", val)}
+            className="w-full"
           />
         </FormField>
 
@@ -1032,7 +1032,7 @@ const CollectFeeModal = ({
 
         <div className="grid grid-cols-2 gap-4">
           <FormField label="Payment Date" error={errors.payment_date} required>
-             <input type="date" className={inputClass} value={form.payment_date} onChange={(e) => update("payment_date", e.target.value)} />
+             <DatePicker value={form.payment_date} onChange={(val) => update("payment_date", val)} className="w-full" />
           </FormField>
           <FormField label="Receipt / Sanction No. (Optional)" error={errors.receipt_number}>
              <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
@@ -1301,11 +1301,10 @@ const CollectMultipleFeesModal = ({
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Date *</label>
-            <input
-              type="date"
+            <DatePicker
               value={form.payment_date}
-              onChange={(e) => update("payment_date", e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              onChange={(val) => update("payment_date", val)}
+              className="w-full"
             />
             {errors.payment_date && <p className="text-[11px] text-red-500 mt-0.5">{errors.payment_date}</p>}
           </div>

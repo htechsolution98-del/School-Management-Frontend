@@ -76,6 +76,7 @@ function LoginFormInner() {
       payload.email = identifier;
     } else if (is10DigitMobile) {
       payload.mobile = digitsOnly;
+      payload.username = digitsOnly;
     } else {
       payload.username = identifier;
     }

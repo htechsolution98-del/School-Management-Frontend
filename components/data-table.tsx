@@ -327,11 +327,12 @@ export function DataTable<T>({
                   aria-label="Created date from"
                   value={dateFrom}
                   max={dateTo && dateTo < today ? dateTo : today}
+                  disableFuture={true}
                   onChange={value => {
                     setDateFrom(value);
                     setPage(1);
                   }}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
+                  className="w-36 sm:w-40"
                 />
                 <label className="text-xs text-slate-500" htmlFor={`${createdDateHeader}-to`}>To</label>
                 <DatePicker
@@ -340,11 +341,12 @@ export function DataTable<T>({
                   value={dateTo}
                   min={dateFrom || undefined}
                   max={today}
+                  disableFuture={true}
                   onChange={value => {
                     setDateTo(value);
                     setPage(1);
                   }}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
+                  className="w-36 sm:w-40"
                 />
               </div>
             )}

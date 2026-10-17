@@ -622,11 +622,13 @@ export function ActivityLogHub({
                 id="activity-from"
                 aria-label="Activity date from"
                 value={startDate}
+                max={endDate || undefined}
+                disableFuture={true}
                 onChange={(value) => {
                   setStartDate(value);
                   setPage(1);
                 }}
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
+                className="w-36 sm:w-40"
               />
               <label className="text-xs text-slate-500" htmlFor="activity-to">
                 To
@@ -635,11 +637,13 @@ export function ActivityLogHub({
                 id="activity-to"
                 aria-label="Activity date to"
                 value={endDate}
+                min={startDate || undefined}
+                disableFuture={true}
                 onChange={(value) => {
                   setEndDate(value);
                   setPage(1);
                 }}
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
+                className="w-36 sm:w-40"
               />
             </div>
 

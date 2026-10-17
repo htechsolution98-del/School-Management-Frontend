@@ -513,22 +513,28 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* Row 2: Chart B (School-wise Comparison) & Chart C (Demographics) */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SchoolComparisonChart
-            data={schoolComparisonData}
-            selectedSchoolId={selectedSchool?.id}
-            onSelectSchool={handleSelectSchool}
-            loading={loading}
-          />
-          <DemographicsChart
-            totalStudents={totalStudents}
-            boys={summary?.total_boys || 0}
-            girls={summary?.total_girls || 0}
-            otherGender={summary?.other_gender || 0}
-            rteStudents={summary?.rte_students || 4}
-            classDistribution={analytics?.class_distribution || []}
-            loading={loading}
-          />
+        <div className="grid gap-6 lg:grid-cols-2 items-stretch">
+          <div className="min-w-0 h-[440px] lg:h-auto lg:min-h-[380px] lg:relative">
+            <div className="h-full lg:absolute lg:inset-0">
+              <SchoolComparisonChart
+                data={schoolComparisonData}
+                selectedSchoolId={selectedSchool?.id}
+                onSelectSchool={handleSelectSchool}
+                loading={loading}
+              />
+            </div>
+          </div>
+          <div className="min-w-0 h-full">
+            <DemographicsChart
+              totalStudents={totalStudents}
+              boys={summary?.total_boys || 0}
+              girls={summary?.total_girls || 0}
+              otherGender={summary?.other_gender || 0}
+              rteStudents={summary?.rte_students || 4}
+              classDistribution={analytics?.class_distribution || []}
+              loading={loading}
+            />
+          </div>
         </div>
 
         {/* Row 3: Chart D (Module Adoption) & Chart E (Financial Analytics) */}

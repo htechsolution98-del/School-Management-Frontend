@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, Eye, GraduationCap, RefreshCw } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getStudentReport, type StudentReport, type StudentReportRow, type StrengthRow, type ExamSummaryRow, type StudentResultRow, type StudentFeeRow, type AttendanceReportRow } from "@/lib/trustee-student-report";
 
@@ -116,8 +117,8 @@ export default function TrusteeStudentReportPage() {
       <label className="space-y-1 text-xs font-medium">Division<select className={control} value={draft.division} onChange={event => setDraft({ ...draft, division: event.target.value })}><option value="">All divisions</option>{Array.from(new Set(report?.options.divisions.filter(item => !draft.school_class || String(item.SchoolClass_id) === draft.school_class).map(item => item.division).filter((value): value is string => !!value))).map(division => <option key={division} value={division}>{division}</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium">Student status<select className={control} value={draft.student_status} onChange={event => setDraft({ ...draft, student_status: event.target.value })}><option value="">All students</option>{["active", "inactive", "transferred", "dropout", "left_unspecified"].map(status => <option key={status} value={status}>{human(status)}</option>)}</select></label>
       <label className="space-y-1 text-xs font-medium sm:col-span-2">Search student<input className={control} value={draft.search} onChange={event => setDraft({ ...draft, search: event.target.value })} placeholder="Name, GR, roll number or mobile" /></label>
-      <label className="space-y-1 text-xs font-medium">Activity from<input className={control} type="date" value={draft.from_date} onChange={event => setDraft({ ...draft, from_date: event.target.value })} /></label>
-      <label className="space-y-1 text-xs font-medium">Activity to<input className={control} type="date" value={draft.to_date} onChange={event => setDraft({ ...draft, to_date: event.target.value })} /></label>
+      <label className="space-y-1 text-xs font-medium">Activity from<DatePicker className="w-full" value={draft.from_date} onChange={date => setDraft({ ...draft, from_date: date })} disableFuture={true} /></label>
+      <label className="space-y-1 text-xs font-medium">Activity to<DatePicker className="w-full" value={draft.to_date} onChange={date => setDraft({ ...draft, to_date: date })} min={draft.from_date || undefined} disableFuture={true} /></label>
       <div className="flex gap-2"><Button type="submit" disabled={loading || exporting}>Apply filters</Button><Button variant="outline" type="button" disabled={loading || exporting} onClick={() => { setDraft(defaults); apply(defaults); }}>Reset</Button></div>
     </form>
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</p>}

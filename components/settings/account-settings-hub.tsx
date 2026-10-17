@@ -114,18 +114,38 @@ export function AccountSettingsHub({
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPasswordError("New password must be at least 6 characters long.");
+    if (currentPassword === newPassword) {
+      setPasswordError("Current password and new password cannot be the same. Please choose a different password.");
+      return;
+    }
+
+    if (!hasMinLength) {
+      setPasswordError("New password must be at least 8 characters long.");
+      return;
+    }
+
+    if (!hasUppercase) {
+      setPasswordError("New password must contain at least one uppercase letter (A-Z).");
+      return;
+    }
+
+    if (!hasLowercase) {
+      setPasswordError("New password must contain at least one lowercase letter (a-z).");
+      return;
+    }
+
+    if (!hasNumber) {
+      setPasswordError("New password must contain at least one number (0-9).");
+      return;
+    }
+
+    if (!hasSpecial) {
+      setPasswordError("New password must contain at least one special character (!@#$%^&* etc.).");
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPasswordError("New password and confirmation password do not match.");
-      return;
-    }
-
-    if (currentPassword === newPassword) {
-      setPasswordError("New password cannot be identical to your current password.");
       return;
     }
 
@@ -154,8 +174,35 @@ export function AccountSettingsHub({
     }
   };
 
-  const isPasswordValid = newPassword.length >= 6;
-  const isMatch = newPassword.length > 0 && newPassword === confirmPassword;
+  // Strong password checks
+  const hasMinLength = newPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasLowercase = /[a-z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>\-_+=\[\]\\;'`~]/.test(newPassword);
+
+  const passedCriteriaCount = [hasMinLength, hasUppercase, hasLowercase, hasNumber, hasSpecial].filter(Boolean).length;
+  const isPasswordStrong = passedCriteriaCount === 5;
+  const isSameAsCurrent = Boolean(currentPassword && newPassword && currentPassword === newPassword);
+  const isMatch = Boolean(newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword);
+
+  const getStrengthMeta = () => {
+    if (!newPassword) {
+      return { label: "", color: "bg-slate-200 dark:bg-zinc-700", textColor: "text-slate-400", level: 0 };
+    }
+    if (passedCriteriaCount <= 2) {
+      return { label: "Weak", color: "bg-rose-500", textColor: "text-rose-600 dark:text-rose-400", level: 1 };
+    }
+    if (passedCriteriaCount <= 3) {
+      return { label: "Fair", color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-400", level: 2 };
+    }
+    if (passedCriteriaCount === 4) {
+      return { label: "Good", color: "bg-blue-500", textColor: "text-blue-600 dark:text-blue-400", level: 3 };
+    }
+    return { label: "Strong", color: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-400", level: 4 };
+  };
+
+  const strengthMeta = getStrengthMeta();
 
   return (
     <div className="space-y-6 pb-16 min-w-0 max-w-6xl mx-auto">
@@ -454,17 +501,19 @@ export function AccountSettingsHub({
                   </div>
 
                   {/* New Password */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
                       New Password <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <Input
                         type={showNewPassword ? "text" : "password"}
-                        placeholder="Enter minimum 6 characters"
+                        placeholder="Create a strong password (min 8 chars)"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all font-mono"
+                        className={`h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all font-mono ${
+                          isSameAsCurrent ? "border-rose-300 focus:border-rose-500 focus:ring-rose-200" : ""
+                        }`}
                       />
                       <button
                         type="button"
@@ -475,12 +524,70 @@ export function AccountSettingsHub({
                       </button>
                     </div>
 
-                    {/* Requirements checklist */}
-                    <div className="pt-1 flex items-center gap-3 text-[11px]">
-                      <span className={`flex items-center gap-1 font-semibold ${isPasswordValid ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                        <CheckCircle2 className={`w-3.5 h-3.5 ${isPasswordValid ? "text-emerald-600" : "text-slate-300"}`} />
-                        At least 6 characters
-                      </span>
+                    {/* Same as current password error alert */}
+                    {isSameAsCurrent && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2 font-semibold"
+                      >
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                        <span>Current password and new password cannot be the same.</span>
+                      </motion.div>
+                    )}
+
+                    {/* Strength Meter */}
+                    {newPassword.length > 0 && (
+                      <div className="pt-1.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 dark:text-zinc-400 font-medium">Password Strength:</span>
+                          <span className={`font-black ${strengthMeta.textColor}`}>
+                            {strengthMeta.label}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                          <div className={`rounded-full transition-all duration-300 ${strengthMeta.level >= 1 ? strengthMeta.color : "bg-slate-100 dark:bg-zinc-800"}`} />
+                          <div className={`rounded-full transition-all duration-300 ${strengthMeta.level >= 2 ? strengthMeta.color : "bg-slate-100 dark:bg-zinc-800"}`} />
+                          <div className={`rounded-full transition-all duration-300 ${strengthMeta.level >= 3 ? strengthMeta.color : "bg-slate-100 dark:bg-zinc-800"}`} />
+                          <div className={`rounded-full transition-all duration-300 ${strengthMeta.level >= 4 ? strengthMeta.color : "bg-slate-100 dark:bg-zinc-800"}`} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Strong Password Requirements Checklist */}
+                    <div className="pt-2 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/40 p-3 border border-slate-100 dark:border-zinc-800/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-300 uppercase tracking-wider">
+                          Strong Password Requirements
+                        </span>
+                        {isPasswordStrong && (
+                          <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 rounded-full">
+                            Strong Password
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                        <div className={`flex items-center gap-1.5 transition-colors ${hasMinLength ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400 dark:text-zinc-500"}`}>
+                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasMinLength ? "text-emerald-600" : "text-slate-300 dark:text-zinc-600"}`} />
+                          <span>At least 8 characters</span>
+                        </div>
+                        <div className={`flex items-center gap-1.5 transition-colors ${hasUppercase ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400 dark:text-zinc-500"}`}>
+                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasUppercase ? "text-emerald-600" : "text-slate-300 dark:text-zinc-600"}`} />
+                          <span>1 uppercase letter (A-Z)</span>
+                        </div>
+                        <div className={`flex items-center gap-1.5 transition-colors ${hasLowercase ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400 dark:text-zinc-500"}`}>
+                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasLowercase ? "text-emerald-600" : "text-slate-300 dark:text-zinc-600"}`} />
+                          <span>1 lowercase letter (a-z)</span>
+                        </div>
+                        <div className={`flex items-center gap-1.5 transition-colors ${hasNumber ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400 dark:text-zinc-500"}`}>
+                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasNumber ? "text-emerald-600" : "text-slate-300 dark:text-zinc-600"}`} />
+                          <span>1 number (0-9)</span>
+                        </div>
+                        <div className={`flex items-center gap-1.5 transition-colors sm:col-span-2 ${hasSpecial ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400 dark:text-zinc-500"}`}>
+                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasSpecial ? "text-emerald-600" : "text-slate-300 dark:text-zinc-600"}`} />
+                          <span>1 special symbol (!@#$%^&* etc.)</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -525,7 +632,7 @@ export function AccountSettingsHub({
                   <div className="pt-3">
                     <Button
                       type="submit"
-                      disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword || !isMatch || !isPasswordValid}
+                      disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword || !isMatch || !isPasswordStrong || isSameAsCurrent}
                       className="w-full h-11 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] disabled:opacity-50"
                     >
                       {savingPassword ? (
