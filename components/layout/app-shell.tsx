@@ -4,7 +4,24 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from "rea
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bell, ChevronDown, Loader2, LogOut, Megaphone, Menu, School, X } from "lucide-react";
+import {
+  Banknote,
+  Bell,
+  BookOpen,
+  CalendarCheck,
+  ChevronDown,
+  Clock,
+  FileCheck,
+  FileText,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  Megaphone,
+  Menu,
+  School,
+  Users,
+  X,
+} from "lucide-react";
 import { logoutUser, getDashboardRoute } from "@/lib/auth";
 import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
 import { type AnnouncementResponse } from "@/lib/principal";
@@ -495,10 +512,58 @@ AppShell({
   const currentUserName = profile?.name || userName || "Administrator";
   const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "SA";
 
+  // Derive role-aware mobile bottom navigation items (5 items: 4 core + More)
+  const mobileNavItems = (() => {
+    const role = (roleTitle || "").toLowerCase();
+
+    if (role.includes("teacher")) {
+      return [
+        { title: "Dashboard", href: "/teacher", icon: LayoutDashboard },
+        { title: "Attendance", href: "/teacher/student-attendance", icon: Users },
+        { title: "Homework", href: "/teacher/Homework", icon: BookOpen },
+        { title: "Materials", href: "/teacher/study-materials", icon: FileText },
+      ];
+    }
+
+    if (role.includes("student")) {
+      return [
+        { title: "Dashboard", href: "/student", icon: LayoutDashboard },
+        { title: "Attendance", href: "/student/attendance", icon: CalendarCheck },
+        { title: "Homework", href: "/student/homework", icon: BookOpen },
+        { title: "Timetable", href: "/student/timetable", icon: Clock },
+      ];
+    }
+
+    if (role.includes("parent")) {
+      return [
+        { title: "Dashboard", href: "/parent", icon: LayoutDashboard },
+        { title: "Children", href: "/parent/children", icon: Users },
+        { title: "Attendance", href: "/parent/attendance", icon: CalendarCheck },
+        { title: "Fees", href: "/parent/fees", icon: Banknote },
+      ];
+    }
+
+    if (role.includes("clerk")) {
+      return [
+        { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
+        { title: "Students", href: "/clerk/students", icon: Users },
+        { title: "Fees", href: "/clerk/fees", icon: Banknote },
+        { title: "Admissions", href: "/clerk/admissions", icon: FileCheck },
+      ];
+    }
+
+    // Default for Admin, Super Admin, Trustee, Principal, Librarian, etc.
+    return links.slice(0, 4).map((l) => ({
+      title: l.title.split(" ")[0],
+      href: l.href,
+      icon: l.icon || LayoutDashboard,
+    }));
+  })();
+
   return (
     <div
       data-resizing={resizing}
-      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#f4f6fb] text-slate-900 ${
+      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] ${
         resizing ? "cursor-col-resize select-none" : ""
       }`}
     >
@@ -508,7 +573,7 @@ AppShell({
         animate={{ width: sidebarWidth }}
         initial={false}
         transition={{ duration: reducedMotion || resizing ? 0 : 0.15 }}
-        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#4f46e5] via-[#4338ca] to-[#312e81] shadow-xl lg:flex overflow-hidden"
+        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#5436F5] via-[#4527D6] to-[#392BC9] shadow-xl lg:flex overflow-hidden"
       >
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
@@ -553,29 +618,25 @@ AppShell({
 
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
-        {/* Top Header Card Bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-4 sm:px-6 shadow-2xs z-20">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50/80 text-[#5826df] border border-indigo-100 shadow-2xs">
-              <School className="h-5 w-5" />
+        {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
+              <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
             </span>
-            <span className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-lg">
-              {currentSchoolDisplayName}
-            </span>
+            <div className="min-w-0">
+              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight">
+                VidyaSanchalan
+              </span>
+              <span className="block truncate text-xs text-white/80 lg:text-[#7183A6] font-normal leading-tight mt-0.5">
+                {roleTitle || "Teacher"}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Page Tutorial Help Button */}
-            <PageTutorialDialog
-              roleTitle={roleTitle}
-              isSuperAdmin={
-                roleTitle === "Super Admin" ||
-                (profile?.roles || (profile?.role ? [profile.role] : [])).some((r) =>
-                  ["super_admin", "superadmin", "super-admin"].includes(String(r).toLowerCase().trim())
-                )
-              }
-            />
-
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
             {/* Notification Bell */}
             <div ref={notificationRef} className="relative">
               <button
@@ -583,25 +644,21 @@ AppShell({
                 onClick={() => setNotificationsOpen((value) => !value)}
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full text-white lg:text-slate-600 hover:bg-white/10 lg:hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 ? (
-                  <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
-                ) : (
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                )}
+                <Bell className="h-5 w-5" />
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                  {unreadCount > 0 ? unreadCount : 3}
+                </span>
               </button>
               {notificationsOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="absolute right-0 z-30 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl">
                   <p className="flex items-center gap-2 border-b border-slate-100 p-4 text-sm font-semibold text-slate-900">
-                    <Bell className="h-4 w-4 text-[#5826df]" />
+                    <Bell className="h-4 w-4 text-[#5436F5]" />
                     Notifications
-                    {unreadCount > 0 && (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-[#5826df]">
-                        {unreadCount} new
-                      </span>
-                    )}
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-[#5436F5]">
+                      {unreadCount > 0 ? unreadCount : 3} new
+                    </span>
                   </p>
                   <div className="max-h-80 overflow-y-auto">
                     {sortedNotifications.length ? (
@@ -615,13 +672,13 @@ AppShell({
                               setSelectedNotification(notification);
                               markAsRead(notification.id);
                             }}
-                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 ${
+                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${
                               isRead ? "" : "bg-indigo-50/40"
                             }`}
                           >
                             <span
                               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                                isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5826df]"
+                                isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5436F5]"
                               }`}
                             >
                               <Megaphone className="h-4 w-4" />
@@ -635,7 +692,7 @@ AppShell({
                                 >
                                   {notification.title}
                                 </span>
-                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#5826df]" />}
+                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#5436F5]" />}
                               </span>
                               <span className="mt-0.5 block line-clamp-2 text-xs text-slate-500">
                                 {notification.description}
@@ -671,17 +728,22 @@ AppShell({
               onClick={() => setProfileOpen(true)}
               aria-label="Open my profile"
               title="View my profile"
-              className="flex items-center gap-2.5 rounded-2xl pl-2 text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5826df]/40"
+              className="flex items-center gap-2 pl-1 text-left transition-opacity hover:opacity-90 focus-visible:outline-none cursor-pointer"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#5826df] text-xs sm:text-sm font-bold text-white shadow-xs">
-                {userInitials}
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6351F7] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#5436F5]">
+                {userInitials || "TE"}
               </span>
-              <span className="hidden sm:block text-left">
-                <span className="block max-w-[140px] truncate text-xs sm:text-sm font-bold text-slate-900 leading-tight">
-                  {currentUserName}
-                </span>
-                <span className="block truncate text-xs text-slate-500 font-normal">{profile?.role || subtitle}</span>
-              </span>
+              <div className="text-left flex items-center gap-1">
+                <div>
+                  <span className="block max-w-[100px] truncate text-xs sm:text-sm font-semibold text-white lg:text-[#142044] leading-tight">
+                    {currentUserName || "teacher1"}
+                  </span>
+                  <span className="block truncate text-[11px] text-white/75 lg:text-[#7183A6] font-normal leading-tight">
+                    {profile?.role?.toLowerCase() || (roleTitle || "teacher").toLowerCase()}
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-white/80 lg:text-slate-400 shrink-0" />
+              </div>
             </button>
           </div>
         </header>
@@ -689,27 +751,74 @@ AppShell({
         {/* Global School Subscription / Free Trial Status Notification (Shown only to School Trustees) */}
         {roleTitle === "Trustee" && <TrialBanner />}
 
-        {/* Content Body */}
+        {/* Content Body: Protected with pb-28 on mobile so bottom bar never blocks content */}
         <main
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto no-scrollbar bg-[#f4f6fb]",
-            (noPadding || roleTitle === "Teacher") ? "p-0" : "px-4 sm:px-6 py-5",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
             mainClassName
           )}
         >
           {children}
         </main>
-      </div>
 
-      {/* Mobile Drawer Button */}
-      <button
-        type="button"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open navigation"
-        className="fixed bottom-4 left-4 z-30 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-600/30 lg:hidden active:scale-95"
-      >
-        <Menu className="h-6 w-6" />
-      </button>
+        {/* Persistent Role-Aware Mobile Bottom Navigation Bar */}
+        <nav
+          aria-label="Mobile Bottom Navigation"
+          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden"
+        >
+          <div className="flex items-center justify-around px-2 pt-2 pb-1 max-w-lg mx-auto">
+            {mobileNavItems.map((item, idx) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href && item.href !== "/" && item.href !== "/teacher" && item.href !== "/clerk" && item.href !== "/student" && pathname.startsWith(`${item.href}/`)) ||
+                (item.title === "Attendance" && (pathname === "/teacher/my-attendance" || pathname === "/teacher/student-attendance" || pathname.startsWith("/teacher/attendance")));
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href || idx}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex flex-col items-center justify-center flex-1 py-0.5 px-1 transition-all ${
+                    isActive ? "text-[#5436F5]" : "text-[#7183A6] hover:text-[#142044]"
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? "text-[#5436F5] fill-[#5436F5]" : "text-[#7183A6]"}`} />
+                  <span
+                    className={`text-[11px] mt-1 tracking-tight truncate max-w-[68px] text-center ${
+                      isActive ? "font-bold text-[#5436F5]" : "font-medium text-[#7183A6]"
+                    }`}
+                  >
+                    {item.title}
+                  </span>
+                  {isActive ? (
+                    <span className="h-[2.5px] w-7 bg-[#5436F5] rounded-full mt-1" />
+                  ) : (
+                    <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
+                  )}
+                </Link>
+              );
+            })}
+
+            {/* 5th Item: More Menu */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open full menu"
+              className="flex flex-col items-center justify-center flex-1 py-0.5 px-1 text-[#7183A6] hover:text-[#142044] transition-all cursor-pointer"
+            >
+              <Menu className="w-5 h-5 text-[#7183A6]" />
+              <span className="text-[11px] mt-1 font-medium text-[#7183A6] tracking-tight">
+                More
+              </span>
+              <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
+            </button>
+          </div>
+          {/* iOS Home Indicator Bar */}
+          <div className="w-32 h-1 bg-slate-300 rounded-full mx-auto my-1.5" />
+        </nav>
+      </div>
 
       {/* Mobile Drawer Overlay & Sidebar */}
       <AnimatePresence>

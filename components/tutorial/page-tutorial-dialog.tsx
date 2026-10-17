@@ -365,12 +365,12 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
         }}
         aria-label="Open Page Tutorial Drawer"
         title="Need Help? Click for step-by-step guidance & dummy data"
-        className={`group relative flex h-10 w-10 items-center justify-center rounded-full border border-indigo-200/80 bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-[#6428F5] shadow-xs transition-all duration-200 hover:scale-105 hover:border-[#6428F5] hover:shadow-md hover:shadow-indigo-500/15 active:scale-95 ${className}`}
+        className={`group relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-indigo-200/80 bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-[#6428F5] shadow-xs transition-all duration-200 hover:scale-105 hover:border-[#6428F5] hover:shadow-md hover:shadow-indigo-500/15 active:scale-95 ${className}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6428F5]/10 transition-colors group-hover:bg-[#6428F5] group-hover:text-white">
-          <Info className="h-4 w-4 stroke-[2.5]" />
+        <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#6428F5]/10 transition-colors group-hover:bg-[#6428F5] group-hover:text-white">
+          <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
         </span>
-        <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400 text-[8px] font-black text-amber-950 shadow-xs ring-2 ring-white">
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 sm:h-3.5 sm:w-3.5 items-center justify-center rounded-full bg-amber-400 text-[7px] sm:text-[8px] font-black text-amber-950 shadow-xs ring-1.5 sm:ring-2 ring-white">
           ?
         </span>
       </button>
@@ -393,47 +393,48 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                 />
 
                 {/* Slide-in Drawer Container */}
-                <div className="fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10">
+                <div className="fixed inset-y-0 right-0 w-full sm:w-auto sm:max-w-[610px] flex justify-end pointer-events-none">
                   <motion.div
                     initial={{ x: "100%" }}
                     animate={{ x: 0 }}
                     exit={{ x: "100%" }}
                     transition={{ type: "spring", damping: 28, stiffness: 280 }}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-screen max-w-full sm:max-w-[610px] bg-white shadow-2xl flex flex-col h-full sm:rounded-l-3xl border-l border-slate-200/80 overflow-hidden relative z-10"
+                    className="w-full sm:w-[610px] bg-white shadow-2xl flex flex-col h-full sm:rounded-l-3xl border-l border-slate-200/80 overflow-hidden relative z-10 pointer-events-auto"
                   >
                     {/* ─── 1. Header Design ───────────────────────────────── */}
-                    <div className="bg-white border-b border-[#E2E8F0] p-6 pb-5 shrink-0">
+                    <div className="bg-white border-b border-[#E2E8F0] p-3.5 sm:p-6 pb-3 sm:pb-5 shrink-0">
                       {/* Top Header Row: Badges, Studio Link & Close Button */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#F5F2FF] text-[#6428F5] border border-[#E9E4FF]">
-                            <Sparkles className="w-3.5 h-3.5 text-[#6428F5]" />
-                            {roleTitle ? `${roleTitle} Guide` : "Clerk Guide"}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-[#F5F2FF] text-[#6428F5] border border-[#E9E4FF] whitespace-nowrap">
+                            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#6428F5] shrink-0" />
+                            <span>{roleTitle ? `${roleTitle} Guide` : "Guide"}</span>
                           </span>
-                          <span className="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-mono bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] min-[360px]:max-w-[160px] sm:max-w-none truncate">
                             {tutorial?.route_path || selectedRoute}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {/* Super Admin Quick Link to Edit Content & Videos in Studio (Rendered only for Super Admin) */}
                           {isAdminUser && (
                             <Link
                               href={`/superadmin/tutorials?role=${encodeURIComponent(roleKey)}&path=${encodeURIComponent(tutorial?.route_path || selectedRoute)}`}
                               onClick={() => setIsOpen(false)}
                               title="Super Admin: Edit this guide & tutorial video in Studio"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-[#6428F5] bg-[#F5F2FF] hover:bg-[#EDE8FF] border border-[#E0D7FE] transition-colors shadow-2xs cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold text-[#6428F5] bg-[#F5F2FF] hover:bg-[#EDE8FF] border border-[#E0D7FE] transition-colors shadow-2xs cursor-pointer"
                             >
                               <Edit3 className="w-3 h-3 text-[#6428F5]" />
-                              <span className="hidden sm:inline">Edit in Studio</span>
+                              <span className="hidden min-[380px]:inline">Edit</span>
+                              <span className="hidden sm:inline"> in Studio</span>
                             </Link>
                           )}
 
                           <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-2xs"
+                            className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer"
                             title="Close Drawer (Esc)"
                           >
                             <X className="h-4 w-4" />
@@ -441,51 +442,52 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                         </div>
                       </div>
 
-                  {/* Middle Header Row: Illustration + Title + Subtitle */}
-                  <div className="flex items-start gap-3.5 sm:gap-4 mt-4">
-                    <div className="h-12 w-12 rounded-full bg-[#F5F2FF] border border-[#E9E4FF] flex items-center justify-center text-[#6428F5] shrink-0 shadow-2xs">
-                      {getHeaderIcon()}
+                      {/* Middle Header Row: Illustration + Title + Subtitle */}
+                      <div className="flex items-start gap-2.5 sm:gap-4 mt-3 sm:mt-4">
+                        <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-xl sm:rounded-full bg-[#F5F2FF] border border-[#E9E4FF] flex items-center justify-center text-[#6428F5] shrink-0 shadow-2xs [&>svg]:w-4.5 [&>svg]:h-4.5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
+                          {getHeaderIcon()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-sm sm:text-lg font-bold text-[#111B35] tracking-tight leading-snug">
+                            {tutorial?.title || `${currentPageTitle} Desk`}
+                          </h2>
+                          <p className="text-[11px] sm:text-xs text-[#475569] leading-relaxed mt-1 line-clamp-2 sm:line-clamp-none">
+                            {tutorial?.summary ||
+                              `Generate, verify, and manage official records and actions for ${currentPageTitle}.`}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-lg sm:text-xl font-bold text-[#111B35] tracking-tight leading-snug">
-                        {tutorial?.title || `${currentPageTitle} Desk`}
-                      </h2>
-                      <p className="text-xs sm:text-sm text-[#475569] leading-relaxed mt-1">
-                        {tutorial?.summary ||
-                          `Generate, verify, and manage official records and actions for ${currentPageTitle}.`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
                 {/* ─── 2. Tutorial Navigation Tabs ────────────────────── */}
-                <div className="flex items-center gap-6 px-6 bg-white border-b border-[#E2E8F0] overflow-x-auto no-scrollbar shrink-0">
+                <div className="flex items-center gap-2 sm:gap-6 px-3 sm:px-6 bg-white border-b border-[#E2E8F0] overflow-x-auto no-scrollbar shrink-0">
                   <button
                     type="button"
                     onClick={() => setActiveTab("steps")}
-                    className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "steps"
                         ? "border-[#6428F5] text-[#6428F5]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Step-by-Step Guide</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>Steps</span>
+                    <span className="hidden min-[380px]:inline">Guide</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setActiveTab("dummy")}
-                    className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "dummy"
                         ? "border-[#6428F5] text-[#6428F5]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Table className="w-4 h-4" />
-                    <span>Sample Dummy Data</span>
+                    <Table className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>Sample Data</span>
                     {tutorial?.dummy_data && tutorial.dummy_data.length > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                      <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] font-bold">
                         {tutorial.dummy_data.length}
                       </span>
                     )}
@@ -494,16 +496,16 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab("tips")}
-                    className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "tips"
                         ? "border-[#6428F5] text-[#6428F5]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Lightbulb className="w-4 h-4" />
-                    <span>Pro Tips</span>
+                    <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>Tips</span>
                     {tutorial?.tips && tutorial.tips.length > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                      <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] font-bold">
                         {tutorial.tips.length}
                       </span>
                     )}
@@ -512,19 +514,19 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab("related")}
-                    className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "related"
                         ? "border-[#6428F5] text-[#6428F5]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Compass className="w-4 h-4" />
-                    <span>Related Guides</span>
+                    <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>Related</span>
                   </button>
                 </div>
 
                 {/* ─── 3. Scrollable Content Body ─────────────────────── */}
-                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-white pb-32">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 bg-white pb-28 sm:pb-32">
                   {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-3">
                       <Loader2 className="w-8 h-8 animate-spin text-[#6428F5]" />
@@ -537,16 +539,16 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                         <div className="space-y-6 animate-in fade-in duration-150">
                           {/* Top Video Tutorial Card (Rendered if video is enabled & configured) */}
                           {tutorial?.show_video !== false && Boolean(tutorial?.video_url && tutorial.video_url.trim()) ? (
-                            <div className="bg-[#F8F6FE] border border-[#E9E4FF] rounded-2xl p-4 sm:p-5 flex flex-col gap-3 relative overflow-hidden group shadow-2xs">
+                            <div className="bg-[#F8F6FE] border border-[#E9E4FF] rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col gap-3 relative overflow-hidden group shadow-2xs">
                               {/* Super Admin Quick Control Toolbar */}
                               {isAdminUser && (
                                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#E9E4FF]/90">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E9E4FF] text-[#6428F5]">
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-[#E9E4FF] text-[#6428F5]">
                                       Super Admin
                                     </span>
-                                    <span className="text-[11px] font-medium text-slate-500">
-                                      Video Section for this page
+                                    <span className="text-[10px] sm:text-[11px] font-medium text-slate-500">
+                                      Video Section
                                     </span>
                                   </div>
 
@@ -563,13 +565,14 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                       ) : (
                                         <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                                       )}
-                                      <span>Delete Video Section</span>
+                                      <span className="hidden min-[380px]:inline">Delete Video Section</span>
+                                      <span className="min-[380px]:hidden">Delete</span>
                                     </button>
                                   </div>
                                 </div>
                               )}
 
-                              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center">
                                 {/* Left Side: Thumbnail Preview */}
                                 <div
                                   onClick={() => {
@@ -577,7 +580,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                       setIsVideoModalOpen(true);
                                     }
                                   }}
-                                  className="w-full sm:w-44 h-28 rounded-xl overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 relative shrink-0 shadow-sm border border-[#E9E4FF] flex items-center justify-center group cursor-pointer"
+                                  className="w-full sm:w-44 h-24 sm:h-28 rounded-xl overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 relative shrink-0 shadow-sm border border-[#E9E4FF] flex items-center justify-center group cursor-pointer"
                                 >
                                   {/* Decorative Mini Mockup in thumbnail */}
                                   <div className="absolute inset-2 rounded-lg border border-white/10 bg-white/5 p-2 flex flex-col justify-between pointer-events-none">
@@ -592,8 +595,8 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   </div>
 
                                   {/* Centered Play Button */}
-                                  <div className="relative z-10 h-10 w-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-[#6428F5] group-hover:scale-110 transition-transform">
-                                    <Play className="h-4 w-4 fill-current ml-0.5" />
+                                  <div className="relative z-10 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-[#6428F5] group-hover:scale-110 transition-transform">
+                                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current ml-0.5" />
                                   </div>
 
                                   {/* Duration Badge */}
@@ -604,17 +607,17 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                                 {/* Right Side: Heading, Description & CTA */}
                                 <div className="min-w-0 flex-1 space-y-1 text-center sm:text-left">
-                                  <h3 className="text-sm sm:text-base font-bold text-[#111B35]">
+                                  <h3 className="text-xs sm:text-base font-bold text-[#111B35]">
                                     Watch Full Tutorial
                                   </h3>
-                                  <p className="text-xs text-[#475569] leading-relaxed">
+                                  <p className="text-[11px] sm:text-xs text-[#475569] leading-relaxed">
                                     Learn how to perform official actions, verify data, and navigate {tutorial?.title || currentPageTitle} in under 4 minutes.
                                   </p>
                                   <div className="pt-1 flex flex-wrap items-center gap-2 justify-center sm:justify-start">
                                     <button
                                       type="button"
                                       onClick={() => setIsVideoModalOpen(true)}
-                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                      className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                                     >
                                       <Play className="w-3.5 h-3.5 fill-current" />
                                       <span>Play Tutorial (3:45)</span>
@@ -626,7 +629,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                           ) : (
                             /* When video is deleted or disabled, Super Admin can see an option to restore/add a video to this page */
                             isAdminUser && (
-                              <div className="bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-3.5 sm:p-4 text-xs transition-all shadow-2xs">
+                              <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-xs transition-all shadow-2xs">
                                 {!isAddingVideo ? (
                                   <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex items-center gap-2 text-slate-600 min-w-0">
@@ -708,7 +711,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                           )}
 
                           {/* Connected Step-by-Step Cards */}
-                          <div className="space-y-6 pt-1">
+                          <div className="space-y-4 sm:space-y-6 pt-1">
                             {stepsList.map((st: TutorialStep, idx: number) => {
                               const stepNumber = st.step || idx + 1;
                               const isActive = currentStepIndex === idx;
@@ -719,15 +722,15 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   ref={(el) => {
                                     stepRefs.current[idx] = el;
                                   }}
-                                  className="flex items-start gap-3 sm:gap-4 group"
+                                  className="flex items-start gap-2 sm:gap-4 group"
                                 >
                                   {/* Left Vertical Progress Line & Badge */}
                                   <div className="flex flex-col items-center shrink-0 self-stretch">
                                     <div
                                       onClick={() => setCurrentStepIndex(idx)}
-                                      className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                                      className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs ${
                                         isActive
-                                          ? "bg-[#6428F5] text-white ring-4 ring-[#6428F5]/20"
+                                          ? "bg-[#6428F5] text-white ring-2 sm:ring-4 ring-[#6428F5]/20"
                                           : currentStepIndex > idx
                                           ? "bg-[#6428F5] text-white"
                                           : "bg-slate-100 text-slate-500 border border-slate-300"
@@ -737,7 +740,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                     </div>
                                     {idx < stepsList.length - 1 && (
                                       <div
-                                        className={`w-0.5 flex-1 my-2 transition-colors ${
+                                        className={`w-0.5 flex-1 my-1.5 sm:my-2 transition-colors ${
                                           currentStepIndex > idx ? "bg-[#6428F5]" : "bg-slate-200"
                                         }`}
                                       />
@@ -747,43 +750,43 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   {/* Right Content Card */}
                                   <div
                                     onClick={() => setCurrentStepIndex(idx)}
-                                    className={`flex-1 p-4 sm:p-5 rounded-2xl bg-white border transition-all ${
+                                    className={`flex-1 min-w-0 p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white border transition-all ${
                                       isActive
                                         ? "border-[#6428F5] shadow-sm ring-1 ring-[#6428F5]/10"
                                         : "border-[#E2E8F0] shadow-2xs hover:border-slate-300"
                                     }`}
                                   >
                                     {/* Card Header: Step Title + Reading Time */}
-                                    <div className="flex items-start justify-between gap-2">
-                                      <h4 className="font-bold text-[#111B35] text-sm sm:text-base leading-snug">
+                                    <div className="flex flex-col min-[340px]:flex-row min-[340px]:items-baseline justify-between gap-1 sm:gap-2">
+                                      <h4 className="font-bold text-[#111B35] text-xs sm:text-sm leading-snug break-words">
                                         Step {stepNumber} — {st.title.replace(/^Step\s*\d+[:.—]?\s*/i, "")}
                                       </h4>
-                                      <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap shrink-0 flex items-center gap-1">
+                                      <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium whitespace-nowrap shrink-0 flex items-center gap-1 self-start min-[340px]:self-auto">
                                         <Clock className="w-3 h-3 text-slate-400" />
                                         {st.reading_time || (idx === 1 ? "2 min read" : "1 min read")}
                                       </span>
                                     </div>
 
                                     {/* Step Description */}
-                                    <p className="text-xs sm:text-sm text-[#475569] leading-relaxed mt-1.5">
+                                    <p className="text-[11px] sm:text-xs text-[#475569] leading-relaxed mt-1.5 break-words">
                                       {st.description}
                                     </p>
 
                                     {/* Contextual Panel: Soft Amber Example Panel */}
                                     {st.dummy_example && (
-                                      <div className="mt-3 p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs">
-                                        <span className="text-[#92400E] font-bold uppercase text-[10px] tracking-wider block mb-1">
+                                      <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs">
+                                        <span className="text-[#92400E] font-bold uppercase text-[9px] sm:text-[10px] tracking-wider block mb-1">
                                           Example
                                         </span>
-                                        <div className="font-mono text-xs font-semibold text-[#78350F] bg-white/90 p-2 rounded-lg border border-[#FDE68A]/70 flex items-center justify-between gap-2 shadow-2xs">
-                                          <span className="break-all">{st.dummy_example}</span>
+                                        <div className="font-mono text-[11px] sm:text-xs font-semibold text-[#78350F] bg-white/90 p-1.5 sm:p-2 rounded-md sm:rounded-lg border border-[#FDE68A]/70 flex items-center justify-between gap-2 shadow-2xs">
+                                          <span className="break-all min-w-0">{st.dummy_example}</span>
                                           <button
                                             type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               handleCopySample(st.dummy_example || "", `step-${idx}`);
                                             }}
-                                            className="text-[#92400E] hover:text-[#78350F] p-1 rounded hover:bg-amber-100 transition-colors shrink-0"
+                                            className="text-[#92400E] hover:text-[#78350F] p-1 rounded hover:bg-amber-100 transition-colors shrink-0 cursor-pointer"
                                             title="Copy example"
                                           >
                                             {copiedIndex === `step-${idx}` ? (
@@ -798,14 +801,14 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                                     {/* Contextual Panel: Light-Blue Checklist Panel */}
                                     {st.checklist && st.checklist.length > 0 && (
-                                      <div className="mt-3 p-3.5 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-xs space-y-1.5">
-                                        <span className="text-[#1E40AF] font-bold uppercase text-[10px] tracking-wider block mb-1">
+                                      <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-[11px] sm:text-xs space-y-1">
+                                        <span className="text-[#1E40AF] font-bold uppercase text-[9px] sm:text-[10px] tracking-wider block mb-1">
                                           Verification Checklist
                                         </span>
                                         {st.checklist.map((item: string, cIdx: number) => (
-                                          <div key={cIdx} className="flex items-start gap-2 text-[#1E40AF]">
-                                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#2563EB]" />
-                                            <span className="leading-snug">{item}</span>
+                                          <div key={cIdx} className="flex items-start gap-1.5 text-[#1E40AF]">
+                                            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 mt-0.5 shrink-0 text-[#2563EB]" />
+                                            <span className="leading-snug break-words">{item}</span>
                                           </div>
                                         ))}
                                       </div>
@@ -813,14 +816,14 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                                     {/* Contextual Panel: Light-Green Options Panel */}
                                     {st.options && st.options.length > 0 && (
-                                      <div className="mt-3 p-3.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] text-xs space-y-1.5">
-                                        <span className="text-[#166534] font-bold uppercase text-[10px] tracking-wider block mb-1">
+                                      <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] text-[11px] sm:text-xs space-y-1">
+                                        <span className="text-[#166534] font-bold uppercase text-[9px] sm:text-[10px] tracking-wider block mb-1">
                                           Available Actions
                                         </span>
                                         {st.options.map((opt: string, oIdx: number) => (
-                                          <div key={oIdx} className="flex items-start gap-2 text-[#166534]">
+                                          <div key={oIdx} className="flex items-start gap-1.5 text-[#166534]">
                                             <span className="text-[#16A34A] font-bold shrink-0">•</span>
-                                            <span className="leading-snug">{opt}</span>
+                                            <span className="leading-snug break-words">{opt}</span>
                                           </div>
                                         ))}
                                       </div>
@@ -849,25 +852,25 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                 return (
                                   <div
                                     key={idx}
-                                    className="p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-2xs space-y-2.5 transition-all hover:border-[#6428F5]/40"
+                                    className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-[#E2E8F0] shadow-2xs space-y-2 sm:space-y-2.5 transition-all hover:border-[#6428F5]/40"
                                   >
-                                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5 sm:pb-2">
                                       <span className="font-bold text-xs text-[#111B35]">
                                         {item.field}
                                       </span>
-                                      <span className="px-2 py-0.5 rounded-md bg-[#F5F2FF] text-[#6428F5] text-[10px] font-bold">
+                                      <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-[#F5F2FF] text-[#6428F5] text-[9px] sm:text-[10px] font-bold">
                                         Sample
                                       </span>
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                      <div className="flex-1 p-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] font-mono text-xs font-semibold text-[#111B35] break-all select-all">
+                                      <div className="flex-1 p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] font-mono text-[11px] sm:text-xs font-semibold text-[#111B35] break-all select-all">
                                         {item.sample_value}
                                       </div>
                                       <button
                                         type="button"
                                         onClick={() => handleCopySample(item.sample_value, `dummy-${idx}`)}
-                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all ${
+                                        className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl border transition-all cursor-pointer ${
                                           isCopied
                                             ? "bg-emerald-600 text-white border-emerald-600"
                                             : "bg-white text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-50"
@@ -879,7 +882,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                     </div>
 
                                     {item.instructions && (
-                                      <p className="text-[11px] text-[#475569] leading-normal">
+                                      <p className="text-[10px] sm:text-[11px] text-[#475569] leading-normal">
                                         <span className="font-semibold text-slate-700">Tip:</span> {item.instructions}
                                       </p>
                                     )}
@@ -888,7 +891,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                               })}
                             </div>
                           ) : (
-                            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs">
+                            <div className="p-6 sm:p-8 text-center bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 text-slate-400 text-xs">
                               No specific dummy values defined for this screen.
                             </div>
                           )}
@@ -897,20 +900,20 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                       {/* ─── TAB 3: PRO TIPS ──────────────────────────── */}
                       {activeTab === "tips" && (
-                        <div className="space-y-4 animate-in fade-in duration-150">
-                          <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-950 flex items-center gap-2.5">
-                            <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-150">
+                          <div className="p-3 sm:p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-950 flex items-center gap-2">
+                            <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
                             <span>Recommended operational tips and shortcuts for this desk.</span>
                           </div>
 
                           {tutorial?.tips && tutorial.tips.length > 0 ? (
-                            <div className="space-y-2.5">
+                            <div className="space-y-2 sm:space-y-2.5">
                               {tutorial.tips.map((tip, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex items-start gap-3 p-3.5 rounded-2xl bg-white border border-[#E2E8F0] text-xs sm:text-sm text-[#475569] shadow-2xs"
+                                  className="flex items-start gap-2.5 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-[#E2E8F0] text-xs sm:text-sm text-[#475569] shadow-2xs"
                                 >
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F5F2FF] text-[#6428F5] text-xs font-black">
+                                  <span className="flex h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0 items-center justify-center rounded-full bg-[#F5F2FF] text-[#6428F5] text-[10px] sm:text-xs font-black">
                                     ✓
                                   </span>
                                   <span className="leading-relaxed">{tip}</span>
@@ -918,7 +921,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                               ))}
                             </div>
                           ) : (
-                            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs">
+                            <div className="p-6 sm:p-8 text-center bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 text-slate-400 text-xs">
                               No pro tips defined for this screen.
                             </div>
                           )}
@@ -927,13 +930,13 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                       {/* ─── TAB 4: RELATED GUIDES ────────────────────── */}
                       {activeTab === "related" && (
-                        <div className="space-y-4 animate-in fade-in duration-150">
-                          <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-950 flex items-center justify-between">
+                        <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-150">
+                          <div className="p-3 sm:p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-950 flex items-center justify-between">
                             <span>Explore related desks and workflows for your role.</span>
                             <span className="font-bold text-[#6428F5]">{rolePages.length} Desks</span>
                           </div>
 
-                          <div className="space-y-2.5">
+                          <div className="space-y-2 sm:space-y-2.5">
                             {rolePages.map((p) => {
                               const isCurrent = normalizePath(p.href) === normalizePath(selectedRoute);
 
@@ -941,7 +944,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                 <div
                                   key={p.href}
                                   onClick={() => handleSelectOtherRoute(p.href)}
-                                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 group ${
+                                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 group ${
                                     isCurrent
                                       ? "bg-[#F5F2FF] border-[#6428F5] shadow-xs"
                                       : "bg-white border-[#E2E8F0] hover:border-slate-300"
@@ -989,24 +992,26 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                 </div>
 
                 {/* ─── 4. Sticky Bottom Footer ────────────────────────── */}
-                <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] p-4 sm:px-6 z-20 flex items-center justify-between shrink-0 shadow-xs">
+                <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] p-2.5 sm:p-4 px-3 sm:px-6 z-20 flex items-center justify-between shrink-0 shadow-xs gap-2">
                   {/* Previous Button */}
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={currentStepIndex === 0}
                     onClick={handlePrevStep}
-                    className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    className="h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Previous
+                    <ArrowLeft className="w-3.5 h-3.5 mr-0.5 sm:mr-1 shrink-0" />
+                    <span className="hidden min-[340px]:inline">Previous</span>
+                    <span className="min-[340px]:hidden">Prev</span>
                   </Button>
 
                   {/* Step X of Y Indicator & Horizontal Progress Bar */}
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <span className="text-xs font-bold text-[#111B35]">
+                  <div className="flex flex-col items-center justify-center text-center min-w-0">
+                    <span className="text-[10px] sm:text-xs font-bold text-[#111B35] whitespace-nowrap">
                       Step {currentStepIndex + 1} of {totalSteps}
                     </span>
-                    <div className="w-24 sm:w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1.5">
+                    <div className="w-14 sm:w-28 h-1 sm:h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
                       <div
                         className="h-full bg-[#6428F5] transition-all duration-300 ease-out"
                         style={{ width: `${progressPercentage}%` }}
@@ -1018,17 +1023,19 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                   <Button
                     size="sm"
                     onClick={handleNextStep}
-                    className="h-9 px-4 rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-xs font-semibold shadow-xs cursor-pointer"
+                    className="h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-[11px] sm:text-xs font-semibold shadow-xs cursor-pointer shrink-0"
                   >
                     {currentStepIndex >= totalSteps - 1 ? (
                       <>
-                        <span>Finish Tutorial</span>
-                        <Check className="w-3.5 h-3.5 ml-1.5" />
+                        <span className="hidden min-[340px]:inline">Finish Guide</span>
+                        <span className="min-[340px]:hidden">Done</span>
+                        <Check className="w-3.5 h-3.5 ml-1 shrink-0" />
                       </>
                     ) : (
                       <>
-                        <span>Next Step</span>
-                        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                        <span className="hidden min-[340px]:inline">Next Step</span>
+                        <span className="min-[340px]:hidden">Next</span>
+                        <ArrowRight className="w-3.5 h-3.5 ml-1 shrink-0" />
                       </>
                     )}
                   </Button>

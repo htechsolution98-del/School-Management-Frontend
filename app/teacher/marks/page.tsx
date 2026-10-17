@@ -262,9 +262,9 @@ export default function EnterMarksPage() {
   const uniqueClasses = Array.from(classesMap.values());
 
   return (
-    <div className="space-y-6 pb-12 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-sm">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8] shrink-0 mt-0.5">
             <GraduationCap className="h-5 w-5" />
@@ -517,8 +517,8 @@ export default function EnterMarksPage() {
                     <p className="text-xs text-slate-500">Loading students...</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="overflow-x-auto w-full">
+                    <Table className="min-w-[700px]">
                       <TableHeader className="bg-slate-50/80 border-b border-gray-100">
                         <TableRow>
                           <TableHead className="w-12 text-center font-bold text-xs uppercase tracking-wider text-slate-500">#</TableHead>

@@ -443,7 +443,7 @@ export default function MyLeavesPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28 lg:pb-8 w-full min-w-0 overflow-x-hidden">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5">
         <div>
@@ -491,7 +491,7 @@ export default function MyLeavesPage() {
       {/* Leave Balance Grid */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-200">Remaining Balances</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {isLoading ? (
             [1, 2, 3, 4].map((i) => (
               <Card key={i} className="animate-pulse border border-zinc-250 bg-white dark:bg-zinc-900">
@@ -579,8 +579,8 @@ export default function MyLeavesPage() {
 
       {/* Leave History List */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-2 gap-4">
-          <TabsList className="bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b pb-2 gap-4">
+          <TabsList className="bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl overflow-x-auto max-w-full no-scrollbar flex flex-nowrap shrink-0">
             <TabsTrigger value="pending" className="px-5 py-2 text-sm font-semibold flex items-center gap-2 rounded-lg transition-all">
               Pending
               {!isLoading && (
@@ -676,8 +676,8 @@ export default function MyLeavesPage() {
                 </motion.div>
               ) : viewMode === "table" ? (
                 <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden w-full">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full min-w-[720px] text-left text-xs">
                       <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
                         <tr>
                           <th className="px-4 py-3.5">Request ID</th>

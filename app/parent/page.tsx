@@ -156,43 +156,44 @@ export default function ParentDashboard() {
   }, [activeChild, attendanceAlerts]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-28 lg:pb-8">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles className="h-3.5 w-3.5" /> Parent Portal
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#142044] via-[#1E2E62] to-[#392BC9] p-4 sm:p-6 lg:p-7 text-white shadow-lg border border-[#392BC9]/30">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-[#5436F5]/25 blur-3xl" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1 sm:space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-[10px] sm:text-xs font-semibold uppercase tracking-wider border border-white/10">
+              <Sparkles className="h-3 w-3 text-amber-300" /> Parent Portal
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Parent & Ward Dashboard</h1>
-            <p className="text-purple-100 max-w-xl text-sm md:text-base">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white">Parent & Ward Dashboard</h1>
+            <p className="text-purple-100/90 max-w-xl text-xs sm:text-sm">
               Monitor your ward&apos;s daily attendance, academic achievements, pending fees, and school notifications in real time.
             </p>
           </div>
 
           <Button
             variant="outline"
+            size="sm"
             onClick={loadData}
             disabled={loading}
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white self-start md:self-auto"
+            className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white self-start md:self-auto text-xs font-semibold h-8 px-3 rounded-xl"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
 
 
       {loading ? (
-        <div className="py-24 text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-indigo-600" />
-          <p className="text-sm text-gray-500 mt-2 font-medium">Loading ward profiles & records...</p>
+        <div className="py-20 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#5436F5]" />
+          <p className="text-xs sm:text-sm text-[#7183A6] mt-2 font-medium">Loading ward profiles & records...</p>
         </div>
       ) : children.length === 0 ? (
-        <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <User className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-          <h3 className="text-lg font-bold text-gray-900">No Student Profile Linked</h3>
-          <p className="text-sm text-gray-500 max-w-md mx-auto mt-1">
+        <div className="rounded-2xl sm:rounded-3xl border border-[#E5EAF4] bg-white p-8 sm:p-12 text-center shadow-xs">
+          <User className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mb-3" />
+          <h3 className="text-base sm:text-lg font-bold text-[#142044]">No Student Profile Linked</h3>
+          <p className="text-xs sm:text-sm text-[#7183A6] max-w-md mx-auto mt-1">
             Your parent account is active, but no student has been assigned to your profile yet. Please contact the school clerk with your GR number.
           </p>
         </div>
@@ -200,19 +201,19 @@ export default function ParentDashboard() {
         <>
           {/* Child Switcher (if multiple children) */}
           {children.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Select Ward:</span>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#7183A6] shrink-0">Select Ward:</span>
               {children.map((kid, idx) => (
                 <button
                   key={kid.id}
                   onClick={() => setSelectedChildIndex(idx)}
-                  className={`flex items-center gap-2.5 px-4 py-2 rounded-2xl font-semibold text-sm transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all shrink-0 ${
                     selectedChildIndex === idx
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                      : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      ? "bg-[#5436F5] text-white shadow-sm shadow-[#5436F5]/30"
+                      : "bg-white border border-[#E5EAF4] text-[#142044] hover:bg-[#F5F7FC]"
                   }`}
                 >
-                  <GraduationCap className="h-4 w-4" />
+                  <GraduationCap className="h-3.5 w-3.5" />
                   {kid.name} {kid.surname} ({kid.school_class_name || "Student"})
                 </button>
               ))}
@@ -220,21 +221,21 @@ export default function ParentDashboard() {
           )}
 
           {activeChild && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Absent Warning Banner if marked absent */}
               {latestAbsentNotice && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-3xl border-2 border-rose-300 bg-gradient-to-r from-rose-50 via-red-50/60 to-orange-50 p-5 shadow-sm text-rose-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 shadow-xs text-rose-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                 >
-                  <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="p-3 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-200 shrink-0">
-                      <AlertTriangle className="h-6 w-6 animate-pulse" />
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-rose-600 text-white shadow-xs shrink-0">
+                      <AlertTriangle className="h-5 w-5 animate-pulse" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md bg-rose-200/90 text-rose-900 text-[10px] font-black uppercase tracking-wider">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-200 text-rose-900 text-[10px] font-black uppercase tracking-wider">
                           Attendance Notification
                         </span>
                         <span className="text-xs text-rose-600 font-semibold">
@@ -248,65 +249,65 @@ export default function ParentDashboard() {
                             : "Today"}
                         </span>
                       </div>
-                      <h4 className="text-base font-extrabold text-rose-950 mt-1">
+                      <h4 className="text-sm sm:text-base font-extrabold text-rose-950 mt-1">
                         {activeChild.name} {activeChild.surname} was marked ABSENT
                       </h4>
-                      <p className="text-xs sm:text-sm font-semibold text-rose-800 mt-0.5">
+                      <p className="text-xs font-medium text-rose-800 mt-0.5">
                         {latestAbsentNotice.description || "Your child's attendance has been marked as Absent."}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    <span className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3.5 py-1.5 rounded-xl shadow-2xs">
+                    <span className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1 rounded-xl shadow-2xs">
                       Status: Absent
                     </span>
                   </div>
                 </motion.div>
               )}
 
-              {/* Dynamic Stats Grid */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Dynamic Stats Grid - 2 columns on mobile */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
                 {[
                   {
                     label: "Attendance Rate",
                     value: `${activeChild.attendance_percentage}%`,
-                    sub: `${activeChild.present_days} / ${activeChild.total_working_days} Days Present`,
+                    sub: `${activeChild.present_days} / ${activeChild.total_working_days} Days`,
                     icon: Calendar,
-                    color: "text-blue-600",
-                    bg: "bg-blue-50",
-                    border: "border-blue-100",
+                    color: "text-[#5436F5]",
+                    bg: "bg-[#5436F5]/10",
+                    border: "border-[#5436F5]/20",
                   },
                   {
                     label: "Class & Roll No",
                     value: activeChild.school_class_name
-                      ? `${activeChild.school_class_name} - ${activeChild.division || "A"}`
-                      : "Class Enrolled",
-                    sub: `Roll No: ${activeChild.roll_no || "N/A"} • GR: ${activeChild.gr_no || "N/A"}`,
+                    ? `${activeChild.school_class_name} - ${activeChild.division || "A"}`
+                    : "Enrolled",
+                    sub: `Roll: ${activeChild.roll_no || "N/A"} • GR: ${activeChild.gr_no || "N/A"}`,
                     icon: GraduationCap,
                     color: "text-emerald-600",
                     bg: "bg-emerald-50",
-                    border: "border-emerald-100",
+                    border: "border-emerald-200/60",
                   },
                   {
                     label: "Fee Settlement",
                     value: activeChild.fee_status,
                     sub:
                       activeChild.pending_fees > 0
-                        ? `Pending: ₹${activeChild.pending_fees.toLocaleString()}`
+                        ? `Due: ₹${activeChild.pending_fees.toLocaleString()}`
                         : "All dues clear",
                     icon: CreditCard,
                     color: activeChild.pending_fees > 0 ? "text-amber-600" : "text-violet-600",
                     bg: activeChild.pending_fees > 0 ? "bg-amber-50" : "bg-violet-50",
-                    border: activeChild.pending_fees > 0 ? "border-amber-100" : "border-violet-100",
+                    border: activeChild.pending_fees > 0 ? "border-amber-200/60" : "border-violet-200/60",
                   },
                   {
-                    label: "School Notices & Alerts",
+                    label: "School Notices",
                     value: (activeChild.notices?.length || attendanceAlerts.length || 0),
-                    sub: latestAbsentNotice ? "⚠️ Active absence alert" : "Recent updates & bulletins",
+                    sub: latestAbsentNotice ? "Active alert" : "Bulletins",
                     icon: latestAbsentNotice ? AlertTriangle : Bell,
                     color: latestAbsentNotice ? "text-rose-600" : "text-orange-600",
                     bg: latestAbsentNotice ? "bg-rose-50" : "bg-orange-50",
-                    border: latestAbsentNotice ? "border-rose-200" : "border-orange-100",
+                    border: latestAbsentNotice ? "border-rose-200" : "border-orange-200/60",
                   },
                 ].map((stat, idx) => {
                   const Icon = stat.icon;
@@ -316,16 +317,16 @@ export default function ParentDashboard() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className={`rounded-2xl border ${stat.border} bg-white p-5 shadow-sm hover:shadow-md transition-shadow`}
+                      className={`rounded-2xl border ${stat.border} bg-white p-3 sm:p-5 shadow-xs hover:shadow-sm transition-shadow`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
-                          <p className="text-xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                          <p className="text-xs text-gray-500 mt-1 font-medium">{stat.sub}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs font-semibold text-[#7183A6] uppercase tracking-wider truncate">{stat.label}</p>
+                          <p className="text-base sm:text-xl font-black text-[#142044] mt-0.5 sm:mt-1 truncate">{stat.value}</p>
+                          <p className="text-[10px] sm:text-xs text-[#7183A6] mt-0.5 font-medium truncate">{stat.sub}</p>
                         </div>
-                        <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shadow-inner`}>
-                          <Icon className="h-6 w-6" />
+                        <div className={`p-2 sm:p-2.5 rounded-xl ${stat.bg} ${stat.color} shrink-0`}>
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                         </div>
                       </div>
                     </motion.div>
@@ -334,7 +335,7 @@ export default function ParentDashboard() {
               </div>
 
               {/* Student Identity & Placement Details */}
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-[#E5EAF4] bg-white p-4 sm:p-6 shadow-xs">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
@@ -391,17 +392,17 @@ export default function ParentDashboard() {
 
                     <div className="space-y-4">
                       <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100">
-                          <p className="text-xs text-gray-500 font-medium">Total Billed</p>
-                          <p className="text-base font-bold text-gray-900 mt-1">₹{activeChild.total_fees.toLocaleString()}</p>
+                        <div className="bg-gray-50 rounded-2xl p-2.5 sm:p-3 border border-gray-100 min-w-0">
+                          <p className="text-[11px] sm:text-xs text-gray-500 font-medium truncate">Total Billed</p>
+                          <p className="text-xs sm:text-base font-bold text-gray-900 mt-1 truncate">₹{activeChild.total_fees.toLocaleString()}</p>
                         </div>
-                        <div className="bg-emerald-50/70 rounded-2xl p-3 border border-emerald-100">
-                          <p className="text-xs text-emerald-700 font-medium">Total Paid</p>
-                          <p className="text-base font-bold text-emerald-700 mt-1">₹{activeChild.paid_fees.toLocaleString()}</p>
+                        <div className="bg-emerald-50/70 rounded-2xl p-2.5 sm:p-3 border border-emerald-100 min-w-0">
+                          <p className="text-[11px] sm:text-xs text-emerald-700 font-medium truncate">Total Paid</p>
+                          <p className="text-xs sm:text-base font-bold text-emerald-700 mt-1 truncate">₹{activeChild.paid_fees.toLocaleString()}</p>
                         </div>
-                        <div className="bg-rose-50/70 rounded-2xl p-3 border border-rose-100">
-                          <p className="text-xs text-rose-700 font-medium">Outstanding</p>
-                          <p className="text-base font-bold text-rose-700 mt-1">₹{activeChild.pending_fees.toLocaleString()}</p>
+                        <div className="bg-rose-50/70 rounded-2xl p-2.5 sm:p-3 border border-rose-100 min-w-0">
+                          <p className="text-[11px] sm:text-xs text-rose-700 font-medium truncate">Outstanding</p>
+                          <p className="text-xs sm:text-base font-bold text-rose-700 mt-1 truncate">₹{activeChild.pending_fees.toLocaleString()}</p>
                         </div>
                       </div>
 
@@ -451,13 +452,13 @@ export default function ParentDashboard() {
                     </div>
 
                     <div className="space-y-3">
-                      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 flex items-center justify-between">
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div>
                           <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Cumulative Performance</span>
                           <div className="text-2xl font-black text-indigo-950 mt-0.5">86.40%</div>
                           <span className="text-xs text-indigo-700 font-medium">Grade A • Passed & Promoted</span>
                         </div>
-                        <div className="text-right">
+                        <div className="sm:text-right">
                           <span className="text-xs text-slate-500 block">Class Rank</span>
                           <span className="text-lg font-black text-indigo-600 font-mono">#03</span>
                         </div>

@@ -890,7 +890,7 @@ export default function ProgressReportsPage() {
   }, [studentReportsMap]);
 
   return (
-    <div className="space-y-6 pb-12 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Print Media Stylesheet to print ONLY the report card */}
       <style jsx global>{`
         @media print {
@@ -914,7 +914,7 @@ export default function ProgressReportsPage() {
       `}</style>
 
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
             <FileCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
@@ -1022,8 +1022,8 @@ export default function ProgressReportsPage() {
               No students found for this division.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full min-w-[700px] text-left text-xs">
                 <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
                   <tr>
                     <th className="px-4 py-3.5 w-12 text-center">#</th>

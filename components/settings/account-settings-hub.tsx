@@ -205,9 +205,9 @@ export function AccountSettingsHub({
   const strengthMeta = getStrengthMeta();
 
   return (
-    <div className="space-y-6 pb-16 min-w-0 max-w-6xl mx-auto">
+    <div className="space-y-6 pb-16 w-full min-w-0 max-w-6xl mx-auto overflow-x-hidden">
       {/* ─── HEADER CARD ────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
             <KeyRound className="h-6 w-6 stroke-[2.2]" />
@@ -289,29 +289,29 @@ export function AccountSettingsHub({
 
                 {/* Info List */}
                 <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <span className="text-slate-500 flex items-center gap-2 font-medium">
+                  <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                    <span className="text-slate-500 flex items-center gap-2 font-medium shrink-0">
                       <Mail className="w-3.5 h-3.5 text-slate-400" /> Email Address
                     </span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200">
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 truncate text-right">
                       {profile?.email || "Not specified"}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <span className="text-slate-500 flex items-center gap-2 font-medium">
+                  <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                    <span className="text-slate-500 flex items-center gap-2 font-medium shrink-0">
                       <Phone className="w-3.5 h-3.5 text-slate-400" /> Mobile Number
                     </span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200">
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 truncate text-right">
                       {profile?.mobile || "Not specified"}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <span className="text-slate-500 flex items-center gap-2 font-medium">
+                  <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                    <span className="text-slate-500 flex items-center gap-2 font-medium shrink-0">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" /> Member Since
                     </span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200">
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 truncate text-right">
                       {formatDate(profile?.date_joined)}
                     </span>
                   </div>

@@ -194,15 +194,15 @@ export default function StudyMaterialsPage() {
   });
 
   return (
-    <div className="space-y-6 pb-12 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-[#E5EAF4] shadow-2xs">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
-            <FileText className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+          <h1 className="text-xl font-black tracking-tight text-[#142044] flex items-center gap-2.5">
+            <FileText className="h-6 w-6 text-[#5436F5]" />
             Study Materials & Assignments Uploader
           </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+          <p className="text-xs text-[#7183A6] mt-1">
             Upload study materials, practice sheets, and reference notes (PDF, JPG, PNG, DOCX - max 5MB per file) for students.
           </p>
         </div>
@@ -210,13 +210,13 @@ export default function StudyMaterialsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Upload Form */}
-        <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardHeader className="pb-3 border-b dark:border-zinc-800">
-            <CardTitle className="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-indigo-600" />
+        <Card className="rounded-2xl border border-[#E5EAF4] bg-white shadow-2xs">
+          <CardHeader className="pb-3 border-b border-[#E5EAF4]">
+            <CardTitle className="text-sm font-bold text-[#142044] flex items-center gap-2">
+              <Plus className="h-4 w-4 text-[#5436F5]" />
               Upload New Material
             </CardTitle>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-xs text-[#7183A6]">
               Select class, subject, and multiple files (up to 5MB each) to share with students.
             </CardDescription>
           </CardHeader>

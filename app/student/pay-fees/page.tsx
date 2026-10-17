@@ -343,8 +343,8 @@ function ReceiptModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -657,7 +657,7 @@ export default function PayFeesPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Error Banner */}
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-600 text-sm">
@@ -673,29 +673,29 @@ export default function PayFeesPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
             <div
               key={index}
-              className={`bg-white rounded-2xl border ${card.border} p-5 flex flex-col gap-3 shadow-sm`}
+              className={`bg-white rounded-2xl border ${card.border} p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3 shadow-sm`}
             >
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${card.iconBg}`}
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${card.iconBg}`}
               >
-                <Icon className={`w-6 h-6 ${card.iconColor}`} />
+                <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500 mb-1">{card.title}</p>
+                <p className="text-xs sm:text-sm text-gray-500 mb-0.5 sm:mb-1">{card.title}</p>
                 {loading ? (
-                  <div className="h-8 w-28 bg-gray-100 animate-pulse rounded-lg" />
+                  <div className="h-7 sm:h-8 w-24 sm:w-28 bg-gray-100 animate-pulse rounded-lg" />
                 ) : (
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">
                     {card.amount}
                   </p>
                 )}
-                <p className="text-xs text-gray-400 mt-1">{card.description}</p>
+                <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">{card.description}</p>
               </div>
             </div>
           );
@@ -703,11 +703,11 @@ export default function PayFeesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6 flex flex-wrap gap-3 items-center shadow-sm">
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6 flex flex-wrap gap-2 sm:gap-3 items-center shadow-sm">
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
         >
           <option>All Months</option>
           {MONTHS.map((m) => (
@@ -718,7 +718,7 @@ export default function PayFeesPage() {
         <select
           value={selectedStatus}
           onChange={(e) => setSelectedStatus(e.target.value)}
-          className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
         >
           <option>All Status</option>
           <option>Paid</option>
@@ -727,22 +727,22 @@ export default function PayFeesPage() {
           <option>Cancelled</option>
         </select>
 
-        <div className="flex-1 relative min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <div className="flex-1 relative min-w-[140px] sm:min-w-[180px]">
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <input
             type="text"
             placeholder="Search fees..."
             value={searchFees}
             onChange={(e) => setSearchFees(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="w-full pl-8 sm:pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
           />
         </div>
 
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors ml-auto"
+          className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ml-auto"
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Export
         </button>
       </div>
@@ -783,9 +783,9 @@ export default function PayFeesPage() {
                 key={fee.id}
                 className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm"
               >
-                <div className="flex flex-wrap gap-4 items-start">
+                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                   {/* Left: Icon + Title */}
-                  <div className="flex items-start gap-3 min-w-[160px]">
+                  <div className="flex items-start gap-3 w-full lg:w-auto min-w-0">
                     <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
                       <svg
                         className="w-6 h-6 text-purple-600"
@@ -821,11 +821,11 @@ export default function PayFeesPage() {
                         <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-base">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-gray-900 text-base truncate">
                         {billingPeriodToLabel(fee.billing_period)} Fee
                       </p>
-                      <p className="text-sm text-gray-400 mb-2">
+                      <p className="text-sm text-gray-400 mb-2 truncate">
                         {billingPeriodToLabel(fee.billing_period)}
                       </p>
                       <StatusBadge status={fee.status as FeeStatus} />
@@ -833,7 +833,7 @@ export default function PayFeesPage() {
                   </div>
 
                   {/* Middle: Fee Details */}
-                  <div className="flex-1 grid grid-cols-3 gap-x-6 gap-y-3 min-w-[280px]">
+                  <div className="w-full lg:flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3 min-w-0">
                     <div>
                       <p className="text-xs text-gray-400 mb-1">Amount</p>
                       <p className="text-sm font-semibold text-gray-800">
@@ -877,33 +877,33 @@ export default function PayFeesPage() {
                   </div>
 
                   {/* Right: Actions */}
-                  <div className="flex flex-col items-end gap-2 min-w-[130px]">
-                    <button className="text-gray-400 hover:text-gray-600 self-end">
+                  <div className="flex flex-row lg:flex-col items-center lg:items-end gap-2 w-full lg:w-auto min-w-0 lg:min-w-[130px] pt-2 lg:pt-0 border-t lg:border-t-0 border-gray-100">
+                    <button className="text-gray-400 hover:text-gray-600 hidden lg:block self-end">
                       <MoreVertical className="w-5 h-5" />
                     </button>
                     {String(fee.status).toLowerCase() === "paid" ? (
-                      <div className="w-full bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Fees Already Paid
+                      <div className="flex-1 lg:w-full bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-center flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>Paid</span>
                       </div>
                     ) : String(fee.status).toLowerCase() === "cancelled" ? (
-                      <div className="text-gray-400 text-sm font-medium mt-1">
+                      <div className="flex-1 lg:w-full text-gray-400 text-sm font-medium mt-1 text-center">
                         Cancelled
                       </div>
                     ) : (
                       <button
                         onClick={() => setPayingFee(fee)}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl text-sm font-semibold transition-colors"
+                        className="flex-1 lg:w-full bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-center"
                       >
                         Pay Now
                       </button>
                     )}
                     <button
                       onClick={() => setReceiptFee(fee)}
-                      className="w-full flex items-center justify-center gap-2 border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                      className="flex-1 lg:w-full flex items-center justify-center gap-1.5 sm:gap-2 border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
                     >
-                      <Download className="w-4 h-4" />
-                      Receipt
+                      <Download className="w-4 h-4 shrink-0" />
+                      <span>Receipt</span>
                     </button>
                   </div>
                 </div>
@@ -947,8 +947,8 @@ export default function PayFeesPage() {
             No payments recorded yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[620px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left text-gray-500 font-medium py-3 pr-4">

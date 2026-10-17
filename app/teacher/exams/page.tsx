@@ -652,7 +652,7 @@ export default function TeacherExamsPage() {
 
   return (
     <div
-      className="w-full min-h-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-x-hidden relative animate-fade-in"
+      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 overflow-x-hidden relative animate-fade-in"
       style={{ fontFamily: "'Outfit', sans-serif" }}
     >
       <style>{`
@@ -1152,8 +1152,8 @@ export default function TeacherExamsPage() {
                 <p className="text-xs font-bold">No students registered in this class.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[650px] border-collapse">
                   <thead>
                     <tr className="bg-slate-50/40 text-left border-b border-slate-100 text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
                       <th className="px-6 py-4.5">GR No.</th>

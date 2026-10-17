@@ -52,16 +52,16 @@ export default function ParentAttendancePage() {
   const activeChild = children[selectedChildIndex];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12 w-full min-w-0 overflow-x-hidden">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-8 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-5 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-emerald-200 text-xs font-semibold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" /> Child School Attendance Portal
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Student Attendance & Alerts</h1>
-            <p className="text-emerald-100 max-w-xl text-sm md:text-base">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Student Attendance & Alerts</h1>
+            <p className="text-emerald-100 max-w-xl text-xs sm:text-base">
               Track daily presence, view attendance percentages, and receive real-time absentee alerts for your ward.
             </p>
           </div>
@@ -79,12 +79,12 @@ export default function ParentAttendancePage() {
 
       {/* Child Selector Tabs */}
       {children.length > 1 && (
-        <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+        <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto max-w-full no-scrollbar">
           {children.map((child, idx) => (
             <button
               key={child.id}
               onClick={() => setSelectedChildIndex(idx)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shrink-0 transition-all ${
                 selectedChildIndex === idx
                   ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"

@@ -175,64 +175,23 @@ function StatCard({
   iconColor: string;
 }) {
   return (
-    <div
-      style={{
-        ...S.card,
-        padding: "18px 20px",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        flex: 1,
-        minWidth: 140,
-        overflow: "visible",
-      }}
-    >
+    <div className="bg-white rounded-2xl border border-[#ede9fe] shadow-2xs p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 min-w-0 w-full overflow-hidden">
       <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: 11,
-          background: iconBg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
+        className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: iconBg }}
       >
-        <Icon size={19} color={iconColor} />
+        <Icon size={18} color={iconColor} />
       </div>
-      <div>
-        <div
-          style={{
-            fontSize: 10,
-            color: "#9ca3af",
-            fontWeight: 700,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
+      <div className="min-w-0 flex-1">
+        <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold tracking-wider uppercase truncate">
           {label}
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 5,
-            marginTop: 2,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 24,
-              fontWeight: 800,
-              color: "#1e1b4b",
-              lineHeight: 1,
-            }}
-          >
+        <div className="flex items-baseline gap-1 sm:gap-1.5 mt-0.5 min-w-0">
+          <span className="text-lg sm:text-2xl font-black text-[#1e1b4b] leading-tight truncate">
             {value}
           </span>
           {sub && (
-            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">
               {sub}
             </span>
           )}
@@ -917,12 +876,7 @@ function StudentListView({
 
   return (
     <div
-      style={{
-        padding: "24px",
-        background: "#f8f7ff",
-        minHeight: "100%",
-        fontFamily: "'Sora', sans-serif",
-      }}
+      className="p-3 sm:p-6 pb-28 lg:pb-8 bg-[#f8f7ff] min-h-full font-['Sora',sans-serif] w-full min-w-0 max-w-full overflow-x-hidden"
     >
       {isAlreadyMarkedToday && (
         <div
@@ -1107,9 +1061,7 @@ function StudentListView({
       </div>
 
       {/* Stats row */}
-      <div
-        style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}
-      >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 mb-5 w-full">
         <StatCard
           label="Total Students"
           value={String(students.length)}
@@ -1505,12 +1457,7 @@ function MarkAttendanceView({
 
   return (
     <div
-      style={{
-        padding: "24px",
-        background: "#f8f7ff",
-        minHeight: "100%",
-        fontFamily: "'Sora', sans-serif",
-      }}
+      className="p-3 sm:p-6 pb-28 lg:pb-8 bg-[#f8f7ff] min-h-full font-['Sora',sans-serif] w-full min-w-0 max-w-full overflow-x-hidden"
     >
       {/* Confirm modal */}
       {showConfirm && (
@@ -1631,69 +1578,64 @@ function MarkAttendanceView({
       )}
 
       {/* Class info bar */}
-      <div
-        style={{
-          ...S.card,
-          padding: "18px 24px",
-          marginBottom: 18,
-          display: "flex",
-          alignItems: "center",
-          gap: 28,
-          flexWrap: "wrap",
-          overflow: "visible",
-        }}
-      >
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 11,
-            background: "linear-gradient(135deg,#ede9fe,#ddd6fe)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <ClipboardList size={20} color="#7c3aed" />
-        </div>
-
-        {[
-          { label: "Division",       value: divisionName },
-          { label: "Total Students", value: String(students.length) },
-          {
-            label: "Present",
-            value: presentCount > 0 ? String(presentCount) : "—",
-          },
-          {
-            label: "Absent",
-            value: absentCount > 0 ? String(absentCount) : "—",
-          },
-        ].map((item) => (
-          <div key={item.label}>
-            <div
-              style={{
-                fontSize: 9,
-                color: "#9ca3af",
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {item.label}
-            </div>
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 800,
-                color: "#1e1b4b",
-                marginTop: 2,
-              }}
-            >
-              {item.value}
-            </div>
+      <div className="bg-white rounded-2xl border border-[#ede9fe] shadow-2xs p-3.5 sm:p-5 mb-4 flex flex-wrap items-center justify-between gap-3 sm:gap-6 w-full min-w-0">
+        <div className="flex items-center gap-3 sm:gap-5 flex-wrap flex-1 min-w-0">
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 11,
+              background: "linear-gradient(135deg,#ede9fe,#ddd6fe)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <ClipboardList size={18} color="#7c3aed" />
           </div>
-        ))}
+
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-3 sm:gap-6 flex-1 min-w-0">
+            {[
+              { label: "Division",       value: divisionName },
+              { label: "Total Students", value: String(students.length) },
+              {
+                label: "Present",
+                value: presentCount > 0 ? String(presentCount) : "—",
+              },
+              {
+                label: "Absent",
+                value: absentCount > 0 ? String(absentCount) : "—",
+              },
+            ].map((item) => (
+              <div key={item.label} className="min-w-0">
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: "#9ca3af",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                  className="truncate"
+                >
+                  {item.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 800,
+                    color: "#1e1b4b",
+                    marginTop: 2,
+                  }}
+                  className="truncate"
+                >
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Live donut */}
         <div style={{ marginLeft: "auto" }}>
