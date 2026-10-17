@@ -152,14 +152,14 @@ function LoginFormInner() {
         >
           <Label
             htmlFor="username"
-            className="text-sm font-bold text-[#1D496C]"
+            className="text-sm font-bold text-[#142044]"
           >
             Mobile, GR No, or Username
           </Label>
           <div className="relative">
             <User
               className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
-                focused === "username" ? "text-[#FFA600]" : "text-[#94A3B8]"
+                focused === "username" ? "text-[#5436F5]" : "text-[#7183A6]"
               }`}
             />
             <Input
@@ -172,7 +172,7 @@ function LoginFormInner() {
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}
               suppressHydrationWarning
-              className="pl-10 h-12 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#CBD5E1] shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/20 transition-all duration-200"
+              className="pl-10 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#5436F5] focus:ring-2 focus:ring-[#5436F5]/20 transition-all duration-200"
             />
           </div>
         </motion.div>
@@ -188,13 +188,13 @@ function LoginFormInner() {
           <div className="flex items-center justify-between">
             <Label
               htmlFor="password"
-              className="text-sm font-bold text-[#1D496C]"
+              className="text-sm font-bold text-[#142044]"
             >
               Password
             </Label>
             <a
               href="#"
-              className="text-xs font-bold text-[#FFA600] hover:text-[#ED6708] transition-colors underline-offset-2 hover:underline"
+              className="text-xs font-bold text-[#5436F5] hover:text-[#392BC9] transition-colors underline-offset-2 hover:underline"
             >
               Forgot password?
             </a>
@@ -202,7 +202,7 @@ function LoginFormInner() {
           <div className="relative">
             <Lock
               className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
-                focused === "password" ? "text-[#FFA600]" : "text-[#94A3B8]"
+                focused === "password" ? "text-[#5436F5]" : "text-[#7183A6]"
               }`}
             />
             <Input
@@ -215,21 +215,21 @@ function LoginFormInner() {
               onFocus={() => setFocused("password")}
               onBlur={() => setFocused(null)}
               suppressHydrationWarning
-              className="pl-10 pr-11 h-12 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#CBD5E1] shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/20 transition-all duration-200"
+              className="pl-10 pr-11 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#5436F5] focus:ring-2 focus:ring-[#5436F5]/20 transition-all duration-200"
             />
             <button
               type="button"
               tabIndex={-1}
               suppressHydrationWarning
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] transition-colors"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#7183A6] hover:text-[#142044] transition-colors"
             >
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
                   key={showPassword ? "hide" : "show"}
                   initial={{ opacity: 0, scale: 0.7 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.7 }}
+                  exit={{ opacity: 0, scale: 1 }}
                   transition={{ duration: 0.15 }}
                 >
                   {showPassword ? (
@@ -250,7 +250,7 @@ function LoginFormInner() {
             animate={{ opacity: 1 }}
             className="text-center"
           >
-            <p className="text-sm font-semibold text-red-500">{error}</p>
+            <p className="text-sm font-semibold text-rose-500">{error}</p>
           </motion.div>
         )}
 
@@ -266,7 +266,7 @@ function LoginFormInner() {
             type="submit"
             disabled={isLoading}
             suppressHydrationWarning
-            className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-[#1D496C] via-[#285E89] to-[#429CE4] text-white font-bold text-sm shadow-lg shadow-[#1D496C]/10 hover:shadow-xl hover:from-[#153957] hover:to-[#2e7ca8] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
+            className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-[#5436F5] via-[#4527D6] to-[#392BC9] text-white font-bold text-sm shadow-md shadow-[#5436F5]/25 hover:shadow-lg hover:from-[#4527D6] hover:to-[#301EA8] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
           >
             <AnimatePresence mode="wait" initial={false}>
               {isLoading ? (

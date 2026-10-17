@@ -1171,7 +1171,7 @@ function HomeworkPageInner() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto overflow-x-hidden p-2 sm:p-4">
+    <div className="max-w-7xl mx-auto overflow-x-hidden w-full min-w-0 p-2 sm:p-4">
       {selectedHw ? (
         <HomeworkDetailView
           hw={selectedHw}

@@ -362,9 +362,9 @@ export function AnnouncementsHub({
     : "Stay updated with important announcements, circulars, and notices from school administration.";
 
   return (
-    <div className="space-y-6 pb-16 min-w-0 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-16 min-w-0 max-w-7xl mx-auto w-full overflow-x-hidden">
       {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs">

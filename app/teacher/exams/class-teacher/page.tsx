@@ -416,7 +416,7 @@ export default function ClassTeacherExamsPage() {
   ];
 
   return (
-    <div className="w-full min-h-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 relative" style={{ fontFamily: "Outfit,sans-serif" }}>
+    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 relative overflow-x-hidden" style={{ fontFamily: "Outfit,sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*,*::before,*::after{box-sizing:border-box}`}</style>
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-80 h-80 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
@@ -495,13 +495,15 @@ export default function ClassTeacherExamsPage() {
           <Button onClick={() => load(month, year)} className="mt-4 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl px-5">Retry</Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden z-10">
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 border-b border-slate-100">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="py-3 text-center text-[10px] font-black uppercase tracking-widest text-indigo-600">{d}</div>
-            ))}
-          </div>
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden z-10 w-full">
+          <div className="overflow-x-auto w-full">
+            <div className="min-w-[620px]">
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 border-b border-slate-100">
+                {WEEKDAYS.map((d) => (
+                  <div key={d} className="py-3 text-center text-[10px] font-black uppercase tracking-widest text-indigo-600">{d}</div>
+                ))}
+              </div>
 
           {/* Day cells */}
           <div className="grid grid-cols-7">
@@ -565,6 +567,8 @@ export default function ClassTeacherExamsPage() {
                 </div>
               );
             })}
+          </div>
+            </div>
           </div>
         </div>
       )}

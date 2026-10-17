@@ -306,7 +306,7 @@ export default function ClerkDashboard() {
   };
 
   return (
-    <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-6">
+    <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-4 sm:space-y-6 pb-28 lg:pb-8">
       {/* ─── Top Sub-bar: Date & Action Buttons ───────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200/80 px-3.5 py-2.5 rounded-xl shadow-2xs">
@@ -428,28 +428,28 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── 5 Key Metrics Pastel Cards ──────────────────────────────────── */}
-      <div className="dashboard-metrics grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="dashboard-metrics grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-5">
         {/* 1. Total Students (Sky Blue Pastel) */}
         <Link
           href="/clerk/students"
-          className="bg-gradient-to-br from-[#eff6ff] to-[#f8fafc] p-5 rounded-2xl border border-blue-100/90 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all group flex flex-col justify-between relative overflow-hidden"
+          className="bg-gradient-to-br from-[#eff6ff] to-[#f8fafc] p-3.5 sm:p-5 rounded-2xl border border-blue-100/90 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all group flex flex-col justify-between relative overflow-hidden"
         >
           {/* Subtle Dot Matrix Pattern */}
           <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-blue-400">
             <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Users size={22} />
+          <div className="flex items-center justify-between mb-2 sm:mb-3 relative z-10">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">TOTAL STUDENTS</span>
+            <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate ml-1">STUDENTS</span>
           </div>
           <div className="relative z-10">
-            <div className="text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-blue-400" /> : totalStudentsCount.toLocaleString("en-IN")}
+            <div className="text-xl sm:text-3xl font-black text-[#142044]">
+              {loading ? <Loader2 size={20} className="animate-spin text-blue-400" /> : totalStudentsCount.toLocaleString("en-IN")}
             </div>
-            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active Enrolled
+            <p className="text-[10px] sm:text-xs font-semibold text-emerald-600 mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 shrink-0" /> Active Enrolled
             </p>
           </div>
         </Link>
@@ -457,23 +457,23 @@ export default function ClerkDashboard() {
         {/* 2. New Admissions (Mint Green Pastel) */}
         <Link
           href="/clerk/admission-form"
-          className="bg-gradient-to-br from-[#f0fdf4] to-[#f8fafc] p-5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-200 transition-all group flex flex-col justify-between relative overflow-hidden"
+          className="bg-gradient-to-br from-[#f0fdf4] to-[#f8fafc] p-3.5 sm:p-5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-200 transition-all group flex flex-col justify-between relative overflow-hidden"
         >
           <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-emerald-400">
             <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <UserPlus size={22} />
+          <div className="flex items-center justify-between mb-2 sm:mb-3 relative z-10">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">NEW ADMISSIONS</span>
+            <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate ml-1">ADMISSIONS</span>
           </div>
           <div className="relative z-10">
-            <div className="text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-emerald-400" /> : newAdmissionsCount.toLocaleString("en-IN")}
+            <div className="text-xl sm:text-3xl font-black text-[#142044]">
+              {loading ? <Loader2 size={20} className="animate-spin text-emerald-400" /> : newAdmissionsCount.toLocaleString("en-IN")}
             </div>
-            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Total Applications
+            <p className="text-[10px] sm:text-xs font-semibold text-emerald-600 mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 shrink-0" /> Applications
             </p>
           </div>
         </Link>
@@ -485,23 +485,23 @@ export default function ClerkDashboard() {
             el?.scrollIntoView({ behavior: "smooth" });
             setAdmissionFilter("pending");
           }}
-          className="bg-gradient-to-br from-[#fffbeb] to-[#f8fafc] p-5 rounded-2xl border border-amber-100/90 shadow-2xs hover:shadow-md hover:border-amber-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
+          className="bg-gradient-to-br from-[#fffbeb] to-[#f8fafc] p-3.5 sm:p-5 rounded-2xl border border-amber-100/90 shadow-2xs hover:shadow-md hover:border-amber-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
         >
           <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-amber-400">
             <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Clock size={22} />
+          <div className="flex items-center justify-between mb-2 sm:mb-3 relative z-10">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">PENDING REVIEW</span>
+            <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate ml-1">PENDING GR</span>
           </div>
           <div className="relative z-10">
-            <div className="text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-amber-400" /> : pendingAdmissionsCount.toLocaleString("en-IN")}
+            <div className="text-xl sm:text-3xl font-black text-[#142044]">
+              {loading ? <Loader2 size={20} className="animate-spin text-amber-400" /> : pendingAdmissionsCount.toLocaleString("en-IN")}
             </div>
-            <p className="text-xs font-semibold text-amber-600 mt-2 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-amber-500" /> Awaiting GR No.
+            <p className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500 shrink-0" /> Needs GR No.
             </p>
           </div>
         </div>
@@ -513,23 +513,23 @@ export default function ClerkDashboard() {
             el?.scrollIntoView({ behavior: "smooth" });
             setDocFilter("pending");
           }}
-          className="bg-gradient-to-br from-[#fff1f2] to-[#f8fafc] p-5 rounded-2xl border border-rose-100/90 shadow-2xs hover:shadow-md hover:border-rose-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
+          className="bg-gradient-to-br from-[#fff1f2] to-[#f8fafc] p-3.5 sm:p-5 rounded-2xl border border-rose-100/90 shadow-2xs hover:shadow-md hover:border-rose-200 transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden"
         >
           <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-rose-400">
             <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <FileCheck2 size={22} />
+          <div className="flex items-center justify-between mb-2 sm:mb-3 relative z-10">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <FileCheck2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">PENDING DOCS</span>
+            <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate ml-1">DOCUMENTS</span>
           </div>
           <div className="relative z-10">
-            <div className="text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-rose-400" /> : pendingDocumentsCount.toLocaleString("en-IN")}
+            <div className="text-xl sm:text-3xl font-black text-[#142044]">
+              {loading ? <Loader2 size={20} className="animate-spin text-rose-400" /> : pendingDocumentsCount.toLocaleString("en-IN")}
             </div>
-            <p className="text-xs font-semibold text-rose-600 mt-2 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-rose-500" /> Needs Verification
+            <p className="text-[10px] sm:text-xs font-semibold text-rose-600 mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-rose-500 shrink-0" /> Verification
             </p>
           </div>
         </div>
@@ -537,62 +537,67 @@ export default function ClerkDashboard() {
         {/* 5. Today's Attendance (Soft Violet Pastel) */}
         <Link
           href="/clerk/location-settings"
-          className="bg-gradient-to-br from-[#f5f3ff] to-[#f8fafc] p-5 rounded-2xl border border-indigo-100/90 shadow-2xs hover:shadow-md hover:border-indigo-200 transition-all group flex flex-col justify-between relative overflow-hidden col-span-1 sm:col-span-2 xl:col-span-1"
+          className="bg-gradient-to-br from-[#f5f3ff] to-[#f8fafc] p-3.5 sm:p-5 rounded-2xl border border-indigo-100/90 shadow-2xs hover:shadow-md hover:border-indigo-200 transition-all group flex flex-col justify-between relative overflow-hidden col-span-2 sm:col-span-2 xl:col-span-1"
         >
           <div className="pointer-events-none absolute right-2 bottom-2 opacity-25 text-indigo-400">
             <svg width="48" height="48" fill="currentColor"><circle cx="4" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/><circle cx="28" cy="4" r="1.5"/><circle cx="40" cy="4" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="28" cy="16" r="1.5"/><circle cx="40" cy="16" r="1.5"/><circle cx="4" cy="28" r="1.5"/><circle cx="16" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="40" cy="28" r="1.5"/><circle cx="4" cy="40" r="1.5"/><circle cx="16" cy="40" r="1.5"/><circle cx="28" cy="40" r="1.5"/><circle cx="40" cy="40" r="1.5"/></svg>
           </div>
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className="w-11 h-11 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <CalendarCheck2 size={22} />
+          <div className="flex items-center justify-between mb-2 sm:mb-3 relative z-10">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-indigo-100 text-[#5436F5] flex items-center justify-center group-hover:scale-105 transition-transform">
+              <CalendarCheck2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">TODAY&apos;S ATTENDANCE</span>
+            <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate ml-1">ATTENDANCE</span>
           </div>
           <div className="relative z-10">
-            <div className="text-3xl font-bold text-slate-900">
-              {loading ? <Loader2 size={24} className="animate-spin text-indigo-400" /> : `${attendanceStats.present}`}
+            <div className="text-xl sm:text-3xl font-black text-[#142044]">
+              {loading ? <Loader2 size={20} className="animate-spin text-indigo-400" /> : `${attendanceStats.present}`}
             </div>
-            <p className="text-xs font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Present / {attendanceStats.total || totalStudentsCount} Students
+            <p className="text-[10px] sm:text-xs font-semibold text-emerald-600 mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 shrink-0" /> Present / {attendanceStats.total || totalStudentsCount}
             </p>
           </div>
         </Link>
       </div>
 
       {/* ─── Everyday Essentials Quick Actions Grid ──────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6">
-        <div className="flex items-center">
-          <h3 className="text-base sm:text-lg font-bold text-[#2a1768]">Everyday essentials</h3>
-          <span className="text-xs text-slate-400 ml-3 hidden sm:inline">A little less searching. A lot more doing.</span>
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-2xs p-4 sm:p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm sm:text-lg font-bold text-[#142044]">Everyday Essentials</h3>
+            <span className="text-xs text-[#7183A6] ml-2 hidden sm:inline">• Administrative shortcuts</span>
+          </div>
+          <span className="text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-[#5436F5]/10 text-[#5436F5]">
+            10 Actions
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-5">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3.5 mt-3 sm:mt-5">
           {/* 1. + New Admission */}
           <Link
             href="/clerk/manual-admission"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6366f1] text-white shadow-2xs">
-                <UserPlus size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#6366f1] text-white shadow-2xs">
+                <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#5826df] transition-colors">+ New Admission</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#5436F5] transition-colors truncate">+ Admission</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#5826df] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#5436F5] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 2. Search Student */}
           <Link
             href="/clerk/students"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0284c7] text-white shadow-2xs">
-                <Search size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#0284c7] text-white shadow-2xs">
+                <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0284c7] transition-colors">Search Student</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#0284c7] transition-colors truncate">Students</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0284c7] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#0284c7] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 3. Verify Documents */}
@@ -602,113 +607,113 @@ export default function ClerkDashboard() {
               el?.scrollIntoView({ behavior: "smooth" });
               setDocFilter("pending");
             }}
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group text-left"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group text-left min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f59e0b] text-white shadow-2xs">
-                <FileCheck2 size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#f59e0b] text-white shadow-2xs">
+                <FileCheck2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#f59e0b] transition-colors">Verify Documents ({pendingDocumentsCount})</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#f59e0b] transition-colors truncate">Verify Docs</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#f59e0b] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#f59e0b] shrink-0 ml-1 hidden xs:block" />
           </button>
 
           {/* 4. Certificates (LC/TC) */}
           <Link
             href="/clerk/certificates"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#10b981] text-white shadow-2xs">
-                <Award size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#10b981] text-white shadow-2xs">
+                <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#10b981] transition-colors">Certificates (LC/TC)</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#10b981] transition-colors truncate">Certificates</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#10b981] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#10b981] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 5. G.R. Register Book */}
           <Link
             href="/clerk/general-register"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xs">
-                <BookOpen size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xs">
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#2563eb] transition-colors">G.R. Register Book</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#2563eb] transition-colors truncate">GR Register</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#2563eb] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#2563eb] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 6. Student Promotion */}
           <Link
             href="/clerk/student-promotion"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f43f5e] text-white shadow-2xs">
-                <Rocket size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#f43f5e] text-white shadow-2xs">
+                <Rocket className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#f43f5e] transition-colors">Student Promotion</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#f43f5e] transition-colors truncate">Promotion</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#f43f5e] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#f43f5e] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 7. Absentee Calling Desk */}
           <Link
             href="/clerk/absentee-desk"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0d9488] text-white shadow-2xs">
-                <PhoneCall size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#0d9488] text-white shadow-2xs">
+                <PhoneCall className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0d9488] transition-colors">Absentee Calling Desk</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#0d9488] transition-colors truncate">Absentee Desk</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0d9488] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#0d9488] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 8. Attendance Zone */}
           <Link
             href="/clerk/location-settings"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7c3aed] text-white shadow-2xs">
-                <MapPin size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#7c3aed] text-white shadow-2xs">
+                <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#7c3aed] transition-colors">Attendance Zone</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#7c3aed] transition-colors truncate">Geo-Location</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#7c3aed] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#7c3aed] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 9. Assign Division */}
           <Link
             href="/clerk/assign-division"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ea580c] text-white shadow-2xs">
-                <Layers size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c] text-white shadow-2xs">
+                <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#ea580c] transition-colors">Assign Division</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#ea580c] transition-colors truncate">Divisions</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#ea580c] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#ea580c] shrink-0 ml-1 hidden xs:block" />
           </Link>
 
           {/* 10. Assign Roll No */}
           <Link
             href="/clerk/assign-roll-no"
-            className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md transition-all group"
+            className="flex items-center justify-between p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#F5F7FC]/50 hover:bg-white hover:border-[#5436F5]/30 hover:shadow-2xs transition-all group min-w-0"
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0891b2] text-white shadow-2xs">
-                <Hash size={16} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-[#0891b2] text-white shadow-2xs">
+                <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-[#0891b2] transition-colors">Assign Roll No</span>
+              <span className="text-[11px] sm:text-xs font-bold text-[#142044] group-hover:text-[#0891b2] transition-colors truncate">Roll Numbers</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400 group-hover:text-[#0891b2] group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight size={13} className="text-slate-400 group-hover:text-[#0891b2] shrink-0 ml-1 hidden xs:block" />
           </Link>
         </div>
       </div>

@@ -1,56 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   Clock,
-  LogIn,
-  LogOut,
-  Calendar,
   Users,
   BookOpen,
   FileText,
   GraduationCap,
-  Sparkles,
+  Calendar,
   RefreshCw,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
   Megaphone,
-  ArrowRight,
-  ClipboardList,
-  CalendarDays,
-  FileCheck,
-  MapPin,
-  TrendingUp,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { getTodayAttendance } from "@/lib/teacher/attendance";
 import { getCurrentUserProfile } from "@/lib/current-user";
 import type { TodayAttendance } from "@/types/teacher";
-
-function fmtApiTime(timeStr: string | null | undefined): string {
-  if (!timeStr) return "--:-- --";
-  try {
-    let h: number, m: number;
-    if (timeStr.includes("T") || timeStr.includes("Z")) {
-      const d = new Date(timeStr);
-      h = d.getHours();
-      m = d.getMinutes();
-    } else {
-      const parts = timeStr.split(":");
-      h = parseInt(parts[0]);
-      m = parseInt(parts[1]);
-    }
-    const ampm = h >= 12 ? "PM" : "AM";
-    return `${(h % 12 || 12).toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")} ${ampm}`;
-  } catch {
-    return timeStr;
-  }
-}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -90,312 +54,437 @@ export default function TeacherDashboard() {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  const teacherName = profile?.name || profile?.user?.name || "Teacher";
+  const teacherName = profile?.name || profile?.user?.name || "teacher1";
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16">
-      {/* HERO BANNER */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-10 text-white shadow-2xl border border-indigo-900/40">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.25),rgba(255,255,255,0))]" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Academic Faculty Hub
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 w-full min-w-0 overflow-x-hidden font-sans pb-28 lg:pb-8">
+      {/* ─── 1. WELCOME HERO BANNER (Compact, Proportional on all mobile sizes) ─── */}
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121B34] p-3.5 sm:p-5 text-white shadow-sm border border-[#1A2648]">
+        {/* Top row: Greeting & Subtitle on Left, Glowing Circular Illustration on Right */}
+        <div className="flex items-center justify-between gap-3 relative z-10">
+          <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#182346] text-[#93C5FD] text-[10px] font-bold tracking-wider uppercase border border-[#233366]">
+              <GraduationCap className="h-3 w-3 text-[#93C5FD]" /> ACADEMIC FACULTY HUB
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight truncate">
               {getGreeting()}, {teacherName}
             </h1>
-            <p className="text-indigo-200/80 max-w-2xl text-sm sm:text-base leading-relaxed">
+            <p className="text-white/70 text-[11px] sm:text-xs leading-relaxed line-clamp-2 max-w-md">
               Manage your daily class periods, student attendance, homework reviews, and faculty duty logs from your dashboard.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
-            <Link href="/teacher/my-attendance">
-              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 gap-2 font-semibold">
-                <Clock className="h-4 w-4" /> Duty Punch Desk
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              onClick={loadDashboardData}
-              disabled={loading}
-              className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
+          {/* Teacher Circular Avatar with Glowing Halo - Zero white borders/corners */}
+          <div className="relative w-16 h-16 sm:w-22 sm:h-22 md:w-26 md:h-26 rounded-full shrink-0 flex items-center justify-center p-0.5 bg-gradient-to-tr from-cyan-400/50 via-blue-500/40 to-indigo-600/50 shadow-md shadow-cyan-500/20">
+            <div className="w-full h-full rounded-full overflow-hidden bg-[#1A2648]">
+              <img
+                src="/teacher-hero.png"
+                alt="Faculty Illustration"
+                className="w-full h-full object-cover object-[center_12%] scale-135"
+              />
+            </div>
           </div>
+        </div>
+
+        {/* Bottom row: Action Buttons (side-by-side on mobile) */}
+        <div className="grid grid-cols-[1fr_auto] sm:flex sm:items-center sm:justify-end gap-2 mt-3 pt-2.5 border-t border-white/10 relative z-10">
+          <Link
+            href="/teacher/my-attendance"
+            className="py-2 px-3 sm:px-4 rounded-xl bg-[#5436F5] hover:bg-[#4327D4] text-white text-[11px] sm:text-xs font-bold flex items-center justify-between sm:justify-center gap-2 shadow-sm shadow-[#5436F5]/40 transition-all active:scale-95"
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              <Clock className="w-3.5 h-3.5 text-white shrink-0" />
+              <span className="truncate">Duty Punch Desk</span>
+            </span>
+            <span className="text-white/80 font-bold sm:hidden">›</span>
+          </Link>
+          <button
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="py-2 px-3 sm:px-4 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-white shrink-0 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
 
-      {/* TOP METRICS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Metric 1: My Duty Attendance */}
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Today's Duty Status</span>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
-              <Clock className="h-5 w-5" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900">
-              {todayAttendance?.checked_in ? "Checked In" : "Pending Check-In"}
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {todayAttendance?.checked_in
-                ? `Punched in at ${fmtApiTime(todayAttendance.check_in)}`
-                : "Shift not yet initiated"}
-            </p>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <Link
-              href="/teacher/my-attendance"
-              className="text-indigo-600 font-bold hover:underline inline-flex items-center gap-1"
-            >
-              Open Duty Desk <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Metric 2: Student Attendance */}
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Student Attendance</span>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900">Class Roll Call</div>
-            <p className="text-xs text-slate-400 mt-0.5">Mark daily presence</p>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <Link
-              href="/teacher/student-attendance"
-              className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
-            >
-              Take Attendance <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Metric 3: Homework & Assignments */}
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Homework Desk</span>
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600">
-              <BookOpen className="h-5 w-5" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900">Assignments</div>
-            <p className="text-xs text-slate-400 mt-0.5">Review submissions</p>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <Link
-              href="/teacher/Homework"
-              className="text-purple-600 font-bold hover:underline inline-flex items-center gap-1"
-            >
-              Manage Tasks <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Metric 4: Marks & Assessment */}
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Evaluation</span>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900">Exam Grading</div>
-            <p className="text-xs text-slate-400 mt-0.5">Periodic marks entry</p>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <Link
-              href="/teacher/marks"
-              className="text-amber-600 font-bold hover:underline inline-flex items-center gap-1"
-            >
-              Grade Sheets <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* QUICK LAUNCH ACTIONS HUB */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* ─── 2. FOUR QUICK ACTION CARDS (Responsive: 2-col on mobile, 4-col on desktop) ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Card 1: Pending Check-In */}
         <Link
           href="/teacher/my-attendance"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all flex flex-col justify-between group shadow-sm"
+          className="rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group min-w-0"
         >
-          <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 w-fit group-hover:scale-110 transition-transform">
-            <Clock className="h-4 w-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center">
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </span>
+              <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xs sm:text-sm font-bold text-[#142044] leading-tight truncate">
+                Pending Check-In
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-[#7183A6] mt-0.5 truncate">
+                {todayAttendance?.checked_in ? "Duty active" : "Shift not yet initiated"}
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">My Attendance</div>
-            <div className="text-[10px] text-slate-400">Punch in & out</div>
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#5436F5] flex items-center gap-0.5 truncate">
+            <span>Open Duty Desk</span>
+            <span className="text-xs">→</span>
           </div>
         </Link>
 
+        {/* Card 2: Class Roll Call */}
         <Link
           href="/teacher/student-attendance"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all flex flex-col justify-between group shadow-sm"
+          className="rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group min-w-0"
         >
-          <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 w-fit group-hover:scale-110 transition-transform">
-            <Users className="h-4 w-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#E8FAF0] text-[#10B981] flex items-center justify-center">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </span>
+              <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xs sm:text-sm font-bold text-[#142044] leading-tight truncate">
+                Class Roll Call
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-[#7183A6] mt-0.5 truncate">
+                Mark daily presence
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Student Attendance</div>
-            <div className="text-[10px] text-slate-400">Daily roll call</div>
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#10B981] flex items-center gap-0.5 truncate">
+            <span>Take Attendance</span>
+            <span className="text-xs">→</span>
           </div>
         </Link>
 
+        {/* Card 3: Assignments */}
         <Link
           href="/teacher/Homework"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-purple-300 hover:bg-purple-50/30 transition-all flex flex-col justify-between group shadow-sm"
+          className="rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group min-w-0"
         >
-          <div className="p-2 rounded-xl bg-purple-50 text-purple-600 w-fit group-hover:scale-110 transition-transform">
-            <BookOpen className="h-4 w-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ECEBFF] text-[#6366F1] flex items-center justify-center">
+                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </span>
+              <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xs sm:text-sm font-bold text-[#142044] leading-tight truncate">
+                Assignments
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-[#7183A6] mt-0.5 truncate">
+                Review submissions
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-purple-600 transition-colors">Homework</div>
-            <div className="text-[10px] text-slate-400">Create & review</div>
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#6366F1] flex items-center gap-0.5 truncate">
+            <span>Manage Tasks</span>
+            <span className="text-xs">→</span>
           </div>
         </Link>
 
-        <Link
-          href="/teacher/study-materials"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-sky-300 hover:bg-sky-50/30 transition-all flex flex-col justify-between group shadow-sm"
-        >
-          <div className="p-2 rounded-xl bg-sky-50 text-sky-600 w-fit group-hover:scale-110 transition-transform">
-            <FileText className="h-4 w-4" />
-          </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors">Study Materials</div>
-            <div className="text-[10px] text-slate-400">PDFs & notes</div>
-          </div>
-        </Link>
-
+        {/* Card 4: Exam Grading */}
         <Link
           href="/teacher/marks"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-amber-300 hover:bg-amber-50/30 transition-all flex flex-col justify-between group shadow-sm"
+          className="rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group min-w-0"
         >
-          <div className="p-2 rounded-xl bg-amber-50 text-amber-600 w-fit group-hover:scale-110 transition-transform">
-            <GraduationCap className="h-4 w-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFF4E8] text-[#F59E0B] flex items-center justify-center">
+                <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </span>
+              <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xs sm:text-sm font-bold text-[#142044] leading-tight truncate">
+                Exam Grading
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-[#7183A6] mt-0.5 truncate">
+                Periodic marks entry
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-amber-600 transition-colors">Marks Entry</div>
-            <div className="text-[10px] text-slate-400">Term evaluations</div>
-          </div>
-        </Link>
-
-        <Link
-          href="/teacher/leaves"
-          className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-rose-300 hover:bg-rose-50/30 transition-all flex flex-col justify-between group shadow-sm"
-        >
-          <div className="p-2 rounded-xl bg-rose-50 text-rose-600 w-fit group-hover:scale-110 transition-transform">
-            <CalendarDays className="h-4 w-4" />
-          </div>
-          <div className="mt-3">
-            <div className="text-xs font-bold text-slate-900 group-hover:text-rose-600 transition-colors">My Leaves</div>
-            <div className="text-[10px] text-slate-400">Apply & balance</div>
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#F59E0B] flex items-center gap-0.5 truncate">
+            <span>Grade Sheets</span>
+            <span className="text-xs">→</span>
           </div>
         </Link>
       </div>
 
-      {/* MID ROW: TODAY'S TIMETABLE & ANNOUNCEMENTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Teaching Schedule */}
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">Today's Class Schedule</h3>
-              <p className="text-xs text-slate-500">Periods assigned for today across your classes</p>
+      {/* ─── 3. SIX FEATURE SHORTCUTS (2 Columns on mobile, 6 on desktop) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        {/* Row 1 Left: My Attendance */}
+        <Link
+          href="/teacher/my-attendance"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#5436F5]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#5436F5] transition-colors leading-tight truncate">
+                My Attendance
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                Punch in & out
+              </p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+
+        {/* Row 1 Right: Student Attendance */}
+        <Link
+          href="/teacher/student-attendance"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#10B981]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#E8FAF0] text-[#10B981] flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#10B981] transition-colors leading-tight truncate">
+                Student Attendance
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                Daily roll call
+              </p>
+            </div>
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+
+        {/* Row 2 Left: Homework */}
+        <Link
+          href="/teacher/Homework"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#5436F5]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#5436F5] transition-colors leading-tight truncate">
+                Homework
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                Create & review
+              </p>
+            </div>
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+
+        {/* Row 2 Right: Study Materials */}
+        <Link
+          href="/teacher/study-materials"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#0284C7]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#E8F3FF] text-[#0284C7] flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#0284C7] transition-colors leading-tight truncate">
+                Study Materials
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                PDFs & notes
+              </p>
+            </div>
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+
+        {/* Row 3 Left: Marks Entry */}
+        <Link
+          href="/teacher/marks"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#F59E0B]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#FFF4E8] text-[#F59E0B] flex items-center justify-center shrink-0">
+              <GraduationCap className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#F59E0B] transition-colors leading-tight truncate">
+                Marks Entry
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                Term evaluations
+              </p>
+            </div>
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+
+        {/* Row 3 Right: My Leaves */}
+        <Link
+          href="/teacher/leaves"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#F43F5E]/40 transition-all flex items-center justify-between group min-w-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-full bg-[#FFEBEF] text-[#F43F5E] flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#F43F5E] transition-colors leading-tight truncate">
+                My Leaves
+              </h4>
+              <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
+                Apply & balance
+              </p>
+            </div>
+          </div>
+          <span className="text-[#7183A6] text-xs font-bold shrink-0 ml-1">›</span>
+        </Link>
+      </div>
+
+      {/* ─── 4. LOWER SECTIONS (Responsive: 1-col on mobile, 2-col on desktop) ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {/* Card 1: Today's Class Schedule */}
+        <div className="rounded-2xl bg-white p-3.5 sm:p-4.5 border border-[#EBF0F8] shadow-2xs space-y-3 min-w-0">
+          <div className="flex items-center justify-between gap-1.5 border-b border-[#F1F5F9] pb-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="p-1.5 rounded-lg bg-[#ECEBFF] text-[#5436F5] shrink-0">
+                <Calendar className="w-4 h-4" />
+              </span>
+              <h3 className="font-bold text-[#142044] text-xs sm:text-sm truncate">
+                Today&apos;s Class Schedule
+              </h3>
+            </div>
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[#ECEBFF] text-[#5436F5] shrink-0">
               {currentTime.toLocaleDateString("en-IN", { weekday: "long" })}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-indigo-900 text-sm">Period 1 · Mathematics</span>
-                <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded">
-                  09:00 - 09:45 AM
-                </span>
+          <div className="space-y-2.5">
+            {/* Period 1 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#5436F5] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-[#7183A6] font-medium leading-tight">
+                    09:00 AM - 09:45 AM
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate mt-0.5">
+                    Mathematics - Class 10 (A)
+                  </p>
+                </div>
               </div>
-              <p className="text-indigo-800/80 font-medium">Class 8-A · Room 204</p>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-sm">Period 2 · Science</span>
-                <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded">
-                  09:50 - 10:35 AM
-                </span>
+            {/* Period 2 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#10B981] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-[#7183A6] font-medium leading-tight">
+                    10:00 AM - 10:45 AM
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate mt-0.5">
+                    Science - Class 9 (B)
+                  </p>
+                </div>
               </div>
-              <p className="text-slate-600 font-medium">Class 9-B · Science Lab 1</p>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-sm">Period 4 · Mathematics</span>
-                <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded">
-                  11:30 - 12:15 PM
-                </span>
+            {/* Period 3 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#F59E0B] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-[#7183A6] font-medium leading-tight">
+                    11:00 AM - 11:45 AM
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate mt-0.5">
+                    English - Class 8 (A)
+                  </p>
+                </div>
               </div>
-              <p className="text-slate-600 font-medium">Class 10-A · Room 301</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-sm">Period 6 · Revision Lab</span>
-                <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded">
-                  01:45 - 02:30 PM
-                </span>
-              </div>
-              <p className="text-slate-600 font-medium">Class 8-A · Computer Lab</p>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
             </div>
           </div>
         </div>
 
-        {/* Notices & Announcements */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-slate-900 text-base">Faculty Announcements</h3>
-              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                <Megaphone className="h-4 w-4" />
+        {/* Card 2: Faculty Announcements */}
+        <div className="rounded-2xl bg-white p-3.5 sm:p-4.5 border border-[#EBF0F8] shadow-2xs space-y-3 min-w-0">
+          <div className="flex items-center justify-between gap-1.5 border-b border-[#F1F5F9] pb-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="p-1.5 rounded-lg bg-[#ECEBFF] text-[#5436F5] shrink-0">
+                <Megaphone className="w-4 h-4" />
               </span>
+              <h3 className="font-bold text-[#142044] text-xs sm:text-sm truncate">
+                Faculty Announcements
+              </h3>
             </div>
-            <p className="text-xs text-slate-500 mb-4">Official notices from administration</p>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <div className="font-bold text-slate-900">Term Exam Marks Submission</div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  All faculty members are requested to complete marks entry for periodic assessments before Friday.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <div className="font-bold text-slate-900">Annual Sports Meet Schedule</div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Inter-house athletics selections will take place during afternoon assembly hours.
-                </p>
-              </div>
-            </div>
+            <Link
+              href="/teacher/announcements"
+              className="text-[10px] sm:text-xs font-semibold text-[#5436F5] hover:underline shrink-0"
+            >
+              View All
+            </Link>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 text-right">
-            <Link href="/teacher/announcements" className="text-xs text-indigo-600 hover:underline font-semibold inline-flex items-center gap-1">
-              View all notices <ArrowRight className="h-3 w-3" />
-            </Link>
+          <div className="space-y-2.5">
+            {/* Announcement 1 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#5436F5] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
+                    Staff Meeting
+                  </p>
+                  <p className="text-[10px] text-[#7183A6] truncate mt-0.5">
+                    Today at 12:00 PM in Conference Room
+                  </p>
+                </div>
+              </div>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
+            </div>
+
+            {/* Announcement 2 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#0284C7] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
+                    Department Update
+                  </p>
+                  <p className="text-[10px] text-[#7183A6] truncate mt-0.5">
+                    New curriculum guidelines are available.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
+            </div>
+
+            {/* Announcement 3 */}
+            <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#10B981] shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
+                    Holiday Notice
+                  </p>
+                  <p className="text-[10px] text-[#7183A6] truncate mt-0.5">
+                    School will be closed on 15th Aug.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[#CBD5E1] text-xs font-bold shrink-0">›</span>
+            </div>
           </div>
         </div>
       </div>

@@ -225,7 +225,7 @@ export default function StudentResultsPage() {
 
   return (
     <div
-      className="w-full min-h-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-x-hidden relative"
+      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col gap-6 overflow-x-hidden relative"
       style={{ fontFamily: "'Outfit', sans-serif" }}
     >
       <style>{`

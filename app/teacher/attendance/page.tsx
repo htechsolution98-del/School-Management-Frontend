@@ -1154,8 +1154,8 @@ export default function AttendanceHistoryPage() {
             </div>
 
             {/* Attendance Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full min-w-[720px] border-collapse text-left text-xs">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="px-4 py-2.5">Roll No</th>

@@ -1064,42 +1064,21 @@ export default function AllHomeworkPage() {
 
   return (
     <div
-      style={{
-        minHeight: "100%",
-        background: "#f4f6fb",
-        fontFamily: "'Inter', sans-serif",
-        padding: "20px 24px",
-        boxSizing: "border-box",
-      }}
+      className="min-h-full bg-[#F5F7FC] font-['Inter',sans-serif] p-3 sm:p-6 pb-28 lg:pb-8 box-border w-full min-w-0 max-w-full overflow-x-hidden"
     >
       {/* Header */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 22,
-        }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5"
       >
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e293b" }}>
-          All Homework
-        </h1>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-[#142044] tracking-tight">
+            Homework & Assignments
+          </h1>
+          <p className="text-xs text-[#7183A6] mt-0.5">Manage daily class assignments, reviews, and student submissions</p>
+        </div>
         <button
           onClick={() => setCreateModal(true)}
-          style={{
-            padding: "9px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
-          }}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5436F5] hover:bg-[#392BC9] text-white text-xs sm:text-sm font-bold shadow-sm shadow-[#5436F5]/25 transition-all active:scale-95 self-start sm:self-auto"
         >
           <Plus size={16} /> Create Homework
         </button>
@@ -1174,9 +1153,9 @@ export default function AllHomeworkPage() {
         </div>
       ) : (
         /* Main Layout Grid */
-        <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 20 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 min-w-0 w-full">
           {/* Left Column: Homework List */}
-          <div>
+          <div className="min-w-0 w-full">
             <div
               style={{
                 position: "relative",
@@ -1221,13 +1200,7 @@ export default function AllHomeworkPage() {
           {/* Right Column: Selected Homework Detail & Submissions */}
           {selectedHw && (
             <div
-              style={{
-                background: "#fff",
-                borderRadius: 20,
-                border: "1px solid #e2e8f0",
-                padding: "26px 28px",
-                boxShadow: "0 4px 20px -2px rgba(15, 23, 42, 0.05)",
-              }}
+              className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-7 shadow-xs min-w-0 w-full overflow-hidden"
             >
               {/* Header */}
               <div
@@ -1340,12 +1313,7 @@ export default function AllHomeworkPage() {
 
               {/* Info Metrics Cards */}
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 14,
-                  marginBottom: 24,
-                }}
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6"
               >
                 {/* Due Date Card */}
                 <div
@@ -1592,8 +1560,8 @@ export default function AllHomeworkPage() {
                     </p>
                   </div>
                 ) : (
-                  <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #f1f5f9" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                  <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #f1f5f9" }} className="w-full">
+                    <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse", textAlign: "left" }}>
                       <thead>
                         <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                           <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.04em" }}>

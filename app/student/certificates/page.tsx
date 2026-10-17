@@ -148,7 +148,7 @@ export default function StudentCertificatesPage() {
   }, [requests]);
 
   return (
-    <div className="min-h-screen bg-slate-50/60 p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50/60 p-3 sm:p-6 lg:p-8 font-sans w-full min-w-0 max-w-full overflow-x-hidden">
       {/* Top Banner / Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -248,7 +248,7 @@ export default function StudentCertificatesPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto max-w-full no-scrollbar pb-1">
             {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((st) => (
               <button
                 key={st}
@@ -288,8 +288,8 @@ export default function StudentCertificatesPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[650px] text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-5">Certificate Type</th>

@@ -229,17 +229,17 @@ export default function StudentDashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-28 lg:pb-8">
       {/* Greeting Header */}
       <motion.div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-zinc-200/80 shadow-xs"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-xs"
         variants={fadeUp}
         initial="hidden"
         animate="visible"
         custom={0}
       >
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
+          <h1 className="text-base sm:text-2xl md:text-3xl font-black text-[#142044] flex items-center gap-2 tracking-tight">
             Good Morning, {studentName}!{" "}
             <motion.span
               animate={{ rotate: [0, 18, -10, 18, 0] }}
@@ -249,44 +249,44 @@ export default function StudentDashboardPage() {
               👋
             </motion.span>
           </h1>
-          <p className="text-slate-500 text-sm mt-1 font-medium">
+          <p className="text-[#7183A6] text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium">
             Welcome to your Student Portal. Here is your class timetable and academic schedule.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 border border-zinc-200 rounded-2xl px-4 py-2.5 shadow-2xs self-start sm:self-auto">
-          <Calendar size={15} className="text-indigo-600" />
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-[#142044] bg-[#F5F7FC] border border-[#E5EAF4] rounded-xl sm:rounded-2xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 shadow-2xs self-start sm:self-auto">
+          <Calendar size={14} className="text-[#5436F5]" />
           <span>{todayFormatted}</span>
         </div>
       </motion.div>
 
-      {/* Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat Cards Grid: 2 columns on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {statCards.map((card, idx) => (
-          <Link key={idx} href={card.href} className="block group">
+          <Link key={idx} href={card.href} className="block group cursor-pointer">
             <motion.div
-              className="bg-white rounded-3xl border border-zinc-200/80 p-5 flex flex-col justify-between gap-3 h-full shadow-xs hover:shadow-md hover:border-indigo-200 transition-all duration-300"
+              className="bg-white rounded-2xl border border-[#E5EAF4] p-3 sm:p-4.5 flex flex-col justify-between gap-2 sm:gap-3 h-full shadow-2xs hover:shadow-xs hover:border-[#5436F5]/40 transition-all duration-300"
               variants={scaleIn}
               initial="hidden"
               animate="visible"
               custom={idx + 1}
-              whileHover={{ y: -3 }}
+              whileHover={{ y: -2 }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{card.title}</span>
-                <div className={`${card.iconBg} p-2.5 rounded-2xl`}>
+                <span className="text-[9px] sm:text-[11px] font-bold text-[#7183A6] uppercase tracking-wider">{card.title}</span>
+                <div className={`${card.iconBg} p-1.5 sm:p-2.5 rounded-xl`}>
                   {card.icon}
                 </div>
               </div>
 
               <div>
-                <p className={`text-3xl sm:text-4xl font-black tracking-tight ${card.valueColor}`}>
+                <p className={`text-xl sm:text-3xl font-black tracking-tight ${card.valueColor}`}>
                   {card.value}
                 </p>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">{card.subtitle}</p>
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">{card.subtitle}</p>
               </div>
 
-              <div className={`text-xs font-bold ${card.linkColor} flex items-center gap-1 group-hover:gap-1.5 transition-all pt-1.5 border-t border-zinc-100`}>
+              <div className={`text-[11px] sm:text-xs font-bold ${card.linkColor} flex items-center gap-1 group-hover:gap-1.5 transition-all pt-1.5 border-t border-zinc-100`}>
                 {card.linkText}
               </div>
             </motion.div>
@@ -296,25 +296,25 @@ export default function StudentDashboardPage() {
 
       {/* Timetable Section (Full Detailed Component) */}
       <motion.div
-        className="bg-white rounded-3xl border border-zinc-200/80 p-6 shadow-xs flex flex-col gap-5"
+        className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/80 p-3.5 sm:p-6 shadow-xs flex flex-col gap-4 sm:gap-5"
         variants={fadeUp}
         initial="hidden"
         animate="visible"
         custom={4}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
-              <Calendar size={20} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 rounded-xl sm:rounded-2xl">
+              <Calendar size={18} />
             </div>
             <div>
-              <h2 className="font-extrabold text-slate-900 text-lg">Class Lecture Timetable</h2>
-              <p className="text-xs text-slate-400 font-medium">Daily lecture schedule, subject timings, and assigned teachers</p>
+              <h2 className="font-extrabold text-slate-900 text-sm sm:text-lg">Class Lecture Timetable</h2>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Daily lecture schedule, subject timings, and assigned teachers</p>
             </div>
           </div>
 
           {/* Weekday Switcher */}
-          <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl overflow-x-auto self-start sm:self-auto max-w-full">
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl sm:rounded-2xl overflow-x-auto self-start sm:self-auto max-w-full no-scrollbar">
             {DAYS_OF_WEEK.map((day) => {
               const isActive = selectedDay === day;
               const isToday = currentWeekday === day;
@@ -322,7 +322,7 @@ export default function StudentDashboardPage() {
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all shrink-0 ${
+                  className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold capitalize transition-all shrink-0 ${
                     isActive
                       ? "bg-white text-indigo-700 shadow-xs border border-zinc-200/70"
                       : "text-slate-500 hover:text-slate-900"
@@ -411,7 +411,7 @@ export default function StudentDashboardPage() {
         
         {/* Today's Homework */}
         <motion.div
-          className="bg-white rounded-3xl border border-zinc-200/80 p-6 shadow-xs flex flex-col"
+          className="bg-white rounded-3xl border border-zinc-200/80 p-4 sm:p-6 shadow-xs flex flex-col"
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -474,7 +474,7 @@ export default function StudentDashboardPage() {
 
         {/* Academic Syllabus & Study Resources */}
         <motion.div
-          className="bg-white rounded-3xl border border-zinc-200/80 p-6 shadow-xs flex flex-col"
+          className="bg-white rounded-3xl border border-zinc-200/80 p-4 sm:p-6 shadow-xs flex flex-col"
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -531,7 +531,7 @@ export default function StudentDashboardPage() {
 
       {/* Motivation Banner */}
       <motion.div
-        className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-md"
+        className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white rounded-3xl p-4 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-md"
         variants={fadeUp}
         initial="hidden"
         animate="visible"
@@ -563,11 +563,11 @@ export default function StudentDashboardPage() {
       {/* Quick Submit Assignment Modal */}
       {quickSubmitHw && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
           onClick={() => setQuickSubmitHw(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-lg w-full border border-slate-200/80 shadow-2xl overflow-hidden"
+            className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200/80 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/40">

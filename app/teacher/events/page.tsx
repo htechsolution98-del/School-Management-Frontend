@@ -5,7 +5,7 @@ import { EventsCalendarHub } from "@/components/events/events-calendar-hub";
 
 export default function TeacherEventsPage() {
   return (
-    <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+    <div className="px-3 sm:px-6 py-4 sm:py-6 pb-28 lg:pb-8 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       <EventsCalendarHub
         roleTitle="Teacher"
         canManage={false}

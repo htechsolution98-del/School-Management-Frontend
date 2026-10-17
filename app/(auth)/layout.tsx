@@ -19,11 +19,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   // Memoize the left branding panel so it only animates on first mount
   // and stays stable during navigation between auth pages.
   const brandingPanel = useMemo(() => (
-    <div className="relative hidden lg:flex flex-col justify-center gap-12 overflow-hidden bg-gradient-to-br from-[#1D496C] via-[#285E89] to-[#429CE4] p-12">
+    <div className="relative hidden lg:flex flex-col justify-center gap-12 overflow-hidden bg-gradient-to-br from-[#142044] via-[#1E2E62] to-[#392BC9] p-12">
       {/* Animated blob background */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-white/5 blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[#E4FF4C]/10 blur-3xl animate-pulse [animation-delay:1s]" />
+        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-[#5436F5]/20 blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[#5436F5]/25 blur-3xl animate-pulse [animation-delay:1s]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-64 rounded-full bg-white/5 blur-2xl" />
         {/* Grid dots */}
         <svg className="absolute inset-0 h-full w-full opacity-10" xmlns="http://www.w3.org/2000/svg">
@@ -48,7 +48,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <img src="/logo.png" alt="VidyaSanchalan Logo" className="h-8 w-auto max-w-[140px] object-contain" />
           </div>
           <span className="text-xl font-black tracking-tight text-white">
-            Vidya<span className="text-[#FFA600]">Sanchalan</span>
+            Vidya<span className="text-[#A78BFA]">Sanchalan</span>
           </span>
         </Link>
       </motion.div>
@@ -64,8 +64,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <h2 className="text-4xl font-black text-white leading-tight mb-4">
             Welcome to VidyaSanchalan!
           </h2>
-          <p className="text-white/70 text-lg leading-relaxed max-w-sm font-medium">
-            Manage your school seamlessly with our cutting-edge unified platform.
+          <p className="text-purple-100/80 text-lg leading-relaxed max-w-sm font-medium">
+            Manage your school seamlessly with our cutting-edge unified ERP platform.
           </p>
         </div>
 
@@ -80,9 +80,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               className="flex items-center gap-3 font-semibold"
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                <f.icon className="h-4 w-4 text-[#E4FF4C]" />
+                <f.icon className="h-4 w-4 text-[#A78BFA]" />
               </div>
-              <span className="text-sm text-white/80">{f.text}</span>
+              <span className="text-sm text-white/90">{f.text}</span>
             </motion.li>
           ))}
         </ul>
@@ -101,7 +101,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               transition={{ duration: 0.4, delay: 0.7 + i * 0.1 }}
             >
               <p className="text-2xl font-bold text-white">{s.value}</p>
-              <p className="text-xs text-white/50 uppercase tracking-wider">{s.label}</p>
+              <p className="text-xs text-white/60 uppercase tracking-wider">{s.label}</p>
             </motion.div>
           ))}
         </div>
@@ -110,11 +110,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   ), []);
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2 bg-white">
+    <div className="grid min-h-svh lg:grid-cols-2 bg-[#F5F7FC]">
       {brandingPanel}
 
       {/* ── RIGHT: Auth forms ── */}
-      <div className="flex flex-col bg-[#F8FAFC]">
+      <div className="flex flex-col bg-[#F5F7FC]">
         {/* Mobile logo */}
         <div className="flex justify-center p-6 lg:hidden">
           <Link href="/" className="flex items-center gap-2 group font-medium">
@@ -122,7 +122,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <img src="/logo.png" alt="VidyaSanchalan Logo" className="h-6 w-auto max-w-[100px] object-contain" />
             </div>
             <span className="text-base font-black tracking-tight">
-              <span className="text-[#285E89]">Vidya</span><span className="text-[#FFA600]">Sanchalan</span>
+              <span className="text-[#142044]">Vidya</span><span className="text-[#5436F5]">Sanchalan</span>
             </span>
           </Link>
         </div>
