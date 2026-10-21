@@ -25,7 +25,7 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          ssh -T "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'SSHEOF'
+          ssh -T "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p {{ secrets.SSH_PORT}} " << 'SSHEOF'
             set -e
             cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
 
