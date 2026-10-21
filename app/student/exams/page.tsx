@@ -22,8 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const FONT_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap";
-
 const SUBJECT_COLORS = [
   { bg: "bg-indigo-50", text: "text-indigo-600", border: "border-indigo-100/80", iconBg: "bg-indigo-100/50" },
   { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100/80", iconBg: "bg-emerald-100/50" },
@@ -145,15 +143,7 @@ export default function StudentExamsPage() {
   }, [exams, searchQuery, subjects]);
 
   return (
-    <div
-      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col gap-6 overflow-x-hidden relative"
-      style={{ fontFamily: "'Outfit', sans-serif" }}
-    >
-      <style>{`
-        @import url('${FONT_URL}');
-        *, *::before, *::after { box-sizing: border-box; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-6 lg:pb-8 flex flex-col gap-6 overflow-x-hidden relative text-slate-800 dark:text-slate-100">
 
       {/* Background Decorative Blur Blobs */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl pointer-events-none" />

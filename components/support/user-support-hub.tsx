@@ -184,25 +184,25 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-3 lg:pb-8">
       {/* ─── Top Banner ──────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#5826df] via-[#6d3df5] to-[#7f4efb] text-white p-6 md:p-7 shadow-lg shadow-purple-500/10">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-800 to-slate-900 text-white p-6 md:p-7 shadow-lg shadow-blue-500/10">
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold text-purple-100 mb-3 border border-white/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold text-blue-100 mb-3 border border-white/20">
               <Headphones className="w-3.5 h-3.5 text-emerald-300" />
               {roleTitle} • Super Admin Helpdesk
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
               Support & Live Chat
             </h1>
-            <p className="text-purple-100 text-xs md:text-sm mt-1 max-w-2xl font-normal leading-relaxed">
+            <p className="text-blue-100 text-xs md:text-sm mt-1 max-w-2xl font-normal leading-relaxed">
               Raise a support ticket to communicate directly with Super Admin. Exchange messages and documents in real time until your issue is resolved.
             </p>
           </div>
 
           <div>
             {activeTicket ? (
-              <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-xl p-3 text-xs text-purple-100 max-w-xs">
+              <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-xl p-3 text-xs text-blue-100 max-w-xs">
                 <div className="flex items-center gap-1.5 font-bold text-white mb-0.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-300" />
                   Active Ticket In Progress
@@ -214,9 +214,9 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
             ) : (
               <Button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-white hover:bg-purple-50 text-[#5826df] font-bold text-xs md:text-sm shadow-md h-10 px-5 rounded-xl"
+                className="bg-white hover:bg-blue-50 text-[#2563EB] font-bold text-xs md:text-sm shadow-md h-10 px-5 rounded-xl"
               >
-                <Plus className="w-4 h-4 mr-1.5 text-[#5826df]" />
+                <Plus className="w-4 h-4 mr-1.5 text-[#2563EB]" />
                 Raise Support Ticket
               </Button>
             )}
@@ -227,13 +227,13 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
       {/* ─── Active Ticket Live Chat Section ────────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center h-64 bg-white rounded-2xl border border-slate-200">
-          <RefreshCw className="w-8 h-8 animate-spin text-[#5826df]" />
+          <RefreshCw className="w-8 h-8 animate-spin text-[#2563EB]" />
         </div>
       ) : activeTicket ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-[#5826df]" /> Active Support Chat
+              <MessageSquare className="w-4 h-4 text-[#2563EB]" /> Active Support Chat
             </h2>
             <Button
               variant="outline"
@@ -256,9 +256,9 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
         </div>
       ) : (
         /* No Active Ticket Card */
-        <div className="bg-white rounded-2xl border border-dashed border-purple-200 p-8 md:p-12 text-center space-y-4 shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-purple-50 text-[#5826df] mx-auto flex items-center justify-center">
-            <LifeBuoy className="w-8 h-8 text-[#5826df]" />
+        <div className="bg-white rounded-2xl border border-dashed border-blue-200 p-8 md:p-12 text-center space-y-4 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#2563EB] mx-auto flex items-center justify-center">
+            <LifeBuoy className="w-8 h-8 text-[#2563EB]" />
           </div>
           <div className="max-w-md mx-auto">
             <h3 className="text-lg font-bold text-slate-900">No Active Support Tickets</h3>
@@ -268,7 +268,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="bg-[#5826df] hover:bg-[#4a1ec4] text-white font-bold text-xs md:text-sm h-10 px-6 rounded-xl shadow-sm"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs md:text-sm h-10 px-6 rounded-xl shadow-sm"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Raise Support Ticket Now
@@ -291,10 +291,10 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
               <div
                 key={ticket.id}
                 onClick={() => setSelectedHistoryTicket(ticket)}
-                className="p-4 rounded-xl border border-slate-200 hover:border-purple-200 hover:bg-purple-50/30 transition-all cursor-pointer space-y-2 bg-white"
+                className="p-4 rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-blue-50/30 transition-all cursor-pointer space-y-2 bg-white"
               >
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono font-bold text-purple-700">
+                  <span className="font-mono font-bold text-blue-700">
                     #{ticket.ticket_number}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
@@ -332,7 +332,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#5826df] flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-[#2563EB] flex items-center justify-center font-bold">
                   <LifeBuoy className="w-4 h-4" />
                 </div>
                 <h3 className="font-bold text-slate-900 text-base">Raise Support Ticket</h3>
@@ -357,7 +357,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="E.g. Issue generating fee receipts for Class 10"
-                  className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5826df]/20"
+                  className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
                 />
               </div>
 
@@ -368,7 +368,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5826df]/20"
+                    className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
                   >
                     <option value="GENERAL">General Inquiry</option>
                     <option value="TECHNICAL">Technical Issue / Bug</option>
@@ -384,7 +384,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
-                    className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5826df]/20"
+                    className="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -419,7 +419,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                   className={`w-full rounded-xl border p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 resize-none ${
                     isWordLimitExceeded
                       ? "border-rose-300 focus:ring-rose-400 bg-rose-50/30"
-                      : "border-slate-200 focus:ring-[#5826df]/20"
+                      : "border-slate-200 focus:ring-[#2563EB]/20"
                   }`}
                 />
               </div>
@@ -439,19 +439,19 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                 />
 
                 {selectedFile ? (
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-purple-50 border border-purple-200 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50 border border-blue-200 text-xs">
                     <div className="flex items-center gap-2 truncate">
                       {filePreviewUrl ? (
                         <img
                           src={filePreviewUrl}
                           alt="Preview"
-                          className="w-7 h-7 rounded object-cover border border-purple-300"
+                          className="w-7 h-7 rounded object-cover border border-blue-300"
                         />
                       ) : (
-                        <FileText className="w-4 h-4 text-purple-600 shrink-0" />
+                        <FileText className="w-4 h-4 text-blue-600 shrink-0" />
                       )}
                       <span className="font-semibold truncate">{selectedFile.name}</span>
-                      <span className="text-[11px] text-purple-600 font-mono shrink-0">
+                      <span className="text-[11px] text-blue-600 font-mono shrink-0">
                         ({Math.round(selectedFile.size / 1024)} KB)
                       </span>
                     </div>
@@ -460,7 +460,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={handleRemoveFile}
-                      className="h-6 w-6 p-0 text-purple-600"
+                      className="h-6 w-6 p-0 text-blue-600"
                     >
                       <X className="w-3.5 h-3.5" />
                     </Button>
@@ -471,9 +471,9 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-9 text-xs text-slate-600 border-dashed border-slate-300 hover:border-purple-300 hover:bg-purple-50/50"
+                    className="w-full h-9 text-xs text-slate-600 border-dashed border-slate-300 hover:border-blue-300 hover:bg-blue-50/50"
                   >
-                    <Paperclip className="w-3.5 h-3.5 mr-1.5 text-purple-600" />
+                    <Paperclip className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
                     Choose screenshot or document
                   </Button>
                 )}
@@ -494,7 +494,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
                   type="submit"
                   size="sm"
                   disabled={isSubmitting || isWordLimitExceeded}
-                  className="text-xs bg-[#5826df] hover:bg-[#4a1ec4] font-semibold text-white px-4"
+                  className="text-xs bg-[#2563EB] hover:bg-[#1D4ED8] font-semibold text-white px-4"
                 >
                   {isSubmitting ? "Submitting..." : "Submit Ticket to Super Admin"}
                 </Button>

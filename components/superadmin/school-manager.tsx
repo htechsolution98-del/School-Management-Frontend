@@ -325,7 +325,7 @@ export default function SchoolManager() {
         <button
           type="button"
           onClick={() => { setAccessSchool(school); setAccessError(""); }}
-          className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+          className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors"
         >
           {school.school_features?.filter(feature => feature.is_enabled).length ?? 0} enabled
         </button>
@@ -339,7 +339,7 @@ export default function SchoolManager() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
               <Building2 className="w-3.5 h-3.5" /> School Management
             </span>
           </div>
@@ -350,7 +350,7 @@ export default function SchoolManager() {
           <AdminButton onClick={load} disabled={loading} variant="outline" className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </AdminButton>
-          <AdminButton onClick={() => startForm()} disabled={loading} className="bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/20">
+          <AdminButton onClick={() => startForm()} disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20">
             <Plus className="h-4 w-4" /> Add School
           </AdminButton>
         </div>
@@ -416,7 +416,7 @@ export default function SchoolManager() {
             {/* 1. BASIC SCHOOL INFO */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Building2 className="h-4 w-4 text-indigo-600" />
+                <Building2 className="h-4 w-4 text-blue-600" />
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">School Profile & Contact Details</h3>
               </div>
               <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
@@ -463,7 +463,7 @@ export default function SchoolManager() {
                       }}
                       onBlur={() => validateField("logo")}
                       aria-invalid={!!errors.logo}
-                      className="rounded-xl border-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                      className="rounded-xl border-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                     />
                     {(preview || editing?.logo) && (
                       <div className="relative shrink-0">
@@ -546,11 +546,11 @@ export default function SchoolManager() {
             </div>
 
             {/* 3. SUBSCRIPTION TIERS (1, 3, 6, 12 MONTHS) */}
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3.5">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 space-y-3.5">
               <div className="flex items-center justify-between flex-wrap gap-2.5">
                 <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-indigo-600 shrink-0" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                  <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
                     Custom Subscription Plans (Defined for this school)
                   </h3>
                 </div>
@@ -562,7 +562,7 @@ export default function SchoolManager() {
                     onClick={() => setForm(curr => ({ ...curr, pricing_model: "FLAT" }))}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                       form.pricing_model !== "PER_STUDENT"
-                        ? "bg-indigo-600 text-white shadow-xs"
+                        ? "bg-blue-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
@@ -573,7 +573,7 @@ export default function SchoolManager() {
                     onClick={() => setForm(curr => ({ ...curr, pricing_model: "PER_STUDENT" }))}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                       form.pricing_model === "PER_STUDENT"
-                        ? "bg-indigo-600 text-white shadow-xs"
+                        ? "bg-blue-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
@@ -583,7 +583,7 @@ export default function SchoolManager() {
               </div>
 
               {/* GST Configuration Bar */}
-              <div className="bg-white/95 rounded-xl p-3 border border-indigo-100 shadow-2xs space-y-2.5">
+              <div className="bg-white/95 rounded-xl p-3 border border-blue-100 shadow-2xs space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-slate-800">GST / Tax Billing:</span>
@@ -604,7 +604,7 @@ export default function SchoolManager() {
                         onClick={() => setForm(curr => ({ ...curr, gst_included: true }))}
                         className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
                           form.gst_included
-                            ? "bg-indigo-600 text-white shadow-xs"
+                            ? "bg-blue-600 text-white shadow-xs"
                             : "text-slate-500 hover:text-slate-900"
                         }`}
                       >
@@ -624,7 +624,7 @@ export default function SchoolManager() {
                             onClick={() => setForm(curr => ({ ...curr, gst_percentage: rate }))}
                             className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-all ${
                               Number(form.gst_percentage) === rate
-                                ? "bg-indigo-100 border-indigo-300 text-indigo-800"
+                                ? "bg-blue-100 border-blue-300 text-blue-800"
                                 : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                             }`}
                           >
@@ -646,7 +646,7 @@ export default function SchoolManager() {
                   )}
                 </div>
                 {form.gst_included && (
-                  <p className="text-[11px] text-indigo-700 font-medium">
+                  <p className="text-[11px] text-blue-700 font-medium">
                     GST ({form.gst_percentage ?? 18}%) will be automatically calculated on top of base rates at checkout and added to final tax invoice.
                   </p>
                 )}
@@ -714,28 +714,28 @@ export default function SchoolManager() {
                 </div>
 
                 {/* 6 Months Half-Yearly */}
-                <div className="bg-white rounded-xl p-3 border border-purple-200/80 shadow-2xs space-y-2 hover:border-purple-300 transition-all">
+                <div className="bg-white rounded-xl p-3 border border-sky-200/80 shadow-2xs space-y-2 hover:border-sky-300 transition-all">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-purple-900 truncate">6 Months</span>
-                    <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-full font-bold shrink-0">Half-Yr</span>
+                    <span className="text-xs font-extrabold uppercase tracking-wide text-sky-900 truncate">6 Months</span>
+                    <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full font-bold shrink-0">Half-Yr</span>
                   </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-purple-400">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-sky-500">₹</span>
                     <Input
                       type="number"
                       min="0"
                       value={form.half_yearly_price ?? 0}
                       onChange={e => setForm(curr => ({ ...curr, half_yearly_price: Number(e.target.value) }))}
-                      className="pl-7 h-9 rounded-lg text-sm font-bold text-purple-950"
+                      className="pl-7 h-9 rounded-lg text-sm font-bold text-sky-950"
                     />
                   </div>
                   {form.gst_included && (
-                    <div className="pt-1 border-t border-purple-100 text-[10px] space-y-0.5 font-medium">
-                      <div className="flex justify-between text-purple-400">
+                    <div className="pt-1 border-t border-sky-100 text-[10px] space-y-0.5 font-medium">
+                      <div className="flex justify-between text-sky-500">
                         <span>GST ({form.gst_percentage}%):</span>
                         <span>+₹{Math.round(Number(form.half_yearly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
                       </div>
-                      <div className="flex justify-between text-purple-950 font-extrabold text-[11px]">
+                      <div className="flex justify-between text-sky-950 font-extrabold text-[11px]">
                         <span>Final Total:</span>
                         <span>₹{Math.round(Number(form.half_yearly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
                       </div>
@@ -779,7 +779,7 @@ export default function SchoolManager() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                  <ShieldCheck className="h-4 w-4 text-blue-600" />
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Assign Feature Modules</h3>
                 </div>
                 <button
@@ -789,7 +789,7 @@ export default function SchoolManager() {
                     setForm(curr => ({ ...curr, feature_ids: allSelected ? [] : features.map(f => f.id) }));
                     clearError("feature_ids");
                   }}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
                 >
                   {form.feature_ids.length === features.length ? "Deselect All" : "Select All"}
                 </button>
@@ -808,7 +808,7 @@ export default function SchoolManager() {
                         setForm(curr => ({ ...curr, feature_ids: next }));
                         clearError("feature_ids");
                       }}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                      className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
                     />
                     <span>{camelCaseText(feature.name)}</span>
                   </label>
@@ -831,7 +831,7 @@ export default function SchoolManager() {
               >
                 Cancel
               </AdminButton>
-              <AdminButton type="submit" disabled={saving || !features.length} className="bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/20">
+              <AdminButton type="submit" disabled={saving || !features.length} className="bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20">
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {saving ? "Saving School…" : editing ? "Save Changes" : "Create School & Assign Plan"}
               </AdminButton>
@@ -865,7 +865,7 @@ export default function SchoolManager() {
                   aria-label={`${camelCaseText(feature.name)} access`}
                   disabled={busyFeature !== null}
                   onClick={() => toggleAccess(feature)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-indigo-600" : "bg-slate-200"}`}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-blue-600" : "bg-slate-200"}`}
                 >
                   <span className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0.5"}`}>
                     {busyFeature === feature.id && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}

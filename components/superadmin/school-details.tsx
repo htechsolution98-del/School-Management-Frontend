@@ -65,7 +65,7 @@ export function SchoolDetails({ school, onClose }: { school: School | null; onCl
 
         {!current && (
           <p className="flex items-center justify-center gap-2 py-16 text-xs font-bold text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
             Loading school details & student directory…
           </p>
         )}
@@ -90,8 +90,8 @@ export function SchoolDetails({ school, onClose }: { school: School | null; onCl
                 <p className="mt-0.5 text-lg font-black text-slate-900">{data.metrics.total_staff}</p>
                 <p className="text-[10px] text-slate-500">{data.metrics.teachers_count} Teachers</p>
               </div>
-              <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-3">
-                <p className="text-[10px] font-bold uppercase text-purple-600">Classes</p>
+              <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
+                <p className="text-[10px] font-bold uppercase text-sky-600">Classes</p>
                 <p className="mt-0.5 text-lg font-black text-slate-900">{data.classes?.length || 0}</p>
                 <p className="text-[10px] text-slate-500">Divisions active</p>
               </div>
@@ -108,7 +108,7 @@ export function SchoolDetails({ school, onClose }: { school: School | null; onCl
                 type="button"
                 onClick={() => setActiveTab("classes")}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === "classes" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  activeTab === "classes" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Classes & Student Filtration ({data.classes?.length || 0})
@@ -117,7 +117,7 @@ export function SchoolDetails({ school, onClose }: { school: School | null; onCl
                 type="button"
                 onClick={() => setActiveTab("staff")}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === "staff" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  activeTab === "staff" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Staff Directory ({data.staff?.length || 0})
@@ -126,7 +126,7 @@ export function SchoolDetails({ school, onClose }: { school: School | null; onCl
                 type="button"
                 onClick={() => setActiveTab("features")}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === "features" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  activeTab === "features" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Modules ({data.features?.length || 0})

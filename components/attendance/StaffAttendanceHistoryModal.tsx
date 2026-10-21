@@ -113,7 +113,7 @@ const STATUS_BADGE_CONFIG: Record<
   },
   HOLIDAY: {
     label: "Holiday",
-    className: "bg-purple-100 text-purple-800 border-purple-200",
+    className: "bg-teal-100 text-teal-800 border-teal-200",
   },
   WEEK_OFF: {
     label: "Week Off",
@@ -294,7 +294,7 @@ export function StaffAttendanceHistoryModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-violet-100 flex items-center justify-center text-violet-700">
+            <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-700">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
@@ -343,9 +343,9 @@ export function StaffAttendanceHistoryModal({
             <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Missing Punch</p>
             <p className="text-lg font-black text-orange-800">{stats.missingPunch}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-violet-50 border border-violet-100 col-span-2 sm:col-span-1">
-            <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider">Attendance Rate</p>
-            <p className="text-lg font-black text-violet-800">{stats.rate}%</p>
+          <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100 col-span-2 sm:col-span-1">
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Attendance Rate</p>
+            <p className="text-lg font-black text-blue-800">{stats.rate}%</p>
           </div>
         </div>
 
@@ -358,7 +358,7 @@ export function StaffAttendanceHistoryModal({
               placeholder="Search date or name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
@@ -369,7 +369,7 @@ export function StaffAttendanceHistoryModal({
                 onClick={() => setStatusFilter(filterKey)}
                 className={`text-[11px] font-bold px-3 py-1.5 rounded-xl capitalize transition-colors shrink-0 ${
                   statusFilter === filterKey
-                    ? "bg-violet-600 text-white shadow-xs"
+                    ? "bg-blue-600 text-white shadow-xs"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                 }`}
               >
@@ -383,7 +383,7 @@ export function StaffAttendanceHistoryModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
               <p className="text-xs font-semibold">Loading records…</p>
             </div>
           ) : error ? (
@@ -430,7 +430,7 @@ export function StaffAttendanceHistoryModal({
                           </span>
                         )}
                         {record.is_early_exit && (
-                          <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-md">
+                          <span className="text-[9px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded-md">
                             Early Exit
                           </span>
                         )}
@@ -442,7 +442,7 @@ export function StaffAttendanceHistoryModal({
                           In: {parseISOTime(record.check_in)}
                         </span>
                         <span className="flex items-center gap-1">
-                          <LogOut className="w-3 h-3 text-purple-600" />
+                          <LogOut className="w-3 h-3 text-blue-600" />
                           Out: {parseISOTime(record.check_out)}
                         </span>
                         {record.working_hours ? (
@@ -465,7 +465,7 @@ export function StaffAttendanceHistoryModal({
                   <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button
                       onClick={() => handleOpenCorrection(record)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-violet-300 text-slate-600 hover:text-violet-700 hover:bg-violet-50/50 transition-colors"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-blue-300 text-slate-600 hover:text-blue-700 hover:bg-blue-50/50 transition-colors"
                     >
                       <FileEdit className="w-3 h-3" />
                       Regularize
@@ -554,7 +554,7 @@ export function StaffAttendanceHistoryModal({
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="e.g. Device GPS malfunction, outdoor field duty..."
-                    className="w-full mt-1 p-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                    className="w-full mt-1 p-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     required
                   />
                 </div>
@@ -570,7 +570,7 @@ export function StaffAttendanceHistoryModal({
                   <button
                     type="submit"
                     disabled={correctionLoading}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5"
                   >
                     {correctionLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                     Submit Request

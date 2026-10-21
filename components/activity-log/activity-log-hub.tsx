@@ -87,7 +87,7 @@ const ROLE_OPTIONS = [
 ];
 
 function filterSelectClass() {
-  return "h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-medium text-slate-700 shadow-2xs outline-none focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all";
+  return "h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-medium text-slate-700 shadow-2xs outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all";
 }
 
 export function ActivityLogHub({
@@ -367,8 +367,8 @@ export function ActivityLogHub({
     }
     if (act.includes("LOGIN")) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-          <KeyRound className="w-3 h-3 text-indigo-600" /> Signed In
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <KeyRound className="w-3 h-3 text-blue-600" /> Signed In
         </span>
       );
     }
@@ -388,8 +388,8 @@ export function ActivityLogHub({
     }
     if (act.includes("PUBLISH")) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-          <Layers className="w-3 h-3 text-purple-600" /> Published
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+          <Layers className="w-3 h-3 text-sky-600" /> Published
         </span>
       );
     }
@@ -425,7 +425,7 @@ export function ActivityLogHub({
     }
     if (act === "LOGIN") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
           Success
         </span>
       );
@@ -446,7 +446,7 @@ export function ActivityLogHub({
     }
     if (act.includes("PUBLISH")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
           Published
         </span>
       );
@@ -460,9 +460,9 @@ export function ActivityLogHub({
 
   const getRoleBadge = (role: string) => {
     const r = (role || "").toLowerCase();
-    if (r.includes("super")) return "bg-purple-100 text-purple-800 border-purple-200";
+    if (r.includes("super")) return "bg-blue-100 text-blue-800 border-blue-200";
     if (r.includes("trustee")) return "bg-blue-100 text-blue-800 border-blue-200";
-    if (r.includes("principal")) return "bg-indigo-100 text-indigo-800 border-indigo-200";
+    if (r.includes("principal")) return "bg-slate-100 text-slate-800 border-slate-200";
     if (r.includes("clerk")) return "bg-emerald-100 text-emerald-800 border-emerald-200";
     if (r.includes("teacher")) return "bg-teal-100 text-teal-800 border-teal-200";
     if (r.includes("student")) return "bg-amber-100 text-amber-800 border-amber-200";
@@ -502,18 +502,18 @@ export function ActivityLogHub({
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner / Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#5826df] via-[#6d3df5] to-[#7f4efb] text-white p-6 md:p-7 shadow-lg shadow-purple-500/10">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] text-white p-6 md:p-7 shadow-lg shadow-blue-500/10">
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold text-purple-100 mb-3 border border-white/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold text-blue-100 mb-3 border border-white/20">
               <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-300" />
               {isSuperAdmin
                 ? "Enterprise Central Activity Logs (All Schools)"
                 : `Comprehensive School Activity Logs • ${roleTitle}`}
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Activity Logs</h1>
-            <p className="text-purple-100 text-xs md:text-sm mt-1 max-w-2xl font-normal leading-relaxed">
+            <p className="text-blue-100 text-xs md:text-sm mt-1 max-w-2xl font-normal leading-relaxed">
               Real-time audit records of user logins, data changes, and administrative actions. Click any row to expand full details.
             </p>
           </div>
@@ -549,9 +549,9 @@ export function ActivityLogHub({
             <Button
               size="sm"
               onClick={handleExportCSV}
-              className="bg-white text-[#5826df] hover:bg-white/90 shadow-md font-semibold transition-all text-xs"
+              className="bg-white text-[#2563EB] hover:bg-white/90 shadow-md font-semibold transition-all text-xs"
             >
-              <Download className="w-3.5 h-3.5 mr-1.5 text-[#5826df]" />
+              <Download className="w-3.5 h-3.5 mr-1.5 text-[#2563EB]" />
               Export CSV
             </Button>
           </div>
@@ -560,25 +560,25 @@ export function ActivityLogHub({
         {/* Stats Metrics Counter Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-6 pt-6 border-t border-white/20">
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
-            <div className="text-xs text-purple-200 font-medium">Total Actions</div>
+            <div className="text-xs text-blue-200 font-medium">Total Actions</div>
             <div className="text-xl md:text-2xl font-extrabold mt-1 tracking-tight">
               {stats?.total_count?.toLocaleString() ?? totalCount.toLocaleString()}
             </div>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
-            <div className="text-xs text-purple-200 font-medium">Today&apos;s Activities</div>
+            <div className="text-xs text-blue-200 font-medium">Today&apos;s Activities</div>
             <div className="text-xl md:text-2xl font-extrabold mt-1 text-emerald-300 tracking-tight">
               {stats?.today_count?.toLocaleString() ?? 0}
             </div>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
-            <div className="text-xs text-purple-200 font-medium">User Logins</div>
+            <div className="text-xs text-blue-200 font-medium">User Logins</div>
             <div className="text-xl md:text-2xl font-extrabold mt-1 tracking-tight">
               {stats?.login_count?.toLocaleString() ?? 0}
             </div>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
-            <div className="text-xs text-purple-200 font-medium">Password & Security</div>
+            <div className="text-xs text-blue-200 font-medium">Password & Security</div>
             <div className="text-xl md:text-2xl font-extrabold mt-1 text-amber-300 tracking-tight">
               {stats?.password_changes_count?.toLocaleString() ?? 0}
             </div>
@@ -592,13 +592,13 @@ export function ActivityLogHub({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#5826df]" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#2563EB]" />
               <Input
                 aria-label="Search activity logs"
                 value={search}
                 onChange={handleSearchChange}
                 placeholder="Search activity records, user, IP..."
-                className="h-10 rounded-xl border-slate-200 bg-white pl-10 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs focus-visible:border-[#5826df] focus-visible:ring-3 focus-visible:ring-[#5826df]/20"
+                className="h-10 rounded-xl border-slate-200 bg-white pl-10 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs focus-visible:border-[#2563EB] focus-visible:ring-3 focus-visible:ring-[#2563EB]/20"
               />
             </div>
             {hasFilters && (
@@ -812,8 +812,8 @@ export function ActivityLogHub({
                     <React.Fragment key={log.id}>
                       <tr
                         onClick={() => setSelectedLog(isSelected ? null : log)}
-                        className={`cursor-pointer align-middle transition-colors hover:bg-indigo-50/40 ${
-                          isSelected ? "bg-purple-50/80 font-medium" : ""
+                        className={`cursor-pointer align-middle transition-colors hover:bg-blue-50/40 ${
+                          isSelected ? "bg-blue-50/80 font-medium" : ""
                         }`}
                       >
                         {/* Created Date */}
@@ -884,20 +884,20 @@ export function ActivityLogHub({
 
                       {/* Expandable Details Drawer directly below clicked row */}
                       {isSelected && (
-                        <tr className="bg-slate-50/90 border-y-2 border-y-purple-200">
+                        <tr className="bg-slate-50/90 border-y-2 border-y-blue-200">
                           <td colSpan={columnCount} className="p-5">
                             <div className="space-y-4 animate-in fade-in duration-150">
                               {/* Detail Card Header */}
                               <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-xl bg-[#5826df] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shadow-xs">
                                     <Terminal className="w-4 h-4" />
                                   </div>
                                   <div>
                                     <span className="font-bold text-sm text-slate-900">
                                       {log.title}
                                     </span>
-                                    <span className="ml-2 text-[11px] font-mono text-purple-600 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200">
+                                    <span className="ml-2 text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-semibold border border-blue-200">
                                       Log #{log.id}
                                     </span>
                                   </div>
@@ -921,7 +921,7 @@ export function ActivityLogHub({
                                 {/* Col 1: API Status & Endpoint */}
                                 <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs space-y-2.5 font-mono">
                                   <div className="font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-sans">
-                                    <Server className="w-3.5 h-3.5 text-purple-600" /> API Call & HTTP Status
+                                    <Server className="w-3.5 h-3.5 text-blue-600" /> API Call & HTTP Status
                                   </div>
 
                                   <div className="flex justify-between items-center pt-1">
@@ -949,7 +949,7 @@ export function ActivityLogHub({
                                 {/* Col 2: Actor & Location */}
                                 <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs space-y-2">
                                   <div className="font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-                                    <UserCheck className="w-3.5 h-3.5 text-purple-600" /> Actor & Environment
+                                    <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Actor & Environment
                                   </div>
 
                                   <div className="space-y-1.5">
@@ -962,7 +962,7 @@ export function ActivityLogHub({
 
                                     <div className="flex justify-between">
                                       <span className="text-slate-500">Role:</span>
-                                      <span className="font-semibold text-purple-700">
+                                      <span className="font-semibold text-blue-700">
                                         {log.user_role}
                                       </span>
                                     </div>
@@ -991,11 +991,11 @@ export function ActivityLogHub({
                                 </div>
 
                                 {/* Col 3: Request Payload / Metadata */}
-                                <div className="bg-slate-900 text-purple-300 rounded-xl p-4 border border-slate-800 flex flex-col justify-between shadow-xs">
+                                <div className="bg-slate-900 text-blue-300 rounded-xl p-4 border border-slate-800 flex flex-col justify-between shadow-xs">
                                   <div>
                                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                                       <span className="font-bold text-white flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
-                                        <Code2 className="w-3.5 h-3.5 text-purple-400" /> Request Payload
+                                        <Code2 className="w-3.5 h-3.5 text-blue-400" /> Request Payload
                                       </span>
                                       <Button
                                         variant="ghost"
@@ -1004,7 +1004,7 @@ export function ActivityLogHub({
                                           e.stopPropagation();
                                           handleCopyPayload();
                                         }}
-                                        className="h-5 px-1.5 text-[10px] text-purple-300 hover:text-white hover:bg-slate-800"
+                                        className="h-5 px-1.5 text-[10px] text-blue-300 hover:text-white hover:bg-slate-800"
                                       >
                                         {copiedPayload ? (
                                           <>
@@ -1018,7 +1018,7 @@ export function ActivityLogHub({
                                       </Button>
                                     </div>
 
-                                    <pre className="font-mono text-[11px] text-purple-200 overflow-x-auto max-h-24 pt-2.5 leading-relaxed whitespace-pre-wrap">
+                                    <pre className="font-mono text-[11px] text-blue-200 overflow-x-auto max-h-24 pt-2.5 leading-relaxed whitespace-pre-wrap">
                                       {log.extra_data && Object.keys(log.extra_data).length > 0
                                         ? JSON.stringify(log.extra_data, null, 2)
                                         : JSON.stringify(
@@ -1074,7 +1074,7 @@ export function ActivityLogHub({
                     setPageSize(Number(e.target.value));
                     setPage(1);
                   }}
-                  className="h-8 rounded-lg border border-purple-300 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-purple-200"
+                  className="h-8 rounded-lg border border-blue-300 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-200"
                 >
                   {[10, 25, 50, 100].map((option) => (
                     <option key={option} value={option}>
@@ -1098,7 +1098,7 @@ export function ActivityLogHub({
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="whitespace-nowrap font-medium text-slate-700">
-                Page <strong className="text-purple-600 font-bold">{page}</strong> of {totalPages}
+                Page <strong className="text-blue-600 font-bold">{page}</strong> of {totalPages}
               </span>
               <button
                 type="button"

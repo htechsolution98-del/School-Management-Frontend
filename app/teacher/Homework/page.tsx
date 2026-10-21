@@ -43,8 +43,8 @@ const FONT_URL =
 // ─── Avatar Color Palette ─────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "#4634D2", "#5B35F5", "#0BAA78", "#F59E0B", "#0284C7",
-  "#EC4899", "#8B5CF6", "#F43F5E", "#10B981",
+  "#1E40AF", "#2563EB", "#0BAA78", "#F59E0B", "#0284C7",
+  "#EC4899", "#0284C7", "#F43F5E", "#10B981",
 ];
 
 function getInitials(name: string): string {
@@ -212,7 +212,7 @@ function CreateHomeworkModal({
       >
         <div className="flex items-center justify-between pb-4 border-b border-[#E4E9F5]">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F0EDFF] text-[#5B35F5] border border-[#DDD6FE] text-[10px] font-extrabold uppercase tracking-wider mb-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] text-[10px] font-extrabold uppercase tracking-wider mb-1">
               <span>CREATE HOMEWORK</span>
             </div>
             <h3 className="text-base sm:text-lg font-black text-[#172447] tracking-tight">
@@ -244,9 +244,9 @@ function CreateHomeworkModal({
                 placeholder="e.g. Chapter 4 — Quadratic Equations Exercise"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all"
+                className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all"
               />
-              <FileText className="w-3.5 h-3.5 text-[#5B35F5] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <FileText className="w-3.5 h-3.5 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
@@ -260,7 +260,7 @@ function CreateHomeworkModal({
                 <select
                   value={divisionId}
                   onChange={(e) => setDivisionId(Number(e.target.value))}
-                  className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                  className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
                 >
                   {uniqueDivisions.length === 0 ? (
                     <option value={0}>Select Division…</option>
@@ -272,7 +272,7 @@ function CreateHomeworkModal({
                     ))
                   )}
                 </select>
-                <Users className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Users className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
@@ -285,7 +285,7 @@ function CreateHomeworkModal({
                 <select
                   value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
-                  className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                  className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
                 >
                   {availableSubjects.length === 0 ? (
                     <option value="">General Subject</option>
@@ -297,7 +297,7 @@ function CreateHomeworkModal({
                     ))
                   )}
                 </select>
-                <BookOpen className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <BookOpen className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
@@ -315,9 +315,9 @@ function CreateHomeworkModal({
                 min={todayStr}
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] outline-none focus:border-[#5B35F5] cursor-pointer"
+                className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] outline-none focus:border-[#2563EB] cursor-pointer"
               />
-              <Calendar className="w-3.5 h-3.5 text-[#5B35F5] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Calendar className="w-3.5 h-3.5 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
@@ -331,7 +331,7 @@ function CreateHomeworkModal({
               placeholder="Provide instructions, textbook questions, or guidelines for students…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#5B35F5] resize-none leading-relaxed"
+              className="w-full p-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#2563EB] resize-none leading-relaxed"
             />
           </div>
 
@@ -340,9 +340,9 @@ function CreateHomeworkModal({
             <label className="block text-[11px] font-bold text-[#172447] uppercase tracking-wider mb-1.5">
               Attach Reference Document <span className="text-slate-400 font-normal">(PDF / Image / Docx)</span>
             </label>
-            <div className="p-3 rounded-2xl bg-[#F8F7FF] border border-dashed border-[#DDD6FE] flex items-center justify-between gap-3">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-dashed border-slate-200 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-[#EDE9FE] text-[#5B35F5] flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
                   <Paperclip size={14} />
                 </div>
                 <div className="min-w-0">
@@ -354,7 +354,7 @@ function CreateHomeworkModal({
                   </p>
                 </div>
               </div>
-              <label className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#F0EDFF] text-[#5B35F5] border border-[#DDD6FE] text-xs font-bold shadow-2xs transition-all cursor-pointer shrink-0">
+              <label className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] text-xs font-bold shadow-2xs transition-all cursor-pointer shrink-0">
                 <span>{file ? "Change" : "Browse"}</span>
                 <input
                   type="file"
@@ -377,7 +377,7 @@ function CreateHomeworkModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#5B35F5] to-[#4030D8] hover:opacity-95 text-white text-xs font-bold shadow-md shadow-[#5B35F5]/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:opacity-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
@@ -463,7 +463,7 @@ function MarkModal({
               required
               value={marks}
               onChange={(e) => setMarks(Number(e.target.value))}
-              className="w-full h-10 px-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-sm font-bold text-[#172447] outline-none focus:border-[#5B35F5] transition-all"
+              className="w-full h-10 px-3 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-sm font-bold text-[#172447] outline-none focus:border-[#2563EB] transition-all"
             />
           </div>
 
@@ -476,7 +476,7 @@ function MarkModal({
               placeholder="e.g. Well researched, neat diagrams. Keep it up!"
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] outline-none focus:border-[#5B35F5] resize-none leading-relaxed"
+              className="w-full p-2.5 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] outline-none focus:border-[#2563EB] resize-none leading-relaxed"
             />
           </div>
 
@@ -492,7 +492,7 @@ function MarkModal({
             <button
               type="submit"
               disabled={isSaving}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white text-xs font-bold shadow-md shadow-[#5B35F5]/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isSaving ? (
                 <>
@@ -852,9 +852,9 @@ export default function AllHomeworkPage() {
         }}
       />
       {/* Soft curved decorative ambient shapes */}
-      <div className="fixed -top-20 -left-20 w-80 h-80 rounded-full bg-[#5B35F5]/8 blur-3xl pointer-events-none z-0" />
-      <div className="fixed top-48 -right-20 w-80 h-80 rounded-full bg-[#8B5CF6]/10 blur-3xl pointer-events-none z-0" />
-      <div className="fixed -bottom-10 -right-20 w-80 h-80 rounded-full bg-[#8B5CF6]/12 blur-3xl pointer-events-none z-0" />
+      <div className="fixed -top-20 -left-20 w-80 h-80 rounded-full bg-blue-600/8 blur-3xl pointer-events-none z-0" />
+      <div className="fixed top-48 -right-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none z-0" />
+      <div className="fixed -bottom-10 -right-20 w-80 h-80 rounded-full bg-blue-500/12 blur-3xl pointer-events-none z-0" />
 
       {/* Content Container (Layered above ambient background) */}
       <div className="relative z-10 space-y-3.5 sm:space-y-4">
@@ -862,8 +862,8 @@ export default function AllHomeworkPage() {
         <div className="relative pt-1">
           {/* 3D Notepad Artwork positioned in Background */}
           <div className="absolute -top-2 right-0 sm:right-4 w-32 h-36 sm:w-40 sm:h-44 pointer-events-none select-none z-0">
-            {/* Soft ambient violet cloud behind notepad matching reference screenshot */}
-            <div className="absolute inset-0 -m-2 rounded-full bg-gradient-to-br from-[#E2D9FD]/80 to-[#D5C6FB]/50 blur-xl -z-10" />
+            {/* Soft ambient royal blue cloud behind notepad matching reference screenshot */}
+            <div className="absolute inset-0 -m-2 rounded-full bg-gradient-to-br from-[#DBEAFE]/80 to-[#BFDBFE]/50 blur-xl -z-10" />
             <Image
               src="/homework-hero.png"
               alt="Homework Illustration"
@@ -877,8 +877,8 @@ export default function AllHomeworkPage() {
           {/* Foreground Text Content */}
           <div className="relative z-10 max-w-[240px] sm:max-w-md">
             {/* Top Pill Badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 backdrop-blur-md border border-[#DDD6FE]/60 text-[#5B35F5] text-[10.5px] font-black uppercase tracking-wider shadow-2xs">
-              <BookOpen size={12} className="text-[#5B35F5]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 backdrop-blur-md border border-[#BFDBFE]/60 text-[#2563EB] text-[10.5px] font-black uppercase tracking-wider shadow-2xs">
+              <BookOpen size={12} className="text-[#2563EB]" />
               <span>HOMEWORK & ASSIGNMENTS</span>
             </div>
 
@@ -896,7 +896,7 @@ export default function AllHomeworkPage() {
             <button
               type="button"
               onClick={() => setCreateModal(true)}
-              className="h-11 px-5 rounded-full bg-gradient-to-r from-[#5B35F5] to-[#4A2CF0] hover:opacity-95 text-white text-xs font-bold shadow-md shadow-[#5B35F5]/30 flex items-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer"
+              className="h-11 px-5 rounded-full bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:opacity-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 flex items-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer"
             >
               <Plus size={16} />
               <span>Create Homework</span>
@@ -908,7 +908,7 @@ export default function AllHomeworkPage() {
                 placeholder="Search homework..."
                 value={searchHW}
                 onChange={(e) => setSearchHW(e.target.value)}
-                className="w-full h-11 pl-9 pr-7 rounded-full bg-white border border-white/90 shadow-xs text-xs font-semibold text-[#172447] placeholder-[#94A3B8] outline-none focus:border-[#5B35F5] transition-all"
+                className="w-full h-11 pl-9 pr-7 rounded-full bg-white border border-white/90 shadow-xs text-xs font-semibold text-[#172447] placeholder-[#94A3B8] outline-none focus:border-[#2563EB] transition-all"
               />
               <Search className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               {searchHW && (
@@ -956,13 +956,13 @@ export default function AllHomeworkPage() {
             </div>
           </div>
 
-          {/* Total Submissions (Violet Accent) */}
+          {/* Total Submissions (Sky Accent) */}
           <div className="bg-white rounded-2xl px-2 py-2 sm:px-3 sm:py-2.5 border border-white/90 shadow-xs flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#F3F0FF] flex items-center justify-center text-[#6366F1] shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#F0F9FF] flex items-center justify-center text-[#0284C7] shrink-0">
               <Users size={14} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[7.5px] sm:text-[9px] font-bold text-[#6366F1] uppercase leading-[1.05] tracking-tight">
+              <p className="text-[7.5px] sm:text-[9px] font-bold text-[#0284C7] uppercase leading-[1.05] tracking-tight">
                 TOTAL<br className="block sm:hidden" /> SUBMISSIONS
               </p>
               <p className="text-lg sm:text-xl font-black text-[#1A1D2F] leading-none mt-0.5">
@@ -983,7 +983,7 @@ export default function AllHomeworkPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer",
                 selectedStatusFilter === "ALL"
-                  ? "bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white shadow-md shadow-[#5B35F5]/25"
+                  ? "bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-md shadow-blue-500/25"
                   : "bg-white/80 hover:bg-white text-[#7180A1] border border-white shadow-2xs"
               )}
             >
@@ -998,7 +998,7 @@ export default function AllHomeworkPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer",
                 selectedStatusFilter === "ACTIVE"
-                  ? "bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white shadow-md shadow-[#5B35F5]/25"
+                  ? "bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-md shadow-blue-500/25"
                   : "bg-white/80 hover:bg-white text-[#172447] border border-white shadow-2xs"
               )}
             >
@@ -1013,7 +1013,7 @@ export default function AllHomeworkPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer",
                 selectedStatusFilter === "DRAFT"
-                  ? "bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white shadow-md shadow-[#5B35F5]/25"
+                  ? "bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-md shadow-blue-500/25"
                   : "bg-white/80 hover:bg-white text-[#7180A1] border border-white shadow-2xs"
               )}
             >
@@ -1028,7 +1028,7 @@ export default function AllHomeworkPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer",
                 selectedStatusFilter === "OVERDUE"
-                  ? "bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white shadow-md shadow-[#5B35F5]/25"
+                  ? "bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-md shadow-blue-500/25"
                   : "bg-white/80 hover:bg-white text-[#7180A1] border border-white shadow-2xs"
               )}
             >
@@ -1044,14 +1044,14 @@ export default function AllHomeworkPage() {
               <select
                 value={selectedClassFilter}
                 onChange={(e) => setSelectedClassFilter(e.target.value)}
-                className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
               >
                 <option value="ALL">All Classes</option>
                 {uniqueClassOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
-              <GraduationCap className="w-4 h-4 text-[#5B35F5] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <GraduationCap className="w-4 h-4 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <ChevronDown className="w-4 h-4 text-[#7180A1] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
@@ -1060,14 +1060,14 @@ export default function AllHomeworkPage() {
               <select
                 value={selectedStatusDropdown}
                 onChange={(e) => setSelectedStatusDropdown(e.target.value)}
-                className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
               >
                 <option value="ALL">All Status</option>
                 <option value="ACTIVE">Active</option>
                 <option value="DRAFT">Draft</option>
                 <option value="OVERDUE">Overdue</option>
               </select>
-              <Filter className="w-3.5 h-3.5 text-[#5B35F5] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Filter className="w-3.5 h-3.5 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <ChevronDown className="w-4 h-4 text-[#7180A1] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
@@ -1076,7 +1076,7 @@ export default function AllHomeworkPage() {
         {/* ── 4. Main Body: Assignment Cards & Second Detailed Card ── */}
         {loadingHw ? (
           <div className="bg-white rounded-3xl border border-[#E4E9F5] p-12 text-center shadow-xs">
-            <Loader2 size={28} className="animate-spin text-[#5B35F5] mx-auto mb-2" />
+            <Loader2 size={28} className="animate-spin text-[#2563EB] mx-auto mb-2" />
             <p className="text-xs font-bold text-[#172447]">Loading homework assignments…</p>
           </div>
         ) : error ? (
@@ -1085,7 +1085,7 @@ export default function AllHomeworkPage() {
           </div>
         ) : homeworks.length === 0 ? (
           <div className="bg-white rounded-3xl border border-[#E4E9F5] p-8 sm:p-12 text-center shadow-xs space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-[#EDE9FE] text-[#5B35F5] flex items-center justify-center mx-auto shadow-2xs">
+            <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mx-auto shadow-2xs">
               <ClipboardList size={26} />
             </div>
             <h3 className="text-base font-extrabold text-[#172447]">
@@ -1114,10 +1114,10 @@ export default function AllHomeworkPage() {
                       onClick={() => setSelectedHw(hw)}
                       className="p-4 sm:p-5 rounded-[26px] border border-white/90 transition-all cursor-pointer relative shadow-xs hover:shadow-sm block text-left bg-white"
                     >
-                      {/* Top Row: Purple Document Tile, Title & Status */}
+                      {/* Top Row: Blue Document Tile, Title & Status */}
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-2xl bg-[#EEF0FF] text-[#4D35FE] flex items-center justify-center shrink-0 shadow-2xs">
+                          <div className="w-10 h-10 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0 shadow-2xs">
                             <FileText size={18} />
                           </div>
 
@@ -1139,7 +1139,7 @@ export default function AllHomeworkPage() {
                             e.stopPropagation();
                             setSelectedHw(hw);
                           }}
-                          className="w-7 h-7 rounded-xl text-[#8E95A9] hover:text-[#4D35FE] hover:bg-[#EEF0FF] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          className="w-7 h-7 rounded-xl text-[#8E95A9] hover:text-[#2563EB] hover:bg-[#EFF6FF] flex items-center justify-center transition-colors cursor-pointer shrink-0"
                         >
                           <MoreVertical size={16} />
                         </button>
@@ -1176,7 +1176,7 @@ export default function AllHomeworkPage() {
                         </div>
 
                         {/* Submissions Count Pill */}
-                        <div className="inline-flex items-center gap-1 text-[#4D35FE] text-[11px] font-bold bg-[#F1F3FE] px-2.5 py-0.5 rounded-full">
+                        <div className="inline-flex items-center gap-1 text-[#2563EB] text-[11px] font-bold bg-[#EFF6FF] px-2.5 py-0.5 rounded-full">
                           <Users size={11} />
                           <span>{hw.submission_count ?? 0} Submissions</span>
                         </div>
@@ -1193,7 +1193,7 @@ export default function AllHomeworkPage() {
                 {/* Header: Tile, Title, Class, Status & Red-Outlined Delete */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-2xl bg-[#EEF0FF] text-[#4D35FE] flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="w-10 h-10 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0 shadow-2xs">
                       <FileText size={18} />
                     </div>
 
@@ -1250,21 +1250,21 @@ export default function AllHomeworkPage() {
                       href={selectedHw.attachment}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#F1F3FE] hover:bg-[#E8EDFE] border border-[#E0E5FB] text-[#4D35FE] text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#2563EB] text-xs font-bold transition-all shadow-2xs cursor-pointer"
                     >
                       <span className="flex items-center gap-2">
                         <Paperclip size={14} />
                         <span>View Attached Material</span>
                       </span>
-                      <ChevronRight size={14} className="text-[#4D35FE]" />
+                      <ChevronRight size={14} className="text-[#2563EB]" />
                     </a>
                   ) : (
-                    <div className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#F1F3FE] border border-[#E0E5FB] text-[#4D35FE] text-xs font-bold opacity-80">
+                    <div className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] text-xs font-bold opacity-80">
                       <span className="flex items-center gap-2">
                         <Paperclip size={14} />
                         <span>View Attached Material</span>
                       </span>
-                      <ChevronRight size={14} className="text-[#4D35FE]" />
+                      <ChevronRight size={14} className="text-[#2563EB]" />
                     </div>
                   )}
                 </div>
@@ -1273,7 +1273,7 @@ export default function AllHomeworkPage() {
                 <div className="pt-2 border-t border-[#F0F2F8] space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Users size={16} className="text-[#4D35FE]" />
+                      <Users size={16} className="text-[#2563EB]" />
                       <h3 className="text-xs font-bold text-[#1A1D2F]">
                         Student Submissions ({submissions.length})
                       </h3>
@@ -1282,7 +1282,7 @@ export default function AllHomeworkPage() {
                     <button
                       type="button"
                       onClick={() => {}}
-                      className="text-xs font-bold text-[#4D35FE] hover:underline flex items-center gap-0.5 cursor-pointer"
+                      className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-0.5 cursor-pointer"
                     >
                       <span>View All</span>
                       <ChevronRight size={12} />
@@ -1292,7 +1292,7 @@ export default function AllHomeworkPage() {
                   {/* Submissions List: Compact Stacked Mobile Rows */}
                   {loadingSub ? (
                     <div className="py-6 text-center text-xs text-[#8E95A9] space-y-1.5">
-                      <Loader2 size={16} className="animate-spin text-[#4D35FE] mx-auto" />
+                      <Loader2 size={16} className="animate-spin text-[#2563EB] mx-auto" />
                       <p>Loading student submissions…</p>
                     </div>
                   ) : submissions.length === 0 ? (
@@ -1318,7 +1318,7 @@ export default function AllHomeworkPage() {
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div
                                 className="w-8 h-8 rounded-full text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-2xs"
-                                style={{ background: "#4D35FE" }}
+                                style={{ background: "#2563EB" }}
                               >
                                 {getInitials(sub.student_name)}
                               </div>
@@ -1352,13 +1352,13 @@ export default function AllHomeworkPage() {
                                   href={sub.file || sub.attachment || "#"}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EEF0FF] hover:bg-[#E0E5FB] text-[#4D35FE] text-[10.5px] font-bold transition-colors mt-0.5"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] text-[10.5px] font-bold transition-colors mt-0.5"
                                 >
                                   <FileText size={11} />
                                   <span>View File</span>
                                 </a>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EEF0FF] text-[#4D35FE] text-[10.5px] font-bold mt-0.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EFF6FF] text-[#2563EB] text-[10.5px] font-bold mt-0.5">
                                   <FileText size={11} />
                                   <span>View File</span>
                                 </span>
@@ -1369,7 +1369,7 @@ export default function AllHomeworkPage() {
                             <button
                               type="button"
                               onClick={() => setMarkModal(sub)}
-                              className="w-6 h-6 rounded-lg text-[#8E95A9] hover:text-[#4D35FE] hover:bg-[#EEF0FF] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                              className="w-6 h-6 rounded-lg text-[#8E95A9] hover:text-[#2563EB] hover:bg-[#EFF6FF] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                             >
                               <MoreVertical size={14} />
                             </button>

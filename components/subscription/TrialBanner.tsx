@@ -129,7 +129,7 @@ export function TrialBanner() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-5xl md:max-w-6xl w-[96vw] !max-w-[1150px] p-0 overflow-hidden rounded-3xl border border-slate-200 shadow-2xl bg-slate-50/50 max-h-[92vh] flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-6 sm:p-7 relative overflow-hidden shrink-0">
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-blue-900 text-white p-6 sm:p-7 relative overflow-hidden shrink-0">
             <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -223,8 +223,8 @@ export function TrialBanner() {
                     name: "6-Month Plan",
                     cycle: "HALF_YEARLY",
                     badge: "Half-Yearly",
-                    badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
-                    borderStyle: "border-purple-200 hover:border-purple-500 hover:shadow-lg",
+                    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
+                    borderStyle: "border-sky-200 hover:border-sky-500 hover:shadow-lg",
                     price: activePlan ? activePlan.half_yearly_price : Number(sub.flat_amount || 0) * 6,
                     duration: "180 Days Full Access",
                     subtext: "Billed semi-annually",

@@ -90,7 +90,7 @@ export default function TeacherDashboard() {
         <div className="grid grid-cols-[1fr_auto] sm:flex sm:items-center sm:justify-end gap-2 mt-3 pt-2.5 border-t border-white/10 relative z-10">
           <Link
             href="/teacher/my-attendance"
-            className="py-2 px-3 sm:px-4 rounded-xl bg-[#5436F5] hover:bg-[#4327D4] text-white text-[11px] sm:text-xs font-bold flex items-center justify-between sm:justify-center gap-2 shadow-sm shadow-[#5436F5]/40 transition-all active:scale-95"
+            className="py-2 px-3 sm:px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] sm:text-xs font-bold flex items-center justify-between sm:justify-center gap-2 shadow-sm shadow-blue-600/30 transition-all active:scale-95"
           >
             <span className="flex items-center gap-1.5 truncate">
               <Clock className="w-3.5 h-3.5 text-white shrink-0" />
@@ -118,7 +118,7 @@ export default function TeacherDashboard() {
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </span>
               <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
@@ -132,7 +132,7 @@ export default function TeacherDashboard() {
               </p>
             </div>
           </div>
-          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#5436F5] flex items-center gap-0.5 truncate">
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-blue-600 flex items-center gap-0.5 truncate">
             <span>Open Duty Desk</span>
             <span className="text-xs">→</span>
           </div>
@@ -172,7 +172,7 @@ export default function TeacherDashboard() {
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ECEBFF] text-[#6366F1] flex items-center justify-center">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                 <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </span>
               <span className="text-[#94A3B8] text-xs font-bold group-hover:translate-x-0.5 transition-transform">›</span>
@@ -186,7 +186,7 @@ export default function TeacherDashboard() {
               </p>
             </div>
           </div>
-          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-[#6366F1] flex items-center gap-0.5 truncate">
+          <div className="mt-2.5 text-[10px] sm:text-xs font-bold text-blue-600 flex items-center gap-0.5 truncate">
             <span>Manage Tasks</span>
             <span className="text-xs">→</span>
           </div>
@@ -225,14 +225,14 @@ export default function TeacherDashboard() {
         {/* Row 1 Left: My Attendance */}
         <Link
           href="/teacher/my-attendance"
-          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#5436F5]/40 transition-all flex items-center justify-between group min-w-0"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-blue-500/40 transition-all flex items-center justify-between group min-w-0"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-8 h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center shrink-0">
+            <span className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Clock className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#5436F5] transition-colors leading-tight truncate">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-blue-600 transition-colors leading-tight truncate">
                 My Attendance
               </h4>
               <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
@@ -267,14 +267,14 @@ export default function TeacherDashboard() {
         {/* Row 2 Left: Homework */}
         <Link
           href="/teacher/Homework"
-          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-[#5436F5]/40 transition-all flex items-center justify-between group min-w-0"
+          className="p-3 rounded-2xl bg-white border border-[#EBF0F8] shadow-2xs hover:border-blue-500/40 transition-all flex items-center justify-between group min-w-0"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-8 h-8 rounded-full bg-[#ECEBFF] text-[#5436F5] flex items-center justify-center shrink-0">
+            <span className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <BookOpen className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-[#5436F5] transition-colors leading-tight truncate">
+              <h4 className="text-xs sm:text-sm font-bold text-[#142044] group-hover:text-blue-600 transition-colors leading-tight truncate">
                 Homework
               </h4>
               <p className="text-[10px] text-[#7183A6] mt-0.5 truncate">
@@ -355,14 +355,14 @@ export default function TeacherDashboard() {
         <div className="rounded-2xl bg-white p-3.5 sm:p-4.5 border border-[#EBF0F8] shadow-2xs space-y-3 min-w-0">
           <div className="flex items-center justify-between gap-1.5 border-b border-[#F1F5F9] pb-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="p-1.5 rounded-lg bg-[#ECEBFF] text-[#5436F5] shrink-0">
+              <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
                 <Calendar className="w-4 h-4" />
               </span>
               <h3 className="font-bold text-[#142044] text-xs sm:text-sm truncate">
                 Today&apos;s Class Schedule
               </h3>
             </div>
-            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[#ECEBFF] text-[#5436F5] shrink-0">
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 shrink-0">
               {currentTime.toLocaleDateString("en-IN", { weekday: "long" })}
             </span>
           </div>
@@ -371,7 +371,7 @@ export default function TeacherDashboard() {
             {/* Period 1 */}
             <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
               <div className="flex items-start gap-2.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-[#5436F5] shrink-0 mt-1.5" />
+                <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" />
                 <div className="min-w-0">
                   <p className="text-[10px] text-[#7183A6] font-medium leading-tight">
                     09:00 AM - 09:45 AM
@@ -422,7 +422,7 @@ export default function TeacherDashboard() {
         <div className="rounded-2xl bg-white p-3.5 sm:p-4.5 border border-[#EBF0F8] shadow-2xs space-y-3 min-w-0">
           <div className="flex items-center justify-between gap-1.5 border-b border-[#F1F5F9] pb-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="p-1.5 rounded-lg bg-[#ECEBFF] text-[#5436F5] shrink-0">
+              <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
                 <Megaphone className="w-4 h-4" />
               </span>
               <h3 className="font-bold text-[#142044] text-xs sm:text-sm truncate">
@@ -431,7 +431,7 @@ export default function TeacherDashboard() {
             </div>
             <Link
               href="/teacher/announcements"
-              className="text-[10px] sm:text-xs font-semibold text-[#5436F5] hover:underline shrink-0"
+              className="text-[10px] sm:text-xs font-semibold text-blue-600 hover:underline shrink-0"
             >
               View All
             </Link>
@@ -441,7 +441,7 @@ export default function TeacherDashboard() {
             {/* Announcement 1 */}
             <div className="flex items-center justify-between gap-2 text-left group cursor-pointer hover:bg-slate-50/70 p-1.5 rounded-xl transition-colors">
               <div className="flex items-start gap-2.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-[#5436F5] shrink-0 mt-1.5" />
+                <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" />
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
                     Staff Meeting

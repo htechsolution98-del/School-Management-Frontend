@@ -225,7 +225,7 @@ export function DatePicker({
   return (
     <div
       className={cn(
-        "relative flex items-center h-10 min-w-36 rounded-lg border border-slate-200 bg-white shadow-2xs transition-all focus-within:border-[#5826df] focus-within:ring-2 focus-within:ring-[#5826df]/20",
+        "relative flex items-center h-10 min-w-36 rounded-lg border border-slate-200 bg-white shadow-2xs transition-all focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-[#2563EB]/20",
         isInvalid && "border-rose-400 focus-within:border-rose-500 focus-within:ring-rose-200",
         className,
         // Override any padding applied on container so inner input sits cleanly
@@ -255,7 +255,7 @@ export function DatePicker({
           type="button"
           disabled={disabled}
           aria-label="Open calendar"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-[#5826df] disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:outline-none"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-[#2563EB] disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:outline-none"
         >
           <CalendarDays className="h-4 w-4" />
         </PopoverTrigger>

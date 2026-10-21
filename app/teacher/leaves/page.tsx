@@ -337,7 +337,7 @@ export default function MyLeavesPage() {
     const type = getLeaveTypeDisplay(leaveType).toUpperCase();
     if (type.includes("SICK")) return "bg-rose-500/10 text-rose-600 border-rose-200/50 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/50";
     if (type.includes("CASUAL")) return "bg-sky-500/10 text-sky-600 border-sky-200/50 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/50";
-    if (type.includes("MATERNITY") || type.includes("PATERNITY")) return "bg-purple-500/10 text-purple-600 border-purple-200/50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50";
+    if (type.includes("MATERNITY") || type.includes("PATERNITY")) return "bg-teal-500/10 text-teal-600 border-teal-200/50 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50";
     return "bg-zinc-500/10 text-zinc-600 border-zinc-200/50 dark:bg-zinc-800/30 dark:text-zinc-400 dark:border-zinc-800/50";
   };
 
@@ -531,7 +531,7 @@ export default function MyLeavesPage() {
               // Decide border gradient color based on type
               let accentColor = "from-sky-400 to-sky-500";
               if (typeLabel.toUpperCase().includes("SICK")) accentColor = "from-rose-400 to-rose-500";
-              if (typeLabel.toUpperCase().includes("MATERNITY") || typeLabel.toUpperCase().includes("PATERNITY")) accentColor = "from-purple-400 to-purple-500";
+              if (typeLabel.toUpperCase().includes("MATERNITY") || typeLabel.toUpperCase().includes("PATERNITY")) accentColor = "from-teal-400 to-teal-500";
               if (typeLabel.toUpperCase().includes("EARNED")) accentColor = "from-emerald-400 to-emerald-500"; const timelineVal = (bal as any).leave_template_timeline ?? (bal as any).timeline ?? "";
               const formattedTimeline = (() => {
                 if (!timelineVal) return "";

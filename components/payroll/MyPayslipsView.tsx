@@ -215,10 +215,10 @@ export function MyPayslipsView({
         </div>
 
         <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 to-blue-400" />
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-600 to-cyan-500" />
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
             <span className="uppercase tracking-wider text-[11px]">Cumulative Received</span>
-            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
@@ -243,10 +243,10 @@ export function MyPayslipsView({
         </div>
 
         <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-purple-500 to-violet-400" />
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
             <span className="uppercase tracking-wider text-[11px]">Total Issued Payslips</span>
-            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50">
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
               <FileText className="w-4 h-4" />
             </div>
           </div>
@@ -266,7 +266,7 @@ export function MyPayslipsView({
             placeholder="Search month or slip ref..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           />
         </div>
 
@@ -275,7 +275,7 @@ export function MyPayslipsView({
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="pl-8 pr-8 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 appearance-none"
+              className="pl-8 pr-8 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
             >
               <option value="ALL">All Years</option>
               {availableYears.map((yr) => (
@@ -294,7 +294,7 @@ export function MyPayslipsView({
       <div className="space-y-3.5">
         {loading ? (
           <div className="bg-white dark:bg-slate-900 p-16 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center space-y-3 shadow-sm">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
             <p className="text-sm text-slate-500 font-medium">Fetching your salary slips...</p>
           </div>
         ) : error ? (
@@ -306,14 +306,14 @@ export function MyPayslipsView({
             <p className="text-sm text-slate-500 mt-1">{error}</p>
             <button
               onClick={fetchPayslips}
-              className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition"
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition"
             >
               Try Again
             </button>
           </div>
         ) : filteredPayslips.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 py-16 px-6 sm:px-12 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center shadow-2xs flex flex-col items-center justify-center relative overflow-hidden">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border border-[#5826df]/20 shadow-2xs flex items-center justify-center text-[#5826df] mb-4">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/40 dark:to-sky-950/30 border border-blue-200/40 shadow-2xs flex items-center justify-center text-blue-600 mb-4">
               <Banknote className="w-8 h-8 sm:w-10 sm:h-10 stroke-[1.8]" />
             </div>
             <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 tracking-tight">
@@ -329,7 +329,7 @@ export function MyPayslipsView({
               </span>
               <span className="text-slate-300 dark:text-zinc-700">•</span>
               <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#5826df]" />
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
                 Official Electronic Receipts
               </span>
             </div>
@@ -352,7 +352,7 @@ export function MyPayslipsView({
                     {/* Card Header: Month + Status Badge */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <span className="p-2.5 rounded-xl bg-gradient-to-br from-[#5826df]/10 to-[#6d3df5]/20 text-[#5826df] border border-[#5826df]/15 shadow-2xs">
+                        <span className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/10 to-sky-500/20 text-blue-600 border border-blue-500/15 shadow-2xs">
                           <Calendar className="w-4 h-4 stroke-[2.2]" />
                         </span>
                         <div>
@@ -366,11 +366,10 @@ export function MyPayslipsView({
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          paymentStatus === "paid"
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${paymentStatus === "paid"
                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                             : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                        }`}>
+                          }`}>
                           <CheckCircle2 className="w-3 h-3" />
                           {paymentStatus === "paid" ? "Paid" : "Disbursed"}
                         </span>
@@ -415,7 +414,7 @@ export function MyPayslipsView({
                       </div>
                       <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center font-bold">
                         <span className="text-slate-800 dark:text-slate-200">Net Take-Home</span>
-                        <span className="text-base font-black text-[#5826df] dark:text-indigo-400">
+                        <span className="text-base font-black text-blue-600 dark:text-blue-400">
                           {formatCurrency(slip.net_salary)}
                         </span>
                       </div>
@@ -426,7 +425,7 @@ export function MyPayslipsView({
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
                     <button
                       onClick={() => handleOpenSlip(slip)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white shadow-md shadow-[#5826df]/20 hover:shadow-[#5826df]/30 transition-all active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 transition-all active:scale-[0.98]"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>View & Download Slip</span>

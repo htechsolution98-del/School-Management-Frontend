@@ -59,10 +59,10 @@ const CATEGORY_CONFIG: Record<
   { bg: string; text: string; border: string; dot: string }
 > = {
   "Study Notes": {
-    bg: "bg-[#F0EDFF]",
-    text: "text-[#5B35F5]",
-    border: "border-[#DDD6FE]",
-    dot: "bg-[#5B35F5]",
+    bg: "bg-[#EFF6FF]",
+    text: "text-[#2563EB]",
+    border: "border-[#BFDBFE]",
+    dot: "bg-[#2563EB]",
   },
   Assignment: {
     bg: "bg-[#E0F2FE]",
@@ -97,7 +97,7 @@ function getFileBadge(ext: string) {
   if (e === "png" || e === "jpg" || e === "jpeg") {
     return { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "IMG" };
   }
-  return { bg: "bg-purple-50 text-purple-700 border-purple-200", label: e.toUpperCase() };
+  return { bg: "bg-sky-50 text-sky-700 border-sky-200", label: e.toUpperCase() };
 }
 
 export default function StudyMaterialsPage() {
@@ -375,14 +375,14 @@ export default function StudyMaterialsPage() {
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           {/* Eyebrow Label */}
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EDE9FE] text-[#5B35F5] text-[10.5px] font-extrabold uppercase tracking-wider border border-[#DDD6FE]/60">
-            <Sparkles size={11} className="text-[#5B35F5]" />
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] text-[10.5px] font-extrabold uppercase tracking-wider border border-[#BFDBFE]/60">
+            <Sparkles size={11} className="text-[#2563EB]" />
             <span>Teaching Resources</span>
           </div>
 
           {/* Dynamic Resource Count */}
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white text-[#172447] text-xs font-bold border border-[#E4E9F5] shadow-2xs">
-            <BookOpen size={12} className="text-[#5B35F5]" />
+            <BookOpen size={12} className="text-[#2563EB]" />
             <span>
               {materials.length} {materials.length === 1 ? "Resource" : "Resources"}
             </span>
@@ -399,7 +399,7 @@ export default function StudyMaterialsPage() {
               Create, organize and share learning resources with your classes.
             </p>
           </div>
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-[#5B35F5] to-[#4030D8] text-white flex items-center justify-center shrink-0 shadow-sm shadow-[#5B35F5]/30">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/25">
             <FileText size={18} />
           </div>
         </div>
@@ -411,9 +411,9 @@ export default function StudyMaterialsPage() {
         <div className="lg:col-span-5 w-full">
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E4E9F5] shadow-xs overflow-hidden">
             {/* Distinctive Upload Workspace Header */}
-            <div className="bg-[#F8F7FF] border-b border-[#ECEAF8] p-3.5 sm:p-4 flex items-center justify-between gap-3">
+            <div className="bg-slate-50/80 border-b border-slate-100 p-3.5 sm:p-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5B35F5] to-[#4030D8] text-white flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white flex items-center justify-center shadow-xs shrink-0">
                   <UploadCloud size={17} />
                 </div>
                 <div className="min-w-0">
@@ -427,7 +427,7 @@ export default function StudyMaterialsPage() {
               </div>
 
               {/* Sub-Step Indicator */}
-              <div className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#E4E9F5] text-[10px] font-bold text-[#5B35F5] shrink-0">
+              <div className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#E4E9F5] text-[10px] font-bold text-[#2563EB] shrink-0">
                 <span>01 DETAILS</span>
                 <span className="text-slate-300">•</span>
                 <span className="text-[#7180A1]">02 FILES</span>
@@ -449,7 +449,7 @@ export default function StudyMaterialsPage() {
                     placeholder="e.g. Chapter 4 — Algebra Notes"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all shadow-2xs"
+                    className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all shadow-2xs"
                   />
                   <FileText className="w-4 h-4 text-[#7180A1] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -466,7 +466,7 @@ export default function StudyMaterialsPage() {
                     <select
                       value={selectedClass}
                       onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all cursor-pointer shadow-2xs"
+                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
                     >
                       <option value="Std 1">Std 1</option>
                       <option value="Std 2">Std 2</option>
@@ -479,7 +479,7 @@ export default function StudyMaterialsPage() {
                       <option value="Std 9">Std 9</option>
                       <option value="Std 10">Std 10</option>
                     </select>
-                    <GraduationCap className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <GraduationCap className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
@@ -493,14 +493,14 @@ export default function StudyMaterialsPage() {
                     <select
                       value={selectedDivision}
                       onChange={(e) => setSelectedDivision(e.target.value)}
-                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all cursor-pointer shadow-2xs"
+                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
                     >
                       <option value="A">Div A</option>
                       <option value="B">Div B</option>
                       <option value="C">Div C</option>
                       <option value="D">Div D</option>
                     </select>
-                    <Users className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Users className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
@@ -517,7 +517,7 @@ export default function StudyMaterialsPage() {
                     <select
                       value={selectedSubject}
                       onChange={(e) => setSelectedSubject(e.target.value)}
-                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all cursor-pointer shadow-2xs"
+                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
                     >
                       <option value="Mathematics">Mathematics</option>
                       <option value="Science">Science</option>
@@ -526,7 +526,7 @@ export default function StudyMaterialsPage() {
                       <option value="Hindi">Hindi</option>
                       <option value="Computer Science">Computer Sci</option>
                     </select>
-                    <BookOpen className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <BookOpen className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
@@ -540,14 +540,14 @@ export default function StudyMaterialsPage() {
                     <select
                       value={materialType}
                       onChange={(e) => setMaterialType(e.target.value as any)}
-                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] focus:ring-2 focus:ring-[#5B35F5]/15 transition-all cursor-pointer shadow-2xs"
+                      className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
                     >
                       <option value="Study Notes">Study Notes</option>
                       <option value="Assignment">Assignment</option>
                       <option value="Practice Sheet">Practice Sheet</option>
                       <option value="Reference Guide">Reference Guide</option>
                     </select>
-                    <Tag className="w-3.5 h-3.5 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Tag className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
@@ -570,17 +570,17 @@ export default function StudyMaterialsPage() {
                   className={cn(
                     "relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center transition-all cursor-pointer",
                     isDragging
-                      ? "border-[#5B35F5] bg-[#F0EDFF]/60 shadow-md shadow-[#5B35F5]/10 scale-[1.01]"
-                      : "border-[#DDD6FE] hover:border-[#5B35F5] bg-[#F8F7FF] hover:bg-[#F3F0FF]/60"
+                      ? "border-[#2563EB] bg-[#EFF6FF]/60 shadow-md shadow-[#2563EB]/10 scale-[1.01]"
+                      : "border-[#BFDBFE] hover:border-[#2563EB] bg-slate-50/70 hover:bg-[#EFF6FF]/60"
                   )}
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#EDE9FE] flex items-center justify-center mx-auto mb-2 text-[#5B35F5] shadow-xs">
+                  <div className="w-10 h-10 rounded-full bg-[#EFF6FF] flex items-center justify-center mx-auto mb-2 text-[#2563EB] shadow-xs">
                     <UploadCloud size={20} />
                   </div>
                   <p className="text-xs font-extrabold text-[#172447]">
                     Drop your files here
                   </p>
-                  <p className="text-[11px] text-[#5B35F5] font-semibold mt-0.5 underline underline-offset-2">
+                  <p className="text-[11px] text-[#2563EB] font-semibold mt-0.5 underline underline-offset-2">
                     or browse from your device
                   </p>
                   <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-white/90 border border-[#E4E9F5] text-[10px] font-bold text-[#7180A1] shadow-2xs">
@@ -605,7 +605,7 @@ export default function StudyMaterialsPage() {
                   <div className="space-y-1.5 pt-2">
                     <div className="flex items-center justify-between text-[11px] font-bold text-[#172447] px-0.5">
                       <span className="flex items-center gap-1">
-                        <Paperclip size={11} className="text-[#5B35F5]" />
+                        <Paperclip size={11} className="text-[#2563EB]" />
                         <span>Attached Files ({selectedFiles.length})</span>
                         <span className="text-[#7180A1] font-normal">• {totalSelectedMB} MB</span>
                       </span>
@@ -662,7 +662,7 @@ export default function StudyMaterialsPage() {
               {/* Upload Progress Bar */}
               {isUploading && (
                 <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-[#5B35F5]">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-[#2563EB]">
                     <span className="flex items-center gap-1.5">
                       <Loader2 size={12} className="animate-spin" />
                       <span>Uploading to class library…</span>
@@ -671,7 +671,7 @@ export default function StudyMaterialsPage() {
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-[#5B35F5] to-[#4030D8] transition-all duration-200"
+                      className="h-full bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] transition-all duration-200"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
@@ -682,7 +682,7 @@ export default function StudyMaterialsPage() {
               <button
                 type="submit"
                 disabled={isUploading || !title.trim() || selectedFiles.length === 0}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-[#5B35F5] to-[#4030D8] text-white text-xs font-bold shadow-md shadow-[#5B35F5]/25 hover:shadow-lg hover:shadow-[#5B35F5]/35 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-55 disabled:cursor-not-allowed"
+                className="w-full h-11 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white text-xs font-bold shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-55 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
                   <>
@@ -711,7 +711,7 @@ export default function StudyMaterialsPage() {
           <div className="bg-white rounded-2xl border border-[#E4E9F5] p-3.5 sm:p-4 shadow-xs space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] text-[#5B35F5] flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
                   <FolderOpen size={16} />
                 </div>
                 <div>
@@ -723,7 +723,7 @@ export default function StudyMaterialsPage() {
                   </p>
                 </div>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#EDE9FE] text-[#5B35F5] text-xs font-bold border border-[#DDD6FE]">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] text-xs font-bold border border-[#BFDBFE]">
                 {filteredMaterials.length} Items
               </span>
             </div>
@@ -738,7 +738,7 @@ export default function StudyMaterialsPage() {
                   placeholder="Search by title, subject, file…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-9 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#5B35F5] transition-all"
+                  className="w-full h-9 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-semibold text-[#172447] placeholder-[#7180A1] outline-none focus:border-[#2563EB] transition-all"
                 />
                 {search && (
                   <button
@@ -756,7 +756,7 @@ export default function StudyMaterialsPage() {
                 <select
                   value={filterClass}
                   onChange={(e) => setFilterClass(e.target.value)}
-                  className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                  className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
                 >
                   <option value="ALL">All Classes</option>
                   <option value="Std 1">Std 1</option>
@@ -770,7 +770,7 @@ export default function StudyMaterialsPage() {
                   <option value="Std 9">Std 9</option>
                   <option value="Std 10">Std 10</option>
                 </select>
-                <GraduationCap className="w-3 h-3 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <GraduationCap className="w-3 h-3 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3 h-3 text-[#7180A1] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
@@ -779,7 +779,7 @@ export default function StudyMaterialsPage() {
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#5B35F5] cursor-pointer"
+                  className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
                 >
                   <option value="ALL">All Types</option>
                   <option value="Study Notes">Study Notes</option>
@@ -787,7 +787,7 @@ export default function StudyMaterialsPage() {
                   <option value="Practice Sheet">Practice Sheet</option>
                   <option value="Reference Guide">Reference Guide</option>
                 </select>
-                <Tag className="w-3 h-3 text-[#5B35F5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Tag className="w-3 h-3 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3 h-3 text-[#7180A1] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
@@ -797,7 +797,7 @@ export default function StudyMaterialsPage() {
           {filteredMaterials.length === 0 ? (
             /* Empty State */
             <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E4E9F5] p-6 sm:p-8 text-center shadow-xs space-y-3">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#EDE9FE] text-[#5B35F5] flex items-center justify-center mx-auto shadow-2xs">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mx-auto shadow-2xs">
                 <FileText size={22} />
               </div>
               <div>
@@ -811,7 +811,7 @@ export default function StudyMaterialsPage() {
               <button
                 type="button"
                 onClick={scrollToUpload}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#5B35F5] hover:bg-[#4030D8] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
               >
                 <Plus size={13} />
                 <span>Upload your first material</span>
@@ -825,7 +825,7 @@ export default function StudyMaterialsPage() {
                 return (
                   <div
                     key={item.id}
-                    className="bg-white rounded-2xl border border-[#E4E9F5] p-3.5 sm:p-4 shadow-xs hover:border-[#DDD6FE] transition-all space-y-3"
+                    className="bg-white rounded-2xl border border-[#E4E9F5] p-3.5 sm:p-4 shadow-xs hover:border-[#BFDBFE] transition-all space-y-3"
                   >
                     {/* Top Row: Category Pill, Date & Delete Button */}
                     <div className="flex items-center justify-between gap-2">
@@ -868,12 +868,12 @@ export default function StudyMaterialsPage() {
                       {/* Metadata Chips */}
                       <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F8F9FD] border border-[#E4E9F5] font-bold text-[#172447]">
-                          <GraduationCap size={11} className="text-[#5B35F5]" />
+                          <GraduationCap size={11} className="text-[#2563EB]" />
                           <span>{item.className} • Div {item.division}</span>
                         </span>
 
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F8F9FD] border border-[#E4E9F5] font-bold text-[#5B35F5]">
-                          <BookOpen size={11} className="text-[#5B35F5]" />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F8F9FD] border border-[#E4E9F5] font-bold text-[#2563EB]">
+                          <BookOpen size={11} className="text-[#2563EB]" />
                           <span>{item.subject}</span>
                         </span>
 
@@ -918,7 +918,7 @@ export default function StudyMaterialsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleDownloadFile(file)}
-                                className="h-7 px-2.5 rounded-lg bg-white hover:bg-[#EDE9FE] text-[#5B35F5] border border-[#DDD6FE] text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                className="h-7 px-2.5 rounded-lg bg-white hover:bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                               >
                                 <Download size={11} />
                                 <span>Download</span>

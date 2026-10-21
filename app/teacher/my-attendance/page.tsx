@@ -393,7 +393,7 @@ export default function MyAttendancePage() {
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
           >
-            <Fingerprint className="w-9 h-9 text-[#5436F5]" />
+            <Fingerprint className="w-9 h-9 text-[#2563EB]" />
           </motion.div>
           <p className="text-xs font-bold text-[#7183A6] tracking-wider uppercase">
             Loading your attendance…
@@ -423,7 +423,7 @@ export default function MyAttendancePage() {
           </div>
           <button
             onClick={loadAll}
-            className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl bg-[#5436F5] text-white text-xs font-bold shadow-md hover:bg-[#4326DE] transition-all cursor-pointer"
+            className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl bg-[#2563EB] text-white text-xs font-bold shadow-md hover:bg-[#1D4ED8] transition-all cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
@@ -447,9 +447,9 @@ export default function MyAttendancePage() {
             type="button"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EDE9FE] text-[#5436F5] hover:bg-[#DDD6FE] transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors cursor-pointer group"
           >
-            <ChevronLeft className="w-3.5 h-3.5 text-[#5436F5] group-hover:-translate-x-0.5 transition-transform" />
+            <ChevronLeft className="w-3.5 h-3.5 text-[#2563EB] group-hover:-translate-x-0.5 transition-transform" />
             <span className="text-[11px] font-extrabold tracking-wider uppercase">
               MY ATTENDANCE
             </span>
@@ -457,7 +457,7 @@ export default function MyAttendancePage() {
 
           {/* Compact Date Selector Pill */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E5EAF4] shadow-xs text-xs font-bold text-[#142044]">
-            <Calendar className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+            <Calendar className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
             <span className="truncate">{fmtHeaderDate(now)}</span>
           </div>
         </div>
@@ -511,7 +511,7 @@ export default function MyAttendancePage() {
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${
                 justDone === "in"
                   ? "bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]"
-                  : "bg-[#F5F3FF] border-[#DDD6FE] text-[#5436F5]"
+                  : "bg-[#EFF6FF] border-[#BFDBFE] text-[#2563EB]"
               }`}
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -536,14 +536,14 @@ export default function MyAttendancePage() {
             transition={{ delay: 0.05 }}
             className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] overflow-hidden"
           >
-        {/* Horizontal GPS & Current Time Lavender Strip */}
-        <div className="bg-[#F8F7FF] px-3.5 sm:px-4 py-2.5 flex items-center justify-between border-b border-[#ECEAF8]">
+        {/* Horizontal GPS & Current Time Blue Strip */}
+        <div className="bg-slate-50 px-3.5 sm:px-4 py-2.5 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-purple-100 shadow-xs shrink-0">
+            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-blue-100 shadow-xs shrink-0">
               <MapPin
                 className={cn(
                   "w-3.5 h-3.5",
-                  gpsPermission === "denied" ? "text-red-500" : "text-[#5436F5]"
+                  gpsPermission === "denied" ? "text-red-500" : "text-blue-600"
                 )}
               />
             </div>
@@ -551,7 +551,7 @@ export default function MyAttendancePage() {
               <span
                 className={cn(
                   "text-xs font-bold tracking-tight",
-                  gpsPermission === "denied" ? "text-red-600" : "text-[#5436F5]"
+                  gpsPermission === "denied" ? "text-red-600" : "text-blue-600"
                 )}
               >
                 {gpsPermission === "denied" ? "GPS Disabled" : "GPS Ready"}
@@ -576,7 +576,7 @@ export default function MyAttendancePage() {
           <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between gap-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <LogIn className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+                <LogIn className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span className="text-xs font-bold text-[#142044] truncate">Check In</span>
               </div>
               <div className="shrink-0">
@@ -635,13 +635,13 @@ export default function MyAttendancePage() {
           <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between gap-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <LogOut className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+                <LogOut className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span className="text-xs font-bold text-[#142044] truncate">Check Out</span>
               </div>
               <div className="shrink-0">
                 {checkedOut ? (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-50 text-[#5436F5] text-[10px] font-bold border border-purple-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#5436F5]" />
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     Done
                   </span>
                 ) : checkedIn ? (
@@ -679,7 +679,7 @@ export default function MyAttendancePage() {
                 type="button"
                 onClick={() => handleAction("out")}
                 disabled={actionLoading !== null}
-                className="w-full h-10 sm:h-11 bg-[#5436F5] hover:bg-[#4326DE] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
+                className="w-full h-10 sm:h-11 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
               >
                 {actionLoading === "out" ? (
                   <>
@@ -694,8 +694,8 @@ export default function MyAttendancePage() {
                 )}
               </button>
             ) : checkedOut ? (
-              <div className="w-full h-10 sm:h-11 bg-indigo-50/80 border border-indigo-200/80 rounded-xl flex items-center justify-center gap-1 text-[#5436F5] text-xs font-bold px-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+              <div className="w-full h-10 sm:h-11 bg-blue-50/80 border border-blue-200/80 rounded-xl flex items-center justify-center gap-1 text-[#2563EB] text-xs font-bold px-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
                 <span className="truncate">{fmtApiTime(today?.check_out)}</span>
               </div>
             ) : (
@@ -714,7 +714,7 @@ export default function MyAttendancePage() {
         {/* Bottom Information Chips */}
         <div className="px-3.5 sm:px-4 py-2.5 bg-[#FAFBFD] border-t border-[#ECEEF5] grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center gap-2 min-w-0">
-            <MapPin className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+            <MapPin className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
             <div className="min-w-0 truncate">
               <p className="text-[10px] text-[#7183A6] leading-none font-medium">
                 Campus Zone
@@ -725,7 +725,7 @@ export default function MyAttendancePage() {
             </div>
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <Clock className="w-3.5 h-3.5 text-[#5436F5] shrink-0" />
+            <Clock className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
             <div className="min-w-0 truncate">
               <p className="text-[10px] text-[#7183A6] leading-none font-medium">
                 Working Hours
@@ -750,7 +750,7 @@ export default function MyAttendancePage() {
       >
         <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
           <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-[#5436F5]" />
+            <Calendar className="w-4 h-4 text-[#2563EB]" />
             <span className="text-xs sm:text-sm font-bold text-[#142044]">
               Weekly Summary
             </span>
@@ -808,14 +808,14 @@ export default function MyAttendancePage() {
       >
         <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
           <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-[#5436F5]" />
+            <Clock className="w-4 h-4 text-[#2563EB]" />
             <h2 className="text-xs sm:text-sm font-bold text-[#142044]">
               Recent Attendance
             </h2>
           </div>
           <Link
             href="/teacher/attendance"
-            className="text-xs font-bold text-[#5436F5] hover:underline"
+            className="text-xs font-bold text-[#2563EB] hover:underline"
           >
             View All
           </Link>
@@ -841,8 +841,8 @@ export default function MyAttendancePage() {
                 dotColor = "bg-amber-500";
               } else if (isHalfDay) {
                 badgeText = "Half Day";
-                badgeColor = "bg-purple-50 text-[#5436F5] border-purple-200";
-                dotColor = "bg-[#5436F5]";
+                badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
+                dotColor = "bg-blue-600";
               } else if (!isPresent) {
                 badgeText = "Absent";
                 badgeColor = "bg-rose-50 text-rose-700 border-rose-200";

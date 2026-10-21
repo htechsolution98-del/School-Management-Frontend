@@ -37,13 +37,13 @@ const COLOR_CONFIGS: Record<
   }
 > = {
   indigo: {
-    iconBg: "bg-indigo-50",
-    iconText: "text-indigo-600",
-    ring: "ring-indigo-500/20",
-    progress: "bg-indigo-600",
-    badgeDefault: "bg-indigo-50 text-indigo-700 border-indigo-200/70",
-    topStripe: "from-indigo-500 to-indigo-600",
-    cardBorderHover: "hover:border-indigo-200",
+    iconBg: "bg-blue-50",
+    iconText: "text-blue-600",
+    ring: "ring-blue-500/20",
+    progress: "bg-blue-600",
+    badgeDefault: "bg-blue-50 text-blue-700 border-blue-200/70",
+    topStripe: "from-blue-500 to-blue-600",
+    cardBorderHover: "hover:border-blue-200",
   },
   emerald: {
     iconBg: "bg-emerald-50",
@@ -64,13 +64,13 @@ const COLOR_CONFIGS: Record<
     cardBorderHover: "hover:border-sky-200",
   },
   purple: {
-    iconBg: "bg-purple-50",
-    iconText: "text-purple-600",
-    ring: "ring-purple-500/20",
-    progress: "bg-purple-500",
-    badgeDefault: "bg-purple-50 text-purple-700 border-purple-200/70",
-    topStripe: "from-purple-400 to-indigo-600",
-    cardBorderHover: "hover:border-purple-200",
+    iconBg: "bg-blue-50",
+    iconText: "text-blue-600",
+    ring: "ring-blue-500/20",
+    progress: "bg-blue-600",
+    badgeDefault: "bg-blue-50 text-blue-700 border-blue-200/70",
+    topStripe: "from-blue-400 to-blue-600",
+    cardBorderHover: "hover:border-blue-200",
   },
   amber: {
     iconBg: "bg-amber-50",
@@ -120,9 +120,9 @@ export function KpiCard({
   })();
 
   const badgeStyles: Record<string, string> = {
-    primary: "bg-indigo-50 text-indigo-700 border-indigo-200/70",
+    primary: "bg-blue-50 text-blue-700 border-blue-200/70",
     info: "bg-sky-50 text-sky-700 border-sky-200/70",
-    purple: "bg-purple-50 text-purple-700 border-purple-200/70",
+    purple: "bg-blue-50 text-blue-700 border-blue-200/70",
     success: "bg-emerald-50 text-emerald-800 border-emerald-200/70",
     warning: "bg-amber-50 text-amber-800 border-amber-200/70",
     error: "bg-rose-50 text-rose-800 border-rose-200/70",

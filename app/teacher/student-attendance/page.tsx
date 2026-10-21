@@ -56,8 +56,8 @@ interface Student {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "#a78bfa", "#f472b6", "#34d399", "#60a5fa",
-  "#fbbf24", "#fb923c", "#818cf8", "#2dd4bf",
+  "#38bdf8", "#f472b6", "#34d399", "#60a5fa",
+  "#fbbf24", "#fb923c", "#0284c7", "#2dd4bf",
   "#f87171", "#4ade80",
 ];
 
@@ -100,9 +100,9 @@ function normalizeDate(dStr: string): string {
 const S = {
   card: {
     background: "#fff",
-    border: "1px solid #ede9fe",
+    border: "1px solid #e2e8f0",
     borderRadius: 16,
-    boxShadow: "0 2px 14px rgba(124,58,237,0.06)",
+    boxShadow: "0 2px 14px rgba(37,99,235,0.06)",
     overflow: "hidden" as const,
   },
   th: {
@@ -110,11 +110,11 @@ const S = {
     textAlign: "left" as const,
     fontSize: 11,
     fontWeight: 700,
-    color: "#7c3aed",
+    color: "#2563eb",
     letterSpacing: "0.06em",
     textTransform: "uppercase" as const,
-    borderBottom: "1px solid #ede9fe",
-    background: "#faf9ff",
+    borderBottom: "1px solid #dbeafe",
+    background: "#f8fafc",
   },
   tdBase: {
     padding: "13px 18px",
@@ -222,8 +222,8 @@ function FilterSelect({
           appearance: "none",
           padding: "7px 30px 7px 12px",
           borderRadius: 8,
-          border: "1px solid #ede9fe",
-          background: "#f8f7ff",
+          border: "1px solid #e2e8f0",
+          background: "#f8fafc",
           fontSize: 13,
           color: "#4b5563",
           fontFamily: "inherit",
@@ -269,7 +269,7 @@ function PagBtn({
       className={cn(
         "w-8 h-8 rounded-xl text-xs font-bold flex items-center justify-center transition-all cursor-pointer font-['Sora',sans-serif]",
         active
-          ? "bg-[#5436F5] text-white shadow-xs"
+          ? "bg-[#2563EB] text-white shadow-xs"
           : "bg-white border border-[#E5EAF4] text-[#7183A6] hover:text-[#142044] hover:border-[#CBD5E1]",
         disabled && "opacity-40 cursor-not-allowed hover:border-[#E5EAF4] hover:text-[#7183A6]"
       )}
@@ -389,7 +389,7 @@ function ErrorState({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5436F5] hover:bg-[#4326DE] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <RefreshCw size={14} />
             <span>Try Again</span>
@@ -435,8 +435,8 @@ function ConfirmModal({
       >
         {/* Header */}
         <div className="bg-[#FAFBFD] p-4 sm:p-5 border-b border-[#E5EAF4] flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#EDE9FE] flex items-center justify-center shrink-0 shadow-2xs">
-            <Save size={18} className="text-[#5436F5]" />
+          <div className="w-10 h-10 rounded-2xl bg-[#EFF6FF] flex items-center justify-center shrink-0 shadow-2xs">
+            <Save size={18} className="text-[#2563EB]" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-black text-[#142044]">
@@ -460,10 +460,10 @@ function ConfirmModal({
           {/* Class & Date pill */}
           <div className="bg-[#F8F9FD] rounded-xl border border-[#E5EAF4] p-3 flex items-center justify-between text-xs">
             <span className="font-semibold text-[#7183A6] flex items-center gap-1.5">
-              <Calendar size={13} className="text-[#5436F5]" />
+              <Calendar size={13} className="text-[#2563EB]" />
               {today}
             </span>
-            <span className="font-bold text-[#5436F5] bg-[#EDE9FE] px-2.5 py-0.5 rounded-lg">
+            <span className="font-bold text-[#2563EB] bg-[#EFF6FF] px-2.5 py-0.5 rounded-lg">
               {divisionName}
             </span>
           </div>
@@ -526,7 +526,7 @@ function ConfirmModal({
               type="button"
               onClick={onConfirm}
               disabled={saving}
-              className="h-10 px-3 rounded-xl bg-[#5436F5] hover:bg-[#4326DE] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              className="h-10 px-3 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
             >
               {saving ? (
                 <>
@@ -709,7 +709,7 @@ function StudentListView({
                   <select
                     value={selectedDivisionId ?? ""}
                     onChange={(e) => onSelectDivision?.(Number(e.target.value))}
-                    className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-white border border-[#E5EAF4] text-xs font-bold text-[#5436F5] shadow-xs cursor-pointer outline-none"
+                    className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-white border border-[#E5EAF4] text-xs font-bold text-[#2563EB] shadow-xs cursor-pointer outline-none"
                   >
                     {assignedDivisions.map((ad) => (
                       <option key={ad.division_id} value={ad.division_id}>
@@ -717,7 +717,7 @@ function StudentListView({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={12} className="text-[#5436F5] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown size={12} className="text-[#2563EB] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               )}
             </div>
@@ -729,14 +729,14 @@ function StudentListView({
           {/* Action Row: Part 1 in a single row side-by-side */}
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
             <div className="h-9 px-2.5 sm:px-3 rounded-xl bg-white border border-[#E5EAF4] shadow-xs text-xs font-bold text-[#142044] flex items-center justify-center gap-1.5 min-w-0">
-              <Calendar size={13} className="text-[#5436F5] shrink-0" />
+              <Calendar size={13} className="text-[#2563EB] shrink-0" />
               <span className="truncate">{today}</span>
             </div>
             {isAlreadyMarkedToday ? (
               <button
                 type="button"
                 onClick={onMarkAttendance}
-                className="h-9 px-3 sm:px-4 rounded-xl bg-[#5436F5] hover:bg-[#4326DE] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer min-w-0"
+                className="h-9 px-3 sm:px-4 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer min-w-0"
               >
                 <Edit3 size={13} className="shrink-0" />
                 <span className="truncate">Review / Edit</span>
@@ -745,7 +745,7 @@ function StudentListView({
               <button
                 type="button"
                 onClick={onMarkAttendance}
-                className="h-9 px-3 sm:px-4 rounded-xl bg-[#5436F5] hover:bg-[#4326DE] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer min-w-0"
+                className="h-9 px-3 sm:px-4 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer min-w-0"
               >
                 <CheckCircle2 size={13} className="shrink-0" />
                 <span className="truncate">Mark Attendance</span>
@@ -761,8 +761,8 @@ function StudentListView({
           label="Total Students"
           value={String(students.length)}
           icon={Users}
-          iconBg="#ede9fe"
-          iconColor="#5436F5"
+          iconBg="#eff6ff"
+          iconColor="#2563eb"
         />
         <StatCard
           label="Present Today"
@@ -833,7 +833,7 @@ function StudentListView({
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#5436F5] transition-colors"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#2563EB] transition-colors"
               />
             </div>
           </div>
@@ -862,7 +862,7 @@ function StudentListView({
                     <p className="text-[11px] text-[#7183A6] mt-0.5 truncate flex items-center gap-1.5 flex-wrap">
                       <span className="font-semibold">GR: {s.grNo}</span>
                       {s.rollNo && (
-                        <span className="text-[10px] font-bold text-[#5436F5] bg-[#EDE9FE] px-1.5 py-0.5 rounded-md">
+                        <span className="text-[10px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-md">
                           Roll #{s.rollNo}
                         </span>
                       )}
@@ -927,7 +927,7 @@ function StudentListView({
                         type="button"
                         onClick={() => onEditStudent?.(s)}
                         title="Edit attendance"
-                        className="h-8 px-2 rounded-xl bg-slate-100 text-slate-600 hover:text-[#5436F5] hover:bg-[#EEF2FF] border border-slate-200/60 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                        className="h-8 px-2 rounded-xl bg-slate-100 text-slate-600 hover:text-[#2563EB] hover:bg-[#EFF6FF] border border-slate-200/60 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                       >
                         <Edit3 size={12} />
                         <span>Edit</span>
@@ -978,15 +978,15 @@ function StudentListView({
                 <tr
                   key={s.id}
                   style={{
-                    borderBottom: "1px solid #f8f7ff",
-                    background: i % 2 === 0 ? "#fff" : "#fefcff",
+                    borderBottom: "1px solid #f1f5f9",
+                    background: i % 2 === 0 ? "#fff" : "#f8fafc",
                   }}
                 >
                   <td
                     style={{
                       ...S.tdBase,
                       fontWeight: 700,
-                      color: "#5436F5",
+                      color: "#2563EB",
                     }}
                   >
                     {s.rollNo ? s.rollNo : "—"}
@@ -1013,7 +1013,7 @@ function StudentListView({
                         style={{
                           fontSize: 14,
                           fontWeight: 600,
-                          color: "#1e1b4b",
+                          color: "#0f172a",
                         }}
                       >
                         {s.name}
@@ -1054,7 +1054,7 @@ function StudentListView({
                             type="button"
                             onClick={() => onEditStudent?.(s)}
                             title="Add remarks / change date or status"
-                            className="h-7 px-2.5 rounded-lg bg-slate-100 text-slate-700 hover:text-[#5436F5] hover:bg-[#EEF2FF] text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-slate-200/80"
+                            className="h-7 px-2.5 rounded-lg bg-slate-100 text-slate-700 hover:text-[#2563EB] hover:bg-[#EFF6FF] text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-slate-200/80"
                           >
                             <Edit3 size={12} /> Edit Attendance
                           </button>
@@ -1284,7 +1284,7 @@ function MarkAttendanceView({
               <button
                 type="button"
                 onClick={onBack}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EDE9FE] text-[#5436F5] hover:bg-[#DDD6FE] transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider"
               >
                 <ArrowLeft size={12} />
                 <span>Back to List</span>
@@ -1299,7 +1299,7 @@ function MarkAttendanceView({
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E5EAF4] shadow-xs text-xs font-bold text-[#142044] self-start sm:self-auto">
-            <Calendar size={13} className="text-[#5436F5]" />
+            <Calendar size={13} className="text-[#2563EB]" />
             <span>{today}</span>
           </div>
         </div>
@@ -1323,8 +1323,8 @@ function MarkAttendanceView({
       {/* Class Info & Donut Card */}
       <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-xs p-3.5 sm:p-5 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full min-w-0">
         <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-2xl bg-[#EDE9FE] flex items-center justify-center shrink-0">
-            <ClipboardList size={20} className="text-[#5436F5]" />
+          <div className="w-10 h-10 rounded-2xl bg-[#EFF6FF] flex items-center justify-center shrink-0">
+            <ClipboardList size={20} className="text-[#2563EB]" />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-6 flex-1 min-w-0">
@@ -1371,7 +1371,7 @@ function MarkAttendanceView({
               cy={cy}
               r={r}
               fill="none"
-              stroke="#F0EEFF"
+              stroke="#F1F5F9"
               strokeWidth={8}
             />
             <circle
@@ -1379,7 +1379,7 @@ function MarkAttendanceView({
               cy={cy}
               r={r}
               fill="none"
-              stroke={pct > 0 ? "#5436F5" : "#E5EAF4"}
+              stroke={pct > 0 ? "#2563EB" : "#E5EAF4"}
               strokeWidth={8}
               strokeDasharray={`${dash} ${circ - dash}`}
               strokeLinecap="round"
@@ -1426,7 +1426,7 @@ function MarkAttendanceView({
               placeholder="Search students..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#5436F5] transition-colors"
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
 
@@ -1551,7 +1551,7 @@ function MarkAttendanceView({
                   <tr
                     key={s.id}
                     style={{
-                      borderBottom: "1px solid #f8f7ff",
+                      borderBottom: "1px solid #f1f5f9",
                       background:
                         status === "present"
                           ? "#f0fdf4"
@@ -1559,7 +1559,7 @@ function MarkAttendanceView({
                             ? "#fef2f2"
                             : i % 2 === 0
                               ? "#fff"
-                              : "#fefcff",
+                              : "#f8fafc",
                       transition: "background 0.2s",
                     }}
                   >
@@ -1585,7 +1585,7 @@ function MarkAttendanceView({
                           style={{
                             fontSize: 14,
                             fontWeight: 600,
-                            color: "#1e1b4b",
+                            color: "#0f172a",
                           }}
                         >
                           {s.name}
@@ -1615,7 +1615,7 @@ function MarkAttendanceView({
                                 ? "2px solid #10b981"
                                 : "1.5px solid #d1fae5",
                             background:
-                              status === "present" ? "#d1fae5" : "#f8f7ff",
+                              status === "present" ? "#d1fae5" : "#f8fafc",
                             color:
                               status === "present" ? "#059669" : "#9ca3af",
                             fontSize: 12,
@@ -1651,7 +1651,7 @@ function MarkAttendanceView({
                                 ? "2px solid #ef4444"
                                 : "1.5px solid #fee2e2",
                             background:
-                              status === "absent" ? "#fee2e2" : "#f8f7ff",
+                              status === "absent" ? "#fee2e2" : "#f8fafc",
                             color:
                               status === "absent" ? "#dc2626" : "#9ca3af",
                             fontSize: 12,
@@ -1680,7 +1680,7 @@ function MarkAttendanceView({
           <div className="text-xs text-[#7183A6]">
             Showing 1–{filtered.length} of {students.length} students
             {markedCount > 0 && (
-              <span className="ml-2 text-[#5436F5] font-bold">
+              <span className="ml-2 text-[#2563EB] font-bold">
                 • {markedCount}/{students.length} marked
               </span>
             )}
@@ -1703,7 +1703,7 @@ function MarkAttendanceView({
                   ? "bg-emerald-600"
                   : markedCount === 0
                     ? "bg-slate-300"
-                    : "bg-[#5436F5] hover:bg-[#4326DE]"
+                    : "bg-[#2563EB] hover:bg-[#1D4ED8]"
               )}
             >
               {saving ? (
@@ -1791,7 +1791,7 @@ function EditStudentAttendanceModal({
                 <h3 className="text-sm sm:text-base font-black text-[#142044] truncate">
                   Edit Attendance
                 </h3>
-                <span className="text-[10px] font-bold text-[#5436F5] bg-[#EDE9FE] px-2 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded-md">
                   {divisionName}
                 </span>
               </div>
@@ -1833,7 +1833,7 @@ function EditStudentAttendanceModal({
                 if (val && val > today) return;
                 setAttendanceDate(val);
               }}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs font-semibold text-[#142044] outline-none focus:border-[#5436F5] transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs font-semibold text-[#142044] outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
 
@@ -1891,7 +1891,7 @@ function EditStudentAttendanceModal({
               placeholder={status === "absent" ? "e.g., Sick leave, Family travel" : "e.g., Late arrival, Regular"}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs font-semibold text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#5436F5] transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8F9FD] border border-[#E5EAF4] text-xs font-semibold text-[#142044] placeholder-[#7183A6] outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
 
@@ -1918,7 +1918,7 @@ function EditStudentAttendanceModal({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 sm:flex-initial h-10 px-5 rounded-xl bg-[#5436F5] hover:bg-[#4326DE] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial h-10 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
           >
             {saving ? (
               <>

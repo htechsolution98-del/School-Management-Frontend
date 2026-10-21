@@ -209,7 +209,7 @@ export function AccountSettingsHub({
       {/* ─── HEADER CARD ────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-700/25 text-[#2563EB] border border-blue-500/20 shadow-2xs shrink-0">
             <KeyRound className="h-6 w-6 stroke-[2.2]" />
           </div>
           <div>
@@ -217,7 +217,7 @@ export function AccountSettingsHub({
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100">
                 {pageTitle || `${roleTitle} Account & Security Settings`}
               </h1>
-              <Badge className="bg-indigo-50 text-[#5826df] dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
+              <Badge className="bg-blue-50 text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
                 {roleTitle}
               </Badge>
             </div>
@@ -232,16 +232,16 @@ export function AccountSettingsHub({
           size="sm"
           onClick={() => fetchProfile(true)}
           disabled={refreshing}
-          className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs shrink-0"
+          className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-blue-500/30 hover:bg-blue-50/40 hover:text-[#2563EB] gap-2 transition-all shadow-2xs shrink-0"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
           Refresh
         </Button>
       </div>
 
       {loading ? (
         <div className="py-24 text-center flex flex-col items-center justify-center gap-3 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-          <Loader2 className="w-8 h-8 text-[#5826df] animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin" />
           <p className="text-xs font-bold text-slate-500">Loading profile & security settings...</p>
         </div>
       ) : (
@@ -250,7 +250,7 @@ export function AccountSettingsHub({
           <div className="lg:col-span-5 space-y-6">
             {/* User Profile Overview Card */}
             <Card className="rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden">
-              <div className="bg-gradient-to-r from-[#5826df] to-[#6d3df5] p-6 text-white relative">
+              <div className="bg-gradient-to-r from-[#1E40AF] to-[#2563EB] p-6 text-white relative">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white text-xl font-black shadow-inner shrink-0">
                     {profile?.initials || (profile?.name ? profile.name.slice(0, 2).toUpperCase() : "U")}
@@ -276,8 +276,8 @@ export function AccountSettingsHub({
               <CardContent className="p-6 space-y-4 text-xs">
                 {/* School affiliation */}
                 {profile?.school && (
-                  <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/70 text-[#5826df] flex items-center justify-center shrink-0">
+                  <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/70 text-[#2563EB] flex items-center justify-center shrink-0">
                       <School className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
@@ -418,15 +418,15 @@ export function AccountSettingsHub({
             </Card>
 
             {/* Security Tip Card */}
-            <Card className="rounded-3xl border border-indigo-100 dark:border-indigo-900/40 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 dark:from-indigo-950/20 dark:to-zinc-900 p-5 shadow-2xs">
+            <Card className="rounded-3xl border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50/70 to-sky-50/40 dark:from-blue-950/20 dark:to-zinc-900 p-5 shadow-2xs">
               <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-2xl bg-[#5826df]/15 text-[#5826df] shrink-0">
+                <div className="p-2.5 rounded-2xl bg-blue-600/15 text-[#2563EB] shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div className="space-y-1 text-xs">
                   <p className="font-bold text-slate-900 dark:text-zinc-100">Account Security Tip</p>
                   <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
-                    New accounts start with the default school password (<code className="px-1.5 py-0.5 rounded-md bg-white dark:bg-zinc-800 border text-[#5826df] font-mono font-bold">123456</code>). Please change your password to keep your academic records and portal access secure.
+                    New accounts start with the default school password (<code className="px-1.5 py-0.5 rounded-md bg-white dark:bg-zinc-800 border text-[#2563EB] font-mono font-bold">123456</code>). Please change your password to keep your academic records and portal access secure.
                   </p>
                 </div>
               </div>
@@ -488,7 +488,7 @@ export function AccountSettingsHub({
                         placeholder="Enter your current password"
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all font-mono"
+                        className="h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all font-mono"
                       />
                       <button
                         type="button"
@@ -511,7 +511,7 @@ export function AccountSettingsHub({
                         placeholder="Create a strong password (min 8 chars)"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className={`h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all font-mono ${
+                        className={`h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all font-mono ${
                           isSameAsCurrent ? "border-rose-300 focus:border-rose-500 focus:ring-rose-200" : ""
                         }`}
                       />
@@ -602,7 +602,7 @@ export function AccountSettingsHub({
                         placeholder="Re-enter your new password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all font-mono"
+                        className="h-11 rounded-2xl pr-10 text-xs border-slate-200 dark:border-zinc-700 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all font-mono"
                       />
                       <button
                         type="button"
@@ -633,7 +633,7 @@ export function AccountSettingsHub({
                     <Button
                       type="submit"
                       disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword || !isMatch || !isPasswordStrong || isSameAsCurrent}
-                      className="w-full h-11 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] disabled:opacity-50"
+                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs rounded-2xl gap-2 shadow-md shadow-blue-500/25 transition-all hover:shadow-blue-500/35 active:scale-[0.98] disabled:opacity-50"
                     >
                       {savingPassword ? (
                         <>

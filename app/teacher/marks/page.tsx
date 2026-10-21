@@ -67,8 +67,8 @@ interface SubjectItem {
 }
 
 const AVATAR_COLORS = [
-  "#4634D2", "#5B35F5", "#0BAA78", "#F59E0B", "#0284C7",
-  "#EC4899", "#8B5CF6", "#F43F5E", "#10B981", "#6366F1",
+  "#2563EB", "#0284C7", "#0BAA78", "#F59E0B", "#0D9488",
+  "#EC4899", "#1D4ED8", "#F43F5E", "#10B981", "#3B82F6",
 ];
 
 function getInitials(name: string): string {
@@ -109,14 +109,14 @@ function getSubjectVisual(name: string) {
   if (n.includes("eng") || n.includes("hin") || n.includes("guj") || n.includes("lang")) {
     return {
       icon: BookOpen,
-      badgeColor: "bg-purple-50 text-[#5c28e8] border-purple-200",
-      iconBg: "bg-purple-50 text-[#5c28e8] border-purple-100",
+      badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+      iconBg: "bg-amber-50 text-amber-600 border-amber-100",
     };
   }
   return {
     icon: FileText,
-    badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    iconBg: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
+    iconBg: "bg-sky-50 text-sky-600 border-sky-100",
   };
 }
 
@@ -618,7 +618,7 @@ export default function EnterMarksPage() {
 
               {step === "CLASS" ? (
                 hasAnyClassTeacherAssignment ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-[#5c28e8] border border-purple-200 shrink-0">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200 shrink-0">
                     Class Teacher Mode
                   </span>
                 ) : (
@@ -627,7 +627,7 @@ export default function EnterMarksPage() {
                   </span>
                 )
               ) : isClassTeacher ? (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#5c28e8] border border-purple-200 shrink-0 flex items-center gap-1">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2563EB] border border-blue-200 shrink-0 flex items-center gap-1">
                   <Sparkles className="w-2.5 h-2.5" /> Class Teacher Authority
                 </span>
               ) : (
@@ -648,7 +648,7 @@ export default function EnterMarksPage() {
 
         {/* Step Counter Badge */}
         <div className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
-          <span className="text-[#5c28e8]">
+          <span className="text-[#2563EB]">
             {step === "CLASS" && "1"}
             {step === "SUBJECT" && "2"}
             {step === "EXAM" && "3"}
@@ -660,7 +660,7 @@ export default function EnterMarksPage() {
       </div>
 
       {isLoading && step !== "ENTRY" ? (
-        <div className="flex flex-col items-center justify-center py-20 text-[#5c28e8]">
+        <div className="flex flex-col items-center justify-center py-20 text-[#2563EB]">
           <Loader2 className="h-8 w-8 animate-spin mb-3" />
           <p className="text-sm text-slate-500 font-medium">Loading details...</p>
         </div>
@@ -681,7 +681,7 @@ export default function EnterMarksPage() {
                     placeholder="Search class or division (e.g. Class 8, Div A)..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5c28e8] focus:bg-white transition-all"
+                    className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2563EB] focus:bg-white transition-all"
                   />
                   {searchQuery && (
                     <button
@@ -717,8 +717,8 @@ export default function EnterMarksPage() {
                       className={cn(
                         "inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
                         classFilterTab === "MY_CLASS"
-                          ? "bg-[#5c28e8] text-white shadow-xs"
-                          : "text-slate-600 hover:text-[#5c28e8]"
+                          ? "bg-[#2563EB] text-white shadow-xs"
+                          : "text-slate-600 hover:text-[#2563EB]"
                       )}
                     >
                       <Sparkles className="w-3 h-3" />
@@ -746,11 +746,11 @@ export default function EnterMarksPage() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Sparkles className="h-4 w-4 text-[#5c28e8]" />
+                      <Sparkles className="h-4 w-4 text-[#2563EB]" />
                       <h2 className="text-sm font-extrabold text-slate-900 dark:text-zinc-100">
                         My Class
                       </h2>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#5c28e8] border border-purple-200">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2563EB] border border-blue-200">
                         Class Teacher
                       </span>
                     </div>
@@ -764,19 +764,19 @@ export default function EnterMarksPage() {
                       {filteredMyClasses.map((cls, idx) => (
                         <Card
                           key={`my-class-${idx}`}
-                          className="cursor-pointer border-2 border-purple-200/90 hover:border-[#5c28e8] bg-gradient-to-br from-white via-purple-50/20 to-white hover:shadow-md transition-all group rounded-2xl shadow-xs overflow-hidden"
+                          className="cursor-pointer border-2 border-blue-200/90 hover:border-[#2563EB] bg-gradient-to-br from-white via-blue-50/20 to-white hover:shadow-md transition-all group rounded-2xl shadow-xs overflow-hidden"
                           onClick={() => handleClassSelect(cls)}
                         >
                           <CardContent className="p-4 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#5c28e8] to-[#4318c4] flex items-center justify-center text-white shrink-0 shadow-xs">
+                              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] flex items-center justify-center text-white shrink-0 shadow-xs">
                                 <Users className="h-5 w-5 text-white" />
                               </div>
                               <div className="min-w-0">
                                 <h3 className="font-extrabold text-slate-900 text-sm truncate">
                                   {cls.class_name}
                                 </h3>
-                                <p className="text-xs font-semibold text-[#5c28e8]">
+                                <p className="text-xs font-semibold text-[#2563EB]">
                                   Division {cls.division_name || "A"}
                                 </p>
                                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">
@@ -784,7 +784,7 @@ export default function EnterMarksPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center text-[#5c28e8] shrink-0 font-bold text-xs group-hover:translate-x-0.5 transition-transform">
+                            <div className="flex items-center text-[#2563EB] shrink-0 font-bold text-xs group-hover:translate-x-0.5 transition-transform">
                               <ChevronRight className="h-5 w-5" />
                             </div>
                           </CardContent>
@@ -875,9 +875,9 @@ export default function EnterMarksPage() {
             <div className="space-y-3.5">
               {/* Class Teacher Guidance Banner */}
               {selectedClass?.is_class_teacher && (
-                <div className="bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white dark:from-purple-950/20 dark:via-zinc-900 dark:to-zinc-900 p-3.5 sm:p-4 rounded-2xl border border-purple-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="bg-gradient-to-r from-blue-50 via-sky-50/50 to-white dark:from-blue-950/20 dark:via-zinc-900 dark:to-zinc-900 p-3.5 sm:p-4 rounded-2xl border border-blue-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-[#5c28e8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <div className="w-9 h-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
@@ -885,7 +885,7 @@ export default function EnterMarksPage() {
                         <p className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-zinc-100">
                           Class Teacher Dashboard
                         </p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#5c28e8] border border-purple-200">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2563EB] border border-blue-200">
                           My Class
                         </span>
                       </div>
@@ -896,7 +896,7 @@ export default function EnterMarksPage() {
                   </div>
                   <a
                     href="/teacher/verify-marks"
-                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl text-xs font-bold transition-all shadow-xs self-start sm:self-auto"
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-bold transition-all shadow-xs self-start sm:self-auto"
                   >
                     <span>Verify & Finalize Results</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -913,7 +913,7 @@ export default function EnterMarksPage() {
                     placeholder="Search subject..."
                     value={subjectSearch}
                     onChange={(e) => setSubjectSearch(e.target.value)}
-                    className="w-full h-9 pl-9 pr-7 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5c28e8]"
+                    className="w-full h-9 pl-9 pr-7 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2563EB]"
                   />
                   {subjectSearch && (
                     <button
@@ -928,7 +928,7 @@ export default function EnterMarksPage() {
               )}
 
               {loadingSubjects ? (
-                <div className="py-16 text-center text-[#5c28e8]">
+                <div className="py-16 text-center text-[#2563EB]">
                   <Loader2 className="h-7 w-7 animate-spin mx-auto mb-2" />
                   <p className="text-xs text-slate-500 font-medium">Loading subjects...</p>
                 </div>
@@ -945,7 +945,7 @@ export default function EnterMarksPage() {
                         className={cn(
                           "cursor-pointer border transition-all rounded-2xl shadow-2xs group overflow-hidden",
                           hasExams
-                            ? "bg-white hover:border-[#5c28e8] hover:shadow-md"
+                            ? "bg-white hover:border-[#2563EB] hover:shadow-md"
                             : "bg-white/80 hover:bg-white border-slate-200"
                         )}
                         onClick={() => handleSubjectSelect(sub.subject, sub.subject_name)}
@@ -965,13 +965,13 @@ export default function EnterMarksPage() {
                                     <Check className="w-2.5 h-2.5" /> Assigned
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-[#5c28e8] border border-purple-200">
+                                  <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200">
                                     Class Subject
                                   </span>
                                 )}
 
                                 {hasExams ? (
-                                  <span className="inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-[#5c28e8] border border-indigo-200">
+                                  <span className="inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-[#2563EB] border border-sky-200">
                                     {sub.exam_count} {sub.exam_count === 1 ? "Exam" : "Exams"}
                                   </span>
                                 ) : (
@@ -982,7 +982,7 @@ export default function EnterMarksPage() {
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                          <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                         </CardContent>
                       </Card>
                     );
@@ -1002,7 +1002,7 @@ export default function EnterMarksPage() {
                       {selectedClass?.is_class_teacher && (
                         <a
                           href="/teacher/verify-marks"
-                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#5c28e8] text-white rounded-xl text-xs font-bold hover:bg-[#4d20cb] shadow-xs"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2563EB] text-white rounded-xl text-xs font-bold hover:bg-[#1D4ED8] shadow-xs"
                         >
                           <span>Go to Verify Marks</span>
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -1024,13 +1024,13 @@ export default function EnterMarksPage() {
                 {matchingExams.map((ex) => (
                   <Card
                     key={ex.id}
-                    className="cursor-pointer border border-gray-200 hover:border-[#5c28e8] hover:shadow-md transition-all group rounded-2xl shadow-2xs bg-white overflow-hidden"
+                    className="cursor-pointer border border-gray-200 hover:border-[#2563EB] hover:shadow-md transition-all group rounded-2xl shadow-2xs bg-white overflow-hidden"
                     onClick={() => handleExamSelect(ex)}
                   >
                     <CardContent className="p-4 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8] shrink-0">
-                          <Calendar className="h-5 w-5 text-[#5c28e8]" />
+                        <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] shrink-0">
+                          <Calendar className="h-5 w-5 text-[#2563EB]" />
                         </div>
                         <div className="min-w-0">
                           <h3 className="font-extrabold text-slate-900 text-sm truncate">
@@ -1043,7 +1043,7 @@ export default function EnterMarksPage() {
                           </div>
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                     </CardContent>
                   </Card>
                 ))}
@@ -1078,14 +1078,14 @@ export default function EnterMarksPage() {
               )}
 
               {isClassTeacher && (
-                <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl flex items-center justify-between gap-2.5 text-purple-900 text-xs">
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl flex items-center justify-between gap-2.5 text-blue-900 text-xs">
                   <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-[#5c28e8] shrink-0" />
+                    <GraduationCap className="h-4 w-4 text-[#2563EB] shrink-0" />
                     <span>
                       <strong>Class Teacher Authority:</strong> You can edit and update any student marks directly.
                     </span>
                   </div>
-                  <Badge className="bg-[#5c28e8] text-white text-[10px] shrink-0">Class Teacher</Badge>
+                  <Badge className="bg-[#2563EB] text-white text-[10px] shrink-0">Class Teacher</Badge>
                 </div>
               )}
 
@@ -1094,7 +1094,7 @@ export default function EnterMarksPage() {
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs">
                     <span className="font-bold text-slate-700">Progress:</span>
-                    <span className="font-extrabold text-[#5c28e8]">
+                    <span className="font-extrabold text-[#2563EB]">
                       {entryStats.entered + entryStats.absent} / {entryStats.total}
                     </span>
                     <span className="text-slate-400">({entryStats.completionPercent}%)</span>
@@ -1123,7 +1123,7 @@ export default function EnterMarksPage() {
                 {/* Progress bar */}
                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-[#5c28e8] to-[#22c55e] transition-all duration-300 rounded-full"
+                    className="h-full bg-gradient-to-r from-[#2563EB] to-[#22c55e] transition-all duration-300 rounded-full"
                     style={{ width: `${entryStats.completionPercent}%` }}
                   />
                 </div>
@@ -1138,7 +1138,7 @@ export default function EnterMarksPage() {
                       placeholder="Search student by name, roll no..."
                       value={studentSearch}
                       onChange={(e) => setStudentSearch(e.target.value)}
-                      className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5c28e8] focus:bg-white"
+                      className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2563EB] focus:bg-white"
                     />
                     {studentSearch && (
                       <button
@@ -1270,7 +1270,7 @@ export default function EnterMarksPage() {
                               disabled={st.is_absent || isLocked}
                               value={st.marks_obtained}
                               onChange={(e) => handleMarkChange(st.student_id, "marks_obtained", e.target.value)}
-                              className="w-16 h-10 text-center text-base font-extrabold rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-[#5c28e8] focus:outline-none disabled:opacity-40 disabled:bg-slate-100"
+                              className="w-16 h-10 text-center text-base font-extrabold rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-[#2563EB] focus:outline-none disabled:opacity-40 disabled:bg-slate-100"
                             />
                           </div>
                           <span className="text-xs font-semibold text-slate-400">/ {maxMarks}</span>
@@ -1347,7 +1347,7 @@ export default function EnterMarksPage() {
                         return (
                           <TableRow key={`dt-${st.student_id}`} className="hover:bg-slate-50/50">
                             <TableCell className="text-center font-mono text-xs text-slate-400">{idx + 1}</TableCell>
-                            <TableCell className="text-xs font-mono font-bold text-[#5c28e8]">
+                            <TableCell className="text-xs font-mono font-bold text-[#2563EB]">
                               {st.roll_no ? `#${st.roll_no}` : "—"}
                             </TableCell>
                             <TableCell className="text-xs font-mono text-slate-500">{st.gr_no || "—"}</TableCell>
@@ -1415,7 +1415,7 @@ export default function EnterMarksPage() {
               <div className="sticky bottom-16 lg:bottom-4 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3 rounded-2xl border border-gray-200 shadow-lg flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-bold text-slate-800">Entered:</span>
-                  <span className="font-extrabold text-[#5c28e8]">
+                  <span className="font-extrabold text-[#2563EB]">
                     {entryStats.entered + entryStats.absent} / {entryStats.total}
                   </span>
                 </div>
@@ -1441,7 +1441,7 @@ export default function EnterMarksPage() {
                       (!!lockedByOtherTeacher && !isClassTeacher)
                     }
                     variant="outline"
-                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-3.5 border-purple-200 text-[#5c28e8] hover:bg-purple-50"
+                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-3.5 border-blue-200 text-[#2563EB] hover:bg-blue-50"
                   >
                     {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     <span>Save Draft</span>
@@ -1456,7 +1456,7 @@ export default function EnterMarksPage() {
                       isSubmittedToClassTeacher ||
                       (!!lockedByOtherTeacher && !isClassTeacher)
                     }
-                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-4 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20"
+                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-blue-500/20"
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

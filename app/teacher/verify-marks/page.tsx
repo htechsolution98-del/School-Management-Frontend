@@ -26,10 +26,10 @@ import type { AcademicYear } from "@/types/fees";
 // ─── Visual Helpers ──────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
   "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
   "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+  "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
   "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
 ];
@@ -443,8 +443,8 @@ export default function VerifyMarksPage() {
     if (pct >= 90) return { grade: "A+", label: "Outstanding", bg: "bg-emerald-100 text-emerald-800 border-emerald-300" };
     if (pct >= 80) return { grade: "A", label: "Distinction", bg: "bg-teal-100 text-teal-800 border-teal-300" };
     if (pct >= 70) return { grade: "B+", label: "First Class", bg: "bg-blue-100 text-blue-800 border-blue-300" };
-    if (pct >= 60) return { grade: "B", label: "Second Class", bg: "bg-indigo-100 text-indigo-800 border-indigo-300" };
-    if (pct >= 50) return { grade: "C", label: "Higher Second", bg: "bg-purple-100 text-purple-800 border-purple-300" };
+    if (pct >= 60) return { grade: "B", label: "Second Class", bg: "bg-sky-100 text-sky-800 border-sky-300" };
+    if (pct >= 50) return { grade: "C", label: "Higher Second", bg: "bg-cyan-100 text-cyan-800 border-cyan-300" };
     if (pct >= 35) return { grade: "D", label: "Pass", bg: "bg-amber-100 text-amber-800 border-amber-300" };
     return { grade: "F", label: "Fail / Low", bg: "bg-rose-100 text-rose-800 border-rose-300" };
   };
@@ -671,7 +671,7 @@ export default function VerifyMarksPage() {
                 {step === "VERIFY" && `${selectedClass?.class_name} • Div ${selectedClass?.division_name || "A"}`}
               </h1>
 
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-[#5c28e8] border border-purple-200 shrink-0 hidden sm:inline-flex items-center gap-1">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200 shrink-0 hidden sm:inline-flex items-center gap-1">
                 <Sparkles className="w-2.5 h-2.5" /> Class Teacher Authority
               </span>
 
@@ -696,7 +696,7 @@ export default function VerifyMarksPage() {
                 const yr = academicYears.find((y) => String(y.id) === e.target.value);
                 if (yr) handleYearSelect(yr);
               }}
-              className="text-[11px] font-bold text-[#5c28e8] bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl px-2 sm:px-2.5 py-1 focus:outline-none cursor-pointer"
+              className="text-[11px] font-bold text-[#2563EB] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl px-2 sm:px-2.5 py-1 focus:outline-none cursor-pointer"
             >
               {academicYears.map((y) => (
                 <option key={y.id} value={y.id}>
@@ -705,7 +705,7 @@ export default function VerifyMarksPage() {
               ))}
             </select>
           ) : selectedYear ? (
-            <span className="text-[11px] font-bold text-[#5c28e8] bg-purple-50 border border-purple-200 rounded-xl px-2 sm:px-2.5 py-1 flex items-center gap-1">
+            <span className="text-[11px] font-bold text-[#2563EB] bg-blue-50 border border-blue-200 rounded-xl px-2 sm:px-2.5 py-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               <span>{selectedYear.name}</span>
             </span>
@@ -725,7 +725,7 @@ export default function VerifyMarksPage() {
       </div>
 
       {isLoading && step !== "VERIFY" ? (
-        <div className="flex flex-col items-center justify-center py-20 text-[#5c28e8]">
+        <div className="flex flex-col items-center justify-center py-20 text-[#2563EB]">
           <Loader2 className="h-8 w-8 animate-spin mb-3" />
           <p className="text-sm text-slate-500 font-medium">Loading verification data...</p>
         </div>
@@ -740,22 +740,22 @@ export default function VerifyMarksPage() {
                 {classTeacherAssignments.map((cls, idx) => (
                   <Card 
                     key={idx} 
-                    className="group cursor-pointer hover:shadow-md transition-all rounded-2xl border-2 border-purple-200/80 hover:border-[#5c28e8] bg-white shadow-2xs overflow-hidden"
+                    className="group cursor-pointer hover:shadow-md transition-all rounded-2xl border-2 border-blue-200/80 hover:border-[#2563EB] bg-white shadow-2xs overflow-hidden"
                     onClick={() => handleClassSelect(cls)}
                   >
                     <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-11 w-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8] shrink-0">
-                          <GraduationCap className="h-6 w-6 text-[#5c28e8]" />
+                        <div className="h-11 w-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] shrink-0">
+                          <GraduationCap className="h-6 w-6 text-[#2563EB]" />
                         </div>
                         <div className="min-w-0">
                           <h3 className="font-extrabold text-slate-900 text-sm truncate">{cls.class_name}</h3>
-                          <p className="text-xs text-purple-700 font-semibold mt-0.5">
+                          <p className="text-xs text-blue-700 font-semibold mt-0.5">
                             Division {cls.division_name || "A"} • Class Teacher
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                     </CardContent>
                   </Card>
                 ))}
@@ -781,13 +781,13 @@ export default function VerifyMarksPage() {
               {academicYears.map((year) => (
                 <Card 
                   key={year.id} 
-                  className="group cursor-pointer hover:shadow-md transition-all rounded-2xl border border-gray-200/80 hover:border-[#5c28e8] bg-white shadow-2xs overflow-hidden"
+                  className="group cursor-pointer hover:shadow-md transition-all rounded-2xl border border-gray-200/80 hover:border-[#2563EB] bg-white shadow-2xs overflow-hidden"
                   onClick={() => handleYearSelect(year)}
                 >
                   <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-11 w-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8]">
-                        <Calendar className="h-5 w-5 text-[#5c28e8]" />
+                      <div className="h-11 w-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB]">
+                        <Calendar className="h-5 w-5 text-[#2563EB]" />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-slate-900 text-sm">{year.name}</h3>
@@ -796,7 +796,7 @@ export default function VerifyMarksPage() {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                   </CardContent>
                 </Card>
               ))}
@@ -824,12 +824,12 @@ export default function VerifyMarksPage() {
 
                 <Card className="rounded-2xl border border-gray-200/80 bg-white shadow-xs p-2.5 sm:p-3.5">
                   <div className="flex items-center gap-2 sm:gap-2.5">
-                    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8] shrink-0">
+                    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] shrink-0">
                       <BarChart3 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Class Average</p>
-                      <h4 className="text-base sm:text-lg font-black text-[#5c28e8] leading-tight">{classStats.avgPct}%</h4>
+                      <h4 className="text-base sm:text-lg font-black text-[#2563EB] leading-tight">{classStats.avgPct}%</h4>
                     </div>
                   </div>
                 </Card>
@@ -864,7 +864,7 @@ export default function VerifyMarksPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div>
                     <h2 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#5c28e8]" />
+                      <Sparkles className="w-4 h-4 text-[#2563EB]" />
                       Class Teacher Verification & Authority
                     </h2>
                     <p className="text-[11px] text-slate-500 mt-0.5">
@@ -928,7 +928,7 @@ export default function VerifyMarksPage() {
                           onClick={handleSaveClassMarks}
                           disabled={isSavingMarks || isSubmitting}
                           variant="outline"
-                          className="rounded-xl font-bold h-9 px-2.5 sm:px-3 text-[11px] sm:text-xs text-[#5c28e8] bg-purple-50 hover:bg-purple-100 border-purple-200 gap-1.5 cursor-pointer"
+                          className="rounded-xl font-bold h-9 px-2.5 sm:px-3 text-[11px] sm:text-xs text-[#2563EB] bg-blue-50 hover:bg-blue-100 border-blue-200 gap-1.5 cursor-pointer"
                         >
                           {isSavingMarks ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Save className="w-3.5 h-3.5 shrink-0" />}
                           <span className="truncate">Save Marks</span>
@@ -949,7 +949,7 @@ export default function VerifyMarksPage() {
                       <Button 
                         onClick={handleSubmitAndVerify}
                         disabled={isSubmitting}
-                        className="w-full sm:w-auto rounded-xl font-bold h-9 sm:h-10 px-4 text-xs bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20 gap-1.5 cursor-pointer justify-center"
+                        className="w-full sm:w-auto rounded-xl font-bold h-9 sm:h-10 px-4 text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-blue-500/20 gap-1.5 cursor-pointer justify-center"
                       >
                         {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
                         <span>Submit & Verify Marks</span>
@@ -965,7 +965,7 @@ export default function VerifyMarksPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2">
                     <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
-                      <Award className="h-4 w-4 text-[#5c28e8]" />
+                      <Award className="h-4 w-4 text-[#2563EB]" />
                       Class Master Marks Sheet
                     </h3>
                     {isEditMode && !isVerified && (
@@ -984,7 +984,7 @@ export default function VerifyMarksPage() {
                         placeholder="Search student..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-2.5 h-8 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#5c28e8]"
+                        className="w-full pl-8 pr-2.5 h-8 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#2563EB]"
                       />
                     </div>
 
@@ -995,7 +995,7 @@ export default function VerifyMarksPage() {
                         onClick={() => setMobileViewMode("cards")}
                         className={cn(
                           "p-1.5 rounded-lg text-xs font-bold transition-all",
-                          mobileViewMode === "cards" ? "bg-white text-[#5c28e8] shadow-xs" : "text-slate-500"
+                          mobileViewMode === "cards" ? "bg-white text-[#2563EB] shadow-xs" : "text-slate-500"
                         )}
                         aria-label="Cards view"
                       >
@@ -1006,7 +1006,7 @@ export default function VerifyMarksPage() {
                         onClick={() => setMobileViewMode("table")}
                         className={cn(
                           "p-1.5 rounded-lg text-xs font-bold transition-all",
-                          mobileViewMode === "table" ? "bg-white text-[#5c28e8] shadow-xs" : "text-slate-500"
+                          mobileViewMode === "table" ? "bg-white text-[#2563EB] shadow-xs" : "text-slate-500"
                         )}
                         aria-label="Table view"
                       >
@@ -1035,7 +1035,7 @@ export default function VerifyMarksPage() {
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
                       activeTab === "ALL"
-                        ? "bg-[#5c28e8] text-white shadow-xs"
+                        ? "bg-[#2563EB] text-white shadow-xs"
                         : "text-slate-600 hover:bg-slate-200/60"
                     )}
                   >
@@ -1051,7 +1051,7 @@ export default function VerifyMarksPage() {
                       className={cn(
                         "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
                         activeTab === t.id
-                          ? "bg-[#5c28e8] text-white shadow-xs"
+                          ? "bg-[#2563EB] text-white shadow-xs"
                           : "text-slate-600 hover:bg-slate-200/60"
                       )}
                     >
@@ -1067,7 +1067,7 @@ export default function VerifyMarksPage() {
                       className={cn(
                         "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
                         activeTab === "TEACHER_ASSESSMENT"
-                          ? "bg-[#5c28e8] text-white shadow-xs"
+                          ? "bg-[#2563EB] text-white shadow-xs"
                           : "text-slate-600 hover:bg-slate-200/60"
                       )}
                     >
@@ -1132,7 +1132,7 @@ export default function VerifyMarksPage() {
                                 {terms.map((t: any) => (
                                   <div key={t.id} className="bg-slate-50/80 dark:bg-zinc-800/40 rounded-xl p-2 border border-slate-100 dark:border-zinc-800">
                                     <div className="flex items-center justify-between mb-1">
-                                      <span className="text-[10px] font-bold text-[#5c28e8] dark:text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                                      <span className="text-[10px] font-bold text-[#2563EB] dark:text-blue-400 uppercase tracking-wider flex items-center gap-1">
                                         <BookOpen className="w-2.5 h-2.5" />
                                         {t.name}
                                       </span>
@@ -1157,7 +1157,7 @@ export default function VerifyMarksPage() {
                                                   const val = e.target.value === "" ? null : Number(e.target.value);
                                                   handleTermMarkChange(st.id, t.id, sub.id, val, mark?.is_absent || false);
                                                 }}
-                                                className="w-12 h-6 text-center font-bold text-xs bg-purple-50/50 rounded border border-purple-200 focus:outline-none"
+                                                className="w-12 h-6 text-center font-bold text-xs bg-blue-50/50 rounded border border-blue-200 focus:outline-none"
                                               />
                                             ) : (
                                               <span className="font-extrabold text-slate-900 dark:text-zinc-100">
@@ -1331,7 +1331,7 @@ export default function VerifyMarksPage() {
                               </TableHead>
                             )}
 
-                            <TableHead colSpan={4} className="text-center font-extrabold text-xs uppercase tracking-wider text-purple-900 bg-purple-100/80 border-l-2 border-purple-200">
+                            <TableHead colSpan={4} className="text-center font-extrabold text-xs uppercase tracking-wider text-blue-900 bg-blue-100/80 border-l-2 border-blue-200">
                               📊 Overall Total & Grade
                             </TableHead>
                           </TableRow>
@@ -1358,16 +1358,16 @@ export default function VerifyMarksPage() {
                               </TableHead>
                             ))}
 
-                            <TableHead className="min-w-[80px] text-center font-bold text-[11px] bg-purple-50/50 border-l-2 border-purple-200 text-purple-950">
+                            <TableHead className="min-w-[80px] text-center font-bold text-[11px] bg-blue-50/50 border-l-2 border-blue-200 text-blue-950">
                               Total Max
                             </TableHead>
-                            <TableHead className="min-w-[85px] text-center font-bold text-[11px] bg-purple-50/50 text-purple-950">
+                            <TableHead className="min-w-[85px] text-center font-bold text-[11px] bg-blue-50/50 text-blue-950">
                               Marks Gained
                             </TableHead>
-                            <TableHead className="min-w-[85px] text-center font-bold text-[11px] bg-purple-50/50 text-purple-950">
+                            <TableHead className="min-w-[85px] text-center font-bold text-[11px] bg-blue-50/50 text-blue-950">
                               Percentage
                             </TableHead>
-                            <TableHead className="min-w-[80px] text-center font-bold text-[11px] bg-purple-50/50 text-purple-950">
+                            <TableHead className="min-w-[80px] text-center font-bold text-[11px] bg-blue-50/50 text-blue-950">
                               Grade
                             </TableHead>
                           </TableRow>
@@ -1384,16 +1384,16 @@ export default function VerifyMarksPage() {
                               <div className="text-[10px] text-slate-400 font-normal">Max: {sub.max_score}</div>
                             </TableHead>
                           ))}
-                          <TableHead className="min-w-[90px] text-center font-bold text-xs bg-purple-50 border-l-2 border-purple-200 text-purple-950">
+                          <TableHead className="min-w-[90px] text-center font-bold text-xs bg-blue-50 border-l-2 border-blue-200 text-blue-950">
                             Total Max
                           </TableHead>
-                          <TableHead className="min-w-[100px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                          <TableHead className="min-w-[100px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                             Marks Gained
                           </TableHead>
-                          <TableHead className="min-w-[100px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                          <TableHead className="min-w-[100px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                             Percentage
                           </TableHead>
-                          <TableHead className="min-w-[85px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                          <TableHead className="min-w-[85px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                             Grade
                           </TableHead>
                         </TableRow>
@@ -1413,16 +1413,16 @@ export default function VerifyMarksPage() {
                                   <div className="text-[10px] text-slate-400 font-normal">Max: {sub.max_marks}</div>
                                 </TableHead>
                               ))}
-                              <TableHead className="min-w-[90px] text-center font-bold text-xs bg-purple-50 border-l-2 border-purple-200 text-purple-950">
+                              <TableHead className="min-w-[90px] text-center font-bold text-xs bg-blue-50 border-l-2 border-blue-200 text-blue-950">
                                 Term Max
                               </TableHead>
-                              <TableHead className="min-w-[100px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                              <TableHead className="min-w-[100px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                                 Marks Gained
                               </TableHead>
-                              <TableHead className="min-w-[100px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                              <TableHead className="min-w-[100px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                                 Percentage
                               </TableHead>
-                              <TableHead className="min-w-[85px] text-center font-bold text-xs bg-purple-50 text-purple-950">
+                              <TableHead className="min-w-[85px] text-center font-bold text-xs bg-blue-50 text-blue-950">
                                 Grade
                               </TableHead>
                             </TableRow>
@@ -1447,7 +1447,7 @@ export default function VerifyMarksPage() {
                             return (
                               <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
                                 <TableCell className="text-center font-mono text-[11px] text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
-                                <TableCell className="text-xs font-mono font-bold text-[#5c28e8] sticky left-10 bg-white z-10">{st.roll_no || "—"}</TableCell>
+                                <TableCell className="text-xs font-mono font-bold text-[#2563EB] sticky left-10 bg-white z-10">{st.roll_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-bold text-slate-900 border-r border-zinc-200">{st.name}</TableCell>
 
@@ -1468,7 +1468,7 @@ export default function VerifyMarksPage() {
                                               const val = e.target.value === "" ? null : Number(e.target.value);
                                               handleTermMarkChange(st.id, t.id, sub.id, val, mark?.is_absent || false);
                                             }}
-                                            className="w-14 h-7 text-center font-bold text-xs p-1 rounded-lg border-slate-200 focus:ring-1 focus:ring-purple-500"
+                                            className="w-14 h-7 text-center font-bold text-xs p-1 rounded-lg border-slate-200 focus:ring-1 focus:ring-blue-500"
                                           />
                                         ) : mark ? (
                                           mark.is_absent ? (
@@ -1515,13 +1515,13 @@ export default function VerifyMarksPage() {
                                 })}
 
                                 {/* RIGHT SIDE TOTALS & PERCENTAGE */}
-                                <TableCell className="text-center border-l-2 border-purple-100 font-mono text-xs text-slate-600 bg-purple-50/20 font-bold">
+                                <TableCell className="text-center border-l-2 border-blue-100 font-mono text-xs text-slate-600 bg-blue-50/20 font-bold">
                                   {totalMax}
                                 </TableCell>
-                                <TableCell className="text-center font-mono text-xs font-extrabold text-purple-950 bg-purple-50/20">
+                                <TableCell className="text-center font-mono text-xs font-extrabold text-blue-950 bg-blue-50/20">
                                   {isAbsent ? <span className="text-red-600 font-bold">AB</span> : totalObtained}
                                 </TableCell>
-                                <TableCell className="text-center bg-purple-50/20">
+                                <TableCell className="text-center bg-blue-50/20">
                                   {percentage !== null ? (
                                     <Badge variant="outline" className={`font-mono text-[11px] font-extrabold ${gradeInfo.bg}`}>
                                       {percentage.toFixed(1)}%
@@ -1530,7 +1530,7 @@ export default function VerifyMarksPage() {
                                     <span className="text-slate-400 text-xs font-mono">—</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-center bg-purple-50/20">
+                                <TableCell className="text-center bg-blue-50/20">
                                   <Badge variant="outline" className={`text-[10px] font-bold ${gradeInfo.bg}`}>
                                     {gradeInfo.grade}
                                   </Badge>
@@ -1543,7 +1543,7 @@ export default function VerifyMarksPage() {
                             return (
                               <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
                                 <TableCell className="text-center font-mono text-xs text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
-                                <TableCell className="text-xs font-mono font-bold text-[#5c28e8]">{st.roll_no || "—"}</TableCell>
+                                <TableCell className="text-xs font-mono font-bold text-[#2563EB]">{st.roll_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-bold text-slate-900 border-r border-zinc-200">{st.name}</TableCell>
                                 {taSubjects.map((sub: any) => {
@@ -1573,13 +1573,13 @@ export default function VerifyMarksPage() {
                                   );
                                 })}
 
-                                <TableCell className="text-center border-l-2 border-purple-100 font-mono text-xs text-slate-600 bg-purple-50/20 font-bold">
+                                <TableCell className="text-center border-l-2 border-blue-100 font-mono text-xs text-slate-600 bg-blue-50/20 font-bold">
                                   {totalMax}
                                 </TableCell>
-                                <TableCell className="text-center font-mono text-xs font-extrabold text-purple-950 bg-purple-50/20">
+                                <TableCell className="text-center font-mono text-xs font-extrabold text-blue-950 bg-blue-50/20">
                                   {totalObtained}
                                 </TableCell>
-                                <TableCell className="text-center bg-purple-50/20">
+                                <TableCell className="text-center bg-blue-50/20">
                                   {percentage !== null ? (
                                     <Badge variant="outline" className={`font-mono text-[11px] font-extrabold ${gradeInfo.bg}`}>
                                       {percentage.toFixed(1)}%
@@ -1588,7 +1588,7 @@ export default function VerifyMarksPage() {
                                     <span className="text-slate-400 text-xs font-mono">—</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-center bg-purple-50/20">
+                                <TableCell className="text-center bg-blue-50/20">
                                   <Badge variant="outline" className={`text-[10px] font-bold ${gradeInfo.bg}`}>
                                     {gradeInfo.grade}
                                   </Badge>
@@ -1603,7 +1603,7 @@ export default function VerifyMarksPage() {
                           return (
                             <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
                               <TableCell className="text-center font-mono text-xs text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
-                              <TableCell className="text-xs font-mono font-bold text-[#5c28e8]">{st.roll_no || "—"}</TableCell>
+                              <TableCell className="text-xs font-mono font-bold text-[#2563EB]">{st.roll_no || "—"}</TableCell>
                               <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
                               <TableCell className="text-xs font-bold text-slate-900 border-r border-zinc-200">{st.name}</TableCell>
                               {currentSubjects.map((sub: any) => {
@@ -1621,7 +1621,7 @@ export default function VerifyMarksPage() {
                                           const val = e.target.value === "" ? null : Number(e.target.value);
                                           handleTermMarkChange(st.id, activeTab, sub.id, val, mark?.is_absent || false);
                                         }}
-                                        className="w-16 h-7 text-center font-bold text-xs p-1 rounded-lg border-slate-200 focus:ring-1 focus:ring-purple-500"
+                                        className="w-16 h-7 text-center font-bold text-xs p-1 rounded-lg border-slate-200 focus:ring-1 focus:ring-blue-500"
                                       />
                                     ) : mark ? (
                                       mark.is_absent ? (
@@ -1638,13 +1638,13 @@ export default function VerifyMarksPage() {
                                 );
                               })}
 
-                              <TableCell className="text-center border-l-2 border-purple-100 font-mono text-xs text-slate-600 bg-purple-50/20 font-bold">
+                              <TableCell className="text-center border-l-2 border-blue-100 font-mono text-xs text-slate-600 bg-blue-50/20 font-bold">
                                 {totalMax}
                               </TableCell>
-                              <TableCell className="text-center font-mono text-xs font-extrabold text-purple-950 bg-purple-50/20">
+                              <TableCell className="text-center font-mono text-xs font-extrabold text-blue-950 bg-blue-50/20">
                                 {isAbsent ? <span className="text-red-600 font-bold">AB</span> : totalObtained}
                               </TableCell>
-                              <TableCell className="text-center bg-purple-50/20">
+                              <TableCell className="text-center bg-blue-50/20">
                                 {percentage !== null ? (
                                   <Badge variant="outline" className={`font-mono text-[11px] font-extrabold ${gradeInfo.bg}`}>
                                     {percentage.toFixed(1)}%
@@ -1653,7 +1653,7 @@ export default function VerifyMarksPage() {
                                   <span className="text-slate-400 text-xs font-mono">—</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-center bg-purple-50/20">
+                              <TableCell className="text-center bg-blue-50/20">
                                 <Badge variant="outline" className={`text-[10px] font-bold ${gradeInfo.bg}`}>
                                   {gradeInfo.grade}
                                 </Badge>
@@ -1691,7 +1691,7 @@ export default function VerifyMarksPage() {
               size="sm"
               onClick={handleSaveClassMarks}
               disabled={isSavingMarks}
-              className="h-8 px-3 text-xs font-bold bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl shadow-xs"
+              className="h-8 px-3 text-xs font-bold bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl shadow-xs"
             >
               {isSavingMarks ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>Save</span>
