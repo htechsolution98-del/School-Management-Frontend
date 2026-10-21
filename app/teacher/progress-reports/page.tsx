@@ -18,6 +18,10 @@ import {
   History,
   Loader2,
   RefreshCw,
+  Search,
+  LayoutGrid,
+  Table as TableIcon,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +32,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getExamsFull, apiFetch, type ExamFull } from "@/lib/exam-api";
+import { cn } from "@/lib/utils";
+
+// ─── Visual Helpers ──────────────────────────────────────────────────────────
+
+const AVATAR_COLORS = [
+  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  if (!name) return "ST";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -217,37 +248,38 @@ function ClassicReportCardModal({
             </DialogDescription>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setIsEditing(!isEditing)}
-              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
             >
               <Sliders className="h-3.5 w-3.5" />
-              {isEditing ? "Cancel Edit" : "Edit Behavior & Remarks"}
+              <span>{isEditing ? "Cancel" : "Edit Details"}</span>
             </Button>
 
             <Button
               size="sm"
               variant="outline"
               onClick={() => onTogglePublish(report.studentId)}
-              className={`h-8 text-xs font-bold rounded-xl gap-1.5 border ${
+              className={`h-8 text-xs font-bold rounded-xl gap-1.5 border cursor-pointer ${
                 report.isPublished
                   ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                   : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
               }`}
             >
               {report.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-              {report.isPublished ? "Unpublish Draft" : `Publish ${report.reportMonth}`}
+              <span>{report.isPublished ? "Unpublish" : "Publish"}</span>
             </Button>
 
             <Button
               size="sm"
               onClick={handlePrint}
-              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md cursor-pointer"
             >
-              <Printer className="h-3.5 w-3.5" /> Print / Download PDF
+              <Printer className="h-3.5 w-3.5" />
+              <span>Print / PDF</span>
             </Button>
           </div>
         </DialogHeader>
@@ -529,6 +561,8 @@ export default function ProgressReportsPage() {
 
   const [studentReportsMap, setStudentReportsMap] = useState<Record<number, StudentReportData>>({});
   const [previewStudentId, setPreviewStudentId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">("cards");
 
   // Load persistent published reports from localStorage for division + month
   const loadPublishedStore = (divId: number, monthYear: string): Record<number, Partial<StudentReportData>> => {
@@ -889,8 +923,18 @@ export default function ProgressReportsPage() {
     return Object.values(studentReportsMap).filter((r) => r.isPublished).length;
   }, [studentReportsMap]);
 
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) return students;
+    const q = searchQuery.toLowerCase();
+    return students.filter((s) =>
+      (s.student_name || "").toLowerCase().includes(q) ||
+      (s.gr_no || "").toLowerCase().includes(q) ||
+      (s.roll_no || "").toLowerCase().includes(q)
+    );
+  }, [students, searchQuery]);
+
   return (
-    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-4 sm:space-y-5 pb-28 lg:pb-12 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
       {/* Print Media Stylesheet to print ONLY the report card */}
       <style jsx global>{`
         @media print {
@@ -914,25 +958,25 @@ export default function ProgressReportsPage() {
       `}</style>
 
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3.5 sm:p-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
-            <FileCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Monthly Student Progress Reports & History
+          <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#5c28e8]" />
+            Monthly Student Progress Reports
           </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Review database exam marks entered by subject teachers (Hindi, Science, Maths, etc.) and publish progress cards.
+          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Review exam marks entered by subject teachers and publish monthly progress cards.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-bold px-3 py-1.5 text-xs">
-            {students.length} Students Enrolled
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          <Badge className="bg-purple-50 text-[#5c28e8] border border-purple-200 font-bold px-2.5 py-1 text-xs shrink-0">
+            {students.length} Students
           </Badge>
           <Button
             onClick={handlePublishAll}
             disabled={students.length === 0}
-            className="h-9 text-xs font-bold rounded-xl gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+            className="h-8 sm:h-9 text-xs font-bold rounded-xl gap-1.5 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-xs cursor-pointer shrink-0"
           >
             <Send className="h-3.5 w-3.5" /> Publish All for {selectedMonthYear}
           </Button>
@@ -941,17 +985,17 @@ export default function ProgressReportsPage() {
 
       {/* Selectors Card (Class / Division + Exam Month Selector) */}
       <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-center">
+        <CardContent className="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-center">
           {/* Class & Division Selector */}
           <div className="space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-indigo-500" />
+            <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-[#5c28e8]" />
               Class & Division
             </label>
             <select
               value={selectedDivisionId}
               onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
-              className="w-full h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
             >
               {divisionList.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -963,14 +1007,14 @@ export default function ProgressReportsPage() {
 
           {/* Exam Report Month Selector (Dynamic from exams) */}
           <div className="space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+            <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-[#5c28e8]" />
               Exam Month & Term
             </label>
             <select
               value={selectedMonthYear}
               onChange={(e) => setSelectedMonthYear(e.target.value)}
-              className="w-full h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
             >
               {availableMonths.map((m) => (
                 <option key={m} value={m}>
@@ -981,7 +1025,7 @@ export default function ProgressReportsPage() {
           </div>
 
           {/* Monthly Summary Statistics */}
-          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-zinc-700">
+          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs bg-slate-50 dark:bg-zinc-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 dark:border-zinc-700">
             <div>
               <span className="text-slate-500 font-semibold block text-[10px] uppercase">Active Term</span>
               <span className="font-extrabold text-slate-900 dark:text-zinc-100">{selectedMonthYear}</span>
@@ -997,142 +1041,330 @@ export default function ProgressReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Roster Table */}
+      {/* Roster Section */}
       <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden">
-        <CardHeader className="pb-3 border-b dark:border-zinc-800 flex flex-row items-center justify-between">
+        <div className="p-3 sm:p-4 border-b dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <History className="h-4 w-4 text-indigo-600" />
+            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <History className="h-4 w-4 text-[#5c28e8]" />
               {selectedMonthYear} Progress Reports Roster
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Live marks synchronized from database for {selectedMonthYear}. Preview and publish to student & parent portals.
-            </CardDescription>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Live marks synchronized from database. Preview and publish to student & parent portals.
+            </p>
           </div>
-        </CardHeader>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search student or GR..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-2.5 h-8 text-xs rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 focus:bg-white focus:outline-none focus:border-[#5c28e8]"
+              />
+            </div>
+
+            {/* Mobile View Toggle */}
+            <div className="sm:hidden flex items-center bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-xl border border-slate-200 dark:border-zinc-700 shrink-0">
+              <button
+                type="button"
+                onClick={() => setMobileViewMode("cards")}
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  mobileViewMode === "cards" ? "bg-white dark:bg-zinc-900 text-[#5c28e8] shadow-xs" : "text-slate-500"
+                )}
+                aria-label="Cards view"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileViewMode("table")}
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  mobileViewMode === "table" ? "bg-white dark:bg-zinc-900 text-[#5c28e8] shadow-xs" : "text-slate-500"
+                )}
+                aria-label="Table view"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
 
         <CardContent className="p-0">
           {loading ? (
             <div className="p-12 text-center flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
-              <span>Loading student roster and academic database records for {selectedMonthYear}...</span>
+              <Loader2 className="h-6 w-6 animate-spin text-[#5c28e8]" />
+              <span>Loading student roster and academic records for {selectedMonthYear}...</span>
             </div>
-          ) : students.length === 0 ? (
+          ) : filteredStudents.length === 0 ? (
             <div className="p-12 text-center text-xs text-slate-400 font-bold">
-              No students found for this division.
+              {students.length === 0 ? "No students found for this division." : "No students match your search."}
             </div>
           ) : (
-            <div className="overflow-x-auto w-full">
-              <table className="w-full min-w-[700px] text-left text-xs">
-                <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
-                  <tr>
-                    <th className="px-4 py-3.5 w-12 text-center">#</th>
-                    <th className="px-4 py-3.5">Student Name</th>
-                    <th className="px-4 py-3.5">GR Number</th>
-                    <th className="px-4 py-3.5 text-center">Report Term</th>
-                    <th className="px-4 py-3.5 text-center">Marks Status</th>
-                    <th className="px-4 py-3.5 text-center">Portal Visibility</th>
-                    <th className="px-4 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 font-medium">
-                  {students.map((st, index) => {
+            <>
+              {/* ── MOBILE CARDS VIEW ── */}
+              {mobileViewMode === "cards" && (
+                <div className="sm:hidden p-3 space-y-2.5">
+                  {filteredStudents.map((st) => {
                     const r = studentReportsMap[st.id];
                     const isEvaluated = r?.status === "Evaluated & Ready";
                     const isPublished = r?.isPublished;
+                    const avatarColor = getAvatarColor(st.student_name);
 
                     return (
-                      <tr key={st.id} className="hover:bg-slate-50/80 dark:hover:bg-zinc-900/50 transition-colors">
-                        <td className="px-4 py-3 text-center font-mono text-slate-400">{index + 1}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-zinc-100">{st.student_name}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 font-mono text-[11px]">
-                            GR: {st.gr_no || `GR-${st.id}`}
-                          </Badge>
-                        </td>
+                      <div
+                        key={`mob-${st.id}`}
+                        className="bg-white dark:bg-zinc-900 rounded-2xl p-3 border border-slate-200/90 dark:border-zinc-800 shadow-2xs space-y-2.5"
+                      >
+                        {/* Student Header */}
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="w-8 h-8 rounded-full text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs"
+                              style={{ background: avatarColor }}
+                            >
+                              {getInitials(st.student_name)}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-slate-900 dark:text-zinc-100 text-xs truncate">
+                                {st.student_name}
+                              </h4>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                                {st.roll_no ? (
+                                  <span className="font-semibold text-slate-600 dark:text-zinc-400">Roll #{st.roll_no}</span>
+                                ) : (
+                                  <span>No Roll</span>
+                                )}
+                                <span>• GR: {st.gr_no || `GR-${st.id}`}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                        <td className="px-4 py-3 text-center">
-                          <Badge variant="secondary" className="font-bold text-[10px] gap-1 px-2 py-0.5">
-                            <Calendar className="h-3 w-3 text-indigo-500" /> {selectedMonthYear}
-                          </Badge>
-                        </td>
+                          {/* Visibility Badge */}
+                          <div className="shrink-0 text-right">
+                            <Badge
+                              className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                isPublished
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              )}
+                            >
+                              {isPublished ? (
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Published
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1">
+                                  <Lock className="w-2.5 h-2.5" /> Hidden (Draft)
+                                </span>
+                              )}
+                            </Badge>
+                          </div>
+                        </div>
 
-                        <td className="px-4 py-3 text-center">
+                        {/* Status & Academics Quick Info */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2 text-xs">
                           <Badge
-                            className={`font-bold text-[10px] gap-1 px-2.5 py-0.5 ${
+                            className={cn(
+                              "font-bold text-[10px] px-2 py-0.5 gap-1",
                               isEvaluated
-                                ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                            }`}
+                                ? "bg-purple-50 text-[#5c28e8] border border-purple-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            )}
                           >
                             {isEvaluated ? (
                               <>
-                                <CheckCircle2 className="h-3 w-3" /> Evaluated & Ready
+                                <CheckCircle2 className="h-2.5 w-2.5" /> Evaluated & Ready
                               </>
                             ) : (
                               <>
-                                <AlertCircle className="h-3 w-3" /> Pending Marks Entry
+                                <AlertCircle className="h-2.5 w-2.5" /> Pending Marks
                               </>
                             )}
                           </Badge>
-                        </td>
 
-                        <td className="px-4 py-3 text-center">
-                          <Badge
-                            className={`font-bold text-[10px] gap-1 px-2.5 py-0.5 ${
-                              isPublished
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                : "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400"
-                            }`}
-                          >
-                            {isPublished ? (
-                              <>
-                                <CheckCircle2 className="h-3 w-3" /> Published ({r.publishedDate})
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="h-3 w-3 text-slate-400" /> Hidden (Draft)
-                              </>
+                          {r && r.academics && r.academics.length > 0 && (
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {r.academics.filter((a) => a.score !== null).length}/{r.academics.length} Subjects
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Subjects Mini Pill Row (if marks available) */}
+                        {r && r.academics && r.academics.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {r.academics.slice(0, 4).map((a, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] font-medium bg-slate-50 dark:bg-zinc-800 px-2 py-0.5 rounded-lg border border-slate-200/80 dark:border-zinc-700 text-slate-700 dark:text-zinc-300"
+                              >
+                                {a.subjectName}: <b className="text-slate-900 dark:text-zinc-100">{a.score !== null ? a.score : "—"}</b>
+                              </span>
+                            ))}
+                            {r.academics.length > 4 && (
+                              <span className="text-[10px] text-slate-400 font-bold self-center">
+                                +{r.academics.length - 4} more
+                              </span>
                             )}
-                          </Badge>
-                        </td>
-
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => setPreviewStudentId(st.id)}
-                              className={`h-8 text-xs font-bold rounded-xl gap-1.5 shadow-2xs ${
-                                isEvaluated
-                                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                                  : "bg-amber-600 hover:bg-amber-700 text-white"
-                              }`}
-                            >
-                              {isEvaluated ? <Eye className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
-                              {isEvaluated ? "View Report Card" : "Fill Marks & Evaluate"}
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleTogglePublish(st.id)}
-                              className={`h-8 text-xs font-bold rounded-xl gap-1 border ${
-                                isPublished
-                                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                              }`}
-                            >
-                              {isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                              {isPublished ? "Unpublish" : "Publish"}
-                            </Button>
                           </div>
-                        </td>
-                      </tr>
+                        )}
+
+                        {/* Action Buttons Row */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => setPreviewStudentId(st.id)}
+                            className={cn(
+                              "h-8.5 text-xs font-bold rounded-xl gap-1.5 shadow-2xs cursor-pointer",
+                              isEvaluated
+                                ? "bg-[#5c28e8] hover:bg-[#4d20cb] text-white"
+                                : "bg-amber-600 hover:bg-amber-700 text-white"
+                            )}
+                          >
+                            {isEvaluated ? <Eye className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
+                            <span>{isEvaluated ? "View Card" : "Fill Marks"}</span>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleTogglePublish(st.id)}
+                            className={cn(
+                              "h-8.5 text-xs font-bold rounded-xl gap-1 border cursor-pointer",
+                              isPublished
+                                ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            )}
+                          >
+                            {isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                            <span>{isPublished ? "Unpublish" : "Publish"}</span>
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              )}
+
+              {/* ── DESKTOP & TABLE VIEW ── */}
+              <div className={cn("overflow-x-auto w-full", mobileViewMode === "cards" ? "hidden sm:block" : "block")}>
+                <table className="w-full min-w-[700px] text-left text-xs">
+                  <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3.5 w-12 text-center">#</th>
+                      <th className="px-4 py-3.5">Student Name</th>
+                      <th className="px-4 py-3.5">GR Number</th>
+                      <th className="px-4 py-3.5 text-center">Report Term</th>
+                      <th className="px-4 py-3.5 text-center">Marks Status</th>
+                      <th className="px-4 py-3.5 text-center">Portal Visibility</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 font-medium">
+                    {filteredStudents.map((st, index) => {
+                      const r = studentReportsMap[st.id];
+                      const isEvaluated = r?.status === "Evaluated & Ready";
+                      const isPublished = r?.isPublished;
+
+                      return (
+                        <tr key={st.id} className="hover:bg-slate-50/80 dark:hover:bg-zinc-900/50 transition-colors">
+                          <td className="px-4 py-3 text-center font-mono text-slate-400">{index + 1}</td>
+                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-zinc-100">{st.student_name}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 font-mono text-[11px]">
+                              GR: {st.gr_no || `GR-${st.id}`}
+                            </Badge>
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="secondary" className="font-bold text-[10px] gap-1 px-2 py-0.5">
+                              <Calendar className="h-3 w-3 text-indigo-500" /> {selectedMonthYear}
+                            </Badge>
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            <Badge
+                              className={`font-bold text-[10px] gap-1 px-2.5 py-0.5 ${
+                                isEvaluated
+                                  ? "bg-purple-100 text-[#5c28e8] dark:bg-purple-950 dark:text-purple-300"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              }`}
+                            >
+                              {isEvaluated ? (
+                                <>
+                                  <CheckCircle2 className="h-3 w-3" /> Evaluated & Ready
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="h-3 w-3" /> Pending Marks Entry
+                                </>
+                              )}
+                            </Badge>
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            <Badge
+                              className={`font-bold text-[10px] gap-1 px-2.5 py-0.5 ${
+                                isPublished
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400"
+                              }`}
+                            >
+                              {isPublished ? (
+                                <>
+                                  <CheckCircle2 className="h-3 w-3" /> Published ({r.publishedDate})
+                                </>
+                              ) : (
+                                <>
+                                  <Lock className="h-3 w-3 text-slate-400" /> Hidden (Draft)
+                                </>
+                              )}
+                            </Badge>
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => setPreviewStudentId(st.id)}
+                                className={`h-8 text-xs font-bold rounded-xl gap-1.5 shadow-2xs cursor-pointer ${
+                                  isEvaluated
+                                    ? "bg-[#5c28e8] hover:bg-[#4d20cb] text-white"
+                                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                                }`}
+                              >
+                                {isEvaluated ? <Eye className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
+                                {isEvaluated ? "View Report Card" : "Fill Marks & Evaluate"}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleTogglePublish(st.id)}
+                                className={`h-8 text-xs font-bold rounded-xl gap-1 border cursor-pointer ${
+                                  isPublished
+                                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                                {isPublished ? "Unpublish" : "Publish"}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

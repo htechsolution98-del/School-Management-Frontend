@@ -13,6 +13,9 @@ import {
   Clock,
   FileCheck,
   FileText,
+  Home,
+  Calendar,
+  MoreHorizontal,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -116,17 +119,17 @@ function findActive(links: SidebarLink[], pathname: string): SidebarLink | undef
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-export function 
-AppShell({
-  children,
-  links,
-  roleTitle,
-  userName,
-  onSignOut,
-  headerTitle,
-  noPadding,
-  mainClassName,
-}: AppShellProps) {
+export function
+  AppShell({
+    children,
+    links,
+    roleTitle,
+    userName,
+    onSignOut,
+    headerTitle,
+    noPadding,
+    mainClassName,
+  }: AppShellProps) {
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
   const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
@@ -262,7 +265,7 @@ AppShell({
     if (lower.includes("academic year")) return "bg-[#3b82f6] text-white";
     if (lower.includes("result dashboard")) return "bg-[#6366f1] text-white";
     if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#8b5cf6] text-white";
-    
+
     // Exam Management
     if (lower === "exam management") return "bg-[#ec4899] text-white";
     if (lower.includes("exam config") || lower.includes("configuration")) return "bg-[#64748b] text-white";
@@ -331,10 +334,9 @@ AppShell({
     const Icon = link.icon;
     const badgeColor = getBadgeColor(link.title, index);
 
-    const base = `group flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 ${
-      compact ? "justify-center px-0" : "gap-3 px-3.5"
-    }`;
-    
+    const base = `group flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 ${compact ? "justify-center px-0" : "gap-3 px-3.5"
+      }`;
+
     // Active item has white card style with deep indigo text
     const tone = selected
       ? "bg-white text-indigo-950 font-bold shadow-md shadow-indigo-950/20"
@@ -343,10 +345,9 @@ AppShell({
     if (link.subLinks?.length) {
       const groupOpen = !compact && openGroup === link.title;
       const childClasses = (active: boolean) =>
-        `flex min-h-9 items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium leading-5 transition-all ${
-          active
-            ? "bg-white/20 text-white font-bold shadow-2xs backdrop-blur-xs"
-            : "text-purple-100/80 hover:bg-white/10 hover:text-white"
+        `flex min-h-9 items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium leading-5 transition-all ${active
+          ? "bg-white/20 text-white font-bold shadow-2xs backdrop-blur-xs"
+          : "text-purple-100/80 hover:bg-white/10 hover:text-white"
         }`;
 
       return (
@@ -369,9 +370,8 @@ AppShell({
               <>
                 <span className="flex-1 text-left truncate">{link.title}</span>
                 <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${
-                    groupOpen ? "rotate-180 text-white" : ""
-                  }`}
+                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${groupOpen ? "rotate-180 text-white" : ""
+                    }`}
                 />
               </>
             )}
@@ -475,9 +475,8 @@ AppShell({
           disabled={signingOut}
           title={compact ? (signingOut ? "Signing out…" : "Sign out") : undefined}
           aria-label="Sign out"
-          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-purple-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${
-            compact ? "justify-center" : "gap-3 px-3.5"
-          }`}
+          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-purple-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3.5"
+            }`}
         >
           {signingOut ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
           {!compact && <span>{signingOut ? "Signing out…" : "Sign out"}</span>}
@@ -518,8 +517,8 @@ AppShell({
 
     if (role.includes("teacher")) {
       return [
-        { title: "Dashboard", href: "/teacher", icon: LayoutDashboard },
-        { title: "Attendance", href: "/teacher/student-attendance", icon: Users },
+        { title: "Dashboard", href: "/teacher", icon: Home },
+        { title: "Attendance", href: "/teacher/my-attendance", icon: Calendar },
         { title: "Homework", href: "/teacher/Homework", icon: BookOpen },
         { title: "Materials", href: "/teacher/study-materials", icon: FileText },
       ];
@@ -563,9 +562,8 @@ AppShell({
   return (
     <div
       data-resizing={resizing}
-      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] ${
-        resizing ? "cursor-col-resize select-none" : ""
-      }`}
+      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] ${resizing ? "cursor-col-resize select-none" : ""
+        }`}
     >
       {/* Desktop Gradient Sidebar */}
       <motion.aside
@@ -578,7 +576,7 @@ AppShell({
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute bottom-0 -right-24 h-56 w-56 rounded-full bg-indigo-900/40 blur-3xl" />
-        
+
         <div className="flex h-full min-w-0 flex-col overflow-hidden relative z-10">
           {navigation(!expanded)}
         </div>
@@ -610,16 +608,15 @@ AppShell({
             event.preventDefault();
             updateWidth(event.key === "ArrowLeft" ? MIN_WIDTH : 248);
           }}
-          className={`absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none transition-colors hover:bg-white/20 focus-visible:bg-white/20 ${
-            resizing ? "bg-white/20" : ""
-          }`}
+          className={`absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none transition-colors hover:bg-white/20 focus-visible:bg-white/20 ${resizing ? "bg-white/20" : ""
+            }`}
         />
       </motion.aside>
 
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
-        {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20">
+        {/* Top Header Bar: Purple gradient on mobile, clean surface on desktop */}
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#4A32E8] via-[#523CEE] to-[#5C3EF2] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(74,50,232,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none z-20">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
               <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -672,23 +669,20 @@ AppShell({
                               setSelectedNotification(notification);
                               markAsRead(notification.id);
                             }}
-                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${
-                              isRead ? "" : "bg-indigo-50/40"
-                            }`}
+                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${isRead ? "" : "bg-indigo-50/40"
+                              }`}
                           >
                             <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                                isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5436F5]"
-                              }`}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5436F5]"
+                                }`}
                             >
                               <Megaphone className="h-4 w-4" />
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center justify-between gap-1">
                                 <span
-                                  className={`truncate text-xs ${
-                                    isRead ? "font-medium text-slate-600" : "font-semibold text-slate-900"
-                                  }`}
+                                  className={`truncate text-xs ${isRead ? "font-medium text-slate-600" : "font-semibold text-slate-900"
+                                    }`}
                                 >
                                   {notification.title}
                                 </span>
@@ -751,28 +745,36 @@ AppShell({
         {/* Global School Subscription / Free Trial Status Notification (Shown only to School Trustees) */}
         {roleTitle === "Trustee" && <TrialBanner />}
 
-        {/* Content Body: Protected with pb-28 on mobile so bottom bar never blocks content */}
+        {/* Content Body: Snug pb-20 on mobile clears the 64px floating glass bar without creating excessive empty space */}
         <main
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0",
-            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F6F7FC]",
+            noPadding ? "p-0 pb-16 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-16 lg:pb-5",
             mainClassName
           )}
         >
           {children}
         </main>
 
-        {/* Persistent Role-Aware Mobile Bottom Navigation Bar */}
+        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Compact) */}
+        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Exact Reference Match) */}
         <nav
           aria-label="Mobile Bottom Navigation"
-          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden"
+          className="glass-bottom-nav lg:hidden"
         >
-          <div className="flex items-center justify-around px-2 pt-2 pb-1 max-w-lg mx-auto">
+          <div className="flex items-center justify-around px-2 py-1.5 w-full">
             {mobileNavItems.map((item, idx) => {
+              const pathLower = pathname.toLowerCase();
+              const itemHrefLower = (item.href || "").toLowerCase();
               const isActive =
-                pathname === item.href ||
-                (item.href && item.href !== "/" && item.href !== "/teacher" && item.href !== "/clerk" && item.href !== "/student" && pathname.startsWith(`${item.href}/`)) ||
-                (item.title === "Attendance" && (pathname === "/teacher/my-attendance" || pathname === "/teacher/student-attendance" || pathname.startsWith("/teacher/attendance")));
+                pathLower === itemHrefLower ||
+                (itemHrefLower &&
+                  itemHrefLower !== "/" &&
+                  itemHrefLower !== "/teacher" &&
+                  itemHrefLower !== "/clerk" &&
+                  itemHrefLower !== "/student" &&
+                  pathLower.startsWith(`${itemHrefLower}/`)) ||
+                (item.title === "Attendance" && (pathLower.includes("attendance")));
               const Icon = item.icon;
 
               return (
@@ -780,22 +782,24 @@ AppShell({
                   key={item.href || idx}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex flex-col items-center justify-center flex-1 py-0.5 px-1 transition-all ${
-                    isActive ? "text-[#5436F5]" : "text-[#7183A6] hover:text-[#142044]"
-                  }`}
+                  className="flex flex-col items-center justify-center flex-1 py-0.5 px-0.5 relative group"
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? "text-[#5436F5] fill-[#5436F5]" : "text-[#7183A6]"}`} />
-                  <span
-                    className={`text-[11px] mt-1 tracking-tight truncate max-w-[68px] text-center ${
-                      isActive ? "font-bold text-[#5436F5]" : "font-medium text-[#7183A6]"
-                    }`}
-                  >
-                    {item.title}
-                  </span>
                   {isActive ? (
-                    <span className="h-[2.5px] w-7 bg-[#5436F5] rounded-full mt-1" />
+                    <div className="flex flex-col items-center">
+                      <div className="px-4 py-1.5 rounded-2xl bg-gradient-to-b from-[#ECE8FE] to-[#DED4FD] border border-[#DDD6FE]/70 shadow-xs flex flex-col items-center">
+                        <Icon className="w-4 h-4 text-[#4D35FE]" />
+                        <span className="text-[9.5px] font-bold text-[#4D35FE] mt-0.5 leading-none">
+                          {item.title}
+                        </span>
+                      </div>
+                    </div>
                   ) : (
-                    <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
+                    <div className="flex flex-col items-center py-1">
+                      <Icon className="w-4 h-4 text-[#8E95A9]" />
+                      <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
+                        {item.title}
+                      </span>
+                    </div>
                   )}
                 </Link>
               );
@@ -806,17 +810,14 @@ AppShell({
               type="button"
               onClick={() => setMobileOpen(true)}
               aria-label="Open full menu"
-              className="flex flex-col items-center justify-center flex-1 py-0.5 px-1 text-[#7183A6] hover:text-[#142044] transition-all cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[#8E95A9] hover:text-[#1A1D2F] transition-all cursor-pointer"
             >
-              <Menu className="w-5 h-5 text-[#7183A6]" />
-              <span className="text-[11px] mt-1 font-medium text-[#7183A6] tracking-tight">
+              <MoreHorizontal className="w-4 h-4 text-[#8E95A9]" />
+              <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
                 More
               </span>
-              <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
             </button>
           </div>
-          {/* iOS Home Indicator Bar */}
-          <div className="w-32 h-1 bg-slate-300 rounded-full mx-auto my-1.5" />
         </nav>
       </div>
 
@@ -918,8 +919,8 @@ AppShell({
                     <p className={`mt-1 text-xs font-medium ${selectedNotification.expires_at && new Date(selectedNotification.expires_at).getTime() < Date.now() ? "text-red-600" : "text-slate-600"}`}>
                       {selectedNotification.expires_at
                         ? new Date(selectedNotification.expires_at).toLocaleString("en-IN", {
-                            day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                          })
+                          day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                        })
                         : "Never"}
                       {selectedNotification.expires_at && new Date(selectedNotification.expires_at).getTime() < Date.now() && " (Expired)"}
                     </p>

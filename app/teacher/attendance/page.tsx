@@ -852,7 +852,7 @@ export default function AttendanceHistoryPage() {
 
   return (
     <div
-      className="w-full max-w-full overflow-hidden px-3 sm:px-4 py-4 flex flex-col gap-4"
+      className="w-full max-w-full overflow-hidden px-3 sm:px-4 py-4 pb-3 lg:pb-8 flex flex-col gap-4"
       style={{ fontFamily: "'Outfit', sans-serif" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');`}</style>

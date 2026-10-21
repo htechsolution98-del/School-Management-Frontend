@@ -200,7 +200,7 @@ export default function SuperAdminSubscriptionsPage() {
       });
       showToast(res.message || "Payment recorded and subscription renewed successfully!");
       setPayingSub(null);
-      fetchData();
+      await fetchData();
       if (res.invoice) {
         setViewingInvoice(res.invoice);
       }
@@ -218,7 +218,7 @@ export default function SuperAdminSubscriptionsPage() {
     try {
       const res = await generateSchoolInvoice(sub.id);
       showToast("Invoice generated successfully.");
-      fetchData();
+      await fetchData();
       if (res.invoice) {
         setViewingInvoice(res.invoice);
       }

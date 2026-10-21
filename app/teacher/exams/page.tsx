@@ -652,7 +652,7 @@ export default function TeacherExamsPage() {
 
   return (
     <div
-      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 overflow-x-hidden relative animate-fade-in"
+      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-3 lg:pb-8 flex flex-col gap-6 overflow-x-hidden relative animate-fade-in"
       style={{ fontFamily: "'Outfit', sans-serif" }}
     >
       <style>{`
