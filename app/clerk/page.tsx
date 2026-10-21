@@ -306,7 +306,7 @@ export default function ClerkDashboard() {
   };
 
   return (
-    <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-4 sm:space-y-6 pb-28 lg:pb-8">
+    <div className="clerk-page clerk-dashboard w-full min-w-0 space-y-4 sm:space-y-6 pb-3 lg:pb-8">
       {/* ─── Top Sub-bar: Date & Action Buttons ───────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200/80 px-3.5 py-2.5 rounded-xl shadow-2xs">

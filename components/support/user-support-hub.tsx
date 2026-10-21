@@ -182,7 +182,7 @@ export const UserSupportHub: React.FC<UserSupportHubProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-28 lg:pb-8">
+    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-3 lg:pb-8">
       {/* ─── Top Banner ──────────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#5826df] via-[#6d3df5] to-[#7f4efb] text-white p-6 md:p-7 shadow-lg shadow-purple-500/10">
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />

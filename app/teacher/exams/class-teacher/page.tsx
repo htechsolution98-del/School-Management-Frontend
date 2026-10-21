@@ -416,7 +416,7 @@ export default function ClassTeacherExamsPage() {
   ];
 
   return (
-    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 relative overflow-x-hidden" style={{ fontFamily: "Outfit,sans-serif" }}>
+    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-3 lg:pb-8 flex flex-col gap-6 relative overflow-x-hidden" style={{ fontFamily: "Outfit,sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*,*::before,*::after{box-sizing:border-box}`}</style>
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-80 h-80 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />

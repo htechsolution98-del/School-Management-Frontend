@@ -57,7 +57,7 @@ export default function TeacherDashboard() {
   const teacherName = profile?.name || profile?.user?.name || "teacher1";
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 w-full min-w-0 overflow-x-hidden font-sans pb-28 lg:pb-8">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── 1. WELCOME HERO BANNER (Compact, Proportional on all mobile sizes) ─── */}
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121B34] p-3.5 sm:p-5 text-white shadow-sm border border-[#1A2648]">
         {/* Top row: Greeting & Subtitle on Left, Glowing Circular Illustration on Right */}

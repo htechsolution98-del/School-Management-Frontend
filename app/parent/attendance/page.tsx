@@ -52,7 +52,7 @@ export default function ParentAttendancePage() {
   const activeChild = children[selectedChildIndex];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12 w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 max-w-6xl mx-auto pb-3 lg:pb-8 w-full min-w-0 overflow-x-hidden">
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-5 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

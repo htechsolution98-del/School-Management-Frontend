@@ -362,32 +362,32 @@ export function AnnouncementsHub({
     : "Stay updated with important announcements, circulars, and notices from school administration.";
 
   return (
-    <div className="space-y-6 pb-16 min-w-0 max-w-7xl mx-auto w-full overflow-x-hidden">
+    <div className="space-y-5 pb-6 min-w-0 max-w-7xl mx-auto w-full overflow-x-hidden">
       {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs">
-              <Megaphone className="h-6 w-6 stroke-[2.2]" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
+        <div className="space-y-1 w-full min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100 truncate">
                 {pageTitle || defaultTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-2">
                 {pageSubtitle || defaultSubtitle}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => fetchAnnouncementsList(true)}
             disabled={refreshing}
-            className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs"
+            className="flex-1 sm:flex-initial h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs justify-center"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
             Refresh
@@ -399,7 +399,7 @@ export function AnnouncementsHub({
                 setEditingItem(null);
                 setModalOpen(true);
               }}
-              className="h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98]"
+              className="flex-1 sm:flex-initial h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] justify-center"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
               New Announcement
@@ -409,21 +409,21 @@ export function AnnouncementsHub({
       </div>
 
       {/* ─── STAT CARDS ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <Card
           onClick={() => setSelectedPriority("ALL_PRIORITY")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "ALL_PRIORITY"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
               <Bell className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Notices</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Total Notices</p>
               <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100">{totalCount}</p>
             </div>
           </CardContent>
@@ -433,16 +433,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("URGENT")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "URGENT"
-              ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-2xs">
               <Flame className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Urgent Alerts</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Urgent Alerts</p>
               <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">{urgentCount}</p>
             </div>
           </CardContent>
@@ -452,16 +452,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("IMPORTANT")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "IMPORTANT"
-              ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-2xs">
               <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Important</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Important</p>
               <p className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">{importantCount}</p>
             </div>
           </CardContent>
@@ -471,16 +471,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("NORMAL")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "NORMAL"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
               <Info className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Normal Notices</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Normal Notices</p>
               <p className="text-xl sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{normalCount}</p>
             </div>
           </CardContent>
@@ -488,21 +488,21 @@ export function AnnouncementsHub({
       </div>
 
       {/* ─── SLEEK MODERN SEGMENTED FILTERS & SEARCH ──────────────────────── */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 space-y-3.5 shadow-2xs">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-full lg:max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by title, student, class, author..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-16 h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="pl-10 pr-16 h-10 sm:h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 px-2 py-0.5 rounded-lg bg-slate-200/60 dark:bg-zinc-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 px-2 py-0.5 rounded-lg bg-slate-200/60 dark:bg-zinc-700 transition-colors"
               >
                 Clear
               </button>
@@ -510,10 +510,10 @@ export function AnnouncementsHub({
           </div>
 
           {/* Priority Segmented Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl overflow-x-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               onClick={() => setSelectedPriority("ALL_PRIORITY")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "ALL_PRIORITY"
                   ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-xs"
                   : "text-slate-600 dark:text-zinc-400 hover:text-slate-900"
@@ -527,7 +527,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("URGENT")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "URGENT"
                   ? "bg-rose-500 text-white shadow-xs"
                   : "text-rose-600 dark:text-rose-400 hover:bg-rose-50/50"
@@ -542,7 +542,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("IMPORTANT")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "IMPORTANT"
                   ? "bg-amber-500 text-white shadow-xs"
                   : "text-amber-600 dark:text-amber-400 hover:bg-amber-50/50"
@@ -557,7 +557,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("NORMAL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "NORMAL"
                   ? "bg-[#5826df] text-white shadow-xs"
                   : "text-[#5826df] dark:text-indigo-400 hover:bg-indigo-50/50"
@@ -573,14 +573,14 @@ export function AnnouncementsHub({
         </div>
 
         {/* Audience Filter Pills */}
-        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Audience:
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+            <Filter className="w-3 h-3 text-[#5826df]" /> Audience:
           </span>
 
           <button
             onClick={() => setSelectedAudience("ALL_FILTER")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 ${
               selectedAudience === "ALL_FILTER"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -591,7 +591,7 @@ export function AnnouncementsHub({
 
           <button
             onClick={() => setSelectedAudience("STUDENTS_PARENTS")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "STUDENTS_PARENTS"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -603,7 +603,7 @@ export function AnnouncementsHub({
 
           <button
             onClick={() => setSelectedAudience("PARTICULAR_STUDENT")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "PARTICULAR_STUDENT"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -615,7 +615,7 @@ export function AnnouncementsHub({
 
           <button
             onClick={() => setSelectedAudience("CLASS_TARGET")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "CLASS_TARGET"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -627,7 +627,7 @@ export function AnnouncementsHub({
 
           <button
             onClick={() => setSelectedAudience("TEACHER")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "TEACHER"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -639,7 +639,7 @@ export function AnnouncementsHub({
 
           <button
             onClick={() => setSelectedAudience("ALL")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "ALL"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -697,19 +697,19 @@ export function AnnouncementsHub({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 shadow-2xs hover:border-[#5826df]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
+                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#5826df]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
               >
                 {/* Header info */}
                 <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {getPriorityBadge(item.priority)}
                       {getAudienceBadge(item.announcement_for, item.is_everyone)}
                       {getTargetScopeBadge(item)}
                     </div>
 
                     {/* Actions Menu */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -752,7 +752,7 @@ export function AnnouncementsHub({
                   <div>
                     <h3
                       onClick={() => setViewingItem(item)}
-                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] dark:hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase"
+                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] dark:hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase leading-snug"
                     >
                       {capitalizeFirstLetter(item.title)}
                     </h3>
@@ -764,7 +764,7 @@ export function AnnouncementsHub({
 
                 {/* Footer metadata */}
                 <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                  <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300 truncate">
+                  <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300 truncate min-w-0">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#5826df] shrink-0" />
                     <span className="truncate font-bold text-slate-800 dark:text-zinc-200">
                       {item.is_created_by_me || (item.created_by_name || "").toLowerCase() === "created by me"
@@ -772,7 +772,7 @@ export function AnnouncementsHub({
                         : (item.created_by_name || item.created_by_role || "Administration")}
                     </span>
                     {item.created_by_role && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50/80 dark:bg-zinc-800 text-[#5826df] dark:text-indigo-300 font-bold uppercase border border-indigo-100/60 dark:border-zinc-700">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50/80 dark:bg-zinc-800 text-[#5826df] dark:text-indigo-300 font-bold uppercase border border-indigo-100/60 dark:border-zinc-700 shrink-0">
                         {item.created_by_role}
                       </span>
                     )}
@@ -1132,13 +1132,13 @@ function AnnouncementFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl p-6 sm:p-7 max-h-[92vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
+        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-2xl p-4 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800">
@@ -1641,13 +1641,13 @@ function AnnouncementDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-xl p-4 sm:p-7 max-h-[88vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
           <div className="space-y-2">
