@@ -1,3 +1,4 @@
+```yaml
 name: School-Management-Frontend
 
 on:
@@ -21,11 +22,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy Frontend
         run: |
-          ssh -T "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p {{ secrets.SSH_PORT}} " << 'SSHEOF'
+          ssh -T -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'SSHEOF'
             set -e
             cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
 
@@ -54,7 +55,7 @@ jobs:
             git reset --hard "origin/${{ secrets.FRONTEND_BRANCH }}"
 
             echo "=== Restart Container (triggers dependency install, build and start) ==="
-            docker restart ${{ secrets.FRONTEND_CONT_NAME }}
+            docker restart "${{ secrets.FRONTEND_CONT_NAME }}"
 
             echo "=== Waiting 50s for build to complete ==="
             sleep 50
@@ -65,3 +66,4 @@ jobs:
       - name: Cleanup SSH
         if: always()
         run: rm -rf ~/.ssh
+```
