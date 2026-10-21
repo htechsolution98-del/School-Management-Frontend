@@ -341,17 +341,17 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
     if (p.includes("certificat")) {
       return (
         <div className="relative flex items-center justify-center">
-          <Award className="h-6 w-6 stroke-[2.2] text-[#6428F5]" />
-          <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#6428F5] text-white ring-2 ring-white">
+          <Award className="h-6 w-6 stroke-[2.2] text-[#2563EB]" />
+          <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#2563EB] text-white ring-2 ring-white">
             <Check className="h-2 w-2 stroke-[3]" />
           </span>
         </div>
       );
     }
-    if (p.includes("librar")) return <BookOpen className="h-6 w-6 stroke-[2.2] text-[#6428F5]" />;
-    if (p.includes("fee") || p.includes("ledger") || p.includes("salary")) return <FileSpreadsheet className="h-6 w-6 stroke-[2.2] text-[#6428F5]" />;
-    if (p.includes("inventor") || p.includes("item")) return <Layers className="h-6 w-6 stroke-[2.2] text-[#6428F5]" />;
-    return <FileText className="h-6 w-6 stroke-[2.2] text-[#6428F5]" />;
+    if (p.includes("librar")) return <BookOpen className="h-6 w-6 stroke-[2.2] text-[#2563EB]" />;
+    if (p.includes("fee") || p.includes("ledger") || p.includes("salary")) return <FileSpreadsheet className="h-6 w-6 stroke-[2.2] text-[#2563EB]" />;
+    if (p.includes("inventor") || p.includes("item")) return <Layers className="h-6 w-6 stroke-[2.2] text-[#2563EB]" />;
+    return <FileText className="h-6 w-6 stroke-[2.2] text-[#2563EB]" />;
   };
 
   return (
@@ -365,9 +365,9 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
         }}
         aria-label="Open Page Tutorial Drawer"
         title="Need Help? Click for step-by-step guidance & dummy data"
-        className={`group relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-indigo-200/80 bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-[#6428F5] shadow-xs transition-all duration-200 hover:scale-105 hover:border-[#6428F5] hover:shadow-md hover:shadow-indigo-500/15 active:scale-95 ${className}`}
+        className={`group relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-blue-200/80 bg-gradient-to-br from-blue-50 via-white to-sky-50 text-[#2563EB] shadow-xs transition-all duration-200 hover:scale-105 hover:border-[#2563EB] hover:shadow-md hover:shadow-blue-500/15 active:scale-95 ${className}`}
       >
-        <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#6428F5]/10 transition-colors group-hover:bg-[#6428F5] group-hover:text-white">
+        <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#2563EB]/10 transition-colors group-hover:bg-[#2563EB] group-hover:text-white">
           <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
         </span>
         <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 sm:h-3.5 sm:w-3.5 items-center justify-center rounded-full bg-amber-400 text-[7px] sm:text-[8px] font-black text-amber-950 shadow-xs ring-1.5 sm:ring-2 ring-white">
@@ -407,8 +407,8 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                       {/* Top Header Row: Badges, Studio Link & Close Button */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-[#F5F2FF] text-[#6428F5] border border-[#E9E4FF] whitespace-nowrap">
-                            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#6428F5] shrink-0" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-[#EFF6FF] text-[#2563EB] border border-[#DBEAFE] whitespace-nowrap">
+                            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#2563EB] shrink-0" />
                             <span>{roleTitle ? `${roleTitle} Guide` : "Guide"}</span>
                           </span>
                           <span className="px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-mono bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] min-[360px]:max-w-[160px] sm:max-w-none truncate">
@@ -423,9 +423,9 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                               href={`/superadmin/tutorials?role=${encodeURIComponent(roleKey)}&path=${encodeURIComponent(tutorial?.route_path || selectedRoute)}`}
                               onClick={() => setIsOpen(false)}
                               title="Super Admin: Edit this guide & tutorial video in Studio"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold text-[#6428F5] bg-[#F5F2FF] hover:bg-[#EDE8FF] border border-[#E0D7FE] transition-colors shadow-2xs cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold text-[#2563EB] bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] transition-colors shadow-2xs cursor-pointer"
                             >
-                              <Edit3 className="w-3 h-3 text-[#6428F5]" />
+                              <Edit3 className="w-3 h-3 text-[#2563EB]" />
                               <span className="hidden min-[380px]:inline">Edit</span>
                               <span className="hidden sm:inline"> in Studio</span>
                             </Link>
@@ -444,7 +444,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
 
                       {/* Middle Header Row: Illustration + Title + Subtitle */}
                       <div className="flex items-start gap-2.5 sm:gap-4 mt-3 sm:mt-4">
-                        <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-xl sm:rounded-full bg-[#F5F2FF] border border-[#E9E4FF] flex items-center justify-center text-[#6428F5] shrink-0 shadow-2xs [&>svg]:w-4.5 [&>svg]:h-4.5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
+                        <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-xl sm:rounded-full bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] shrink-0 shadow-2xs [&>svg]:w-4.5 [&>svg]:h-4.5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
                           {getHeaderIcon()}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -466,7 +466,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                     onClick={() => setActiveTab("steps")}
                     className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "steps"
-                        ? "border-[#6428F5] text-[#6428F5]"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
@@ -480,7 +480,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                     onClick={() => setActiveTab("dummy")}
                     className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "dummy"
-                        ? "border-[#6428F5] text-[#6428F5]"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
@@ -498,7 +498,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                     onClick={() => setActiveTab("tips")}
                     className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "tips"
-                        ? "border-[#6428F5] text-[#6428F5]"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
@@ -516,7 +516,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                     onClick={() => setActiveTab("related")}
                     className={`py-2.5 sm:py-3 text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                       activeTab === "related"
-                        ? "border-[#6428F5] text-[#6428F5]"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                   >
@@ -529,7 +529,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                 <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 bg-white pb-28 sm:pb-32">
                   {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#6428F5]" />
+                      <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
                       <p className="text-xs font-semibold">Loading tutorial...</p>
                     </div>
                   ) : (
@@ -539,12 +539,12 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                         <div className="space-y-6 animate-in fade-in duration-150">
                           {/* Top Video Tutorial Card (Rendered if video is enabled & configured) */}
                           {tutorial?.show_video !== false && Boolean(tutorial?.video_url && tutorial.video_url.trim()) ? (
-                            <div className="bg-[#F8F6FE] border border-[#E9E4FF] rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col gap-3 relative overflow-hidden group shadow-2xs">
+                            <div className="bg-[#F8FAFC] border border-[#DBEAFE] rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col gap-3 relative overflow-hidden group shadow-2xs">
                               {/* Super Admin Quick Control Toolbar */}
                               {isAdminUser && (
-                                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#E9E4FF]/90">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#DBEAFE]/90">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-[#E9E4FF] text-[#6428F5]">
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-[#DBEAFE] text-[#2563EB]">
                                       Super Admin
                                     </span>
                                     <span className="text-[10px] sm:text-[11px] font-medium text-slate-500">
@@ -580,13 +580,13 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                       setIsVideoModalOpen(true);
                                     }
                                   }}
-                                  className="w-full sm:w-44 h-24 sm:h-28 rounded-xl overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 relative shrink-0 shadow-sm border border-[#E9E4FF] flex items-center justify-center group cursor-pointer"
+                                  className="w-full sm:w-44 h-24 sm:h-28 rounded-xl overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 relative shrink-0 shadow-sm border border-[#DBEAFE] flex items-center justify-center group cursor-pointer"
                                 >
                                   {/* Decorative Mini Mockup in thumbnail */}
                                   <div className="absolute inset-2 rounded-lg border border-white/10 bg-white/5 p-2 flex flex-col justify-between pointer-events-none">
                                     <div className="flex items-center justify-between">
                                       <div className="h-1.5 w-12 rounded-full bg-white/30" />
-                                      <div className="h-2 w-2 rounded-full bg-purple-400/60" />
+                                      <div className="h-2 w-2 rounded-full bg-blue-400/60" />
                                     </div>
                                     <div className="space-y-1">
                                       <div className="h-1 w-20 rounded-full bg-white/20" />
@@ -595,7 +595,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   </div>
 
                                   {/* Centered Play Button */}
-                                  <div className="relative z-10 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-[#6428F5] group-hover:scale-110 transition-transform">
+                                  <div className="relative z-10 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-[#2563EB] group-hover:scale-110 transition-transform">
                                     <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current ml-0.5" />
                                   </div>
 
@@ -617,7 +617,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => setIsVideoModalOpen(true)}
-                                      className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                      className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                                     >
                                       <Play className="w-3.5 h-3.5 fill-current" />
                                       <span>Play Tutorial (3:45)</span>
@@ -651,7 +651,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                         setIsAddingVideo(true);
                                         setNewVideoUrl(tutorial?.video_url || "");
                                       }}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#6428F5] bg-[#F5F2FF] hover:bg-[#ECE7FE] border border-[#DDD4FE] transition-colors shrink-0 shadow-2xs cursor-pointer"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#2563EB] bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] transition-colors shrink-0 shadow-2xs cursor-pointer"
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                       <span>+ Add Video Section</span>
@@ -661,7 +661,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                       <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
-                                        <Video className="w-4 h-4 text-[#6428F5]" />
+                                        <Video className="w-4 h-4 text-[#2563EB]" />
                                         Add Tutorial Video for {tutorial?.route_path || selectedRoute}
                                       </span>
                                       <button
@@ -681,13 +681,13 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                         value={newVideoUrl}
                                         onChange={(e) => setNewVideoUrl(e.target.value)}
                                         placeholder="https://www.youtube.com/watch?v=..."
-                                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-[#6428F5]/30 bg-white"
+                                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-[#2563EB]/30 bg-white"
                                       />
                                       <button
                                         type="button"
                                         onClick={handleSaveVideo}
                                         disabled={isSavingVideo || !newVideoUrl.trim()}
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#6428F5] hover:bg-[#521fd1] text-white font-bold text-xs shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
                                       >
                                         {isSavingVideo ? (
                                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -730,9 +730,9 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                       onClick={() => setCurrentStepIndex(idx)}
                                       className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs ${
                                         isActive
-                                          ? "bg-[#6428F5] text-white ring-2 sm:ring-4 ring-[#6428F5]/20"
+                                          ? "bg-[#2563EB] text-white ring-2 sm:ring-4 ring-[#2563EB]/20"
                                           : currentStepIndex > idx
-                                          ? "bg-[#6428F5] text-white"
+                                          ? "bg-[#2563EB] text-white"
                                           : "bg-slate-100 text-slate-500 border border-slate-300"
                                       }`}
                                     >
@@ -741,7 +741,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                     {idx < stepsList.length - 1 && (
                                       <div
                                         className={`w-0.5 flex-1 my-1.5 sm:my-2 transition-colors ${
-                                          currentStepIndex > idx ? "bg-[#6428F5]" : "bg-slate-200"
+                                          currentStepIndex > idx ? "bg-[#2563EB]" : "bg-slate-200"
                                         }`}
                                       />
                                     )}
@@ -752,7 +752,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                     onClick={() => setCurrentStepIndex(idx)}
                                     className={`flex-1 min-w-0 p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white border transition-all ${
                                       isActive
-                                        ? "border-[#6428F5] shadow-sm ring-1 ring-[#6428F5]/10"
+                                        ? "border-[#2563EB] shadow-sm ring-1 ring-[#2563EB]/10"
                                         : "border-[#E2E8F0] shadow-2xs hover:border-slate-300"
                                     }`}
                                   >
@@ -841,7 +841,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                         <div className="space-y-4 animate-in fade-in duration-150">
                           <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#475569] flex items-center justify-between">
                             <span>Reference formatted values for fields on this screen.</span>
-                            <span className="text-[11px] font-bold text-[#6428F5]">One-Click Copy</span>
+                            <span className="text-[11px] font-bold text-[#2563EB]">One-Click Copy</span>
                           </div>
 
                           {tutorial?.dummy_data && tutorial.dummy_data.length > 0 ? (
@@ -852,13 +852,13 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                 return (
                                   <div
                                     key={idx}
-                                    className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-[#E2E8F0] shadow-2xs space-y-2 sm:space-y-2.5 transition-all hover:border-[#6428F5]/40"
+                                    className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-[#E2E8F0] shadow-2xs space-y-2 sm:space-y-2.5 transition-all hover:border-[#2563EB]/40"
                                   >
                                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5 sm:pb-2">
                                       <span className="font-bold text-xs text-[#111B35]">
                                         {item.field}
                                       </span>
-                                      <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-[#F5F2FF] text-[#6428F5] text-[9px] sm:text-[10px] font-bold">
+                                      <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#2563EB] text-[9px] sm:text-[10px] font-bold">
                                         Sample
                                       </span>
                                     </div>
@@ -913,7 +913,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   key={idx}
                                   className="flex items-start gap-2.5 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-[#E2E8F0] text-xs sm:text-sm text-[#475569] shadow-2xs"
                                 >
-                                  <span className="flex h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0 items-center justify-center rounded-full bg-[#F5F2FF] text-[#6428F5] text-[10px] sm:text-xs font-black">
+                                  <span className="flex h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB] text-[10px] sm:text-xs font-black">
                                     ✓
                                   </span>
                                   <span className="leading-relaxed">{tip}</span>
@@ -931,9 +931,9 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                       {/* ─── TAB 4: RELATED GUIDES ────────────────────── */}
                       {activeTab === "related" && (
                         <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-150">
-                          <div className="p-3 sm:p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-950 flex items-center justify-between">
+                          <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 border border-blue-100 text-xs text-blue-950 flex items-center justify-between">
                             <span>Explore related desks and workflows for your role.</span>
-                            <span className="font-bold text-[#6428F5]">{rolePages.length} Desks</span>
+                            <span className="font-bold text-[#2563EB]">{rolePages.length} Desks</span>
                           </div>
 
                           <div className="space-y-2 sm:space-y-2.5">
@@ -946,7 +946,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   onClick={() => handleSelectOtherRoute(p.href)}
                                   className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 group ${
                                     isCurrent
-                                      ? "bg-[#F5F2FF] border-[#6428F5] shadow-xs"
+                                      ? "bg-[#EFF6FF] border-[#2563EB] shadow-xs"
                                       : "bg-white border-[#E2E8F0] hover:border-slate-300"
                                   }`}
                                 >
@@ -961,7 +961,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                         </span>
                                       )}
                                       {isCurrent && (
-                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#6428F5] text-white">
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#2563EB] text-white">
                                           Current
                                         </span>
                                       )}
@@ -977,7 +977,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                                   <ChevronRight
                                     className={`w-4 h-4 shrink-0 transition-transform ${
                                       isCurrent
-                                        ? "text-[#6428F5] translate-x-0.5"
+                                        ? "text-[#2563EB] translate-x-0.5"
                                         : "text-slate-300 group-hover:text-slate-600"
                                     }`}
                                   />
@@ -1013,7 +1013,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                     </span>
                     <div className="w-14 sm:w-28 h-1 sm:h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
                       <div
-                        className="h-full bg-[#6428F5] transition-all duration-300 ease-out"
+                        className="h-full bg-[#2563EB] transition-all duration-300 ease-out"
                         style={{ width: `${progressPercentage}%` }}
                       />
                     </div>
@@ -1023,7 +1023,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                   <Button
                     size="sm"
                     onClick={handleNextStep}
-                    className="h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-[#6428F5] hover:bg-[#531fd1] text-white text-[11px] sm:text-xs font-semibold shadow-xs cursor-pointer shrink-0"
+                    className="h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] sm:text-xs font-semibold shadow-xs cursor-pointer shrink-0"
                   >
                     {currentStepIndex >= totalSteps - 1 ? (
                       <>
@@ -1078,7 +1078,7 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-white p-6 text-center space-y-3">
-              <PlayCircle className="w-12 h-12 text-[#6428F5]" />
+              <PlayCircle className="w-12 h-12 text-[#2563EB]" />
               <p className="text-base font-bold">Video Walkthrough</p>
               <p className="text-xs text-slate-400 max-w-md">
                 A video tutorial is in production for this screen. Review the step-by-step cards and sample dummy values in the drawer for instant guidance.

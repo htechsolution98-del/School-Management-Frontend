@@ -291,12 +291,12 @@ export function StaffAttendanceCard({
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');`}</style>
 
       {/* ── Top Header / Live Clock Banner ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-violet-50/80 via-indigo-50/40 to-slate-50/60">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-slate-50/60">
         <div className="flex items-center gap-3">
           <GpsPulse active={checkedIn && !checkedOut} />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-600 bg-violet-100/70 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
                 {roleName} Attendance
               </span>
               {checkedIn && !checkedOut && (
@@ -321,7 +321,7 @@ export function StaffAttendanceCard({
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
               Live Time
             </p>
-            <p className="text-base sm:text-lg font-black text-violet-700 tabular-nums leading-tight">
+            <p className="text-base sm:text-lg font-black text-blue-700 tabular-nums leading-tight">
               {fmtClock(now)}
             </p>
           </div>
@@ -330,9 +330,9 @@ export function StaffAttendanceCard({
             <button
               type="button"
               onClick={() => setShowHistoryModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-violet-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
             >
-              <History className="w-3.5 h-3.5 text-violet-500" />
+              <History className="w-3.5 h-3.5 text-blue-500" />
               <span>Log</span>
               <ChevronRight className="w-3 h-3 text-slate-400" />
             </button>
@@ -378,16 +378,16 @@ export function StaffAttendanceCard({
               style={
                 justDone === "in"
                   ? { background: "#f0fdf4", borderColor: "#bbf7d0" }
-                  : { background: "#f5f3ff", borderColor: "#ddd6fe" }
+                  : { background: "#eff6ff", borderColor: "#bfdbfe" }
               }
             >
               <CheckCircle2
                 className="w-4 h-4 shrink-0"
-                style={{ color: justDone === "in" ? "#22c55e" : "#7c3aed" }}
+                style={{ color: justDone === "in" ? "#22c55e" : "#2563eb" }}
               />
               <p
                 className="text-xs font-bold"
-                style={{ color: justDone === "in" ? "#15803d" : "#5b21b6" }}
+                style={{ color: justDone === "in" ? "#15803d" : "#1d4ed8" }}
               >
                 {justDone === "in"
                   ? "Check-in recorded successfully!"
@@ -483,17 +483,17 @@ export function StaffAttendanceCard({
             <div className="flex items-center gap-2">
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: checkedOut ? "#ede9fe" : "#f1f5f9" }}
+                style={{ background: checkedOut ? "#eff6ff" : "#f1f5f9" }}
               >
                 <LogOut
                   className="w-3.5 h-3.5"
-                  style={{ color: checkedOut ? "#7c3aed" : "#94a3b8" }}
+                  style={{ color: checkedOut ? "#2563eb" : "#94a3b8" }}
                 />
               </div>
               <div>
                 <p
                   className="text-xs font-extrabold"
-                  style={{ color: checkedOut ? "#7c3aed" : "#64748b" }}
+                  style={{ color: checkedOut ? "#2563eb" : "#64748b" }}
                 >
                   Check Out
                 </p>
@@ -504,7 +504,7 @@ export function StaffAttendanceCard({
               className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={
                 checkedOut
-                  ? { background: "#ede9fe", color: "#4c1d95" }
+                  ? { background: "#eff6ff", color: "#1d4ed8" }
                   : checkedIn
                   ? { background: "#fff7ed", color: "#9a3412" }
                   : { background: "#f8fafc", color: "#94a3b8" }
@@ -514,7 +514,7 @@ export function StaffAttendanceCard({
                 className="w-1.5 h-1.5 rounded-full"
                 style={{
                   background: checkedOut
-                    ? "#7c3aed"
+                    ? "#2563eb"
                     : checkedIn
                     ? "#f97316"
                     : "#cbd5e1",
@@ -541,7 +541,7 @@ export function StaffAttendanceCard({
               whileTap={{ scale: 0.97 }}
               onClick={() => handleAction("out")}
               disabled={actionLoading !== null || pageLoading}
-              className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md disabled:opacity-60 bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
+              className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md disabled:opacity-60 bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
             >
               {actionLoading === "out" ? (
                 <>
@@ -555,7 +555,7 @@ export function StaffAttendanceCard({
               )}
             </motion.button>
           ) : checkedOut ? (
-            <div className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-violet-50 text-violet-700 border border-violet-200">
+            <div className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200">
               <CheckCircle2 className="w-3.5 h-3.5" /> Checked Out
             </div>
           ) : (
@@ -569,8 +569,8 @@ export function StaffAttendanceCard({
       {/* ── Bottom Information Bar ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 sm:divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/70 text-xs">
         <div className="flex items-center gap-2.5 px-4 py-2.5">
-          <div className="w-6 h-6 rounded-md bg-violet-100/70 flex items-center justify-center shrink-0">
-            <School className="w-3.5 h-3.5 text-violet-600" />
+          <div className="w-6 h-6 rounded-md bg-blue-100/70 flex items-center justify-center shrink-0">
+            <School className="w-3.5 h-3.5 text-blue-600" />
           </div>
           <div className="min-w-0">
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">

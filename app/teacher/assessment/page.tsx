@@ -66,10 +66,10 @@ interface SubjectItem {
 // ─── Visual Helpers ──────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-  "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+  "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
   "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+  "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
   "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
 ];
@@ -115,14 +115,14 @@ function getSubjectVisual(subjectName: string) {
   if (name.includes("hin") || name.includes("mar") || name.includes("guj")) {
     return {
       icon: BookOpen,
-      badgeColor: "bg-purple-50 text-[#5c28e8] border-purple-200",
-      iconBg: "bg-purple-50 text-[#5c28e8] border-purple-100",
+      badgeColor: "bg-orange-50 text-orange-700 border-orange-200",
+      iconBg: "bg-orange-50 text-orange-600 border-orange-100",
     };
   }
   return {
     icon: FileText,
-    badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    iconBg: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
+    iconBg: "bg-sky-50 text-sky-600 border-sky-100",
   };
 }
 
@@ -509,7 +509,7 @@ export default function TeacherAssessmentPage() {
 
               {step === "CLASS" ? (
                 myClasses.length > 0 ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-[#5c28e8] border border-purple-200 shrink-0">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200 shrink-0">
                     Class Teacher Mode
                   </span>
                 ) : (
@@ -518,7 +518,7 @@ export default function TeacherAssessmentPage() {
                   </span>
                 )
               ) : selectedClass?.is_class_teacher ? (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#5c28e8] border border-purple-200 shrink-0 flex items-center gap-1">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2563EB] border border-blue-200 shrink-0 flex items-center gap-1">
                   <Sparkles className="w-2.5 h-2.5" /> Class Teacher
                 </span>
               ) : (
@@ -553,7 +553,7 @@ export default function TeacherAssessmentPage() {
                     }
                   }
                 }}
-                className="text-[11px] font-bold text-[#5c28e8] bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl px-2.5 py-1 focus:outline-none cursor-pointer"
+                className="text-[11px] font-bold text-[#2563EB] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl px-2.5 py-1 focus:outline-none cursor-pointer"
               >
                 {academicYears.map((y) => (
                   <option key={y.id} value={y.id}>
@@ -563,7 +563,7 @@ export default function TeacherAssessmentPage() {
               </select>
             </div>
           ) : selectedYear ? (
-            <span className="text-[11px] font-bold text-[#5c28e8] bg-purple-50 border border-purple-200 rounded-xl px-2.5 py-1 flex items-center gap-1">
+            <span className="text-[11px] font-bold text-[#2563EB] bg-blue-50 border border-blue-200 rounded-xl px-2.5 py-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               <span>{selectedYear.name}</span>
             </span>
@@ -571,7 +571,7 @@ export default function TeacherAssessmentPage() {
 
           {/* Step Counter */}
           <div className="hidden sm:flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
-            <span className="text-[#5c28e8]">
+            <span className="text-[#2563EB]">
               {step === "CLASS" && "1"}
               {step === "SUBJECT" && "2"}
               {step === "ENTRY" && "3"}
@@ -585,7 +585,7 @@ export default function TeacherAssessmentPage() {
 
       {/* ── Loader ── */}
       {isLoading && step !== "ENTRY" ? (
-        <div className="flex flex-col items-center justify-center py-20 text-[#5c28e8]">
+        <div className="flex flex-col items-center justify-center py-20 text-[#2563EB]">
           <Loader2 className="h-8 w-8 animate-spin mb-3" />
           <p className="text-sm text-slate-500 font-medium">Loading assessment details...</p>
         </div>
@@ -603,15 +603,15 @@ export default function TeacherAssessmentPage() {
                     className={cn(
                       "group cursor-pointer hover:shadow-md transition-all rounded-2xl border bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden",
                       selectedYear?.id === year.id
-                        ? "border-[#5c28e8] ring-2 ring-purple-500/20"
-                        : "border-gray-200 hover:border-purple-300"
+                        ? "border-[#2563EB] ring-2 ring-blue-500/20"
+                        : "border-gray-200 hover:border-blue-300"
                     )}
                     onClick={() => handleYearSelect(year)}
                   >
                     <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5c28e8]">
-                          <Calendar className="h-5 w-5 text-[#5c28e8]" />
+                        <div className="h-11 w-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB]">
+                          <Calendar className="h-5 w-5 text-[#2563EB]" />
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
@@ -625,7 +625,7 @@ export default function TeacherAssessmentPage() {
                           <p className="text-xs text-slate-400 mt-0.5">Click to view class assessments</p>
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                     </CardContent>
                   </Card>
                 ))}
@@ -648,7 +648,7 @@ export default function TeacherAssessmentPage() {
                     placeholder="Search class, division, or subject..."
                     value={classSearchQuery}
                     onChange={(e) => setClassSearchQuery(e.target.value)}
-                    className="w-full h-10 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#5c28e8] transition-all"
+                    className="w-full h-10 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2563EB] transition-all"
                   />
                   {classSearchQuery && (
                     <button
@@ -669,7 +669,7 @@ export default function TeacherAssessmentPage() {
                     className={cn(
                       "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
                       classFilterTab === "ALL"
-                        ? "bg-[#5c28e8] text-white shadow-xs"
+                        ? "bg-[#2563EB] text-white shadow-xs"
                         : "bg-slate-100 hover:bg-slate-200 text-slate-600"
                     )}
                   >
@@ -686,13 +686,13 @@ export default function TeacherAssessmentPage() {
                       className={cn(
                         "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
                         classFilterTab === "MY_CLASS"
-                          ? "bg-[#5c28e8] text-white shadow-xs"
-                          : "bg-purple-50 hover:bg-purple-100 text-[#5c28e8] border border-purple-200/60"
+                          ? "bg-[#2563EB] text-white shadow-xs"
+                          : "bg-blue-50 hover:bg-blue-100 text-[#2563EB] border border-blue-200/60"
                       )}
                     >
                       <Sparkles className="w-3 h-3" />
                       <span>My Class</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-200/60 text-[#5c28e8]">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200/60 text-[#2563EB]">
                         {filteredMyClasses.length}
                       </span>
                     </button>
@@ -705,7 +705,7 @@ export default function TeacherAssessmentPage() {
                       className={cn(
                         "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
                         classFilterTab === "OTHER_CLASSES"
-                          ? "bg-[#5c28e8] text-white shadow-xs"
+                          ? "bg-[#2563EB] text-white shadow-xs"
                           : "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/60"
                       )}
                     >
@@ -724,12 +724,12 @@ export default function TeacherAssessmentPage() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-[#5c28e8]" />
+                      <div className="w-2 h-2 rounded-full bg-[#2563EB]" />
                       <h2 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-zinc-100 uppercase tracking-wider">
                         My Class
                       </h2>
                     </div>
-                    <span className="text-[11px] font-semibold text-[#5c28e8] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                    <span className="text-[11px] font-semibold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                       Class Teacher
                     </span>
                   </div>
@@ -738,24 +738,24 @@ export default function TeacherAssessmentPage() {
                     {filteredMyClasses.map((cls, idx) => (
                       <Card
                         key={`my-class-${idx}`}
-                        className="cursor-pointer border-2 border-purple-300/80 hover:border-[#5c28e8] hover:shadow-md transition-all group rounded-2xl shadow-xs bg-linear-to-br from-white via-purple-50/20 to-white dark:from-zinc-900 dark:to-zinc-900 overflow-hidden"
+                        className="cursor-pointer border-2 border-blue-300/80 hover:border-[#2563EB] hover:shadow-md transition-all group rounded-2xl shadow-xs bg-linear-to-br from-white via-blue-50/20 to-white dark:from-zinc-900 dark:to-zinc-900 overflow-hidden"
                         onClick={() => handleClassSelect(cls)}
                       >
                         <CardContent className="p-4 flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-11 w-11 rounded-xl bg-purple-100/80 border border-purple-200 flex items-center justify-center text-[#5c28e8] shrink-0">
-                              <GraduationCap className="h-5 w-5 text-[#5c28e8]" />
+                            <div className="h-11 w-11 rounded-xl bg-blue-100/80 border border-blue-200 flex items-center justify-center text-[#2563EB] shrink-0">
+                              <GraduationCap className="h-5 w-5 text-[#2563EB]" />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <h3 className="font-extrabold text-slate-900 text-sm truncate">
                                   {cls.class_name}
                                 </h3>
-                                <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-md bg-purple-100 text-[#5c28e8]">
+                                <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-md bg-blue-100 text-[#2563EB]">
                                   Div {cls.division_name || "A"}
                                 </span>
                               </div>
-                              <p className="text-xs text-purple-700 font-semibold mt-0.5 flex items-center gap-1">
+                              <p className="text-xs text-blue-700 font-semibold mt-0.5 flex items-center gap-1">
                                 <Sparkles className="w-3 h-3" /> Class Teacher Authority
                               </p>
                               <p className="text-[10px] text-slate-400 font-medium mt-0.5">
@@ -763,7 +763,7 @@ export default function TeacherAssessmentPage() {
                               </p>
                             </div>
                           </div>
-                          <ChevronRight className="h-5 w-5 text-purple-400 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                          <ChevronRight className="h-5 w-5 text-blue-400 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                         </CardContent>
                       </Card>
                     ))}
@@ -844,9 +844,9 @@ export default function TeacherAssessmentPage() {
             <div className="space-y-3.5">
               {/* Class Teacher Banner */}
               {selectedClass?.is_class_teacher && (
-                <div className="bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white dark:from-purple-950/20 dark:via-zinc-900 dark:to-zinc-900 p-3.5 sm:p-4 rounded-2xl border border-purple-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="bg-gradient-to-r from-blue-50 via-sky-50/50 to-white dark:from-blue-950/20 dark:via-zinc-900 dark:to-zinc-900 p-3.5 sm:p-4 rounded-2xl border border-blue-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-[#5c28e8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <div className="w-9 h-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
@@ -854,7 +854,7 @@ export default function TeacherAssessmentPage() {
                         <p className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-zinc-100">
                           Class Teacher Dashboard
                         </p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#5c28e8] border border-purple-200">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2563EB] border border-blue-200">
                           My Class
                         </span>
                       </div>
@@ -865,7 +865,7 @@ export default function TeacherAssessmentPage() {
                   </div>
                   <a
                     href="/teacher/verify-marks"
-                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl text-xs font-bold transition-all shadow-xs self-start sm:self-auto"
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-bold transition-all shadow-xs self-start sm:self-auto"
                   >
                     <span>View Class Grid</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -882,7 +882,7 @@ export default function TeacherAssessmentPage() {
                     placeholder="Search subject..."
                     value={subjectSearch}
                     onChange={(e) => setSubjectSearch(e.target.value)}
-                    className="w-full h-9 pl-9 pr-7 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5c28e8]"
+                    className="w-full h-9 pl-9 pr-7 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2563EB]"
                   />
                   {subjectSearch && (
                     <button
@@ -905,7 +905,7 @@ export default function TeacherAssessmentPage() {
                   return (
                     <Card
                       key={`sub-${idx}`}
-                      className="cursor-pointer border transition-all rounded-2xl shadow-2xs group overflow-hidden bg-white hover:border-[#5c28e8] hover:shadow-md"
+                      className="cursor-pointer border transition-all rounded-2xl shadow-2xs group overflow-hidden bg-white hover:border-[#2563EB] hover:shadow-md"
                       onClick={() => handleSubjectSelect(sub)}
                     >
                       <CardContent className="p-3.5 sm:p-4 flex items-center justify-between gap-3">
@@ -927,7 +927,7 @@ export default function TeacherAssessmentPage() {
                             </div>
                           </div>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#5c28e8] group-hover:translate-x-0.5 transition-all shrink-0" />
+                        <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all shrink-0" />
                       </CardContent>
                     </Card>
                   );
@@ -947,7 +947,7 @@ export default function TeacherAssessmentPage() {
                     {selectedClass?.is_class_teacher && (
                       <a
                         href="/teacher/verify-marks"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#5c28e8] text-white rounded-xl text-xs font-bold hover:bg-[#4d20cb] shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2563EB] text-white rounded-xl text-xs font-bold hover:bg-[#1D4ED8] shadow-xs"
                       >
                         <span>Go to Verify Marks</span>
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -969,7 +969,7 @@ export default function TeacherAssessmentPage() {
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap text-xs">
                     <span className="font-bold text-slate-700">Scored Progress:</span>
-                    <span className="font-extrabold text-[#5c28e8]">
+                    <span className="font-extrabold text-[#2563EB]">
                       {stats.scored} / {stats.total}
                     </span>
                     <span className="text-slate-400">({stats.pct}%)</span>
@@ -999,7 +999,7 @@ export default function TeacherAssessmentPage() {
                 {/* Progress bar */}
                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-[#5c28e8] to-[#22c55e] transition-all duration-300 rounded-full"
+                    className="h-full bg-gradient-to-r from-[#2563EB] to-[#22c55e] transition-all duration-300 rounded-full"
                     style={{ width: `${stats.pct}%` }}
                   />
                 </div>
@@ -1008,7 +1008,7 @@ export default function TeacherAssessmentPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <Sliders className="w-3.5 h-3.5 text-[#5c28e8]" />
+                      <Sliders className="w-3.5 h-3.5 text-[#2563EB]" />
                       Max Score:
                     </span>
 
@@ -1022,7 +1022,7 @@ export default function TeacherAssessmentPage() {
                           className={cn(
                             "px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer",
                             globalMaxScore === preset
-                              ? "bg-[#5c28e8] text-white shadow-xs"
+                              ? "bg-[#2563EB] text-white shadow-xs"
                               : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                           )}
                         >
@@ -1038,7 +1038,7 @@ export default function TeacherAssessmentPage() {
                       max="1000"
                       value={globalMaxScore}
                       onChange={(e) => handleGlobalMaxScoreChange(e.target.value)}
-                      className="w-14 h-7 text-center font-extrabold text-xs rounded-lg bg-slate-50 border border-slate-200 text-[#5c28e8] focus:bg-white focus:outline-none focus:border-[#5c28e8]"
+                      className="w-14 h-7 text-center font-extrabold text-xs rounded-lg bg-slate-50 border border-slate-200 text-[#2563EB] focus:bg-white focus:outline-none focus:border-[#2563EB]"
                     />
                   </div>
 
@@ -1057,7 +1057,7 @@ export default function TeacherAssessmentPage() {
                       placeholder="Search student by name, roll no, GR..."
                       value={studentSearchQuery}
                       onChange={(e) => setStudentSearchQuery(e.target.value)}
-                      className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#5c28e8]"
+                      className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2563EB]"
                     />
                     {studentSearchQuery && (
                       <button
@@ -1078,7 +1078,7 @@ export default function TeacherAssessmentPage() {
                       className={cn(
                         "px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer",
                         studentFilter === "ALL"
-                          ? "bg-[#5c28e8] text-white"
+                          ? "bg-[#2563EB] text-white"
                           : "bg-slate-100 hover:bg-slate-200 text-slate-600"
                       )}
                     >
@@ -1178,7 +1178,7 @@ export default function TeacherAssessmentPage() {
                             disabled={isInputDisabled}
                             value={st.score}
                             onChange={(e) => handleScoreChange(st.student_id, "score", e.target.value)}
-                            className="w-16 h-10 text-center text-base font-extrabold rounded-xl bg-slate-50 border border-slate-200 text-[#5c28e8] focus:bg-white focus:border-[#5c28e8] focus:outline-none disabled:opacity-50 disabled:bg-slate-100"
+                            className="w-16 h-10 text-center text-base font-extrabold rounded-xl bg-slate-50 border border-slate-200 text-[#2563EB] focus:bg-white focus:border-[#2563EB] focus:outline-none disabled:opacity-50 disabled:bg-slate-100"
                           />
                           <span className="text-xs font-semibold text-slate-400">/ {maxVal}</span>
                         </div>
@@ -1191,7 +1191,7 @@ export default function TeacherAssessmentPage() {
                             disabled={isInputDisabled}
                             value={st.remarks || ""}
                             onChange={(e) => handleScoreChange(st.student_id, "remarks", e.target.value)}
-                            className="w-full h-9 px-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#5c28e8] disabled:opacity-50"
+                            className="w-full h-9 px-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2563EB] disabled:opacity-50"
                           />
                         </div>
                       </div>
@@ -1252,7 +1252,7 @@ export default function TeacherAssessmentPage() {
                             <TableCell className="text-center font-mono text-xs text-slate-400">
                               {idx + 1}
                             </TableCell>
-                            <TableCell className="text-xs font-mono font-bold text-[#5c28e8]">
+                            <TableCell className="text-xs font-mono font-bold text-[#2563EB]">
                               {st.roll_no || "—"}
                             </TableCell>
                             <TableCell className="text-xs font-mono text-slate-500">
@@ -1281,7 +1281,7 @@ export default function TeacherAssessmentPage() {
                                 disabled={isInputDisabled}
                                 value={st.score}
                                 onChange={(e) => handleScoreChange(st.student_id, "score", e.target.value)}
-                                className="h-8.5 text-center font-extrabold text-xs bg-slate-50 focus:bg-white text-[#5c28e8] rounded-xl border-gray-200 w-24 mx-auto disabled:opacity-50"
+                                className="h-8.5 text-center font-extrabold text-xs bg-slate-50 focus:bg-white text-[#2563EB] rounded-xl border-gray-200 w-24 mx-auto disabled:opacity-50"
                               />
                             </TableCell>
                             <TableCell className="text-center">
@@ -1314,7 +1314,7 @@ export default function TeacherAssessmentPage() {
               <div className="sticky bottom-16 lg:bottom-4 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3 rounded-2xl border border-gray-200 shadow-lg flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-bold text-slate-800">Scored:</span>
-                  <span className="font-extrabold text-[#5c28e8]">
+                  <span className="font-extrabold text-[#2563EB]">
                     {stats.scored} / {stats.total}
                   </span>
                   <span className="text-slate-400">({stats.pct}%)</span>
@@ -1334,7 +1334,7 @@ export default function TeacherAssessmentPage() {
                   <Button
                     onClick={handleSaveScores}
                     disabled={isSaving || studentRows.length === 0}
-                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-4 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20"
+                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-blue-500/20"
                   >
                     {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     <span>{hasExistingScores ? "Update Scores" : "Save Assessments"}</span>

@@ -261,10 +261,10 @@ export function
 
   const getBadgeColor = (title: string, index: number) => {
     const lower = title.toLowerCase().trim();
-    if (lower === "dashboard") return "bg-indigo-500 text-white";
+    if (lower === "dashboard") return "bg-blue-600 text-white";
     if (lower.includes("academic year")) return "bg-[#3b82f6] text-white";
-    if (lower.includes("result dashboard")) return "bg-[#6366f1] text-white";
-    if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#8b5cf6] text-white";
+    if (lower.includes("result dashboard")) return "bg-[#0284c7] text-white";
+    if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#2563eb] text-white";
 
     // Exam Management
     if (lower === "exam management") return "bg-[#ec4899] text-white";
@@ -282,7 +282,7 @@ export function
     // Result Processing
     if (lower === "result processing") return "bg-[#e11d48] text-white";
     if (lower.includes("result preview")) return "bg-[#3b82f6] text-white";
-    if (lower.includes("result verification")) return "bg-[#a855f7] text-white";
+    if (lower.includes("result verification")) return "bg-[#0284c7] text-white";
     if (lower.includes("result publish") || lower === "result publish") return "bg-[#06b6d4] text-white";
     if (lower.includes("published result") || lower.includes("progress report")) return "bg-[#f59e0b] text-white";
 
@@ -293,21 +293,21 @@ export function
     if (lower.includes("hr") || lower.includes("staff") || lower.includes("department")) return "bg-[#06b6d4] text-white";
     if (lower.includes("admission") || lower.includes("applicant") || lower.includes("student directory") || lower.includes("students")) return "bg-[#f43f5e] text-white";
     if (lower.includes("fee type")) return "bg-[#ec4899] text-white";
-    if (lower.includes("fee structure")) return "bg-[#8b5cf6] text-white";
+    if (lower.includes("fee structure")) return "bg-[#2563eb] text-white";
     if (lower.includes("generate fee") || lower.includes("genrate fee")) return "bg-[#10b981] text-white";
     if (lower.includes("student ledger") || lower.includes("ledger") || lower.includes("receipt")) return "bg-[#f97316] text-white";
-    if (lower.includes("division")) return "bg-[#818cf8] text-white";
+    if (lower.includes("division")) return "bg-[#0284c7] text-white";
     if (lower.includes("categorie")) return "bg-[#fbbf24] text-white";
     if (lower.includes("school") || lower.includes("class") || lower.includes("profile")) return "bg-[#38bdf8] text-white";
     if (lower.includes("attendance")) return "bg-[#22c55e] text-white";
-    if (lower.includes("curriculum") || lower.includes("subject") || lower.includes("syllabus")) return "bg-[#818cf8] text-white";
+    if (lower.includes("curriculum") || lower.includes("subject") || lower.includes("syllabus")) return "bg-[#0284c7] text-white";
     if (lower.includes("teacher") || lower.includes("faculty") || lower.includes("workload")) return "bg-[#f97316] text-white";
     if (lower.includes("timetable") || lower.includes("schedule")) return "bg-[#06b6d4] text-white";
     if (lower.includes("announcement") || lower.includes("notice")) return "bg-[#ec4899] text-white";
     if (lower.includes("leave request")) return "bg-[#84cc16] text-white";
     if (lower.includes("my leave") || lower.includes("leave")) return "bg-[#fb7185] text-white";
     if (lower.includes("fee") || lower.includes("payment")) return "bg-[#10b981] text-white";
-    if (lower.includes("inventory") || lower.includes("stock") || lower.includes("asset")) return "bg-[#a855f7] text-white";
+    if (lower.includes("inventory") || lower.includes("stock") || lower.includes("asset")) return "bg-[#0284c7] text-white";
     if (lower.includes("librar") || lower.includes("book")) return "bg-[#eab308] text-white";
     if (lower.includes("exam") || lower.includes("result") || lower.includes("mark")) return "bg-[#e11d48] text-white";
     if (lower.includes("homework") || lower.includes("assignment")) return "bg-[#06b6d4] text-white";
@@ -318,12 +318,12 @@ export function
       "bg-[#10b981] text-white", // Emerald
       "bg-[#f97316] text-white", // Orange
       "bg-[#f43f5e] text-white", // Rose
-      "bg-[#8b5cf6] text-white", // Purple
+      "bg-[#2563eb] text-white", // Blue
       "bg-[#38bdf8] text-white", // Sky
       "bg-[#fbbf24] text-white", // Amber
       "bg-[#22c55e] text-white", // Green
       "bg-[#ec4899] text-white", // Pink
-      "bg-[#6366f1] text-white", // Indigo
+      "bg-[#0284c7] text-white", // Light Blue
     ];
     return palette[index % palette.length];
   };
@@ -337,9 +337,9 @@ export function
     const base = `group flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 ${compact ? "justify-center px-0" : "gap-3 px-3.5"
       }`;
 
-    // Active item has white card style with deep indigo text
+    // Active item has white card style with deep blue text
     const tone = selected
-      ? "bg-white text-indigo-950 font-bold shadow-md shadow-indigo-950/20"
+      ? "bg-white text-blue-950 font-bold shadow-md shadow-blue-950/20"
       : "text-white/85 hover:bg-white/10 hover:text-white";
 
     if (link.subLinks?.length) {
@@ -347,7 +347,7 @@ export function
       const childClasses = (active: boolean) =>
         `flex min-h-9 items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium leading-5 transition-all ${active
           ? "bg-white/20 text-white font-bold shadow-2xs backdrop-blur-xs"
-          : "text-purple-100/80 hover:bg-white/10 hover:text-white"
+          : "text-blue-100/80 hover:bg-white/10 hover:text-white"
         }`;
 
       return (
@@ -450,14 +450,14 @@ export function
         {!compact && (
           <div className="min-w-0">
             <p className="truncate text-base font-bold tracking-tight text-white drop-shadow-xs">VidyaSanchalan</p>
-            <p className="truncate text-xs text-purple-200/90 font-medium">{subtitle}</p>
+            <p className="truncate text-xs text-blue-200/90 font-medium">{subtitle}</p>
           </div>
         )}
       </div>
 
       {/* Section Label */}
       {!compact && (
-        <p className="px-6 pb-2 pt-6 text-[11px] font-bold uppercase tracking-widest text-purple-200/60">
+        <p className="px-6 pb-2 pt-6 text-[11px] font-bold uppercase tracking-widest text-blue-200/60">
           WORKSPACE
         </p>
       )}
@@ -475,7 +475,7 @@ export function
           disabled={signingOut}
           title={compact ? (signingOut ? "Signing out…" : "Sign out") : undefined}
           aria-label="Sign out"
-          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-purple-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3.5"
+          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-blue-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3.5"
             }`}
         >
           {signingOut ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
@@ -494,8 +494,8 @@ export function
 
   if (requiresRoleCheck && authorizedPath !== pathname) {
     return (
-      <div className="flex h-svh items-center justify-center bg-[#f4f6fb] text-indigo-900 font-semibold">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-indigo-600" /> Checking access…
+      <div className="flex h-svh items-center justify-center bg-[#f4f6fb] text-slate-900 font-semibold">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin text-blue-600" /> Checking access…
       </div>
     );
   }
@@ -571,11 +571,11 @@ export function
         animate={{ width: sidebarWidth }}
         initial={false}
         transition={{ duration: reducedMotion || resizing ? 0 : 0.15 }}
-        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#5436F5] via-[#4527D6] to-[#392BC9] shadow-xl lg:flex overflow-hidden"
+        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#1E40AF] via-[#1D4ED8] to-[#172554] shadow-xl lg:flex overflow-hidden"
       >
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute bottom-0 -right-24 h-56 w-56 rounded-full bg-indigo-900/40 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 -right-24 h-56 w-56 rounded-full bg-blue-900/40 blur-3xl" />
 
         <div className="flex h-full min-w-0 flex-col overflow-hidden relative z-10">
           {navigation(!expanded)}
@@ -615,8 +615,8 @@ export function
 
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
-        {/* Top Header Bar: Purple gradient on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#4A32E8] via-[#523CEE] to-[#5C3EF2] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(74,50,232,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none z-20">
+        {/* Top Header Bar: Royal Blue gradient on mobile, clean surface on desktop */}
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#1E40AF]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(30,64,175,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none z-20">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
               <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -651,9 +651,9 @@ export function
               {notificationsOpen && (
                 <div className="absolute right-0 z-30 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl">
                   <p className="flex items-center gap-2 border-b border-slate-100 p-4 text-sm font-semibold text-slate-900">
-                    <Bell className="h-4 w-4 text-[#5436F5]" />
+                    <Bell className="h-4 w-4 text-[#2563EB]" />
                     Notifications
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-[#5436F5]">
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
                       {unreadCount > 0 ? unreadCount : 3} new
                     </span>
                   </p>
@@ -669,11 +669,11 @@ export function
                               setSelectedNotification(notification);
                               markAsRead(notification.id);
                             }}
-                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${isRead ? "" : "bg-indigo-50/40"
+                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${isRead ? "" : "bg-blue-50/40"
                               }`}
                           >
                             <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5436F5]"
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRead ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-[#2563EB]"
                                 }`}
                             >
                               <Megaphone className="h-4 w-4" />
@@ -686,7 +686,7 @@ export function
                                 >
                                   {notification.title}
                                 </span>
-                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#5436F5]" />}
+                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563EB]" />}
                               </span>
                               <span className="mt-0.5 block line-clamp-2 text-xs text-slate-500">
                                 {notification.description}
@@ -724,7 +724,7 @@ export function
               title="View my profile"
               className="flex items-center gap-2 pl-1 text-left transition-opacity hover:opacity-90 focus-visible:outline-none cursor-pointer"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6351F7] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#5436F5]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1D4ED8] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#2563EB]">
                 {userInitials || "TE"}
               </span>
               <div className="text-left flex items-center gap-1">
@@ -786,9 +786,9 @@ export function
                 >
                   {isActive ? (
                     <div className="flex flex-col items-center">
-                      <div className="px-4 py-1.5 rounded-2xl bg-gradient-to-b from-[#ECE8FE] to-[#DED4FD] border border-[#DDD6FE]/70 shadow-xs flex flex-col items-center">
-                        <Icon className="w-4 h-4 text-[#4D35FE]" />
-                        <span className="text-[9.5px] font-bold text-[#4D35FE] mt-0.5 leading-none">
+                      <div className="px-4 py-1.5 rounded-2xl bg-gradient-to-b from-blue-50 to-blue-100 border border-blue-200/80 shadow-xs flex flex-col items-center">
+                        <Icon className="w-4 h-4 text-[#2563EB]" />
+                        <span className="text-[9.5px] font-bold text-[#2563EB] mt-0.5 leading-none">
                           {item.title}
                         </span>
                       </div>
@@ -837,7 +837,7 @@ export function
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="relative flex w-[280px] max-w-[85vw] flex-col bg-gradient-to-b from-[#4f46e5] via-[#4338ca] to-[#312e81] shadow-2xl z-10 overflow-hidden"
+              className="relative flex w-[280px] max-w-[85vw] flex-col bg-gradient-to-b from-[#1E40AF] via-[#1D4ED8] to-[#172554] shadow-2xl z-10 overflow-hidden"
             >
               {navigation(false, () => setMobileOpen(false))}
             </motion.aside>
@@ -859,7 +859,7 @@ export function
             >
               <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-900">
-                  <Megaphone className="h-5 w-5 text-[#5826df]" />
+                  <Megaphone className="h-5 w-5 text-[#2563EB]" />
                   Announcement Detail
                 </h3>
                 <button onClick={() => setSelectedNotification(null)} className="rounded-xl p-1.5 text-slate-500 transition-colors hover:bg-slate-100" aria-label="Close announcement">
@@ -894,7 +894,7 @@ export function
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Target Audience</h4>
-                    <span className="mt-1.5 inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-[#5826df]">
+                    <span className="mt-1.5 inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
                       {selectedNotification.announcement_for ?? "ALL"}
                     </span>
                   </div>
@@ -931,7 +931,7 @@ export function
                 <button
                   type="button"
                   onClick={() => setSelectedNotification(null)}
-                  className="rounded-xl bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white shadow-md shadow-[#5826df]/25 px-6 py-2.5 text-xs font-bold transition-all active:scale-[0.98]"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md shadow-blue-500/25 px-6 py-2.5 text-xs font-bold transition-all active:scale-[0.98]"
                 >
                   Close Notice
                 </button>

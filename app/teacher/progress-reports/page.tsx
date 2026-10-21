@@ -37,10 +37,10 @@ import { cn } from "@/lib/utils";
 // ─── Visual Helpers ──────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
   "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
   "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+  "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
   "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
 ];
@@ -276,7 +276,7 @@ function ClassicReportCardModal({
             <Button
               size="sm"
               onClick={handlePrint}
-              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md cursor-pointer"
+              className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Print / PDF</span>
@@ -961,7 +961,7 @@ export default function ProgressReportsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3.5 sm:p-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
           <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-            <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#5c28e8]" />
+            <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#2563EB]" />
             Monthly Student Progress Reports
           </h1>
           <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
@@ -970,13 +970,13 @@ export default function ProgressReportsPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-          <Badge className="bg-purple-50 text-[#5c28e8] border border-purple-200 font-bold px-2.5 py-1 text-xs shrink-0">
+          <Badge className="bg-blue-50 text-[#2563EB] border border-blue-200 font-bold px-2.5 py-1 text-xs shrink-0">
             {students.length} Students
           </Badge>
           <Button
             onClick={handlePublishAll}
             disabled={students.length === 0}
-            className="h-8 sm:h-9 text-xs font-bold rounded-xl gap-1.5 bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-xs cursor-pointer shrink-0"
+            className="h-8 sm:h-9 text-xs font-bold rounded-xl gap-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs cursor-pointer shrink-0"
           >
             <Send className="h-3.5 w-3.5" /> Publish All for {selectedMonthYear}
           </Button>
@@ -989,13 +989,13 @@ export default function ProgressReportsPage() {
           {/* Class & Division Selector */}
           <div className="space-y-1">
             <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-[#5c28e8]" />
+              <Users className="h-3.5 w-3.5 text-[#2563EB]" />
               Class & Division
             </label>
             <select
               value={selectedDivisionId}
               onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
-              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
             >
               {divisionList.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -1008,13 +1008,13 @@ export default function ProgressReportsPage() {
           {/* Exam Report Month Selector (Dynamic from exams) */}
           <div className="space-y-1">
             <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-[#5c28e8]" />
+              <Calendar className="h-3.5 w-3.5 text-[#2563EB]" />
               Exam Month & Term
             </label>
             <select
               value={selectedMonthYear}
               onChange={(e) => setSelectedMonthYear(e.target.value)}
-              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+              className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
             >
               {availableMonths.map((m) => (
                 <option key={m} value={m}>
@@ -1046,7 +1046,7 @@ export default function ProgressReportsPage() {
         <div className="p-3 sm:p-4 border-b dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <History className="h-4 w-4 text-[#5c28e8]" />
+              <History className="h-4 w-4 text-[#2563EB]" />
               {selectedMonthYear} Progress Reports Roster
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
@@ -1063,7 +1063,7 @@ export default function ProgressReportsPage() {
                 placeholder="Search student or GR..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-2.5 h-8 text-xs rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 focus:bg-white focus:outline-none focus:border-[#5c28e8]"
+                className="w-full pl-8 pr-2.5 h-8 text-xs rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 focus:bg-white focus:outline-none focus:border-[#2563EB]"
               />
             </div>
 
@@ -1074,7 +1074,7 @@ export default function ProgressReportsPage() {
                 onClick={() => setMobileViewMode("cards")}
                 className={cn(
                   "p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  mobileViewMode === "cards" ? "bg-white dark:bg-zinc-900 text-[#5c28e8] shadow-xs" : "text-slate-500"
+                  mobileViewMode === "cards" ? "bg-white dark:bg-zinc-900 text-[#2563EB] shadow-xs" : "text-slate-500"
                 )}
                 aria-label="Cards view"
               >
@@ -1085,7 +1085,7 @@ export default function ProgressReportsPage() {
                 onClick={() => setMobileViewMode("table")}
                 className={cn(
                   "p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  mobileViewMode === "table" ? "bg-white dark:bg-zinc-900 text-[#5c28e8] shadow-xs" : "text-slate-500"
+                  mobileViewMode === "table" ? "bg-white dark:bg-zinc-900 text-[#2563EB] shadow-xs" : "text-slate-500"
                 )}
                 aria-label="Table view"
               >
@@ -1098,7 +1098,7 @@ export default function ProgressReportsPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-12 text-center flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
-              <Loader2 className="h-6 w-6 animate-spin text-[#5c28e8]" />
+              <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
               <span>Loading student roster and academic records for {selectedMonthYear}...</span>
             </div>
           ) : filteredStudents.length === 0 ? (
@@ -1174,7 +1174,7 @@ export default function ProgressReportsPage() {
                             className={cn(
                               "font-bold text-[10px] px-2 py-0.5 gap-1",
                               isEvaluated
-                                ? "bg-purple-50 text-[#5c28e8] border border-purple-200"
+                                ? "bg-blue-50 text-[#2563EB] border border-blue-200"
                                 : "bg-amber-50 text-amber-700 border border-amber-200"
                             )}
                           >
@@ -1223,7 +1223,7 @@ export default function ProgressReportsPage() {
                             className={cn(
                               "h-8.5 text-xs font-bold rounded-xl gap-1.5 shadow-2xs cursor-pointer",
                               isEvaluated
-                                ? "bg-[#5c28e8] hover:bg-[#4d20cb] text-white"
+                                ? "bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
                                 : "bg-amber-600 hover:bg-amber-700 text-white"
                             )}
                           >
@@ -1292,7 +1292,7 @@ export default function ProgressReportsPage() {
                             <Badge
                               className={`font-bold text-[10px] gap-1 px-2.5 py-0.5 ${
                                 isEvaluated
-                                  ? "bg-purple-100 text-[#5c28e8] dark:bg-purple-950 dark:text-purple-300"
+                                  ? "bg-blue-100 text-[#2563EB] dark:bg-blue-950 dark:text-blue-300"
                                   : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                               }`}
                             >
@@ -1335,7 +1335,7 @@ export default function ProgressReportsPage() {
                                 onClick={() => setPreviewStudentId(st.id)}
                                 className={`h-8 text-xs font-bold rounded-xl gap-1.5 shadow-2xs cursor-pointer ${
                                   isEvaluated
-                                    ? "bg-[#5c28e8] hover:bg-[#4d20cb] text-white"
+                                    ? "bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
                                     : "bg-amber-600 hover:bg-amber-700 text-white"
                                 }`}
                               >

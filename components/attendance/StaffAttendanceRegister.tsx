@@ -89,8 +89,8 @@ const STATUS_BADGE_CONFIG: Record<
   },
   HOLIDAY: {
     label: "Holiday",
-    className: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800",
-    bgSoft: "bg-purple-500",
+    className: "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800",
+    bgSoft: "bg-teal-500",
     icon: Calendar,
   },
   WEEK_OFF: {

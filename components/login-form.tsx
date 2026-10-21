@@ -159,7 +159,7 @@ function LoginFormInner() {
           <div className="relative">
             <User
               className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
-                focused === "username" ? "text-[#5436F5]" : "text-[#7183A6]"
+                focused === "username" ? "text-[#2563EB]" : "text-[#7183A6]"
               }`}
             />
             <Input
@@ -172,7 +172,7 @@ function LoginFormInner() {
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}
               suppressHydrationWarning
-              className="pl-10 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#5436F5] focus:ring-2 focus:ring-[#5436F5]/20 transition-all duration-200"
+              className="pl-10 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all duration-200"
             />
           </div>
         </motion.div>
@@ -194,7 +194,7 @@ function LoginFormInner() {
             </Label>
             <a
               href="#"
-              className="text-xs font-bold text-[#5436F5] hover:text-[#392BC9] transition-colors underline-offset-2 hover:underline"
+              className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] transition-colors underline-offset-2 hover:underline"
             >
               Forgot password?
             </a>
@@ -202,7 +202,7 @@ function LoginFormInner() {
           <div className="relative">
             <Lock
               className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
-                focused === "password" ? "text-[#5436F5]" : "text-[#7183A6]"
+                focused === "password" ? "text-[#2563EB]" : "text-[#7183A6]"
               }`}
             />
             <Input
@@ -215,7 +215,7 @@ function LoginFormInner() {
               onFocus={() => setFocused("password")}
               onBlur={() => setFocused(null)}
               suppressHydrationWarning
-              className="pl-10 pr-11 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#5436F5] focus:ring-2 focus:ring-[#5436F5]/20 transition-all duration-200"
+              className="pl-10 pr-11 h-12 rounded-xl border-[#E5EAF4] bg-white text-[#142044] placeholder:text-[#7183A6]/60 shadow-xs focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all duration-200"
             />
             <button
               type="button"
@@ -266,7 +266,7 @@ function LoginFormInner() {
             type="submit"
             disabled={isLoading}
             suppressHydrationWarning
-            className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-[#5436F5] via-[#4527D6] to-[#392BC9] text-white font-bold text-sm shadow-md shadow-[#5436F5]/25 hover:shadow-lg hover:from-[#4527D6] hover:to-[#301EA8] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
+            className="group relative w-full h-12 rounded-xl bg-gradient-to-r from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] text-white font-bold text-sm shadow-md shadow-[#2563EB]/25 hover:shadow-lg hover:from-[#1D4ED8] hover:to-[#1E3A8A] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
           >
             <AnimatePresence mode="wait" initial={false}>
               {isLoading ? (
