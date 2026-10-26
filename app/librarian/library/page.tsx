@@ -16,6 +16,8 @@ import {
   ArrowRightLeft,
   RotateCcw,
   Users,
+  User,
+  Power,
   Calendar,
   Layers,
   Sparkles,
@@ -58,7 +60,6 @@ import {
   LibrarySetting,
   BookCategory,
   Author,
-  Publisher,
   Rack,
   Shelf,
   BookCopy,
@@ -81,22 +82,22 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  toggleCategoryActive,
   getAuthors,
   createAuthor,
   updateAuthor,
   deleteAuthor,
-  getPublishers,
-  createPublisher,
-  updatePublisher,
-  deletePublisher,
+  toggleAuthorActive,
   getRacks,
   createRack,
   updateRack,
   deleteRack,
+  toggleRackActive,
   getShelves,
   createShelf,
   updateShelf,
   deleteShelf,
+  toggleShelfActive,
   getBookCopies,
   generateBookCopies,
   transferBookCopy,
@@ -122,6 +123,12 @@ import {
   InventoryAuditData,
 } from "@/lib/library";
 import { getSchoolClasses } from "@/lib/clerk/classes";
+import { CategoryCombobox } from "@/components/library/CategoryCombobox";
+import { ConfirmDeleteModal } from "@/components/library/ConfirmDeleteModal";
+import { ManageCopiesModal } from "@/components/library/ManageCopiesModal";
+import { PrintBarcodeStickerModal } from "@/components/library/PrintBarcodeStickerModal";
+import { BarcodeSvg } from "@/components/library/BarcodeSvg";
+import { LibraryFineReceiptModal } from "@/components/library/LibraryFineReceiptModal";
 
 function toTitleCase(str: string | undefined | null): string {
   if (!str) return "";
@@ -154,7 +161,6 @@ export default function LibrarianDashboard() {
   const [reservations, setReservations] = useState<BookReservation[]>([]);
   const [categories, setCategories] = useState<BookCategory[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [racks, setRacks] = useState<Rack[]>([]);
   const [shelves, setShelves] = useState<Shelf[]>([]);
   const [students, setStudents] = useState<LibraryStudent[]>([]);
@@ -170,6 +176,12 @@ export default function LibrarianDashboard() {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Author filter in Catalog
+  const [authorFilter, setAuthorFilter] = useState("ALL");
+  const [isAuthorDropdownOpen, setIsAuthorDropdownOpen] = useState(false);
+  const [authorSearch, setAuthorSearch] = useState("");
+  const authorDropdownRef = useRef<HTMLDivElement>(null);
 
   // Particular Book filter in Catalog
   const [particularBookFilter, setParticularBookFilter] = useState("ALL");
@@ -189,6 +201,7 @@ export default function LibrarianDashboard() {
   const [historyBookFilter, setHistoryBookFilter] = useState("ALL");
   const [historyCategoryFilter, setHistoryCategoryFilter] = useState("ALL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
+  const [historyPaymentTypeFilter, setHistoryPaymentTypeFilter] = useState("ALL");
 
   // Multi-Student Book Issue State
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
@@ -197,7 +210,7 @@ export default function LibrarianDashboard() {
   const [isIssueBookDropdownOpen, setIsIssueBookDropdownOpen] = useState(false);
   const issueBookDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [masterSubTab, setMasterSubTab] = useState<"categories" | "authors" | "publishers" | "racks">("racks");
+  const [masterSubTab, setMasterSubTab] = useState<"categories" | "authors" | "racks">("racks");
 
   // Circulation Issue Modal Student/Staff cascading filter & search states
   const [issueClassFilter, setIssueClassFilter] = useState("");
@@ -228,9 +241,37 @@ export default function LibrarianDashboard() {
   const [bookCopiesList, setBookCopiesList] = useState<BookCopy[]>([]);
   const [showMasterModal, setShowMasterModal] = useState<string | null>(null);
   const [editingMaster, setEditingMaster] = useState<{
-    type: "category" | "author" | "publisher" | "rack" | "shelf";
+    type: "category" | "author" | "rack" | "shelf";
     id: number;
   } | null>(null);
+
+  // Custom Delete Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemName?: string;
+    itemType?: "rack" | "shelf" | "book" | "copy" | "reservation" | "custom";
+    description?: string;
+    consequences?: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => {},
+  });
+
+  // Barcode Sticker & Labels Printable Modal State
+  const [printStickerModal, setPrintStickerModal] = useState<{
+    isOpen: boolean;
+    copy?: BookCopy | null;
+    book?: Book | null;
+    allCopies?: BookCopy[];
+  }>({
+    isOpen: false,
+  });
 
   // Fine Payment & Printable Receipt Modal
   const [finePaymentModal, setFinePaymentModal] = useState<BookIssued | null>(null);
@@ -275,7 +316,7 @@ export default function LibrarianDashboard() {
     remarks: "",
     damage_fee: 0,
     lost_fee: 0,
-    pay_now: false,
+    pay_now: true,
     payment_method: "Cash",
   });
 
@@ -295,7 +336,6 @@ export default function LibrarianDashboard() {
     category: "",
     category_ref: "",
     author_ref: "",
-    publisher_ref: "",
     rack: "",
     shelf: "",
     edition: "",
@@ -350,7 +390,6 @@ export default function LibrarianDashboard() {
         reservationsData,
         catsData,
         authorsData,
-        pubsData,
         racksData,
         shelvesData,
         studentsData,
@@ -363,7 +402,6 @@ export default function LibrarianDashboard() {
         getReservations().catch(() => []),
         getCategories().catch(() => []),
         getAuthors().catch(() => []),
-        getPublishers().catch(() => []),
         getRacks().catch(() => []),
         getShelves().catch(() => []),
         getLibraryStudents().catch(() => []),
@@ -381,11 +419,23 @@ export default function LibrarianDashboard() {
           edition: b.edition ? toTitleCase(b.edition) : "",
         }))
       );
-      setIssuedRecords(issuedData);
-      setReservations(reservationsData);
+      const sortedIssued = (issuedData || []).slice().sort((a: any, b: any) => {
+        const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
+        const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
+      setIssuedRecords(sortedIssued);
+
+      const sortedReservations = (reservationsData || []).slice().sort((a: any, b: any) => {
+        const timeA = a.reservation_date ? new Date(a.reservation_date).getTime() : 0;
+        const timeB = b.reservation_date ? new Date(b.reservation_date).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
+      setReservations(sortedReservations);
       setCategories(catsData);
       setAuthors(authorsData);
-      setPublishers(pubsData);
       setRacks(racksData);
       setShelves(shelvesData);
 
@@ -486,6 +536,37 @@ export default function LibrarianDashboard() {
     return categoryNames.filter((cat) => cat.toLowerCase().includes(q));
   }, [categoryNames, categorySearch]);
 
+  // Book authors list
+  const authorNames = useMemo(() => {
+    const set = new Set<string>();
+    books.forEach((b) => {
+      if (b.author) set.add(toTitleCase(b.author));
+    });
+    authors.forEach((a) => {
+      if (a.name) set.add(toTitleCase(a.name));
+    });
+    return ["ALL", ...Array.from(set)];
+  }, [books, authors]);
+
+  // Book count per author for badge counters
+  const authorCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: books.length };
+    books.forEach((b) => {
+      const auth = toTitleCase(b.author);
+      if (auth) {
+        counts[auth] = (counts[auth] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [books]);
+
+  // Filtered authors within the dropdown search
+  const filteredAuthorNames = useMemo(() => {
+    if (!authorSearch.trim()) return authorNames;
+    const q = authorSearch.toLowerCase().trim();
+    return authorNames.filter((auth) => auth.toLowerCase().includes(q));
+  }, [authorNames, authorSearch]);
+
   // Click outside to close dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -494,6 +575,12 @@ export default function LibrarianDashboard() {
         !categoryDropdownRef.current.contains(event.target as Node)
       ) {
         setIsCategoryDropdownOpen(false);
+      }
+      if (
+        authorDropdownRef.current &&
+        !authorDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAuthorDropdownOpen(false);
       }
       if (
         studentDropdownRef.current &&
@@ -529,6 +616,7 @@ export default function LibrarianDashboard() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsCategoryDropdownOpen(false);
+        setIsAuthorDropdownOpen(false);
         setIsParticularBookDropdownOpen(false);
         setIsStudentDropdownOpen(false);
         setIsStaffDropdownOpen(false);
@@ -680,7 +768,7 @@ export default function LibrarianDashboard() {
     });
   }, [books, issueCategoryFilter, issueBookSearch]);
 
-  // Filtered books (Search, Category, and Particular Book)
+  // Filtered books (Search, Category, Author, and Particular Book)
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
       const matchesSearch =
@@ -691,18 +779,25 @@ export default function LibrarianDashboard() {
       const matchesCat =
         categoryFilter === "ALL" ||
         toTitleCase(b.category) === categoryFilter;
+      const matchesAuth =
+        authorFilter === "ALL" ||
+        toTitleCase(b.author) === authorFilter;
       const matchesBook =
         particularBookFilter === "ALL" ||
         String(b.id) === String(particularBookFilter);
-      return matchesSearch && matchesCat && matchesBook;
+      return matchesSearch && matchesCat && matchesAuth && matchesBook;
     });
-  }, [books, searchQuery, categoryFilter, particularBookFilter]);
+  }, [books, searchQuery, categoryFilter, authorFilter, particularBookFilter]);
 
-  // Books available for the Particular Book dropdown (filtered by category if one is active)
+  // Books available for the Particular Book dropdown (filtered by category and author if active)
   const availableBooksForParticularDropdown = useMemo(() => {
-    const list = categoryFilter === "ALL" 
-      ? books 
-      : books.filter((b) => toTitleCase(b.category) === categoryFilter);
+    let list = books;
+    if (categoryFilter !== "ALL") {
+      list = list.filter((b) => toTitleCase(b.category) === categoryFilter);
+    }
+    if (authorFilter !== "ALL") {
+      list = list.filter((b) => toTitleCase(b.author) === authorFilter);
+    }
     if (!particularBookSearch.trim()) return list;
     const q = particularBookSearch.toLowerCase().trim();
     return list.filter(
@@ -711,7 +806,7 @@ export default function LibrarianDashboard() {
         b.author.toLowerCase().includes(q) ||
         (b.isbn && b.isbn.toLowerCase().includes(q))
     );
-  }, [books, categoryFilter, particularBookSearch]);
+  }, [books, categoryFilter, authorFilter, particularBookSearch]);
 
   // Selected particular book object helper
   const selectedParticularBook = useMemo(() => {
@@ -719,13 +814,29 @@ export default function LibrarianDashboard() {
     return books.find((b) => String(b.id) === String(particularBookFilter)) || null;
   }, [books, particularBookFilter]);
 
-  // Active vs History circulation
+  // Active vs History circulation (Current to Past: newest first)
   const activeLoans = useMemo(() => {
-    return issuedRecords.filter((r) => r.status === "ISSUED");
+    return issuedRecords
+      .filter((r) => r.status === "ISSUED")
+      .slice()
+      .sort((a, b) => {
+        const timeA = a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0;
+        const timeB = b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
   }, [issuedRecords]);
 
   const historyLoans = useMemo(() => {
-    return issuedRecords.filter((r) => r.status !== "ISSUED");
+    return issuedRecords
+      .filter((r) => r.status !== "ISSUED")
+      .slice()
+      .sort((a, b) => {
+        const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
+        const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
   }, [issuedRecords]);
 
   // Unique books currently in active loans
@@ -815,6 +926,8 @@ export default function LibrarianDashboard() {
         (item.staff_name && item.staff_name.toLowerCase().includes(q)) ||
         (item.student_gr_no && item.student_gr_no.toLowerCase().includes(q)) ||
         (item.accession_no && item.accession_no.toLowerCase().includes(q)) ||
+        (item.payment_method && item.payment_method.toLowerCase().includes(q)) ||
+        (item.payment_receipt_no && item.payment_receipt_no.toLowerCase().includes(q)) ||
         (item.remarks && item.remarks.toLowerCase().includes(q));
 
       const matchesBook =
@@ -825,13 +938,57 @@ export default function LibrarianDashboard() {
         historyCategoryFilter === "ALL" ||
         toTitleCase(item.book_category) === historyCategoryFilter;
 
+      const isDamaged =
+        item.status === "DAMAGED" ||
+        item.condition_on_return === "MINOR_DAMAGE" ||
+        item.condition_on_return === "MAJOR_DAMAGE" ||
+        Number(item.damage_fees || 0) > 0;
+
       const matchesStatus =
         historyStatusFilter === "ALL" ||
-        item.status === historyStatusFilter;
+        (historyStatusFilter === "DAMAGED" ? isDamaged : item.status === historyStatusFilter);
 
-      return matchesSearch && matchesBook && matchesCategory && matchesStatus;
+      const totalFine = Number(item.total_fine || 0);
+      const paidFine = Number(item.fine_paid_amount || 0);
+      const isPaid = item.is_fine_paid || (totalFine > 0 && paidFine >= totalFine);
+      const pMethod = (item.payment_method || "").toLowerCase();
+
+      let matchesPaymentType = true;
+      if (historyPaymentTypeFilter === "CASH") {
+        matchesPaymentType = pMethod === "cash";
+      } else if (historyPaymentTypeFilter === "ONLINE") {
+        matchesPaymentType = pMethod === "online" || pMethod === "upi" || pMethod === "card";
+      } else if (historyPaymentTypeFilter === "PAID") {
+        matchesPaymentType = totalFine > 0 && isPaid;
+      } else if (historyPaymentTypeFilter === "UNPAID") {
+        matchesPaymentType = totalFine > 0 && !isPaid;
+      } else if (historyPaymentTypeFilter === "NO_FINE") {
+        matchesPaymentType = totalFine <= 0;
+      }
+
+      return matchesSearch && matchesBook && matchesCategory && matchesStatus && matchesPaymentType;
     });
-  }, [historyLoans, historySearch, historyBookFilter, historyCategoryFilter, historyStatusFilter]);
+  }, [historyLoans, historySearch, historyBookFilter, historyCategoryFilter, historyStatusFilter, historyPaymentTypeFilter]);
+
+  // Helper to check for duplicate ISBN in real-time
+  const checkIsbnDuplicate = useCallback(
+    (enteredIsbn: string, currentBookId?: number | null) => {
+      const trimmed = (enteredIsbn || "").trim();
+      if (!trimmed) return "";
+      const cleanEntered = trimmed.replace(/[-\s]/g, "").toLowerCase();
+      const duplicate = books.find((b) => {
+        if (currentBookId && b.id === currentBookId) return false;
+        if (!b.isbn) return false;
+        const cleanExisting = b.isbn.trim().replace(/[-\s]/g, "").toLowerCase();
+        return cleanExisting === cleanEntered;
+      });
+      if (duplicate) {
+        return `A book with ISBN "${trimmed}" already exists: "${toTitleCase(duplicate.title)}" by ${toTitleCase(duplicate.author)} (Book ID #${duplicate.id}). Each book must have a unique ISBN.`;
+      }
+      return "";
+    },
+    [books]
+  );
 
   // Validation function for Book form
   const validateBookForm = () => {
@@ -865,6 +1022,14 @@ export default function LibrarianDashboard() {
       errors.category = "Category / Subject must contain letters, cannot be numbers only.";
     }
 
+    const trimmedIsbn = bookForm.isbn?.trim() || "";
+    if (trimmedIsbn) {
+      const duplicateError = checkIsbnDuplicate(trimmedIsbn, editingBook?.id);
+      if (duplicateError) {
+        errors.isbn = duplicateError;
+      }
+    }
+
     if (!bookForm.rack || !String(bookForm.rack).trim()) {
       errors.rack = "Please select a Rack Location.";
     }
@@ -895,7 +1060,11 @@ export default function LibrarianDashboard() {
     const errors = validateBookForm();
     if (Object.keys(errors).length > 0) {
       setBookFormErrors(errors);
-      showToast("error", "Please fill in all mandatory fields marked with an asterisk (*).");
+      if (errors.isbn) {
+        showToast("error", errors.isbn);
+      } else {
+        showToast("error", "Please fill in all mandatory fields marked with an asterisk (*).");
+      }
       return;
     }
     setBookFormErrors({});
@@ -909,7 +1078,6 @@ export default function LibrarianDashboard() {
         category: toTitleCase(bookForm.category),
         category_ref: bookForm.category_ref ? Number(bookForm.category_ref) : null,
         author_ref: bookForm.author_ref ? Number(bookForm.author_ref) : null,
-        publisher_ref: bookForm.publisher_ref ? Number(bookForm.publisher_ref) : null,
         rack: bookForm.rack ? Number(bookForm.rack) : null,
         shelf: bookForm.shelf ? Number(bookForm.shelf) : null,
         edition: bookForm.edition ? toTitleCase(bookForm.edition) : "",
@@ -933,25 +1101,82 @@ export default function LibrarianDashboard() {
       setBookFormErrors({});
       await loadAllData();
     } catch (err: any) {
-      showToast("error", err.message || "Failed to save book.");
+      const msg = err.message || "Failed to save book.";
+      showToast("error", msg);
+      if (msg.toLowerCase().includes("isbn")) {
+        setBookFormErrors((prev) => ({ ...prev, isbn: msg }));
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
   // Handlers: Delete Book
-  const handleDeleteBook = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this book?")) return;
-    setActionLoading(true);
-    try {
-      await deleteBook(id);
-      showToast("success", "Book removed from catalogue.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to delete book.");
-    } finally {
-      setActionLoading(false);
+  const handleDeleteBook = (target: Book | number, fallbackTitle?: string) => {
+    const bookId = typeof target === "number" ? target : target.id;
+    const title = typeof target === "object" ? target.title : fallbackTitle || `Book #${bookId}`;
+    const bookObj = typeof target === "object" ? target : books.find((b) => b.id === bookId);
+    const copiesCount = bookObj?.total_copies || 0;
+    const isIssued = bookObj ? bookObj.available_copies < bookObj.total_copies : false;
+
+    if (isIssued) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Cannot Delete Book On Loan",
+        itemName: title,
+        itemType: "book",
+        description: `Book "${title}" is currently issued to students or staff.`,
+        consequences: "All borrowed copies must be returned and cleared before this book can be deleted.",
+        confirmText: "Understood",
+        cancelText: "Close",
+        isDestructive: false,
+        onConfirm: () => {},
+      });
+      return;
     }
+
+    if (copiesCount > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Cannot Delete Book With Inventory Copies",
+        itemName: title,
+        itemType: "book",
+        description: `Book "${title}" has ${copiesCount} physical inventory copies in circulation. Books with existing data cannot be deleted.`,
+        consequences: "To delete this book master, you must first dispose of or clear its physical copies in the Copies modal.",
+        confirmText: "Manage Copies",
+        cancelText: "Cancel",
+        isDestructive: false,
+        onConfirm: () => {
+          if (bookObj) handleOpenCopies(bookObj);
+        },
+      });
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Book Title?",
+      itemName: title,
+      itemType: "book",
+      description: `Are you sure you want to delete book master "${title}" (ID #${bookId})?`,
+      consequences:
+        "This book has 0 physical copies and will be permanently removed from your catalogue.",
+      confirmText: "Delete Book",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await deleteBook(bookId);
+          showToast("success", `"${title}" removed from catalogue.`);
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to delete book.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: Issue Book (Supports single student and multi-student according to stock)
@@ -1068,6 +1293,16 @@ export default function LibrarianDashboard() {
         : "";
       showToast("success", `Book marked as ${res.status}${fineMsg}`);
       setShowReturnModal(null);
+      if (returnForm.pay_now && Number(res.total_fine) > 0) {
+        setReceiptModal({
+          detail: "Fine Settled on Return",
+          receipt_no: res.payment_receipt_no || `LIB-RCP-${res.id}`,
+          amount_paid: String(res.fine_paid_amount || res.total_fine),
+          remaining_due: "0.00",
+          is_fine_paid: true,
+          record: res,
+        });
+      }
       await loadAllData();
     } catch (err: any) {
       showToast("error", err.message || "Failed to return book.");
@@ -1138,18 +1373,31 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Mark Lost
-  const handleMarkLost = async (id: number) => {
-    if (!confirm("Are you sure you want to mark this book as LOST? A replacement fee will be charged.")) return;
-    setActionLoading(true);
-    try {
-      await markBookLost(id);
-      showToast("success", "Book marked as Lost and penalty calculated.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to mark book lost.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleMarkLost = (id: number, bookTitle?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Mark Book as Lost?",
+      itemName: bookTitle || `Loan Record #${id}`,
+      itemType: "copy",
+      description: "Are you sure you want to mark this issued book as LOST?",
+      consequences:
+        "The physical copy status will become LOST, and a book replacement penalty fee will be billed to the borrower according to library policy.",
+      confirmText: "Mark as Lost",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await markBookLost(id);
+          showToast("success", "Book marked as Lost and penalty fee recorded.");
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to mark book lost.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: View Copies
@@ -1229,22 +1477,36 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Dispose Copy
-  const handleDisposeCopy = async (copyId: number) => {
-    if (!confirm("Are you sure you want to DISPOSE this physical copy? Historical transaction records will be preserved.")) return;
-    setActionLoading(true);
-    try {
-      await deleteBookCopy(copyId);
-      showToast("success", "Physical copy marked as DISPOSED.");
-      if (showCopiesModal) {
-        const updated = await getBookCopies(showCopiesModal.id);
-        setBookCopiesList(updated);
-      }
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to dispose copy.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleDisposeCopy = (copyId: number, accessionNo?: string) => {
+    const accLabel = accessionNo || `Copy #${copyId}`;
+    setConfirmModal({
+      isOpen: true,
+      title: "Dispose Physical Copy?",
+      itemName: accLabel,
+      itemType: "copy",
+      description: `Are you sure you want to DISPOSE physical copy "${accLabel}"?`,
+      consequences:
+        "This copy will be retired from circulation inventory. Historical checkout and clearance logs will be retained for audit tracking.",
+      confirmText: "Dispose Copy",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await deleteBookCopy(copyId);
+          showToast("success", `Physical copy "${accLabel}" marked as DISPOSED.`);
+          if (showCopiesModal) {
+            const updated = await getBookCopies(showCopiesModal.id);
+            setBookCopiesList(updated);
+          }
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to dispose copy.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: Save Settings
@@ -1263,7 +1525,7 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Save Master (Create or Update)
-  const openAddMasterModal = (type: "category" | "author" | "publisher" | "rack" | "shelf", defaultParentRack?: number) => {
+  const openAddMasterModal = (type: "category" | "author" | "rack" | "shelf", defaultParentRack?: number) => {
     setEditingMaster(null);
     setMasterErrors({});
     setMasterForm({
@@ -1275,15 +1537,13 @@ export default function LibrarianDashboard() {
     setShowMasterModal(type);
   };
 
-  const openEditMasterModal = (type: "category" | "author" | "publisher" | "rack" | "shelf", item: any) => {
+  const openEditMasterModal = (type: "category" | "author" | "rack" | "shelf", item: any) => {
     setEditingMaster({ type, id: item.id });
     setMasterErrors({});
     if (type === "category") {
       setMasterForm({ name: item.name, code: item.code || "", extra: item.description || "", extra2: "" });
     } else if (type === "author") {
       setMasterForm({ name: item.name, code: item.code || "", extra: item.biography || "", extra2: "" });
-    } else if (type === "publisher") {
-      setMasterForm({ name: item.name, code: item.code || "", extra: item.contact_no || "", extra2: item.email || "" });
     } else if (type === "rack") {
       setMasterForm({ name: item.rack_name, code: item.rack_code || "", extra: item.description || "", extra2: "" });
     } else if (type === "shelf") {
@@ -1333,20 +1593,6 @@ export default function LibrarianDashboard() {
         } else {
           await createAuthor(payload);
           showToast("success", "Author added!");
-        }
-      } else if (showMasterModal === "publisher") {
-        const payload = {
-          name: masterForm.name.trim(),
-          code: masterForm.code.trim() || undefined,
-          contact_no: masterForm.extra,
-          email: masterForm.extra2,
-        };
-        if (editingMaster) {
-          await updatePublisher(editingMaster.id, payload);
-          showToast("success", "Publisher updated!");
-        } else {
-          await createPublisher(payload);
-          showToast("success", "Publisher added!");
         }
       } else if (showMasterModal === "rack") {
         if (editingMaster) {
@@ -1526,34 +1772,112 @@ export default function LibrarianDashboard() {
     }
   };
 
-  const handleDeleteMaster = async (type: "category" | "author" | "publisher" | "rack" | "shelf", id: number) => {
-    if (!confirm(`Are you sure you want to delete this ${type}? It will be deactivated safely.`)) return;
+  const handleToggleActiveMaster = async (
+    type: "category" | "author" | "rack" | "shelf",
+    id: number,
+    name: string,
+    currentActive: boolean
+  ) => {
     setActionLoading(true);
     try {
-      if (type === "category") await deleteCategory(id);
-      else if (type === "author") await deleteAuthor(id);
-      else if (type === "publisher") await deletePublisher(id);
-      else if (type === "rack") await deleteRack(id);
-      else if (type === "shelf") await deleteShelf(id);
-      showToast("success", `${type} deactivated successfully.`);
+      let res: any;
+      if (type === "category") res = await toggleCategoryActive(id);
+      else if (type === "author") res = await toggleAuthorActive(id);
+      else if (type === "rack") res = await toggleRackActive(id);
+      else if (type === "shelf") res = await toggleShelfActive(id);
+
+      const isNowActive = res?.is_active ?? !currentActive;
+      showToast(
+        "success",
+        `${type.charAt(0).toUpperCase() + type.slice(1)} "${name}" is now ${isNowActive ? "Activated" : "Deactivated"}.`
+      );
       await loadAllData();
     } catch (err: any) {
-      showToast("error", err.message || `Failed to delete ${type}.`);
+      showToast("error", err.message || `Failed to change status of ${type}.`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Handlers: Cancel & Sweep Reservations
-  const handleCancelReservation = async (id: number) => {
-    if (!confirm("Cancel this student reservation?")) return;
-    try {
-      await cancelReservation(id);
-      showToast("success", "Reservation cancelled.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to cancel.");
+  const handleDeleteMaster = (
+    type: "category" | "author" | "rack" | "shelf",
+    id: number,
+    name?: string,
+    hasDataCount: number = 0
+  ) => {
+    const typeLabel =
+      type === "rack" ? "Rack" : type === "shelf" ? "Shelf" : type.charAt(0).toUpperCase() + type.slice(1);
+    const itemLabel = name || `${typeLabel} #${id}`;
+
+    if (hasDataCount > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: `Cannot Delete ${typeLabel}`,
+        itemName: itemLabel,
+        itemType: type === "rack" ? "rack" : type === "shelf" ? "shelf" : "custom",
+        description: `"${itemLabel}" currently contains ${hasDataCount} associated book(s) or record(s). Items containing active data cannot be deleted.`,
+        consequences: `To maintain library catalogue integrity, items with data cannot be permanently removed. You can deactivate it instead to prevent new assignments while keeping existing data safe.`,
+        confirmText: `Deactivate ${typeLabel} Instead`,
+        cancelText: "Cancel",
+        isDestructive: false,
+        onConfirm: async () => {
+          await handleToggleActiveMaster(type, id, itemLabel, true);
+        },
+      });
+      return;
     }
+
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete ${typeLabel}?`,
+      itemName: itemLabel,
+      itemType: type === "rack" ? "rack" : type === "shelf" ? "shelf" : "custom",
+      description: `Are you sure you want to permanently delete ${typeLabel} "${itemLabel}"?`,
+      consequences: `This ${typeLabel} contains 0 records and will be permanently removed. This action cannot be undone.`,
+      confirmText: `Delete ${typeLabel}`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          if (type === "category") await deleteCategory(id);
+          else if (type === "author") await deleteAuthor(id);
+          else if (type === "rack") await deleteRack(id);
+          else if (type === "shelf") await deleteShelf(id);
+          showToast("success", `${typeLabel} deleted successfully.`);
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || `Failed to delete ${typeLabel}.`);
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  };
+
+  // Handlers: Cancel & Sweep Reservations
+  const handleCancelReservation = (id: number, bookTitle?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Cancel Student Hold Reservation?",
+      itemName: bookTitle || `Hold Reservation #${id}`,
+      itemType: "reservation",
+      description: "Are you sure you want to cancel this student book hold reservation?",
+      consequences:
+        "The student will be removed from the waitlist queue, and the next waiting student will become eligible for lending.",
+      confirmText: "Cancel Reservation",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await cancelReservation(id);
+          showToast("success", "Reservation cancelled.");
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to cancel reservation.");
+          throw err;
+        }
+      },
+    });
   };
 
   const handleSweepHoldExpiries = async () => {
@@ -1696,7 +2020,6 @@ export default function LibrarianDashboard() {
                   category: "",
                   category_ref: "",
                   author_ref: "",
-                  publisher_ref: "",
                   rack: "",
                   shelf: "",
                   edition: "",
@@ -2071,7 +2394,6 @@ export default function LibrarianDashboard() {
                         category: "",
                         category_ref: "",
                         author_ref: "",
-                        publisher_ref: "",
                         rack: "",
                         shelf: "",
                         edition: "",
@@ -2317,6 +2639,161 @@ export default function LibrarianDashboard() {
                       )}
                     </div>
 
+                    {/* Author Filter Dropdown */}
+                    <div className="relative" ref={authorDropdownRef}>
+                      <button
+                        type="button"
+                        id="author-filter-dropdown-btn"
+                        onClick={() => setIsAuthorDropdownOpen((prev) => !prev)}
+                        className={`h-10 flex items-center gap-2 px-3.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all shadow-2xs ${
+                          authorFilter !== "ALL"
+                            ? "bg-purple-50 border-purple-300 text-purple-700 ring-2 ring-purple-500/10 font-bold"
+                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <User className={`h-4 w-4 shrink-0 ${authorFilter !== "ALL" ? "text-purple-600" : "text-slate-400"}`} />
+                        <span className="truncate max-w-[120px] sm:max-w-[160px]">
+                          {authorFilter === "ALL" ? "All Authors" : authorFilter}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                            authorFilter !== "ALL"
+                              ? "bg-purple-200/80 text-purple-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {authorCounts[authorFilter] ?? (authorFilter === "ALL" ? books.length : 0)}
+                        </span>
+                        {authorFilter !== "ALL" && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAuthorFilter("ALL");
+                            }}
+                            className="p-0.5 rounded-md hover:bg-purple-200 text-purple-700 transition-colors"
+                            title="Reset to All Authors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
+                            isAuthorDropdownOpen ? "rotate-180 text-purple-600" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {/* Author Dropdown Menu */}
+                      {isAuthorDropdownOpen && (
+                        <div className="absolute right-0 mt-2 w-72 max-w-[90vw] bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                          {authorNames.length > 5 && (
+                            <div className="relative mb-2 px-1">
+                              <Search className="absolute left-3.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                              <input
+                                type="text"
+                                value={authorSearch}
+                                onChange={(e) => setAuthorSearch(e.target.value)}
+                                placeholder="Search author..."
+                                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                autoFocus
+                              />
+                              {authorSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAuthorSearch("")}
+                                  className="absolute right-3 top-2 text-slate-400 hover:text-slate-600"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
+                            {(!authorSearch.trim() || "all authors".includes(authorSearch.toLowerCase().trim())) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAuthorFilter("ALL");
+                                  setIsAuthorDropdownOpen(false);
+                                  setAuthorSearch("");
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                  authorFilter === "ALL"
+                                    ? "bg-purple-600 text-white"
+                                    : "text-slate-700 hover:bg-slate-100"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <User className={`h-3.5 w-3.5 ${authorFilter === "ALL" ? "text-white" : "text-purple-500"}`} />
+                                  <span>All Authors</span>
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                    authorFilter === "ALL" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {books.length}
+                                </span>
+                              </button>
+                            )}
+
+                            {filteredAuthorNames
+                              .filter((auth) => auth !== "ALL")
+                              .map((auth) => {
+                                const isSelected = authorFilter === auth;
+                                const count = authorCounts[auth] || 0;
+                                return (
+                                  <button
+                                    key={auth}
+                                    type="button"
+                                    onClick={() => {
+                                      setAuthorFilter(auth);
+                                      setIsAuthorDropdownOpen(false);
+                                      setAuthorSearch("");
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                      isSelected
+                                        ? "bg-purple-600 text-white"
+                                        : "text-slate-700 hover:bg-slate-100"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span
+                                        className={`h-2 w-2 rounded-full shrink-0 ${
+                                          isSelected ? "bg-white" : count > 0 ? "bg-purple-500" : "bg-slate-300"
+                                        }`}
+                                      />
+                                      <span className="truncate">{auth}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                          isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                                        }`}
+                                      >
+                                        {count}
+                                      </span>
+                                      {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+
+                            {filteredAuthorNames.filter((auth) => auth !== "ALL").length === 0 &&
+                              authorSearch.trim() &&
+                              !"all authors".includes(authorSearch.toLowerCase().trim()) && (
+                                <div className="text-center py-4 text-xs text-slate-400 font-medium">
+                                  No authors matching &quot;{authorSearch}&quot;
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Particular Book Filter Dropdown */}
                     <div className="relative" ref={particularBookDropdownRef}>
                       <button
@@ -2500,13 +2977,21 @@ export default function LibrarianDashboard() {
                 </div>
 
                 {/* Active Filters Bar */}
-                {(categoryFilter !== "ALL" || particularBookFilter !== "ALL" || searchQuery) && (
+                {(categoryFilter !== "ALL" || authorFilter !== "ALL" || particularBookFilter !== "ALL" || searchQuery) && (
                   <div className="flex items-center flex-wrap gap-2 px-1 text-xs">
                     <span className="text-slate-400 font-semibold text-[11px]">Active Filters:</span>
                     {categoryFilter !== "ALL" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
                         Category: {categoryFilter}
                         <button type="button" onClick={() => setCategoryFilter("ALL")} className="hover:text-indigo-900">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {authorFilter !== "ALL" && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-bold">
+                        Author: {authorFilter}
+                        <button type="button" onClick={() => setAuthorFilter("ALL")} className="hover:text-purple-900">
                           <X className="h-3 w-3" />
                         </button>
                       </span>
@@ -2531,6 +3016,7 @@ export default function LibrarianDashboard() {
                       type="button"
                       onClick={() => {
                         setCategoryFilter("ALL");
+                        setAuthorFilter("ALL");
                         setParticularBookFilter("ALL");
                         setSearchQuery("");
                       }}
@@ -2567,7 +3053,6 @@ export default function LibrarianDashboard() {
                           category: "",
                           category_ref: "",
                           author_ref: "",
-                          publisher_ref: "",
                           rack: "",
                           shelf: "",
                           edition: "",
@@ -2710,7 +3195,6 @@ export default function LibrarianDashboard() {
                                         category: toTitleCase(book.category),
                                         category_ref: book.category_ref ? String(book.category_ref) : "",
                                         author_ref: book.author_ref ? String(book.author_ref) : "",
-                                        publisher_ref: book.publisher_ref ? String(book.publisher_ref) : "",
                                         rack: book.rack ? String(book.rack) : "",
                                         shelf: book.shelf ? String(book.shelf) : "",
                                         edition: toTitleCase(book.edition || ""),
@@ -2731,7 +3215,7 @@ export default function LibrarianDashboard() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => handleDeleteBook(book.id)}
+                                    onClick={() => handleDeleteBook(book)}
                                     className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 rounded-lg"
                                     title="Delete Title"
                                   >
@@ -2758,11 +3242,11 @@ export default function LibrarianDashboard() {
 
                         <div className="p-4 sm:p-5 space-y-3">
                           <div className="flex items-start justify-between gap-2">
-                            <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold tracking-wide">
+                            <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold tracking-wide truncate max-w-[130px]">
                               {toTitleCase(book.category) || "General"}
                             </span>
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
                                 book.available_copies > 0
                                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : "bg-rose-50 text-rose-700 border border-rose-200"
@@ -2773,7 +3257,7 @@ export default function LibrarianDashboard() {
                                   book.available_copies > 0 ? "bg-emerald-500" : "bg-rose-500"
                                 }`}
                               />
-                              {book.available_copies > 0 ? `${book.available_copies} Available` : "Checked Out"}
+                              {book.available_copies > 0 ? `${book.available_copies} of ${book.total_copies} Available` : `0 of ${book.total_copies} (Checked Out)`}
                             </span>
                           </div>
 
@@ -2805,17 +3289,19 @@ export default function LibrarianDashboard() {
                           </div>
                         </div>
 
-                        <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex items-center justify-between border-t border-slate-100">
+                        <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 mt-auto">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleOpenCopies(book)}
-                            className="text-xs gap-1.5 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 font-bold rounded-xl"
+                            className="h-8 text-xs gap-1.5 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 font-bold rounded-xl whitespace-nowrap shadow-2xs"
+                            title="Manage physical copies & view barcodes"
                           >
-                            <QrCode className="h-3.5 w-3.5 text-indigo-600" /> Copies ({book.total_copies})
+                            <QrCode className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                            <span>Copies ({book.total_copies})</span>
                           </Button>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 shrink-0">
                             {book.available_copies > 0 && (
                               <Button
                                 size="sm"
@@ -2851,7 +3337,6 @@ export default function LibrarianDashboard() {
                                   category: toTitleCase(book.category),
                                   category_ref: book.category_ref ? String(book.category_ref) : "",
                                   author_ref: book.author_ref ? String(book.author_ref) : "",
-                                  publisher_ref: book.publisher_ref ? String(book.publisher_ref) : "",
                                   rack: book.rack ? String(book.rack) : "",
                                   shelf: book.shelf ? String(book.shelf) : "",
                                   edition: toTitleCase(book.edition || ""),
@@ -2871,7 +3356,7 @@ export default function LibrarianDashboard() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDeleteBook(book.id)}
+                              onClick={() => handleDeleteBook(book)}
                               className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 rounded-lg"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -2896,7 +3381,6 @@ export default function LibrarianDashboard() {
                             category: "",
                             category_ref: "",
                             author_ref: "",
-                            publisher_ref: "",
                             rack: "",
                             shelf: "",
                             edition: "",
@@ -3179,8 +3663,8 @@ export default function LibrarianDashboard() {
                                       remarks: "",
                                       damage_fee: Number(librarySettings?.damage_penalty || 50),
                                       lost_fee: Number(librarySettings?.lost_penalty || 100),
-                                      pay_now: false,
-                                      payment_method: "CASH",
+                                      pay_now: true,
+                                      payment_method: "Cash",
                                     });
                                   }}
                                   className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs"
@@ -3190,7 +3674,7 @@ export default function LibrarianDashboard() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => handleMarkLost(loan.id)}
+                                  onClick={() => handleMarkLost(loan.id, loan.book_title)}
                                   className="text-xs h-8 text-rose-600 hover:bg-rose-50 font-bold rounded-lg"
                                 >
                                   Lost
@@ -3813,7 +4297,7 @@ export default function LibrarianDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleCancelReservation(res.id)}
+                            onClick={() => handleCancelReservation(res.id, res.book_title)}
                             className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
                           >
                             Cancel
@@ -4179,14 +4663,6 @@ export default function LibrarianDashboard() {
                 Authors ({authors.length})
               </button>
               <button
-                onClick={() => setMasterSubTab("publishers")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  masterSubTab === "publishers" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Publishers ({publishers.length})
-              </button>
-              <button
                 onClick={() => setMasterSubTab("racks")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
                   masterSubTab === "racks" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
@@ -4198,54 +4674,132 @@ export default function LibrarianDashboard() {
 
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 capitalize">Manage {masterSubTab}</h3>
+                <h3 className="font-bold text-slate-900 capitalize">Manage {masterSubTab === "racks" ? "Racks & Shelves" : masterSubTab}</h3>
                 <Button
                   size="sm"
                   onClick={() => {
                     if (masterSubTab === "categories") openAddMasterModal("category");
                     else if (masterSubTab === "authors") openAddMasterModal("author");
-                    else if (masterSubTab === "publishers") openAddMasterModal("publisher");
                     else if (masterSubTab === "racks") openAddMasterModal("rack");
                   }}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add New {masterSubTab === "racks" ? "Rack" : masterSubTab === "categories" ? "Category" : masterSubTab === "authors" ? "Author" : "Publisher"}
+                  <Plus className="h-3.5 w-3.5" /> Add New {masterSubTab === "racks" ? "Rack" : masterSubTab === "categories" ? "Category" : "Author"}
                 </Button>
               </div>
 
               {masterSubTab === "categories" && (
                 <div className="space-y-3">
                   {categories.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No categories created yet. Click above to add one.</p>
+                    <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                      <Layers className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs text-slate-500 font-medium">No categories found.</p>
+                      <Button
+                        size="sm"
+                        onClick={() => openAddMasterModal("category")}
+                        className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add First Category
+                      </Button>
+                    </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {categories.map((c) => (
-                        <div key={c.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{c.name}</div>
-                            {c.code && <div className="text-xs text-slate-400">Code: {c.code}</div>}
-                            {c.description && <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{c.description}</div>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {categories.map((c) => {
+                        const count = categoryCounts[toTitleCase(c.name)] || 0;
+                        const isActive = c.is_active !== false;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`p-3.5 bg-white border rounded-xl shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3 group ${
+                              isActive ? "border-slate-200/90 hover:border-indigo-300" : "border-amber-200/80 bg-amber-50/20"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="font-bold text-slate-900 text-sm truncate" title={toTitleCase(c.name)}>
+                                  {toTitleCase(c.name)}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                      isActive
+                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                                    }`}
+                                  >
+                                    {isActive ? "Active" : "Deactivated"}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 border border-indigo-200/60 text-indigo-700">
+                                    {count} {count === 1 ? "Book" : "Books"}
+                                  </span>
+                                </div>
+                              </div>
+                              {c.code && (
+                                <div className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                                  Code: <span className="font-mono text-slate-600">{c.code}</span>
+                                </div>
+                              )}
+                              {c.description && (
+                                <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={c.description}>
+                                  {c.description}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCategoryFilter(toTitleCase(c.name));
+                                  setActiveTab("catalog");
+                                }}
+                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline"
+                                title="View matching books in catalog"
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                <span>Filter ({count})</span>
+                              </button>
+                              <div className="flex items-center gap-0.5">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleToggleActiveMaster("category", c.id, c.name, isActive)}
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    isActive
+                                      ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }`}
+                                  title={isActive ? "Deactivate category" : "Activate category"}
+                                >
+                                  <Power className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openEditMasterModal("category", c)}
+                                  className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                                  title="Edit Category"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteMaster("category", c.id, c.name, count)}
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    count > 0
+                                      ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                      : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                                  }`}
+                                  title={count > 0 ? `Contains ${count} book(s). Cannot be deleted. Deactivate instead.` : "Delete Category"}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("category", c)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("category", c.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -4254,155 +4808,313 @@ export default function LibrarianDashboard() {
               {masterSubTab === "authors" && (
                 <div className="space-y-3">
                   {authors.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No authors created yet. Click above to add one.</p>
+                    <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                      <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs text-slate-500 font-medium">No authors found.</p>
+                      <Button
+                        size="sm"
+                        onClick={() => openAddMasterModal("author")}
+                        className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add First Author
+                      </Button>
+                    </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {authors.map((a) => (
-                        <div key={a.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{a.name}</div>
-                            {a.code && <div className="text-xs text-slate-400">Code: {a.code}</div>}
-                            {a.biography && <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{a.biography}</div>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {authors.map((a) => {
+                        const count = authorCounts[toTitleCase(a.name)] || 0;
+                        const isActive = a.is_active !== false;
+                        return (
+                          <div
+                            key={a.id}
+                            className={`p-3.5 bg-white border rounded-xl shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3 group ${
+                              isActive ? "border-slate-200/90 hover:border-purple-300" : "border-amber-200/80 bg-amber-50/20"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="font-bold text-slate-900 text-sm truncate" title={toTitleCase(a.name)}>
+                                  {toTitleCase(a.name)}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                      isActive
+                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                                    }`}
+                                  >
+                                    {isActive ? "Active" : "Deactivated"}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-50 border border-purple-200/60 text-purple-700">
+                                    {count} {count === 1 ? "Book" : "Books"}
+                                  </span>
+                                </div>
+                              </div>
+                              {a.code && (
+                                <div className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                                  Code: <span className="font-mono text-slate-600">{a.code}</span>
+                                </div>
+                              )}
+                              {a.biography && (
+                                <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={a.biography}>
+                                  {a.biography}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAuthorFilter(toTitleCase(a.name));
+                                  setActiveTab("catalog");
+                                }}
+                                className="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 hover:underline"
+                                title="View books by this author in catalog"
+                              >
+                                <User className="h-3 w-3" />
+                                <span>Filter ({count})</span>
+                              </button>
+                              <div className="flex items-center gap-0.5">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleToggleActiveMaster("author", a.id, a.name, isActive)}
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    isActive
+                                      ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }`}
+                                  title={isActive ? "Deactivate author" : "Activate author"}
+                                >
+                                  <Power className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openEditMasterModal("author", a)}
+                                  className="h-7 w-7 p-0 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+                                  title="Edit Author"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteMaster("author", a.id, a.name, count)}
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    count > 0
+                                      ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                      : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                                  }`}
+                                  title={count > 0 ? `Associated with ${count} book(s). Cannot be deleted. Deactivate instead.` : "Delete Author"}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("author", a)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("author", a.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
 
-              {masterSubTab === "publishers" && (
-                <div className="space-y-3">
-                  {publishers.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No publishers created yet. Click above to add one.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {publishers.map((p) => (
-                        <div key={p.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{p.name}</div>
-                            {p.contact_no && <div className="text-xs text-slate-500">📞 {p.contact_no}</div>}
-                            {p.email && <div className="text-xs text-slate-400">✉️ {p.email}</div>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("publisher", p)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("publisher", p.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {masterSubTab === "racks" && (
                 <div className="space-y-3">
                   {racks.length === 0 ? (
-                    <div className="p-6 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                      <p className="text-xs text-slate-500 mb-2">No physical racks created yet.</p>
+                    <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-2xs">
+                      <MapPin className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm font-bold text-slate-800">No physical racks created yet</p>
+                      <p className="text-xs text-slate-500 mb-4 mt-0.5">Define your library racks to organize book shelving and physical copies.</p>
                       <Button
                         size="sm"
                         onClick={() => openAddMasterModal("rack")}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs"
                       >
-                        <Plus className="h-3 w-3 mr-1" /> Add First Rack
+                        <Plus className="h-3.5 w-3.5 mr-1" /> + Add First Rack
                       </Button>
                     </div>
                   ) : (
-                    racks.map((r) => (
-                      <div key={r.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="font-bold text-slate-900 flex items-center gap-2">
-                            <span>{r.rack_code} — {r.rack_name}</span>
-                            <div className="flex items-center gap-1 ml-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openEditMasterModal("rack", r)}
-                                className="h-6 w-6 p-0 text-slate-400 hover:text-indigo-600"
+                    racks.map((r) => {
+                      const rackShelves = shelves.filter((s) => s.rack === r.id);
+                      const rackBooks = books.filter((b) => b.rack === r.id || b.rack_code === r.rack_code);
+                      const totalRackData = rackShelves.length + rackBooks.length;
+                      const isRackActive = r.is_active !== false;
+                      return (
+                        <div
+                          key={r.id}
+                          className={`p-4 bg-white border rounded-2xl shadow-2xs space-y-3 transition-colors ${
+                            isRackActive ? "border-slate-200/90 hover:border-slate-300" : "border-amber-200 bg-amber-50/20"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200 text-xs font-bold">
+                                <MapPin className="h-3 w-3 text-amber-600" /> Rack {r.rack_code}
+                              </span>
+                              <span className="font-bold text-slate-900 text-sm">{r.rack_name}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                  isRackActive
+                                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                    : "bg-amber-50 border border-amber-200 text-amber-700"
+                                }`}
                               >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDeleteMaster("rack", r.id)}
-                                className="h-6 w-6 p-0 text-slate-400 hover:text-rose-600"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                                {isRackActive ? "Active" : "Deactivated"}
+                              </span>
+                              <span className="text-xs text-slate-400 font-medium">
+                                ({rackShelves.length} Shelves, {rackBooks.length} Books)
+                              </span>
+                              <div className="flex items-center gap-1 ml-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleToggleActiveMaster("rack", r.id, r.rack_name, isRackActive)}
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    isRackActive ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }`}
+                                  title={isRackActive ? "Deactivate rack" : "Activate rack"}
+                                >
+                                  <Power className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openEditMasterModal("rack", r)}
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-indigo-600 rounded-lg"
+                                  title="Edit rack"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    handleDeleteMaster(
+                                      "rack",
+                                      r.id,
+                                      `${r.rack_code} — ${r.rack_name}`,
+                                      totalRackData
+                                    )
+                                  }
+                                  className={`h-7 w-7 p-0 rounded-lg ${
+                                    totalRackData > 0
+                                      ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                      : "text-slate-400 hover:text-rose-600 rounded-lg"
+                                  }`}
+                                  title={
+                                    totalRackData > 0
+                                      ? `Contains ${rackShelves.length} shelves and ${rackBooks.length} books. Cannot be deleted. Deactivate instead.`
+                                      : "Delete rack"
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openAddMasterModal("shelf", r.id)}
+                              className="text-xs h-8 px-3 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold rounded-xl gap-1"
+                            >
+                              <Plus className="h-3.5 w-3.5" /> + Add Shelf
+                            </Button>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openAddMasterModal("shelf", r.id)}
-                            className="text-xs h-7 border-slate-200 bg-white"
-                          >
-                            <Plus className="h-3 w-3 mr-1" /> Add Shelf
-                          </Button>
+                          <div>
+                            {rackShelves.length === 0 ? (
+                              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-500">
+                                <span className="italic">No shelves configured in this rack yet.</span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openAddMasterModal("shelf", r.id)}
+                                  className="h-7 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" /> + Add Shelf Now
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2">
+                                {rackShelves.map((s) => {
+                                  const shelfBooks = books.filter(
+                                    (b) => b.shelf === s.id || b.shelf_code === s.shelf_code
+                                  );
+                                  const isShelfActive = s.is_active !== false;
+                                  return (
+                                    <span
+                                      key={s.id}
+                                      className={`inline-flex items-center gap-1.5 border text-xs px-3 py-1.5 rounded-xl font-medium shadow-2xs transition-colors ${
+                                        isShelfActive
+                                          ? "bg-slate-50 hover:bg-slate-100 border-slate-200/90 text-slate-700"
+                                          : "bg-amber-50/50 border-amber-200 text-amber-800"
+                                      }`}
+                                    >
+                                      <span className="font-mono font-bold text-slate-900">{s.shelf_code}</span>
+                                      <span className="text-slate-500">({s.shelf_name})</span>
+                                      {!isShelfActive && (
+                                        <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 rounded">
+                                          Inactive
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleToggleActiveMaster("shelf", s.id, s.shelf_name, isShelfActive)
+                                        }
+                                        className={`p-0.5 ml-1 transition-colors ${
+                                          isShelfActive
+                                            ? "text-slate-400 hover:text-amber-600"
+                                            : "text-emerald-600 hover:text-emerald-700"
+                                        }`}
+                                        title={isShelfActive ? "Deactivate shelf" : "Activate shelf"}
+                                      >
+                                        <Power className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditMasterModal("shelf", s)}
+                                        className="text-slate-400 hover:text-indigo-600 p-0.5 transition-colors"
+                                        title="Edit shelf"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteMaster(
+                                            "shelf",
+                                            s.id,
+                                            `${s.shelf_code} (${s.shelf_name})`,
+                                            shelfBooks.length
+                                          )
+                                        }
+                                        className={`p-0.5 transition-colors ${
+                                          shelfBooks.length > 0
+                                            ? "text-slate-300 hover:text-amber-600 cursor-pointer"
+                                            : "text-slate-400 hover:text-rose-600"
+                                        }`}
+                                        title={
+                                          shelfBooks.length > 0
+                                            ? `Contains ${shelfBooks.length} book(s). Cannot be deleted. Deactivate instead.`
+                                            : "Delete shelf"
+                                        }
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {shelves.filter((s) => s.rack === r.id).length === 0 ? (
-                            <span className="text-[11px] text-slate-400 italic">No shelves added to this rack yet. Click Add Shelf.</span>
-                          ) : (
-                            shelves
-                              .filter((s) => s.rack === r.id)
-                              .map((s) => (
-                                <span key={s.id} className="inline-flex items-center gap-1 bg-white border border-slate-200 text-xs px-2.5 py-1 rounded shadow-2xs font-medium text-slate-700">
-                                  <span>{s.shelf_code} ({s.shelf_name})</span>
-                                  <button
-                                    onClick={() => openEditMasterModal("shelf", s)}
-                                    className="text-slate-400 hover:text-indigo-600 ml-1"
-                                    title="Edit shelf"
-                                  >
-                                    <Edit className="h-2.5 w-2.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteMaster("shelf", s.id)}
-                                    className="text-slate-400 hover:text-rose-600"
-                                    title="Delete shelf"
-                                  >
-                                    <Trash2 className="h-2.5 w-2.5" />
-                                  </button>
-                                </span>
-                              ))
-                          )}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -4567,12 +5279,13 @@ export default function LibrarianDashboard() {
 
               {/* History Search & Filters Toolbar */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 pt-1">
-                <div className="md:col-span-5 relative">
+                {/* Search by borrower, book, accession, payment mode */}
+                <div className="md:col-span-4 relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Search borrower, book, accession, remarks..."
+                    placeholder="Search borrower name, book, accession, receipt..."
                     className="pl-9 h-9 text-xs rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                   />
                   {historySearch && (
@@ -4587,7 +5300,7 @@ export default function LibrarianDashboard() {
                 </div>
 
                 {/* Filter by Particular Book */}
-                <div className="md:col-span-4">
+                <div className="md:col-span-3">
                   <select
                     value={historyBookFilter}
                     onChange={(e) => setHistoryBookFilter(e.target.value)}
@@ -4625,11 +5338,30 @@ export default function LibrarianDashboard() {
                     ))}
                   </select>
                 </div>
+
+                {/* Filter by Payment Type: Cash, Online, Unpaid, All */}
+                <div className="md:col-span-2">
+                  <select
+                    value={historyPaymentTypeFilter}
+                    onChange={(e) => setHistoryPaymentTypeFilter(e.target.value)}
+                    className={`w-full h-9 rounded-xl border px-3 text-xs font-semibold transition-colors ${
+                      historyPaymentTypeFilter !== "ALL"
+                        ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <option value="ALL">Payment: All Types</option>
+                    <option value="CASH">💵 Cash Counter</option>
+                    <option value="ONLINE">💳 Online / UPI</option>
+                    <option value="UNPAID">⏳ Unpaid / Due</option>
+                    <option value="NO_FINE">✓ No Fine</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Status Chips & Reset */}
+              {/* Status Chips, Quick Filters & Reset */}
               <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-                {["ALL", "RETURNED", "LOST", "DAMAGED"].map((st) => (
+                {["ALL", "RETURNED", "DAMAGED", "LOST"].map((st) => (
                   <button
                     key={st}
                     type="button"
@@ -4640,11 +5372,48 @@ export default function LibrarianDashboard() {
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {st === "ALL" ? "All History" : st.charAt(0) + st.slice(1).toLowerCase()}
+                    {st === "ALL" ? "All History" : st === "DAMAGED" ? "⚠️ Damaged (Penalties)" : st.charAt(0) + st.slice(1).toLowerCase()}
                   </button>
                 ))}
 
-                {(historySearch || historyBookFilter !== "ALL" || historyCategoryFilter !== "ALL" || historyStatusFilter !== "ALL") && (
+                <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+                {/* Quick Payment Mode Filters */}
+                <button
+                  type="button"
+                  onClick={() => setHistoryPaymentTypeFilter(historyPaymentTypeFilter === "CASH" ? "ALL" : "CASH")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 ${
+                    historyPaymentTypeFilter === "CASH"
+                      ? "bg-emerald-600 text-white shadow-2xs"
+                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                  }`}
+                >
+                  <DollarSign className="h-3 w-3" /> Cash Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryPaymentTypeFilter(historyPaymentTypeFilter === "ONLINE" ? "ALL" : "ONLINE")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 ${
+                    historyPaymentTypeFilter === "ONLINE"
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                  }`}
+                >
+                  <CreditCard className="h-3 w-3" /> Online Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryPaymentTypeFilter(historyPaymentTypeFilter === "UNPAID" ? "ALL" : "UNPAID")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 ${
+                    historyPaymentTypeFilter === "UNPAID"
+                      ? "bg-rose-600 text-white shadow-2xs"
+                      : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                  }`}
+                >
+                  <Clock className="h-3 w-3" /> Due Fines
+                </button>
+
+                {(historySearch || historyBookFilter !== "ALL" || historyCategoryFilter !== "ALL" || historyStatusFilter !== "ALL" || historyPaymentTypeFilter !== "ALL") && (
                   <button
                     type="button"
                     onClick={() => {
@@ -4652,6 +5421,7 @@ export default function LibrarianDashboard() {
                       setHistoryBookFilter("ALL");
                       setHistoryCategoryFilter("ALL");
                       setHistoryStatusFilter("ALL");
+                      setHistoryPaymentTypeFilter("ALL");
                     }}
                     className="text-rose-600 font-bold hover:underline ml-2"
                   >
@@ -4679,6 +5449,7 @@ export default function LibrarianDashboard() {
                     setHistoryBookFilter("ALL");
                     setHistoryCategoryFilter("ALL");
                     setHistoryStatusFilter("ALL");
+                    setHistoryPaymentTypeFilter("ALL");
                   }}
                   className="mt-3 text-xs"
                 >
@@ -4691,12 +5462,14 @@ export default function LibrarianDashboard() {
                   <thead className="bg-slate-50/90 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3.5 whitespace-nowrap">Book Title</th>
+                      <th className="px-4 py-3.5 whitespace-nowrap">Category</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Accession No</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Borrower</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Issue Date</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Return Date</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Condition / Status</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Fine Amount &amp; Status</th>
+                      <th className="px-4 py-3.5 whitespace-nowrap">Damage &amp; Late Fee</th>
+                      <th className="px-4 py-3.5 whitespace-nowrap">Payment Mode</th>
                       <th className="px-4 py-3.5 whitespace-nowrap">Remarks</th>
                       <th className="px-4 py-3.5 whitespace-nowrap text-right">Actions</th>
                     </tr>
@@ -4716,6 +5489,11 @@ export default function LibrarianDashboard() {
                               </div>
                               <span className="font-bold text-slate-900 text-sm">{toTitleCase(item.book_title)}</span>
                             </div>
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                              {toTitleCase(item.book_category) || "General"}
+                            </span>
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {item.accession_no ? (
@@ -4768,15 +5546,27 @@ export default function LibrarianDashboard() {
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {totalFine > 0 ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 text-xs">Total: ₹{totalFine}</span>
-                                {item.is_fine_paid || dueFine <= 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Fully Paid
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-900 text-xs">Total: ₹{totalFine}</span>
+                                  {item.is_fine_paid || dueFine <= 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                                      <CheckCircle2 className="h-2.5 w-2.5" /> Paid
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.5 rounded-full">
+                                      Due: ₹{dueFine}
+                                    </span>
+                                  )}
+                                </div>
+                                {Number(item.damage_fees || 0) > 0 && (
+                                  <span className="text-[10px] text-amber-700 font-bold block">
+                                    Damage: ₹{item.damage_fees}
                                   </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full">
-                                    Due: ₹{dueFine}
+                                )}
+                                {Number(item.late_fees || 0) > 0 && (
+                                  <span className="text-[10px] text-slate-500 font-medium block">
+                                    Late: ₹{item.late_fees}
                                   </span>
                                 )}
                               </div>
@@ -4784,6 +5574,29 @@ export default function LibrarianDashboard() {
                               <span className="text-slate-400 font-mono text-xs bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
                                 ₹0 (No Fine)
                               </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            {totalFine > 0 ? (
+                              (item.payment_method || "").toLowerCase() === "cash" ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                  <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Cash
+                                </span>
+                              ) : ["online", "upi", "card"].includes((item.payment_method || "").toLowerCase()) ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                                  <CreditCard className="h-3.5 w-3.5 text-indigo-600" /> Online
+                                </span>
+                              ) : dueFine > 0 ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                  <Clock className="h-3.5 w-3.5 text-rose-500" /> Pending (Due)
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 text-xs font-semibold">
+                                  {item.payment_method || "Settled"}
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500">{item.remarks || "—"}</td>
@@ -4834,30 +5647,47 @@ export default function LibrarianDashboard() {
 
       {/* MODAL: ADD / EDIT BOOK */}
       {showAddBookModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-lg font-bold text-slate-900">{editingBook ? "Edit Book Item" : "Add New Book Master"}</h2>
-              <button onClick={() => setShowAddBookModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-3xl lg:max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Fixed Header */}
+            <div className="flex items-start justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-gradient-to-r from-slate-50 via-white to-indigo-50/20">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                    <BookOpen className="h-4 w-4" />
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                    {editingBook ? "Edit Book Master" : "Add New Book Master"}
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 pl-10">
+                  Configure book catalogue details, storage rack locations, and generate unique physical copy barcodes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddBookModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form noValidate onSubmit={handleSaveBook} className="space-y-4">
-              {Object.keys(bookFormErrors).length > 0 && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                  <span className="font-semibold">Please correct the highlighted mandatory fields marked in red below.</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1 md:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-slate-800">
-                      Book Title <span className="text-rose-500">*</span>
-                    </Label>
+            {/* Form with Scrollable Content Body */}
+            <form noValidate onSubmit={handleSaveBook} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                {Object.keys(bookFormErrors).length > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span className="font-semibold">Please correct the highlighted mandatory fields marked in red below.</span>
                   </div>
+                )}
+
+                {/* 1. Full-width Book Title */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-800">
+                    Book Title <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     value={bookForm.title}
                     onChange={(e) => {
@@ -4872,8 +5702,10 @@ export default function LibrarianDashboard() {
                       }
                     }}
                     placeholder="e.g. Mathematics Class 10"
-                    className={`transition-colors ${
-                      bookFormErrors.title ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
+                    className={`h-10 text-sm rounded-xl transition-colors ${
+                      bookFormErrors.title
+                        ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                        : "border-slate-200"
                     }`}
                   />
                   {bookFormErrors.title && (
@@ -4883,302 +5715,361 @@ export default function LibrarianDashboard() {
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 2. Two-column layout: Author & Category / Subject */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Author <span className="text-rose-500">*</span>
                     </Label>
+                    <Input
+                      value={bookForm.author}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, author: e.target.value });
+                        if (bookFormErrors.author) {
+                          setBookFormErrors((prev) => ({ ...prev, author: "" }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          setBookForm((prev) => ({ ...prev, author: toTitleCase(prev.author) }));
+                        }
+                      }}
+                      placeholder="e.g. R.D. Sharma"
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.author
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.author && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.author}
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    value={bookForm.author}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, author: e.target.value });
-                      if (bookFormErrors.author) {
-                        setBookFormErrors((prev) => ({ ...prev, author: "" }));
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, author: toTitleCase(prev.author) }));
-                      }
-                    }}
-                    placeholder="e.g. R.D. Sharma"
-                    className={`transition-colors ${
-                      bookFormErrors.author ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.author && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.author}
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Category / Subject <span className="text-rose-500">*</span>
                     </Label>
-                    <span className="text-[10px] text-slate-400">Select existing or type new</span>
+                    <CategoryCombobox
+                      value={bookForm.category}
+                      onChange={(catName, catRefId) => {
+                        setBookForm((prev) => ({
+                          ...prev,
+                          category: catName,
+                          category_ref: catRefId ? String(catRefId) : "",
+                        }));
+                        if (bookFormErrors.category) {
+                          setBookFormErrors((prev) => ({ ...prev, category: "" }));
+                        }
+                      }}
+                      categories={categories}
+                      allBookCategoryNames={categoryNames}
+                      error={bookFormErrors.category}
+                    />
+                    {bookFormErrors.category && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.category}
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    list="existing-book-categories"
-                    value={bookForm.category}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, category: e.target.value });
-                      if (bookFormErrors.category) {
-                        setBookFormErrors((prev) => ({ ...prev, category: "" }));
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, category: toTitleCase(prev.category) }));
-                      }
-                    }}
-                    placeholder="e.g. Science, Mathematics, Literature..."
-                    className={`transition-colors ${
-                      bookFormErrors.category ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  <datalist id="existing-book-categories">
-                    {categoryNames.filter((c) => c !== "ALL").map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                  {categoryNames.filter((c) => c !== "ALL").length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 pt-1">
-                      <span className="text-[10px] font-medium text-slate-400">Quick pick:</span>
-                      {categoryNames.filter((c) => c !== "ALL").slice(0, 6).map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => {
-                            setBookForm({ ...bookForm, category: c });
-                            if (bookFormErrors.category) setBookFormErrors((prev) => ({ ...prev, category: "" }));
-                          }}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                            bookForm.category === c
-                              ? "bg-indigo-600 text-white border-indigo-600 font-bold"
-                              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
+                </div>
+
+                {/* 3. Two-column layout: ISBN & Book Price */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-slate-800">
+                        ISBN (International Standard Book No)
+                      </Label>
+                      {bookForm.isbn?.trim() && !bookFormErrors.isbn && (
+                        <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Unique &amp; Available
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {bookFormErrors.category && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.category}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-800">ISBN (Optional)</Label>
-                  <Input
-                    value={bookForm.isbn}
-                    onChange={(e) => setBookForm({ ...bookForm, isbn: e.target.value })}
-                    placeholder="e.g. 978-3-16-148410-0"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-slate-800">Book Price (₹)</Label>
+                    <div className="relative">
+                      <Input
+                        value={bookForm.isbn}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBookForm((prev) => ({ ...prev, isbn: val }));
+                          const errorMsg = checkIsbnDuplicate(val, editingBook?.id);
+                          setBookFormErrors((prev) => {
+                            const next = { ...prev };
+                            if (errorMsg) {
+                              next.isbn = errorMsg;
+                            } else {
+                              delete next.isbn;
+                            }
+                            return next;
+                          });
+                        }}
+                        onBlur={() => {
+                          if (bookForm.isbn) {
+                            const errorMsg = checkIsbnDuplicate(bookForm.isbn, editingBook?.id);
+                            if (errorMsg) {
+                              setBookFormErrors((prev) => ({ ...prev, isbn: errorMsg }));
+                            }
+                          }
+                        }}
+                        placeholder="e.g. 978-3-16-148410-0"
+                        className={`h-10 text-sm rounded-xl transition-all ${
+                          bookFormErrors.isbn
+                            ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20 pr-9"
+                            : "border-slate-200 focus:border-indigo-500"
+                        }`}
+                      />
+                      {bookFormErrors.isbn && (
+                        <AlertCircle className="absolute right-3 top-3 h-4 w-4 text-rose-500 pointer-events-none" />
+                      )}
+                    </div>
+                    {bookFormErrors.isbn && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-start gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-rose-600" />
+                        <span>{bookFormErrors.isbn}</span>
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={bookForm.price}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, price: Number(e.target.value) });
-                      if (bookFormErrors.price) {
-                        setBookFormErrors((prev) => ({ ...prev, price: "" }));
-                      }
-                    }}
-                    placeholder="150"
-                    className={`transition-colors ${
-                      bookFormErrors.price ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.price && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.price}
-                    </p>
-                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-800">Book Price (₹)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={bookForm.price}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, price: Number(e.target.value) });
+                        if (bookFormErrors.price) {
+                          setBookFormErrors((prev) => ({ ...prev, price: "" }));
+                        }
+                      }}
+                      placeholder="150"
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.price
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.price && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.price}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 4. Two-column layout: Rack Location & Shelf Location with side-by-side Add buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Rack Location with Side-by-side Add Button */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Rack Location <span className="text-rose-500">*</span>
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => openAddMasterModal("rack")}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 hover:underline"
-                    >
-                      <Plus className="h-3 w-3" /> Add Rack
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={bookForm.rack}
+                        onChange={(e) => {
+                          const newRack = e.target.value;
+                          if (bookFormErrors.rack) {
+                            setBookFormErrors((prev) => ({ ...prev, rack: "" }));
+                          }
+                          setBookForm((prev) => {
+                            const isCurrentShelfInNewRack =
+                              newRack && prev.shelf
+                                ? shelves.some(
+                                    (s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf)
+                                  )
+                                : false;
+                            return {
+                              ...prev,
+                              rack: newRack,
+                              shelf: isCurrentShelfInNewRack ? prev.shelf : "",
+                            };
+                          });
+                        }}
+                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs ${
+                          bookFormErrors.rack
+                            ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        }`}
+                      >
+                        <option value="">{racks.length === 0 ? "-- No Racks Configured --" : "-- Select Rack --"}</option>
+                        {racks
+                          .filter((r) => r.is_active !== false || String(r.id) === String(bookForm.rack))
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.rack_code} - {r.rack_name} {r.is_active === false ? " (Deactivated)" : ""}
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        type="button"
+                        onClick={() => openAddMasterModal("rack")}
+                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all"
+                        title="Add a new rack"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Add Rack</span>
+                      </Button>
+                    </div>
+                    {bookFormErrors.rack && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.rack}
+                      </p>
+                    )}
+                    {racks.length === 0 && !bookFormErrors.rack && (
+                      <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> No library racks configured. Click &ldquo;+ Add Rack&rdquo; to set up your first rack.
+                      </p>
+                    )}
                   </div>
-                  <select
-                    value={bookForm.rack}
-                    onChange={(e) => {
-                      const newRack = e.target.value;
-                      if (bookFormErrors.rack) {
-                        setBookFormErrors((prev) => ({ ...prev, rack: "" }));
-                      }
-                      setBookForm((prev) => {
-                        const isCurrentShelfInNewRack =
-                          newRack && prev.shelf
-                            ? shelves.some((s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf))
-                            : false;
-                        return {
-                          ...prev,
-                          rack: newRack,
-                          shelf: isCurrentShelfInNewRack ? prev.shelf : "",
-                        };
-                      });
-                    }}
-                    className={`w-full h-9 rounded-md border px-3 text-sm transition-colors ${
-                      bookFormErrors.rack ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  >
-                    <option value="">{racks.length === 0 ? "-- No Racks Available (Click + Add Rack) --" : "-- Select Rack --"}</option>
-                    {racks.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.rack_code} - {r.rack_name}
-                      </option>
-                    ))}
-                  </select>
-                  {bookFormErrors.rack && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.rack}
-                    </p>
-                  )}
-                  {racks.length === 0 && !bookFormErrors.rack && (
-                    <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" /> No racks created yet. Click{" "}
-                      <button type="button" onClick={() => openAddMasterModal("rack")} className="font-bold underline text-indigo-600 hover:text-indigo-800 ml-0.5">
-                        + Add Rack
-                      </button>{" "}
-                      to set up one.
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                  {/* Shelf Location with Side-by-side Add Button */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Shelf Location <span className="text-rose-500">*</span>
                     </Label>
-                    {bookForm.rack && (
-                      <button
-                        type="button"
-                        onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 hover:underline"
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={bookForm.shelf}
+                        onChange={(e) => {
+                          setBookForm({ ...bookForm, shelf: e.target.value });
+                          if (bookFormErrors.shelf) {
+                            setBookFormErrors((prev) => ({ ...prev, shelf: "" }));
+                          }
+                        }}
+                        disabled={!bookForm.rack}
+                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
+                          bookFormErrors.shelf
+                            ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        }`}
                       >
-                        <Plus className="h-3 w-3" /> Add Shelf
-                      </button>
-                    )}
-                  </div>
-                  <select
-                    value={bookForm.shelf}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, shelf: e.target.value });
-                      if (bookFormErrors.shelf) {
-                        setBookFormErrors((prev) => ({ ...prev, shelf: "" }));
-                      }
-                    }}
-                    disabled={!bookForm.rack}
-                    className={`w-full h-9 rounded-md border px-3 text-sm transition-colors disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
-                      bookFormErrors.shelf ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  >
-                    {!bookForm.rack ? (
-                      <option value="">-- Select Rack First --</option>
-                    ) : (
-                      <>
-                        <option value="">
-                          {shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0
-                            ? "-- No Shelves in this Rack (Click + Add Shelf) --"
-                            : "-- Select Shelf --"}
-                        </option>
-                        {shelves
-                          .filter((s) => String(s.rack) === String(bookForm.rack))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.shelf_code} ({s.shelf_name})
+                        {!bookForm.rack ? (
+                          <option value="">-- Select Rack First --</option>
+                        ) : (
+                          <>
+                            <option value="">
+                              {shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0
+                                ? "-- No Shelves in this Rack --"
+                                : "-- Select Shelf --"}
                             </option>
-                          ))}
-                      </>
+                            {shelves
+                              .filter(
+                                (s) =>
+                                  String(s.rack) === String(bookForm.rack) &&
+                                  (s.is_active !== false || String(s.id) === String(bookForm.shelf))
+                              )
+                              .map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.shelf_code} ({s.shelf_name}) {s.is_active === false ? " (Deactivated)" : ""}
+                                </option>
+                              ))}
+                          </>
+                        )}
+                      </select>
+                      <Button
+                        type="button"
+                        disabled={!bookForm.rack}
+                        onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))}
+                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!bookForm.rack ? "Select a rack first" : "Add a new shelf to the selected rack"}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Add Shelf</span>
+                      </Button>
+                    </div>
+                    {bookFormErrors.shelf && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.shelf}
+                      </p>
                     )}
-                  </select>
-                  {bookFormErrors.shelf && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.shelf}
-                    </p>
-                  )}
-                  {bookForm.rack && shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0 && !bookFormErrors.shelf && (
-                    <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" /> No shelves in this rack. Click{" "}
-                      <button type="button" onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))} className="font-bold underline text-indigo-600 hover:text-indigo-800 ml-0.5">
-                        + Add Shelf
-                      </button>{" "}
-                      to create one.
-                    </p>
-                  )}
+                    {bookForm.rack &&
+                      shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0 &&
+                      !bookFormErrors.shelf && (
+                        <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Selected rack has no shelves yet. Click &ldquo;+ Add Shelf&rdquo; to add one.
+                        </p>
+                      )}
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 5. Two-column layout: Total Physical Copies & Edition/Year */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Total Physical Copies <span className="text-rose-500">*</span>
                     </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={bookForm.total_copies}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, total_copies: Number(e.target.value) });
+                        if (bookFormErrors.total_copies) {
+                          setBookFormErrors((prev) => ({ ...prev, total_copies: "" }));
+                        }
+                      }}
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.total_copies
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.total_copies ? (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.total_copies}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        Generates unique sequential SBIN barcodes for each physical copy automatically.
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={bookForm.total_copies}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, total_copies: Number(e.target.value) });
-                      if (bookFormErrors.total_copies) {
-                        setBookFormErrors((prev) => ({ ...prev, total_copies: "" }));
-                      }
-                    }}
-                    className={`transition-colors ${
-                      bookFormErrors.total_copies ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.total_copies && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.total_copies}
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Edition / Year</Label>
-                  <Input
-                    value={bookForm.edition}
-                    onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, edition: toTitleCase(prev.edition) }));
-                      }
-                    }}
-                    placeholder="e.g. 1st Edition E.S.T 800"
-                  />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-800">Edition / Year (Optional)</Label>
+                    <Input
+                      value={bookForm.edition}
+                      onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          setBookForm((prev) => ({ ...prev, edition: toTitleCase(prev.edition) }));
+                        }
+                      }}
+                      placeholder="e.g. 2nd Revised Edition 2024"
+                      className="h-10 text-sm rounded-xl border-slate-200"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => setShowAddBookModal(false)}>
+              {/* Fixed Distinct Footer Area */}
+              <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/90 flex items-center justify-end gap-2.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddBookModal(false)}
+                  className="h-10 px-4 rounded-xl border-slate-200 text-slate-700 font-semibold hover:bg-white"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  {editingBook ? "Update Book" : "Create Book & Generate Barcodes"}
+                <Button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="h-10 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs transition-all gap-1.5"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingBook ? "Update Book" : "Create Book & Generate Barcodes"}</span>
+                  )}
                 </Button>
               </div>
             </form>
@@ -6083,24 +6974,150 @@ export default function LibrarianDashboard() {
               </div>
 
               {returnForm.condition !== "GOOD" && returnForm.condition !== "LOST" && (
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Damage Penalty Fee (₹)</Label>
-                  <Input
-                    type="number"
-                    value={returnForm.damage_fee}
-                    onChange={(e) => setReturnForm({ ...returnForm, damage_fee: Number(e.target.value) })}
-                  />
+                <div className="space-y-3 p-3.5 bg-amber-50/60 rounded-xl border border-amber-200">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-amber-950">Damage Penalty Fee (₹)</Label>
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300">
+                        Damage Fee Assessed
+                      </span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={returnForm.damage_fee}
+                      onChange={(e) => setReturnForm({ ...returnForm, damage_fee: Number(e.target.value) })}
+                      className="bg-white border-amber-300 font-bold text-slate-900"
+                    />
+                  </div>
+
+                  {/* Payment Mode Options: Cash or Online */}
+                  <div className="space-y-2 pt-1.5 border-t border-amber-200/80">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-slate-800">
+                        Damage Penalty Payment Mode *
+                      </Label>
+                      <span className="text-[10px] font-medium text-slate-500">Select Cash or Online</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Cash", pay_now: true })}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Cash" && returnForm.pay_now
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                        }`}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        <span>Cash Counter</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Online", pay_now: true })}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Online" && returnForm.pay_now
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/20"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50"
+                        }`}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Online / UPI</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="text-[11px] text-slate-700 font-medium flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={returnForm.pay_now}
+                          onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                        />
+                        <span>Collect Fine Now ({returnForm.payment_method})</span>
+                      </label>
+                      {!returnForm.pay_now && (
+                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Pending (Due to be collected)
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
               {returnForm.condition === "LOST" && (
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Lost Penalty Fee (₹)</Label>
-                  <Input
-                    type="number"
-                    value={returnForm.lost_fee}
-                    onChange={(e) => setReturnForm({ ...returnForm, lost_fee: Number(e.target.value) })}
-                  />
+                <div className="space-y-3 p-3.5 bg-rose-50/60 rounded-xl border border-rose-200">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-rose-950">Lost Penalty Fee (₹)</Label>
+                      <span className="text-[10px] font-bold text-rose-800 bg-rose-100/90 px-2 py-0.5 rounded-full border border-rose-300">
+                        Book Replacement Fee
+                      </span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={returnForm.lost_fee}
+                      onChange={(e) => setReturnForm({ ...returnForm, lost_fee: Number(e.target.value) })}
+                      className="bg-white border-rose-300 font-bold text-slate-900"
+                    />
+                  </div>
+
+                  {/* Payment Mode Options: Cash or Online */}
+                  <div className="space-y-2 pt-1.5 border-t border-rose-200/80">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-slate-800">
+                        Lost Penalty Payment Mode *
+                      </Label>
+                      <span className="text-[10px] font-medium text-slate-500">Select Cash or Online</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Cash", pay_now: true })}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Cash" && returnForm.pay_now
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                        }`}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        <span>Cash Counter</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Online", pay_now: true })}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Online" && returnForm.pay_now
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50"
+                        }`}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Online / UPI</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="text-[11px] text-slate-700 font-medium flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={returnForm.pay_now}
+                          onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                        />
+                        <span>Collect Fine Now ({returnForm.payment_method})</span>
+                      </label>
+                      {!returnForm.pay_now && (
+                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Pending (Due to be collected)
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -6113,36 +7130,48 @@ export default function LibrarianDashboard() {
                 />
               </div>
 
-              {/* Instant Fine Payment on Return */}
-              <div className="pt-2 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="return_pay_now"
-                    checked={returnForm.pay_now}
-                    onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <label htmlFor="return_pay_now" className="text-xs font-semibold text-slate-800">
-                    Collect Fine Now (Instant Payment Settlement)
-                  </label>
-                </div>
-                {returnForm.pay_now && (
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Payment Method</Label>
-                    <select
-                      value={returnForm.payment_method}
-                      onChange={(e) => setReturnForm({ ...returnForm, payment_method: e.target.value })}
-                      className="w-full h-9 rounded-md border border-slate-200 px-3 text-xs bg-white"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Online">Online</option>
-                      <option value="Card">Card</option>
-                    </select>
+              {returnForm.condition === "GOOD" && (
+                <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="return_pay_now"
+                      checked={returnForm.pay_now}
+                      onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="return_pay_now" className="text-xs font-semibold text-slate-800">
+                      Collect Any Late Fine Now (Instant Settlement)
+                    </label>
                   </div>
-                )}
-              </div>
+                  {returnForm.pay_now && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Cash" })}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Cash"
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-700 border-slate-200"
+                        }`}
+                      >
+                        <DollarSign className="h-3.5 w-3.5" /> Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, payment_method: "Online" })}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          returnForm.payment_method === "Online"
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-slate-700 border-slate-200"
+                        }`}
+                      >
+                        <CreditCard className="h-3.5 w-3.5" /> Online
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setShowReturnModal(null)}>
@@ -6162,159 +7191,58 @@ export default function LibrarianDashboard() {
       )}
 
       {/* MODAL: BOOK COPIES & BARCODES */}
-      {showCopiesModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Physical Copies & Barcodes</h2>
-                <p className="text-xs text-slate-500">{showCopiesModal.title}</p>
-              </div>
-              <button onClick={() => setShowCopiesModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Copies list with transfer & status change */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase text-slate-500">Registered Accession Copies ({bookCopiesList.length})</h4>
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {bookCopiesList.map((copy) => (
-                  <div key={copy.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="font-mono text-xs font-bold text-slate-900">{copy.accession_no}</div>
-                      <div className="text-[11px] text-slate-500">
-                        Barcode: {copy.barcode || "N/A"} • Rack: {copy.rack_code || "—"} • Shelf: {copy.shelf_code || "—"}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Condition: {copy.condition}</div>
-                    </div>
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                      <select
-                        value={copy.status}
-                        onChange={(e) => handleChangeCopyStatus(copy.id, e.target.value)}
-                        disabled={copy.status === "ISSUED" || copy.status === "RESERVED"}
-                        className="h-7 text-[11px] rounded border border-slate-200 bg-white px-2 font-medium disabled:bg-slate-100 disabled:text-slate-500"
-                        title={copy.status === "ISSUED" ? "Cannot change status while book is issued on loan" : ""}
-                      >
-                        <option value="AVAILABLE">Available</option>
-                        <option value="ISSUED">Issued (On Loan)</option>
-                        <option value="RESERVED">Reserved</option>
-                        <option value="UNDER_REPAIR">Under Repair</option>
-                        <option value="DAMAGED">Damaged</option>
-                        <option value="LOST">Lost</option>
-                        <option value="DISPOSED">Disposed</option>
-                      </select>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setTransferCopyModal(copy);
-                          setTransferForm({
-                            rack_id: copy.rack ? String(copy.rack) : "",
-                            shelf_id: copy.shelf ? String(copy.shelf) : "",
-                          });
-                        }}
-                        className="h-7 text-[11px] px-2 border-slate-200 bg-white hover:bg-slate-50 text-indigo-600"
-                      >
-                        <ArrowRightLeft className="h-3 w-3 mr-1" /> Transfer
-                      </Button>
-                      {copy.status !== "DISPOSED" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDisposeCopy(copy.id)}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
-                          title="Dispose physical copy"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Add extra copies form */}
-            <form noValidate onSubmit={handleGenerateCopies} className="pt-3 border-t space-y-3">
-              <h4 className="text-xs font-bold uppercase text-slate-500">Generate Additional Copies</h4>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">Count</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={generateCopiesForm.count}
-                    onChange={(e) => setGenerateCopiesForm({ ...generateCopiesForm, count: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Rack</Label>
-                  <select
-                    value={generateCopiesForm.rack_id}
-                    onChange={(e) => {
-                      const newRack = e.target.value;
-                      setGenerateCopiesForm((prev) => {
-                        const isShelfInNewRack =
-                          newRack && prev.shelf_id
-                            ? shelves.some((s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf_id))
-                            : false;
-                        return {
-                          ...prev,
-                          rack_id: newRack,
-                          shelf_id: isShelfInNewRack ? prev.shelf_id : "",
-                        };
-                      });
-                    }}
-                    className="w-full h-9 rounded-md border border-slate-200 text-xs px-2"
-                  >
-                    <option value="">-- Rack --</option>
-                    {racks.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.rack_code}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label className="text-xs">Shelf</Label>
-                  <select
-                    value={generateCopiesForm.shelf_id}
-                    onChange={(e) => setGenerateCopiesForm({ ...generateCopiesForm, shelf_id: e.target.value })}
-                    disabled={!generateCopiesForm.rack_id}
-                    className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    {!generateCopiesForm.rack_id ? (
-                      <option value="">-- Select Rack First --</option>
-                    ) : (
-                      <>
-                        <option value="">-- Shelf --</option>
-                        {shelves
-                          .filter((s) => String(s.rack) === String(generateCopiesForm.rack_id))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.shelf_code} ({s.shelf_name})
-                            </option>
-                          ))}
-                      </>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowCopiesModal(null)}>
-                  Close
-                </Button>
-                <Button type="submit" size="sm" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Generate Barcodes
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ManageCopiesModal
+        isOpen={!!showCopiesModal}
+        onClose={() => setShowCopiesModal(null)}
+        book={showCopiesModal}
+        copies={bookCopiesList}
+        racks={racks}
+        shelves={shelves}
+        actionLoading={actionLoading}
+        onGenerateCopies={async (count, rackId, shelfId) => {
+          if (!showCopiesModal) return;
+          setActionLoading(true);
+          try {
+            await generateBookCopies({
+              book_id: showCopiesModal.id,
+              count: Number(count),
+              rack_id: rackId ? Number(rackId) : null,
+              shelf_id: shelfId ? Number(shelfId) : null,
+            });
+            showToast("success", `${count} physical copy barcode(s) generated!`);
+            const updatedCopies = await getBookCopies(showCopiesModal.id);
+            setBookCopiesList(updatedCopies);
+            await loadAllData();
+          } catch (err: any) {
+            showToast("error", err.message || "Failed to generate copies.");
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+        onChangeStatus={handleChangeCopyStatus}
+        onTransferClick={(copy) => {
+          setTransferCopyModal(copy);
+          setTransferForm({
+            rack_id: copy.rack ? String(copy.rack) : "",
+            shelf_id: copy.shelf ? String(copy.shelf) : "",
+          });
+        }}
+        onDisposeClick={handleDisposeCopy}
+        onPrintSticker={(copy) => {
+          setPrintStickerModal({
+            isOpen: true,
+            copy,
+            book: showCopiesModal,
+          });
+        }}
+        onPrintAllBarcodes={(b, cps) => {
+          setPrintStickerModal({
+            isOpen: true,
+            book: b,
+            allCopies: cps,
+          });
+        }}
+      />
 
       {/* MODAL: ADD MASTER */}
       {showMasterModal && (
@@ -6370,8 +7298,6 @@ export default function LibrarianDashboard() {
                     ? editingMaster ? "Shelf Name / Number *" : "Shelf Name(s) / Number(s) * (comma-separated for multiple)"
                     : showMasterModal === "author"
                     ? "Author Full Name *"
-                    : showMasterModal === "publisher"
-                    ? "Publisher Name *"
                     : "Category / Subject Name *"}
                 </Label>
                 <Input
@@ -6387,8 +7313,6 @@ export default function LibrarianDashboard() {
                       ? "e.g. Shelf 1, Shelf 2, Shelf 3, Shelf 4"
                       : showMasterModal === "author"
                       ? "e.g. H.C. Verma"
-                      : showMasterModal === "publisher"
-                      ? "e.g. Oxford University Press"
                       : "e.g. Physics / Mathematics"
                   }
                   className={
@@ -6444,27 +7368,6 @@ export default function LibrarianDashboard() {
                   </p>
                 )}
               </div>
-
-              {showMasterModal === "publisher" && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Contact Phone (Optional)</Label>
-                    <Input
-                      value={masterForm.extra}
-                      onChange={(e) => setMasterForm({ ...masterForm, extra: e.target.value })}
-                      placeholder="+91 9876543210"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Contact Email (Optional)</Label>
-                    <Input
-                      value={masterForm.extra2}
-                      onChange={(e) => setMasterForm({ ...masterForm, extra2: e.target.value })}
-                      placeholder="contact@publisher.com"
-                    />
-                  </div>
-                </>
-              )}
 
               {showMasterModal === "category" && (
                 <div className="space-y-1">
@@ -6562,18 +7465,34 @@ export default function LibrarianDashboard() {
                 )}
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Payment Method *</Label>
-                <select
-                  value={finePaymentForm.payment_method}
-                  onChange={(e) => setFinePaymentForm({ ...finePaymentForm, payment_method: e.target.value })}
-                  className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm bg-white"
-                >
-                  <option value="Cash">Cash Counter</option>
-                  <option value="UPI">UPI / QR Code</option>
-                  <option value="Online">Online NetBanking</option>
-                  <option value="Card">Debit / Credit Card</option>
-                </select>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Payment Mode *</Label>
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFinePaymentForm({ ...finePaymentForm, payment_method: "Cash" })}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                      finePaymentForm.payment_method === "Cash"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                    }`}
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    <span>Cash Counter</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFinePaymentForm({ ...finePaymentForm, payment_method: "Online" })}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                      finePaymentForm.payment_method === "Online"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/20"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50"
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span>Online / UPI</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t">
@@ -6591,81 +7510,11 @@ export default function LibrarianDashboard() {
       )}
 
       {/* MODAL: PRINTABLE RECEIPT */}
-      {receiptModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl printable-area">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-lg font-bold text-slate-900">Library Fine Receipt</h2>
-              </div>
-              <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 space-y-3 font-mono text-xs">
-              <div className="text-center border-b pb-2">
-                <div className="font-bold text-sm text-slate-900">OFFICIAL LIBRARY RECEIPT</div>
-                <div className="text-[11px] text-slate-500">School Library Management System</div>
-                <div className="text-[11px] text-indigo-700 font-bold mt-1">Receipt No: {receiptModal.receipt_no}</div>
-              </div>
-
-              <div className="space-y-1.5 pt-1 text-slate-700">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Date & Time:</span>
-                  <span>{new Date().toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Borrower:</span>
-                  <span className="font-bold">{receiptModal.record?.staff_name || receiptModal.record?.student_name}</span>
-                </div>
-                {receiptModal.record?.student_gr_no && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">GR Number:</span>
-                    <span>{receiptModal.record.student_gr_no}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Book Title:</span>
-                  <span className="text-right max-w-[200px] truncate">{receiptModal.record?.book_title}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Payment Mode:</span>
-                  <span>{receiptModal.record?.payment_method || "Cash"}</span>
-                </div>
-                <div className="border-t pt-1 flex justify-between font-bold text-slate-900 text-sm">
-                  <span>Amount Paid:</span>
-                  <span className="text-emerald-700">₹{receiptModal.amount_paid}</span>
-                </div>
-                <div className="flex justify-between text-slate-500 text-[11px]">
-                  <span>Remaining Due:</span>
-                  <span className={Number(receiptModal.remaining_due) > 0 ? "text-rose-600 font-bold" : "text-slate-500"}>
-                    ₹{receiptModal.remaining_due}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-center border-t pt-2 text-[10px] text-slate-400 italic">
-                {receiptModal.is_fine_paid ? "All library dues for this loan transaction are fully settled." : "Partial settlement recorded."}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setReceiptModal(null)}>
-                Close
-              </Button>
-              <Button
-                onClick={() => window.print()}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-medium"
-              >
-                <Printer className="h-3.5 w-3.5" /> Print Receipt
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LibraryFineReceiptModal
+        isOpen={!!receiptModal}
+        onClose={() => setReceiptModal(null)}
+        receiptData={receiptModal}
+      />
 
       {/* MODAL: TRANSFER PHYSICAL COPY */}
       {transferCopyModal && (
@@ -6690,11 +7539,13 @@ export default function LibrarianDashboard() {
                   className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white"
                 >
                   <option value="">-- No Rack --</option>
-                  {racks.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.rack_code} — {r.rack_name}
-                    </option>
-                  ))}
+                  {racks
+                    .filter((r) => r.is_active !== false || String(r.id) === String(transferForm.rack_id))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.rack_code} — {r.rack_name} {r.is_active === false ? " (Deactivated)" : ""}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -6712,10 +7563,14 @@ export default function LibrarianDashboard() {
                     <>
                       <option value="">-- No Shelf --</option>
                       {shelves
-                        .filter((s) => String(s.rack) === String(transferForm.rack_id))
+                        .filter(
+                          (s) =>
+                            String(s.rack) === String(transferForm.rack_id) &&
+                            (s.is_active !== false || String(s.id) === String(transferForm.shelf_id))
+                        )
                         .map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.shelf_code} ({s.shelf_name})
+                            {s.shelf_code} ({s.shelf_name}) {s.is_active === false ? " (Deactivated)" : ""}
                           </option>
                         ))}
                     </>
@@ -6735,6 +7590,30 @@ export default function LibrarianDashboard() {
           </div>
         </div>
       )}
+
+      {/* REUSABLE CUSTOM DELETE CONFIRMATION MODAL */}
+      <ConfirmDeleteModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        itemName={confirmModal.itemName}
+        itemType={confirmModal.itemType}
+        description={confirmModal.description}
+        consequences={confirmModal.consequences}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDestructive={confirmModal.isDestructive}
+      />
+
+      {/* BARCODE STICKERS & LABELS PRINT MODAL */}
+      <PrintBarcodeStickerModal
+        isOpen={printStickerModal.isOpen}
+        onClose={() => setPrintStickerModal((prev) => ({ ...prev, isOpen: false }))}
+        copy={printStickerModal.copy}
+        book={printStickerModal.book}
+        allCopies={printStickerModal.allCopies}
+      />
     </div>
   );
 }

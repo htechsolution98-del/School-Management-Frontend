@@ -119,6 +119,16 @@ function findActive(links: SidebarLink[], pathname: string): SidebarLink | undef
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
+function formatSchoolDisplayName(name?: string | null): string {
+  if (!name) return "VidyaSanchalan";
+  const trimmed = name.trim();
+  if (trimmed.toLowerCase() === "vidyasanchalan") return "VidyaSanchalan";
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function
   AppShell({
     children,
@@ -174,6 +184,8 @@ export function
   const [selectedNotification, setSelectedNotification] = useState<AnnouncementResponse | null>(null);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState<string | null>(null);
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [logoImgError, setLogoImgError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -181,6 +193,12 @@ export function
       .then((data) => {
         if (!mounted) return;
         setProfile(data);
+        if (data.school?.name) setSchoolName(data.school.name);
+        const resolvedLogo = data.school?.logo || data.avatar;
+        if (resolvedLogo) {
+          setSchoolLogo(resolvedLogo);
+          setLogoImgError(false);
+        }
         const serverRoles = (data.roles || (data.role ? [data.role] : [])).map(r => String(r).toLowerCase().trim());
         if (requiresRoleCheck && roleTitle && ROLE_ALLOWED_MAP[roleTitle]) {
           const isAllowed = ROLE_ALLOWED_MAP[roleTitle].some(r => serverRoles.includes(r));
@@ -195,7 +213,10 @@ export function
   }, [requiresRoleCheck, roleTitle, pathname]);
 
   useEffect(() => {
-    try { setSchoolName(localStorage.getItem("school_name")); } catch { /* ignore */ }
+    try {
+      setSchoolName(localStorage.getItem("school_name"));
+      setSchoolLogo(localStorage.getItem("school_logo"));
+    } catch { /* ignore */ }
   }, []);
 
   // Auto-expand the group that owns the active page.
@@ -433,6 +454,19 @@ export function
     );
   };
 
+  const isSuperAdminRole =
+    roleTitle === "Super Admin" ||
+    (profile?.roles || []).some((r) => String(r).toLowerCase().includes("super"));
+  const rawSchoolName =
+    headerTitle ||
+    (isSuperAdminRole
+      ? "VidyaSanchalan Platform"
+      : profile?.school?.name || schoolName || "VidyaSanchalan");
+  const currentSchoolDisplayName = isSuperAdminRole
+    ? "VidyaSanchalan Platform"
+    : formatSchoolDisplayName(rawSchoolName);
+  const activeLogo = isSuperAdminRole ? null : (profile?.school?.logo || profile?.avatar || schoolLogo);
+
   const navigation = (compact: boolean, onNavigate?: () => void) => (
     <div className="flex h-full flex-col relative z-10">
       {/* Brand Header */}
@@ -443,13 +477,24 @@ export function
           onClick={() => updateWidth(expanded ? MIN_WIDTH : DEFAULT_WIDTH)}
           className="shrink-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-white transition-transform active:scale-95"
         >
-          <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-md p-1.5 flex items-center justify-center shadow-inner border border-white/20">
-            <School className="h-6 w-6 text-amber-300 drop-shadow-sm" />
+          <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-md p-1.5 flex items-center justify-center shadow-inner border border-white/20 overflow-hidden">
+            {!logoImgError && activeLogo ? (
+              <img
+                src={activeLogo}
+                alt={currentSchoolDisplayName}
+                onError={() => setLogoImgError(true)}
+                className="h-full w-full object-contain rounded-xl"
+              />
+            ) : (
+              <School className="h-6 w-6 text-amber-300 drop-shadow-sm" />
+            )}
           </div>
         </button>
         {!compact && (
           <div className="min-w-0">
-            <p className="truncate text-base font-bold tracking-tight text-white drop-shadow-xs">VidyaSanchalan</p>
+            <p className="truncate text-base font-bold tracking-tight text-white drop-shadow-xs" title={currentSchoolDisplayName}>
+              {currentSchoolDisplayName}
+            </p>
             <p className="truncate text-xs text-blue-200/90 font-medium">{subtitle}</p>
           </div>
         )}
@@ -500,14 +545,6 @@ export function
     );
   }
 
-  const isSuperAdminRole =
-    roleTitle === "Super Admin" ||
-    (profile?.roles || []).some((r) => String(r).toLowerCase().includes("super"));
-  const currentSchoolDisplayName =
-    headerTitle ||
-    (isSuperAdminRole
-      ? "VidyaSanchalan Platform"
-      : profile?.school?.name || schoolName || "VidyaSanchalan");
   const currentUserName = profile?.name || userName || "Administrator";
   const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "SA";
 
@@ -618,14 +655,23 @@ export function
         {/* Top Header Bar: Royal Blue gradient on mobile, clean surface on desktop */}
         <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#1E40AF]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(30,64,175,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none z-20">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
-              <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
+              {!logoImgError && activeLogo ? (
+                <img
+                  src={activeLogo}
+                  alt={currentSchoolDisplayName}
+                  onError={() => setLogoImgError(true)}
+                  className="h-full w-full object-contain p-0.5 rounded-full"
+                />
+              ) : (
+                <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              )}
             </span>
             <div className="min-w-0">
-              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight">
-                VidyaSanchalan
+              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight" title={currentSchoolDisplayName}>
+                {currentSchoolDisplayName}
               </span>
               <span className="block truncate text-xs text-white/80 lg:text-[#7183A6] font-normal leading-tight mt-0.5">
                 {roleTitle || "Teacher"}
