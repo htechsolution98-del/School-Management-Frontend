@@ -44,6 +44,10 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     if (profile.school?.slug) {
       localStorage.setItem("school_slug", profile.school.slug);
     }
+    const logoUrl = profile.school?.logo || profile.avatar;
+    if (logoUrl) {
+      localStorage.setItem("school_logo", logoUrl);
+    }
   }
 
   return profile;

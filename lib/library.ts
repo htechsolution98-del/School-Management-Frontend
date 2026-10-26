@@ -149,6 +149,27 @@ export interface BookIssued {
   condition_on_return?: string;
   remarks?: string;
   status: "ISSUED" | "RETURNED" | "LOST" | "DAMAGED";
+  school_id?: number;
+  school_code?: string;
+  school_name?: string;
+  school_logo?: string | null;
+  school_address?: string;
+  school_phone?: string;
+  school_email?: string;
+  school_info?: {
+    id: number;
+    name: string;
+    code?: string;
+    logo?: string | null;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+    index_no?: string;
+  };
 }
 
 export interface BookReservation {
@@ -239,8 +260,17 @@ export async function getLibraryStaff(): Promise<LibraryStaff[]> {
 
 // ---------------- BOOK CATALOG ---------------- //
 
-export async function getBooks(): Promise<Book[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_MANAGE}`, {
+export async function getBooks(params?: { author?: string; category?: string; search?: string }): Promise<Book[]> {
+  let url = `${API_BASE_URL}${API_ENDPOINTS.BOOKS_MANAGE}`;
+  if (params) {
+    const sp = new URLSearchParams();
+    if (params.author) sp.append("author", params.author);
+    if (params.category) sp.append("category", params.category);
+    if (params.search) sp.append("search", params.search);
+    const qs = sp.toString();
+    if (qs) url += `?${qs}`;
+  }
+  const response = await fetchWithAuth(url, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -253,6 +283,7 @@ export async function getBooks(): Promise<Book[]> {
   const data = await response.json();
   return Array.isArray(data) ? data : data.results ?? [];
 }
+
 
 export async function getPublicBooks(): Promise<Book[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BOOKS}`, {
@@ -484,6 +515,22 @@ export async function payBookFine(
     throw new Error(String(errorMsg));
   }
 
+  return response.json();
+}
+
+export async function getFineReceipt(params: { receipt_no?: string; id?: number }): Promise<FinePaymentResult> {
+  const query = new URLSearchParams();
+  if (params.receipt_no) query.set("receipt_no", params.receipt_no);
+  if (params.id) query.set("id", String(params.id));
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}receipt/?${query.toString()}`);
+  if (!response.ok) {
+    let errorMsg = "Failed to load receipt details.";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
   return response.json();
 }
 
@@ -771,6 +818,22 @@ export async function deleteCategory(id: number): Promise<void> {
   }
 }
 
+export async function toggleCategoryActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_CATEGORIES}${id}/toggle-active/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to toggle category status";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
 export async function getAuthors(): Promise<Author[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}`, {
     method: "GET",
@@ -828,6 +891,22 @@ export async function deleteAuthor(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+}
+
+export async function toggleAuthorActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}${id}/toggle-active/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to toggle author status";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
 }
 
 export async function getPublishers(): Promise<Publisher[]> {
@@ -889,6 +968,22 @@ export async function deletePublisher(id: number): Promise<void> {
   }
 }
 
+export async function togglePublisherActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_PUBLISHERS}${id}/toggle-active/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to toggle publisher status";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
+}
+
 export async function getRacks(): Promise<Rack[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}`, {
     method: "GET",
@@ -946,6 +1041,22 @@ export async function deleteRack(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+}
+
+export async function toggleRackActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}${id}/toggle-active/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to toggle rack status";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
 }
 
 export async function getShelves(rackId?: number): Promise<Shelf[]> {
@@ -1006,6 +1117,22 @@ export async function deleteShelf(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+}
+
+export async function toggleShelfActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SHELVES}${id}/toggle-active/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    let errorMsg = "Failed to toggle shelf status";
+    try {
+      const err = await response.json();
+      errorMsg = err?.detail || err?.message || errorMsg;
+    } catch {}
+    throw new Error(String(errorMsg));
+  }
+  return response.json();
 }
 
 // ---------------- LIBRARY SETTINGS & RULES ---------------- //
