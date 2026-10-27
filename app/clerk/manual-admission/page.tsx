@@ -48,9 +48,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-import { AdmissionFieldInput } from "@/components/clerk/admission-field";
+import { AdmissionFieldInput, type MobileVerificationStatus } from "@/components/clerk/admission-field";
 import { BulkAdmissionImport } from "@/components/clerk/bulk-admission-import";
-import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, isAadhaarAdmissionField, AADHAAR_DUPLICATE_ERROR, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
+import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, isAadhaarAdmissionField, isPhoneField, AADHAAR_DUPLICATE_ERROR, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
 import { checkAadhaarUnique } from "@/lib/student-profile-validation";
 import { submitAdmission } from "@/lib/clerk/admission-submit";
 import "../clerk-workspace.css";
@@ -478,7 +478,53 @@ export default function ManualAdmissionPage() {
   const [isRte, setIsRte] = useState(false);
   const [rteDocument, setRteDocument] = useState<File | null>(null);
 
+  // Sibling / Family detection state
+  const [siblingModalOpen, setSiblingModalOpen] = useState(false);
+  const [siblingData, setSiblingData] = useState<{
+    parent: {
+      id?: number | null;
+      parent_user_id?: number | null;
+      mobile: string;
+      father_name?: string;
+      mother_name?: string;
+      surname?: string;
+      guardian_name?: string;
+      address?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      pincode?: string;
+      email?: string;
+      field_values?: Record<string, string>;
+    };
+    siblings: {
+      id: number;
+      name: string;
+      gr_no?: string;
+      class_name?: string;
+      admission_number?: string;
+    }[];
+    mobile: string;
+  } | null>(null);
+
+  const [mobileStatus, setMobileStatus] = useState<MobileVerificationStatus>("unchecked");
+  const [verifyingMobile, setVerifyingMobile] = useState(false);
+  const [verifiedMobileNumber, setVerifiedMobileNumber] = useState<string>("");
+  const [linkedParent, setLinkedParent] = useState<{
+    parentId: number | string;
+    parentName: string;
+    siblings: { id: number; name: string; class_name?: string }[];
+  } | null>(null);
+
   const firstInputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  const phoneField = useMemo(() => {
+    if (!activeForm) return null;
+    return admissionFields(activeForm).find(isPhoneField) || null;
+  }, [activeForm]);
+
+  const hasPhoneField = Boolean(phoneField);
+  const isMobileVerified = !hasPhoneField || mobileStatus === "verified_new" || mobileStatus === "sibling_linked";
 
   useEffect(() => {
     async function loadData() {
@@ -538,6 +584,50 @@ export default function ManualAdmissionPage() {
   }, [submitting]);
   useEffect(() => { const refresh = () => { void refreshForms(); }; window.addEventListener("focus", refresh); return () => window.removeEventListener("focus", refresh); }, [refreshForms]);
 
+  const handleVerifyMobile = useCallback(async (field?: FormField) => {
+    let phoneVal = "";
+    if (field && dynamicValues[field.id]) {
+      phoneVal = String(dynamicValues[field.id]);
+    } else if (phoneField && dynamicValues[phoneField.id]) {
+      phoneVal = String(dynamicValues[phoneField.id]);
+    }
+
+    const clean = phoneVal.replace(/\D/g, "");
+    if (clean.length !== 10) {
+      toast.error("Please enter a valid 10-digit mobile number before verifying.");
+      return;
+    }
+
+    setVerifyingMobile(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/check-parent/?mobile=${clean}`);
+      if (res.ok) {
+        const data = await res.json();
+        setVerifiedMobileNumber(clean);
+        if (data.exists && (data.parent || (data.siblings && data.siblings.length > 0))) {
+          setMobileStatus("duplicate_found");
+          setSiblingData({
+            parent: data.parent || null,
+            siblings: data.siblings || [],
+            mobile: clean,
+          });
+          setSiblingModalOpen(true);
+        } else {
+          setMobileStatus("verified_new");
+          setSiblingData(null);
+          toast.success("Mobile number verified as new (No existing records found).");
+        }
+      } else {
+        toast.error("Failed to verify mobile number. Please try again.");
+      }
+    } catch (e) {
+      console.error("Error verifying mobile:", e);
+      toast.error("Network error while verifying mobile number.");
+    } finally {
+      setVerifyingMobile(false);
+    }
+  }, [phoneField, dynamicValues]);
+
   // Real-time Field Validator
   const validateSingleField = (field: FormField, value: any): string => {
     return validateAdmissionField(field, normalizeAdmissionValue(field, value));
@@ -575,6 +665,115 @@ export default function ManualAdmissionPage() {
         });
       }
     }
+
+    if (isPhoneField(field)) {
+      const clean = String(processedValue || "").replace(/\D/g, "");
+      if (clean !== verifiedMobileNumber) {
+        setMobileStatus("unchecked");
+        if (linkedParent) setLinkedParent(null);
+      }
+    }
+  };
+
+  const handleFieldBlur = (_field: FormField) => {
+    // Blur handler
+  };
+
+  const handleDismissSibling = () => {
+    setSiblingModalOpen(false);
+    setMobileStatus("duplicate_found");
+    toast.error("Mobile number is already registered. Please enter a different mobile number or link as sibling.");
+  };
+
+  const handleAutoFillSibling = () => {
+    if (!siblingData || !activeForm) return;
+
+    const p = siblingData.parent;
+    const pValues = p.field_values || {};
+
+    const allFields = admissionFields(activeForm);
+    const updates: Record<number, any> = {};
+    const clearedErrors: Record<number, string> = { ...fieldErrors };
+
+    for (const f of allFields) {
+      const mapping = (f.map_to_student_field || "").toLowerCase();
+      const lbl = (f.label || "").toLowerCase();
+
+      // Skip student specific fields! Do NOT overwrite student name, DOB, Aadhaar, gender, etc.
+      if (
+        mapping === "name" ||
+        mapping === "first_name" ||
+        mapping === "date_of_birth" ||
+        mapping === "aadhar_number" ||
+        mapping === "gender" ||
+        /student\s*name|first\s*name|candidate\s*name|dob|birth|gender|aadh?aar/i.test(lbl)
+      ) {
+        continue;
+      }
+
+      let matchedValue: string | undefined = undefined;
+
+      // Father Name
+      if (mapping === "father_name" || (/father/i.test(lbl) && !/mobile|phone|occup|qualif|email/i.test(lbl))) {
+        matchedValue = p.father_name || pValues.father_name;
+      }
+      // Mother Name
+      else if (mapping === "mother_name" || (/mother/i.test(lbl) && !/mobile|phone|occup|qualif|email/i.test(lbl))) {
+        matchedValue = p.mother_name || pValues.mother_name;
+      }
+      // Surname / Last Name
+      else if (mapping === "surname" || /surname|last\s*name/i.test(lbl)) {
+        matchedValue = p.surname || pValues.surname;
+      }
+      // Guardian Name
+      else if (/guardian/i.test(lbl) && !/mobile|phone|occup|relation/i.test(lbl)) {
+        matchedValue = p.guardian_name || p.father_name || pValues.guardian_name;
+      }
+      // Address
+      else if (/address/i.test(lbl)) {
+        matchedValue = p.address || pValues.address;
+      }
+      // City / Village / Town
+      else if (/city|village|town/i.test(lbl)) {
+        matchedValue = p.city || pValues.city;
+      }
+      // District
+      else if (/district/i.test(lbl)) {
+        matchedValue = p.district || pValues.district;
+      }
+      // State
+      else if (/state/i.test(lbl)) {
+        matchedValue = p.state || pValues.state;
+      }
+      // Pincode
+      else if (/pin(code)?/i.test(lbl)) {
+        matchedValue = p.pincode || pValues.pincode;
+      }
+      // Email
+      else if (/email/i.test(lbl) && !/student/i.test(lbl)) {
+        matchedValue = p.email || pValues.email;
+      }
+
+      if (matchedValue !== undefined && matchedValue !== "") {
+        updates[f.id] = matchedValue;
+        delete clearedErrors[f.id];
+      }
+    }
+
+    setDynamicValues(prev => ({ ...prev, ...updates }));
+    setFieldErrors(clearedErrors);
+
+    const parentIdentifier = p.parent_user_id || p.id;
+    const pDisplayName = [p.father_name, p.surname].filter(Boolean).join(" ") || `Parent (${siblingData.mobile})`;
+    setLinkedParent({
+      parentId: parentIdentifier || siblingData.mobile,
+      parentName: pDisplayName,
+      siblings: siblingData.siblings,
+    });
+
+    toast.success("Parent & address details auto-filled for sibling!");
+    setMobileStatus("sibling_linked");
+    setSiblingModalOpen(false);
   };
 
   const handleFileChange = (docFieldId: number, file: File | null): boolean => {
@@ -639,6 +838,20 @@ export default function ManualAdmissionPage() {
     }
 
     if (academicYears.length && !academicYears.some(year => String(year.id) === selectedAcademicYear)) { setErrorMsg("Select an available academic year."); return; }
+ 
+    if (hasPhoneField && !isMobileVerified) {
+      const msg = "Please verify the mobile number before submitting the application.";
+      setErrorMsg(msg);
+      toast.error(msg);
+      if (phoneField) {
+        const el = document.getElementById(`field-input-${phoneField.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }
+      return;
+    }
 
     // Comprehensive validation pass
     const newErrors: Record<number, string> = {};
@@ -710,7 +923,15 @@ export default function ManualAdmissionPage() {
     setSubmitting(true);
 
     try {
-      const result = await submitAdmission({ form: activeForm, values: dynamicValues, academicYear: selectedAcademicYear, documents: docFiles, isRte, rteDocument });
+      const result = await submitAdmission({
+        form: activeForm,
+        values: dynamicValues,
+        academicYear: selectedAcademicYear,
+        documents: docFiles,
+        isRte,
+        rteDocument,
+        parentId: linkedParent?.parentId,
+      });
       const admissionNumber = result.admissionNumber;
       setSubmissionWarnings(result.warnings);
       result.warnings.forEach(warning => toast.warning(warning));
@@ -729,6 +950,8 @@ export default function ManualAdmissionPage() {
         setFieldErrors({});
         setIsRte(false);
         setRteDocument(null);
+        setLinkedParent(null);
+        setSiblingData(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setSuccessData({
@@ -766,6 +989,11 @@ export default function ManualAdmissionPage() {
     setDocFiles({});
     setIsRte(false);
     setRteDocument(null);
+    setLinkedParent(null);
+    setSiblingData(null);
+    setMobileStatus("unchecked");
+    setVerifiedMobileNumber("");
+    setSiblingModalOpen(false);
   };
 
   // Find student birth date field value if present to show live age preview
@@ -902,6 +1130,35 @@ export default function ManualAdmissionPage() {
           <fieldset disabled={submitting} className="space-y-6">
 
           {dobValue && calculatedAge.valid && <p className="rounded-xl border border-teal-100 bg-teal-50/50 px-4 py-3 text-xs font-semibold text-teal-800">Student age: {calculatedAge.text}</p>}
+
+          {linkedParent && (
+            <div className="flex items-center justify-between p-3.5 bg-emerald-50/90 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-900 dark:text-emerald-200 text-xs shadow-xs animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-emerald-950 dark:text-emerald-100">Linked Sibling / Family:</span>{" "}
+                  <span>{linkedParent.parentName}</span>
+                  {linkedParent.siblings && linkedParent.siblings.length > 0 && (
+                    <span className="text-emerald-700 dark:text-emerald-300 ml-1.5 font-medium">
+                      (Sibling of: {linkedParent.siblings.map(s => s.name).join(", ")})
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setLinkedParent(null)}
+                className="h-7 text-xs text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/60 rounded-lg px-2.5"
+              >
+                Unlink
+              </Button>
+            </div>
+          )}
+
           {/* DYNAMIC SECTIONS */}
           {activeForm.sections.map((section, sIdx) => (
             <Card key={section.id} className="rounded-2xl border-gray-200 dark:border-zinc-800 shadow-xs overflow-hidden bg-white dark:bg-zinc-900">
@@ -922,7 +1179,24 @@ export default function ManualAdmissionPage() {
               </CardHeader>
               
               <CardContent className="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
-                {section.fields?.map(field => <AdmissionFieldInput key={field.id} field={field} value={dynamicValues[field.id]} onChange={value => handleDynamicChange(field, value)} error={fieldErrors[field.id]} disabled={submitting} classes={classes} />)}
+                {section.fields?.map(field => {
+                  const isPhone = isPhoneField(field);
+                  return (
+                    <AdmissionFieldInput
+                      key={field.id}
+                      field={field}
+                      value={dynamicValues[field.id]}
+                      onChange={value => handleDynamicChange(field, value)}
+                      onBlur={() => handleFieldBlur(field)}
+                      error={fieldErrors[field.id]}
+                      disabled={submitting}
+                      classes={classes}
+                      mobileStatus={isPhone ? mobileStatus : undefined}
+                      isVerifyingMobile={isPhone ? verifyingMobile : undefined}
+                      onVerifyMobile={isPhone ? () => void handleVerifyMobile(field) : undefined}
+                    />
+                  );
+                })}
               </CardContent>
             </Card>
           ))}
@@ -1116,13 +1390,22 @@ export default function ManualAdmissionPage() {
               Cancel
             </Button>
 
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              {hasPhoneField && !isMobileVerified && (
+                <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  {mobileStatus === "duplicate_found"
+                    ? "Existing mobile! Link as sibling or change number."
+                    : "Verify mobile number to enable submission."}
+                </span>
+              )}
+
               <Button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || (hasPhoneField && !isMobileVerified)}
                 onClick={(e) => handleSubmit(e, "add_another")}
                 variant="outline"
-                className="w-full sm:w-auto px-5 py-2.5 border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-900 dark:text-teal-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                className="w-full sm:w-auto px-5 py-2.5 border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-900 dark:text-teal-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting && submitMode === "add_another" ? (
                   <>
@@ -1137,8 +1420,8 @@ export default function ManualAdmissionPage() {
 
               <Button
                 type="submit"
-                disabled={submitting}
-                className="w-full sm:w-auto px-7 py-2.5 office-primary text-white rounded-xl text-xs font-semibold shadow-md flex items-center justify-center gap-2"
+                disabled={submitting || (hasPhoneField && !isMobileVerified)}
+                className="w-full sm:w-auto px-7 py-2.5 office-primary text-white rounded-xl text-xs font-semibold shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting && submitMode === "standard" ? (
                   <>
@@ -1179,6 +1462,129 @@ export default function ManualAdmissionPage() {
           onClose={() => setPreviewDoc(null)}
         />
       )}
+
+      {/* Sibling Detection Modal */}
+      <Dialog open={siblingModalOpen} onOpenChange={setSiblingModalOpen}>
+        <DialogContent className="max-w-lg rounded-2xl p-6">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-100 text-[#5826df] dark:bg-purple-950/50">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-slate-900 dark:text-zinc-100">
+                  Existing Sibling / Family Detected
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                  Mobile number <span className="font-semibold text-slate-800 dark:text-zinc-200">{siblingData?.mobile}</span> is already registered with an existing student.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 my-2">
+            {/* Existing Students List */}
+            {siblingData?.siblings && siblingData.siblings.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700/60 space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Existing Student(s) in School
+                </span>
+                <div className="space-y-1.5">
+                  {siblingData.siblings.map((sib) => (
+                    <div key={sib.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-zinc-700/40 last:border-none">
+                      <div className="font-semibold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                        <GraduationCap className="h-3.5 w-3.5 text-teal-600" />
+                        <span>{sib.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-500">
+                        {sib.class_name && (
+                          <Badge variant="outline" className="text-[10px] font-medium py-0 px-1.5 bg-white">
+                            {sib.class_name}
+                          </Badge>
+                        )}
+                        {sib.gr_no && (
+                          <span className="text-[11px] font-mono text-slate-600">GR: {sib.gr_no}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Parent Details Preview Card */}
+            {siblingData?.parent && (
+              <div className="p-3.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 text-xs space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300">
+                  Parent & Address Details to Auto-fill
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-slate-700 dark:text-zinc-300">
+                  {siblingData.parent.father_name && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Father Name:</span>
+                      <span className="font-semibold">{siblingData.parent.father_name}</span>
+                    </div>
+                  )}
+                  {siblingData.parent.mother_name && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Mother Name:</span>
+                      <span className="font-semibold">{siblingData.parent.mother_name}</span>
+                    </div>
+                  )}
+                  {siblingData.parent.surname && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Surname:</span>
+                      <span className="font-semibold">{siblingData.parent.surname}</span>
+                    </div>
+                  )}
+                  {(siblingData.parent.city || siblingData.parent.pincode) && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">City / PIN:</span>
+                      <span className="font-semibold">
+                        {[siblingData.parent.city, siblingData.parent.pincode].filter(Boolean).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {siblingData.parent.address && (
+                    <div className="col-span-2">
+                      <span className="text-slate-400 block text-[10px]">Address:</span>
+                      <span className="font-medium truncate block">{siblingData.parent.address}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-200 text-blue-900 text-xs">
+              <p className="font-medium">
+                Do you want to auto-fill the parent & address details and link this applicant as a sibling to the existing family account?
+              </p>
+              <p className="text-[11px] text-blue-700 mt-1">
+                Student-specific fields (first name, birth date, Aadhaar, gender) will remain clear for you to enter.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDismissSibling}
+              className="rounded-xl text-xs font-semibold px-4 h-9"
+            >
+              No, keep new
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAutoFillSibling}
+              className="office-primary text-white rounded-xl text-xs font-semibold px-5 h-9 shadow-sm flex items-center gap-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Yes, auto-fill sibling
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

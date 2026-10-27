@@ -563,7 +563,7 @@ AppShell({
   return (
     <div
       data-resizing={resizing}
-      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] ${
+      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] print:h-auto print:overflow-visible print:bg-transparent ${
         resizing ? "cursor-col-resize select-none" : ""
       }`}
     >
@@ -573,7 +573,7 @@ AppShell({
         animate={{ width: sidebarWidth }}
         initial={false}
         transition={{ duration: reducedMotion || resizing ? 0 : 0.15 }}
-        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#5436F5] via-[#4527D6] to-[#392BC9] shadow-xl lg:flex overflow-hidden"
+        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#5436F5] via-[#4527D6] to-[#392BC9] shadow-xl lg:flex overflow-hidden print:hidden"
       >
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
@@ -617,9 +617,9 @@ AppShell({
       </motion.aside>
 
       {/* Main Workspace Area */}
-      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden print:h-auto print:overflow-visible print:block">
         {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
               <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -749,12 +749,16 @@ AppShell({
         </header>
 
         {/* Global School Subscription / Free Trial Status Notification (Shown only to School Trustees) */}
-        {roleTitle === "Trustee" && <TrialBanner />}
+        {roleTitle === "Trustee" && (
+          <div className="print:hidden">
+            <TrialBanner />
+          </div>
+        )}
 
         {/* Content Body: Protected with pb-28 on mobile so bottom bar never blocks content */}
         <main
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
             (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
             mainClassName
           )}
@@ -765,7 +769,7 @@ AppShell({
         {/* Persistent Role-Aware Mobile Bottom Navigation Bar */}
         <nav
           aria-label="Mobile Bottom Navigation"
-          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden"
+          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden print:hidden"
         >
           <div className="flex items-center justify-around px-2 pt-2 pb-1 max-w-lg mx-auto">
             {mobileNavItems.map((item, idx) => {

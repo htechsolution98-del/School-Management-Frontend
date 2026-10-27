@@ -36,7 +36,7 @@ const sidebarLinks = [
   { title: "Progress Reports", href: "/teacher/progress-reports", icon: FileCheck },
   { title: "Announcements", href: "/teacher/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/teacher/events", icon: CalendarDays },
-  { title: "Stock Management", href: "/teacher/stock", icon: Boxes },
+  { title: "Request Supplies", href: "/teacher/stock", icon: Boxes },
   { title: "My Leaves", href: "/teacher/leaves", icon: CalendarCheck },
   { title: "My Payslips", href: "/teacher/payslips", icon: Banknote },
   { title: "Attendance History", href: "/teacher/attendance", icon: ClipboardList },

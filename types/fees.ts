@@ -158,6 +158,7 @@ export interface Payment {
   verified_by_username?: string | null;
   verified_at?: string | null;
   balance_after_payment?: string;
+  payment_details?: any;
 }
 
 export interface StudentFeePayload {
@@ -239,6 +240,7 @@ export interface CollectFeePayload {
   receipt_number?: string;
   note?: string;
   payment_date?: string;
+  payment_details?: any;
 }
 
 export interface FeeVerifyRecord {

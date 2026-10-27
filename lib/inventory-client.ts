@@ -161,6 +161,77 @@ attachRefreshInterceptor(coreApi);
 export function extractErrorMessage(err: any, fallback = "An unexpected error occurred."): string {
   if (!err) return fallback;
 
+  if (typeof err === "string") {
+    return err;
+  }
+
+  const responseData = err.response?.data;
+  if (responseData) {
+    // If response is raw HTML (e.g. Django debug page)
+    if (typeof responseData === "string") {
+      const trimmed = responseData.trim();
+      if (trimmed.startsWith("<") || trimmed.includes("<!DOCTYPE") || trimmed.includes("<html") || trimmed.includes("<?xml")) {
+        return fallback;
+      }
+      return trimmed || fallback;
+    }
+
+    if (typeof responseData === "object") {
+      // 1. Check specific keys: error, detail, message
+      if (responseData.error) {
+        if (typeof responseData.error === "string") return responseData.error;
+        if (Array.isArray(responseData.error) && responseData.error.length > 0) return String(responseData.error[0]);
+        if (typeof responseData.error === "object") {
+          const firstVal = Object.values(responseData.error)[0];
+          if (Array.isArray(firstVal) && firstVal.length > 0) return String(firstVal[0]);
+          if (typeof firstVal === "string") return firstVal;
+        }
+      }
+
+      if (responseData.detail) {
+        if (typeof responseData.detail === "string") return responseData.detail;
+        if (Array.isArray(responseData.detail) && responseData.detail.length > 0) return String(responseData.detail[0]);
+      }
+
+      if (responseData.message && typeof responseData.message === "string") {
+        return responseData.message;
+      }
+
+      // 2. Check field_errors
+      if (responseData.field_errors && typeof responseData.field_errors === "object") {
+        const firstEntry = Object.entries(responseData.field_errors)[0];
+        if (firstEntry) {
+          const [field, val] = firstEntry;
+          const msg = Array.isArray(val) ? val[0] : String(val);
+          return field === "non_field_errors" || field === "detail" || field === "error"
+            ? String(msg)
+            : `${field.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}: ${msg}`;
+        }
+      }
+
+      // 3. Fallback to Object.values(responseData)[0]
+      const values = Object.values(responseData);
+      if (values.length > 0) {
+        const firstVal = values[0];
+        if (typeof firstVal === "string") return firstVal;
+        if (Array.isArray(firstVal) && firstVal.length > 0) {
+          const firstElem = firstVal[0];
+          if (typeof firstElem === "string") return firstElem;
+          if (typeof firstElem === "object" && firstElem !== null) {
+            const nestedVals = Object.values(firstElem);
+            if (nestedVals.length > 0) return String(nestedVals[0]);
+          }
+          return String(firstElem);
+        }
+        if (typeof firstVal === "object" && firstVal !== null) {
+          const nested = Object.values(firstVal)[0];
+          if (Array.isArray(nested) && nested.length > 0) return String(nested[0]);
+          if (typeof nested === "string") return nested;
+        }
+      }
+    }
+  }
+
   if (err.response?.status === 404) {
     return "Requested resource or endpoint was not found (404).";
   }
@@ -174,50 +245,17 @@ export function extractErrorMessage(err: any, fallback = "An unexpected error oc
     return "Server error occurred. Please try again later.";
   }
 
-  if (err.response?.data) {
-    const data = err.response.data;
-
-    // Filter out raw HTML / XML error pages (Django 404/500 debug pages)
-    if (typeof data === "string") {
-      const trimmed = data.trim();
-      if (trimmed.startsWith("<") || trimmed.includes("<!DOCTYPE") || trimmed.includes("<html") || trimmed.includes("<?xml")) {
-        return fallback;
-      }
-      return data;
-    }
-
-    if (data.detail && typeof data.detail === "string") return data.detail;
-    if (data.error && typeof data.error === "string") return data.error;
-    if (data.message && typeof data.message === "string") return data.message;
-
-    // DRF field error dictionary e.g. { "name": ["This field must be unique."] }
-    if (typeof data === "object") {
-      const keys = Object.keys(data);
-      if (keys.length > 0) {
-        const firstKey = keys[0];
-        const val = data[firstKey];
-        const fieldName = firstKey.replace(/_/g, " ").toUpperCase();
-        if (Array.isArray(val) && val.length > 0) {
-          return `${fieldName}: ${val[0]}`;
-        }
-        if (typeof val === "string") {
-          return `${fieldName}: ${val}`;
-        }
-      }
-    }
-  }
-
   if (err.message && typeof err.message === "string" && !err.message.startsWith("<")) {
     return err.message;
   }
+
   return fallback;
 }
 
 export function showApiError(err: any, fallback = "Action failed") {
   const msg = extractErrorMessage(err, fallback);
-  toast.error("Error", {
-    description: msg,
-    duration: 4500,
+  toast.error(msg, {
+    duration: 5000,
   });
 }
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   Search,
   Wallet,
@@ -25,6 +26,7 @@ import {
   Clock,
   Building2,
   Download,
+  Printer,
 } from "lucide-react";
 import {
   getSalaryPayments,
@@ -1541,14 +1543,23 @@ export default function GenerateSalaryPage() {
                       </div>
 
                       {/* Action */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex items-center gap-1.5">
                         {s.salary_generated ? (
-                          <button
-                            onClick={() => openReceipt(s)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                          >
-                            <Eye size={13} /> View Receipt
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openReceipt(s)}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            >
+                              <Eye size={13} /> View Receipt
+                            </button>
+                            <Link
+                              href={`/trustee/cheque-printing?payee=${encodeURIComponent(s.name)}&amount=${s.net_salary != null ? s.net_salary : s.basic_salary}&memo=${encodeURIComponent("Salary - " + formatMonth(salaryMonth))}`}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+                              title="Print Cheque for this disbursement"
+                            >
+                              <Printer size={13} /> Cheque
+                            </Link>
+                          </>
                         ) : (
                           <button
                             onClick={() => setSelectedStaff(s)}

@@ -12,6 +12,8 @@ import {
   Coins
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { toast } from "sonner";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 export default function PricingAndFeeMappingPage() {
   const [pricings, setPricings] = useState<any[]>([]);
@@ -132,15 +134,24 @@ export default function PricingAndFeeMappingPage() {
     }
   };
 
+  const handleChargingTypeChange = (type: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      charging_type: type,
+      selling_price: (type === "FREE" || type === "INCLUDED_IN_FEE") ? "0.00" : (Number(prev.selling_price) > 0 ? prev.selling_price : ""),
+    }));
+  };
+
   const handleOpenModal = (itemPricing: any = null) => {
     if (itemPricing) {
       setEditingId(itemPricing.id);
+      const isLocked = itemPricing.charging_type === "FREE" || itemPricing.charging_type === "INCLUDED_IN_FEE";
       setFormData({
         item: itemPricing.item || "",
         academic_year: itemPricing.academic_year || yearFilter || "",
         school_class: itemPricing.school_class || "",
         purchase_cost: itemPricing.purchase_cost || "0.00",
-        selling_price: itemPricing.selling_price || "0.00",
+        selling_price: isLocked ? "0.00" : (itemPricing.selling_price || "0.00"),
         charging_type: itemPricing.charging_type || "INCLUDED_IN_FEE",
         included_fee_type: itemPricing.included_fee_type || "",
         effective_from: itemPricing.effective_from || "",
@@ -171,14 +182,39 @@ export default function PricingAndFeeMappingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.item) {
+      toast.error("Please select an item.");
+      return;
+    }
+
+    if (!formData.academic_year) {
+      toast.error("Please select an academic year.");
+      return;
+    }
+
+    if (formData.charging_type === "INCLUDED_IN_FEE" && !formData.included_fee_type) {
+      toast.error("Please select an included fee type.");
+      return;
+    }
+
+    if (formData.charging_type === "SEPARATE_CHARGE") {
+      const price = Number(formData.selling_price);
+      if (isNaN(price) || price <= 0) {
+        toast.error("Selling price must be greater than zero for Separate Charge items.");
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      const isLocked = formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE";
       const payload: any = {
         item: Number(formData.item),
         academic_year: Number(formData.academic_year),
         school_class: formData.school_class ? Number(formData.school_class) : null,
-        purchase_cost: formData.purchase_cost,
-        selling_price: formData.charging_type === "FREE" ? "0.00" : formData.selling_price,
+        purchase_cost: formData.purchase_cost !== "" && formData.purchase_cost !== null ? formData.purchase_cost : "0.00",
+        selling_price: isLocked ? "0.00" : (formData.selling_price !== "" && formData.selling_price !== null ? formData.selling_price : "0.00"),
         charging_type: formData.charging_type,
         included_fee_type: formData.charging_type === "INCLUDED_IN_FEE" && formData.included_fee_type ? Number(formData.included_fee_type) : null,
         effective_from: formData.effective_from || null,
@@ -191,7 +227,7 @@ export default function PricingAndFeeMappingPage() {
         showSuccess("Pricing configuration updated successfully");
       } else {
         await inventoryApi.post("/pricing/", payload);
-        showSuccess("Pricing configuration created successfully");
+        showSuccess("Pricing configuration saved successfully");
       }
 
       setIsModalOpen(false);
@@ -203,14 +239,22 @@ export default function PricingAndFeeMappingPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to remove this pricing configuration?")) return;
+  // Delete Confirmation State
+  const [pricingToDelete, setPricingToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!pricingToDelete) return;
+    setIsDeleting(true);
     try {
-      await inventoryApi.delete(`/pricing/${id}/`);
+      await inventoryApi.delete(`/pricing/${pricingToDelete.id}/`);
       showSuccess("Pricing configuration removed successfully");
+      setPricingToDelete(null);
       fetchPricings();
-    } catch (err) {
+    } catch (err: any) {
       showApiError(err, "Failed to delete pricing configuration.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -358,7 +402,7 @@ export default function PricingAndFeeMappingPage() {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
+                          onClick={() => setPricingToDelete(p)}
                           title="Delete Pricing"
                           className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                         >
@@ -390,7 +434,7 @@ export default function PricingAndFeeMappingPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -461,7 +505,7 @@ export default function PricingAndFeeMappingPage() {
                       name="charging_type"
                       value="INCLUDED_IN_FEE"
                       checked={formData.charging_type === "INCLUDED_IN_FEE"}
-                      onChange={(e) => setFormData({ ...formData, charging_type: e.target.value })}
+                      onChange={() => handleChargingTypeChange("INCLUDED_IN_FEE")}
                       className="hidden"
                     />
                     <span className="text-xs">Included in Fees</span>
@@ -478,7 +522,7 @@ export default function PricingAndFeeMappingPage() {
                       name="charging_type"
                       value="SEPARATE_CHARGE"
                       checked={formData.charging_type === "SEPARATE_CHARGE"}
-                      onChange={(e) => setFormData({ ...formData, charging_type: e.target.value })}
+                      onChange={() => handleChargingTypeChange("SEPARATE_CHARGE")}
                       className="hidden"
                     />
                     <span className="text-xs">Separate Charge</span>
@@ -495,7 +539,7 @@ export default function PricingAndFeeMappingPage() {
                       name="charging_type"
                       value="FREE"
                       checked={formData.charging_type === "FREE"}
-                      onChange={(e) => setFormData({ ...formData, charging_type: e.target.value })}
+                      onChange={() => handleChargingTypeChange("FREE")}
                       className="hidden"
                     />
                     <span className="text-xs">Free Item</span>
@@ -508,7 +552,7 @@ export default function PricingAndFeeMappingPage() {
               {formData.charging_type === "INCLUDED_IN_FEE" && (
                 <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 space-y-2">
                   <label className="block text-xs font-bold text-blue-900 dark:text-blue-200">
-                    Existing Fee Type Mapping <span className="text-red-500">*</span>
+                     Existing Fee Type Mapping <span className="text-red-500">*</span>
                   </label>
                   <select
                     required
@@ -557,19 +601,25 @@ export default function PricingAndFeeMappingPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Student Selling / Assigned Price (₹)
+                    Student Selling / Assigned Price (₹) {formData.charging_type === "SEPARATE_CHARGE" && <span className="text-red-500">*</span>}
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    disabled={formData.charging_type === "FREE"}
-                    placeholder="e.g. 900.00"
-                    value={formData.charging_type === "FREE" ? "0.00" : formData.selling_price}
+                    disabled={formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE"}
+                    placeholder={formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE" ? "0.00 (Locked)" : "e.g. 900.00"}
+                    value={formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE" ? "0.00" : formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50"
+                    className={`w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${
+                      formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE" ? "opacity-60 bg-slate-100 dark:bg-slate-900 cursor-not-allowed text-slate-400" : ""
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400">Internal item value or direct student charge.</span>
+                  <span className="text-[10px] text-slate-400">
+                    {formData.charging_type === "FREE" || formData.charging_type === "INCLUDED_IN_FEE"
+                      ? `Locked at ₹0.00 for ${formData.charging_type === "FREE" ? "Free Item" : "Included in Fees"}.`
+                      : "Direct student charge when item is issued. Must be greater than 0."}
+                  </span>
                 </div>
               </div>
 
@@ -594,6 +644,27 @@ export default function PricingAndFeeMappingPage() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!pricingToDelete}
+        title="Remove Pricing Configuration"
+        message={
+          pricingToDelete ? (
+            <span>
+              Are you sure you want to remove the pricing configuration for{" "}
+              <strong className="text-slate-900 dark:text-white font-semibold">
+                "{pricingToDelete.item_name}"
+              </strong>{" "}
+              ({pricingToDelete.academic_year_name || "Academic Year"})? This action cannot be undone.
+            </span>
+          ) : null
+        }
+        confirmText="Remove"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPricingToDelete(null)}
+      />
     </div>
   );
 }

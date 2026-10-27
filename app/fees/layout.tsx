@@ -13,6 +13,8 @@ import {
   Settings,
   Clock,
   Banknote,
+  Boxes,
+  BookOpen,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -22,6 +24,11 @@ const sidebarLinks = [
     href: "/fees", 
     icon: LayoutDashboard,
     exact: true,
+  },
+  { 
+    title: "Request Supplies", 
+    href: "/fees/stock-request", 
+    icon: Boxes,
   },
   { 
     title: "My Attendance", 
@@ -62,6 +69,16 @@ const sidebarLinks = [
     title: "Student Ledger", 
     href: "/fees/student-ledger", 
     icon: ReceiptText,
+  },
+  { 
+    title: "Daily Cash Register", 
+    href: "/fees/cash-register", 
+    icon: Banknote,
+  },
+  { 
+    title: "Account Ledger", 
+    href: "/fees/account-ledger", 
+    icon: BookOpen,
   },
   { 
     title: "Announcements", 

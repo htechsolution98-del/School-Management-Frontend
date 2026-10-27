@@ -20,6 +20,7 @@ import {
   Banknote,
   Layers,
   ReceiptText,
+  Printer,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -42,6 +43,7 @@ const sidebarLinks = [
       { title: "Salary Components", href: "/trustee/salary-components", icon: Layers },
       { title: "Staff Salary", href: "/trustee/staff-salary", icon: Users },
       { title: "Generate Salary", href: "/trustee/generate-salary", icon: ReceiptText },
+      { title: "Cheque Printing", href: "/trustee/cheque-printing", icon: Printer },
     ],
   },
   {

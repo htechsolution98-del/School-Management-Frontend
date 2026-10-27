@@ -79,6 +79,11 @@ export default function TeacherWorkloadPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Selection & Bulk Scope State
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState<number[]>([]);
+  const [bulkScope, setBulkScope] = useState<"selected" | "filtered" | "all">("all");
+  const [bulkStandardDaily, setBulkStandardDaily] = useState<number>(5);
+
   // Bulk Edit Modal State
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkMon, setBulkMon] = useState<number>(5);
@@ -90,6 +95,31 @@ export default function TeacherWorkloadPage() {
   const [bulkWeekly, setBulkWeekly] = useState<number>(25);
   const [bulkConsecutive, setBulkConsecutive] = useState<number>(3);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  const toggleSelectAll = () => {
+    if (selectedTeacherIds.length === filteredTeachers.length && filteredTeachers.length > 0) {
+      setSelectedTeacherIds([]);
+    } else {
+      setSelectedTeacherIds(filteredTeachers.map((t) => t.id));
+    }
+  };
+
+  const toggleSelectTeacher = (id: number) => {
+    setSelectedTeacherIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleStandardDailyChange = (val: number) => {
+    setBulkStandardDaily(val);
+    setBulkMon(val);
+    setBulkTue(val);
+    setBulkWed(val);
+    setBulkThu(val);
+    setBulkFri(val);
+    setBulkSat(val);
+    setBulkWeekly(Math.min(60, val * 5));
+  };
 
   // Fetch data
   const fetchData = async (isManualRefresh = false) => {
@@ -226,7 +256,7 @@ export default function TeacherWorkloadPage() {
       );
 
       toast.success(`Workload limits updated for ${editingTeacher.name || "Teacher"}.`, {
-        description: `M:${periodsMon} T:${periodsTue} W:${periodsWed} T:${periodsThu} F:${periodsFri} S:${periodsSat} | Weekly: ${weeklyPeriods}`,
+        description: `Mo:${periodsMon} Tu:${periodsTue} We:${periodsWed} Th:${periodsThu} Fr:${periodsFri} Sa:${periodsSat} | Weekly: ${weeklyPeriods}`,
       });
       setEditingTeacher(null);
     } catch (err: any) {
@@ -239,18 +269,27 @@ export default function TeacherWorkloadPage() {
   // Bulk Apply
   const handleBulkApply = async () => {
     const maxBulkDay = Math.max(bulkMon, bulkTue, bulkWed, bulkThu, bulkFri, bulkSat);
+    const sumBulkDaily = bulkMon + bulkTue + bulkWed + bulkThu + bulkFri + bulkSat;
     if (bulkConsecutive > maxBulkDay && maxBulkDay > 0) {
-      toast.error("Consecutive periods cannot exceed highest daily limit");
+      toast.error(`Consecutive periods (${bulkConsecutive}) cannot exceed highest daily limit (${maxBulkDay}).`);
       return;
     }
-    if (bulkWeekly < maxBulkDay) {
-      toast.error("Weekly periods cannot be less than highest daily limit");
+    if (bulkWeekly > sumBulkDaily) {
+      toast.error(`Weekly periods (${bulkWeekly}) cannot exceed sum of daily limits (${sumBulkDaily}).`);
       return;
     }
 
     setIsBulkSaving(true);
     try {
+      let targetIds: number[] | undefined = undefined;
+      if (bulkScope === "selected" && selectedTeacherIds.length > 0) {
+        targetIds = selectedTeacherIds;
+      } else if (bulkScope === "filtered" && filteredTeachers.length > 0) {
+        targetIds = filteredTeachers.map((t) => t.id);
+      }
+
       const res = await bulkUpdateTeacherWorkloads({
+        teacher_ids: targetIds,
         max_periods_mon: bulkMon,
         max_periods_tue: bulkTue,
         max_periods_wed: bulkWed,
@@ -263,6 +302,7 @@ export default function TeacherWorkloadPage() {
 
       toast.success(res.message || "Bulk limits applied successfully!");
       setIsBulkModalOpen(false);
+      setSelectedTeacherIds([]);
       await fetchData(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to apply bulk limits");
@@ -283,12 +323,13 @@ export default function TeacherWorkloadPage() {
   // Filtered teachers
   const filteredTeachers = useMemo(() => {
     return teachers.filter((t) => {
-      // Search
+      // Search by Name or Contact (Mobile, Email) or Department
       const q = searchQuery.toLowerCase().trim();
       const nameMatch = (t.name || "").toLowerCase().includes(q);
       const emailMatch = (t.email || "").toLowerCase().includes(q);
+      const mobileMatch = (t.mobile || "").toLowerCase().includes(q);
       const deptMatch = (t.department_name || "").toLowerCase().includes(q);
-      const matchesSearch = !q || nameMatch || emailMatch || deptMatch;
+      const matchesSearch = !q || nameMatch || emailMatch || mobileMatch || deptMatch;
 
       // Department
       const matchesDept =
@@ -304,13 +345,18 @@ export default function TeacherWorkloadPage() {
         t.max_periods_fri ?? 5,
         t.max_periods_sat ?? 5
       );
+      const weekly = t.max_weekly_periods ?? 25;
+      const assigned = t.assigned_periods ?? t.assigned_classes_count ?? 0;
+
       let matchesWorkload = true;
-      if (workloadFilter === "high") {
-        matchesWorkload = maxDaily >= 6 || (t.max_weekly_periods ?? 25) >= 30;
+      if (workloadFilter === "overallocated") {
+        matchesWorkload = assigned > weekly;
+      } else if (workloadFilter === "high") {
+        matchesWorkload = maxDaily >= 6 || weekly >= 30;
       } else if (workloadFilter === "standard") {
-        matchesWorkload = maxDaily === 5 && (t.max_weekly_periods ?? 25) === 25;
+        matchesWorkload = maxDaily === 5 && weekly === 25;
       } else if (workloadFilter === "light") {
-        matchesWorkload = maxDaily <= 4 || (t.max_weekly_periods ?? 25) <= 20;
+        matchesWorkload = maxDaily <= 4 || weekly <= 20;
       }
 
       return matchesSearch && matchesDept && matchesWorkload;
@@ -387,11 +433,19 @@ export default function TeacherWorkloadPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsBulkModalOpen(true)}
-            className="h-9 gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            onClick={() => {
+              setBulkScope(selectedTeacherIds.length > 0 ? "selected" : "all");
+              setIsBulkModalOpen(true);
+            }}
+            className="h-9 gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold shadow-2xs"
           >
             <Zap className="w-3.5 h-3.5 text-indigo-600" />
-            Batch Set Defaults
+            Set Default Limits
+            {selectedTeacherIds.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
+                {selectedTeacherIds.length}
+              </span>
+            )}
           </Button>
 
           <Link href="/clerk/timetable">
@@ -476,13 +530,13 @@ export default function TeacherWorkloadPage() {
 
       {/* ── TOOLBAR / FILTERS ────────────────────────────────────────────────── */}
       <Card className="border-slate-200 shadow-sm bg-white">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Search teacher by name, email, or department..."
+                placeholder="Search teacher by name or contact (mobile, email)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-sm bg-slate-50/50 border-slate-200 focus-visible:bg-white focus-visible:ring-indigo-500"
@@ -498,16 +552,20 @@ export default function TeacherWorkloadPage() {
             </div>
 
             {/* Department Filter */}
-            <div className="w-full md:w-52">
+            <div className="w-full sm:w-60 shrink-0">
               <Select value={departmentFilter} onValueChange={(val) => setDepartmentFilter(val ?? "all")}>
-                <SelectTrigger className="h-9 text-sm bg-slate-50/50 border-slate-200">
-                  <div className="flex items-center gap-1.5 text-slate-600 truncate">
-                    <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <SelectValue placeholder="Department" />
+                <SelectTrigger className="w-full h-9 text-xs sm:text-sm bg-slate-50/50 border-slate-200">
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0 text-left text-slate-700">
+                    <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <SelectValue placeholder="All Departments">
+                      {departmentFilter === "all"
+                        ? `All Departments (${teachers.length})`
+                        : departmentFilter}
+                    </SelectValue>
                   </div>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
+                <SelectContent className="w-auto min-w-[240px]">
+                  <SelectItem value="all">All Departments ({teachers.length})</SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept} value={dept}>
                       {dept}
@@ -518,16 +576,29 @@ export default function TeacherWorkloadPage() {
             </div>
 
             {/* Workload Filter */}
-            <div className="w-full md:w-44">
+            <div className="w-full sm:w-56 shrink-0">
               <Select value={workloadFilter} onValueChange={(val) => setWorkloadFilter(val ?? "all")}>
-                <SelectTrigger className="h-9 text-sm bg-slate-50/50 border-slate-200">
-                  <div className="flex items-center gap-1.5 text-slate-600 truncate">
-                    <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <SelectValue placeholder="Workload Tier" />
+                <SelectTrigger className="w-full h-9 text-xs sm:text-sm bg-slate-50/50 border-slate-200">
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0 text-left text-slate-700">
+                    <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <SelectValue placeholder="All Workloads">
+                      {workloadFilter === "all"
+                        ? "All Workloads"
+                        : workloadFilter === "overallocated"
+                        ? "Over Capacity (> Max)"
+                        : workloadFilter === "high"
+                        ? "Heavy (≥ 6/day)"
+                        : workloadFilter === "standard"
+                        ? "Standard (5/day)"
+                        : workloadFilter === "light"
+                        ? "Light (≤ 4/day)"
+                        : "All Workloads"}
+                    </SelectValue>
                   </div>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Capacity Tiers</SelectItem>
+                <SelectContent className="w-auto min-w-[220px]">
+                  <SelectItem value="all">All Workloads</SelectItem>
+                  <SelectItem value="overallocated">Over Capacity (&gt; Max)</SelectItem>
                   <SelectItem value="high">Heavy (≥ 6/day)</SelectItem>
                   <SelectItem value="standard">Standard (5/day)</SelectItem>
                   <SelectItem value="light">Light (≤ 4/day)</SelectItem>
@@ -535,6 +606,41 @@ export default function TeacherWorkloadPage() {
               </Select>
             </div>
           </div>
+
+          {/* Selection Action Bar (when teachers are selected) */}
+          {selectedTeacherIds.length > 0 && (
+            <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white">
+                  {selectedTeacherIds.length} Selected
+                </span>
+                <span className="text-xs text-indigo-950 font-medium">
+                  teachers selected. Apply standard daily limit or custom capacity limits.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setBulkScope("selected");
+                    setIsBulkModalOpen(true);
+                  }}
+                  className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5 shadow-2xs"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Set Default Limits ({selectedTeacherIds.length})
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedTeacherIds([])}
+                  className="h-7 text-xs text-slate-500 hover:text-slate-800"
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -551,7 +657,7 @@ export default function TeacherWorkloadPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 hidden sm:inline">
-              Format: M (Mon) · T (Tue) · W (Wed) · T (Thu) · F (Fri) · S (Sat)
+              Format: Mo (Mon) · Tu (Tue) · We (Wed) · Th (Thu) · Fr (Fri) · Sa (Sat)
             </span>
           </div>
         </CardHeader>
@@ -594,9 +700,21 @@ export default function TeacherWorkloadPage() {
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50/80 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                   <tr>
+                    <th className="py-3 px-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filteredTeachers.length > 0 &&
+                          selectedTeacherIds.length === filteredTeachers.length
+                        }
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                        aria-label="Select all teachers"
+                      />
+                    </th>
                     <th className="py-3 px-4">Teacher Name & Contact</th>
                     <th className="py-3 px-4">Department</th>
-                    <th className="py-3 px-4 text-center">Day-Specific Limits (M – S)</th>
+                    <th className="py-3 px-4 text-center">Day-Specific Limits (Mo – Sa)</th>
                     <th className="py-3 px-4 text-center">Max Weekly</th>
                     <th className="py-3 px-4 text-center">Max Consecutive</th>
                     <th className="py-3 px-4 text-center">Assigned</th>
@@ -614,7 +732,9 @@ export default function TeacherWorkloadPage() {
                     const sat = teacher.max_periods_sat ?? 5;
                     const weekly = teacher.max_weekly_periods ?? 25;
                     const consecutive = teacher.max_consecutive_periods ?? 3;
-                    const assigned = teacher.assigned_classes_count ?? 0;
+                    const assignedPeriods = teacher.assigned_periods ?? teacher.assigned_classes_count ?? 0;
+                    const isOverAllocated = assignedPeriods > weekly;
+                    const isSelected = selectedTeacherIds.includes(teacher.id);
 
                     const maxDay = Math.max(mon, tue, wed, thu, fri, sat);
 
@@ -623,7 +743,12 @@ export default function TeacherWorkloadPage() {
                       label: "Balanced",
                       cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
                     };
-                    if (maxDay >= 7 || weekly >= 32) {
+                    if (isOverAllocated) {
+                      healthBadge = {
+                        label: "Over-Capacity",
+                        cls: "bg-red-50 text-red-700 border-red-200 font-bold",
+                      };
+                    } else if (maxDay >= 7 || weekly >= 32) {
                       healthBadge = {
                         label: "Heavy",
                         cls: "bg-amber-50 text-amber-700 border-amber-200",
@@ -636,19 +761,33 @@ export default function TeacherWorkloadPage() {
                     }
 
                     const daysSummary = [
-                      { label: "M", val: mon, name: "Monday" },
-                      { label: "T", val: tue, name: "Tuesday" },
-                      { label: "W", val: wed, name: "Wednesday" },
-                      { label: "T", val: thu, name: "Thursday" },
-                      { label: "F", val: fri, name: "Friday" },
-                      { label: "S", val: sat, name: "Saturday" },
+                      { label: "Mo", val: mon, name: "Monday" },
+                      { label: "Tu", val: tue, name: "Tuesday" },
+                      { label: "We", val: wed, name: "Wednesday" },
+                      { label: "Th", val: thu, name: "Thursday" },
+                      { label: "Fr", val: fri, name: "Friday" },
+                      { label: "Sa", val: sat, name: "Saturday" },
                     ];
 
                     return (
                       <tr
                         key={teacher.id}
-                        className="hover:bg-slate-50/70 transition-colors group"
+                        className={cn(
+                          "hover:bg-slate-50/70 transition-colors group",
+                          isSelected && "bg-indigo-50/40"
+                        )}
                       >
+                        {/* Checkbox */}
+                        <td className="py-3.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectTeacher(teacher.id)}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                            aria-label={`Select ${teacher.name}`}
+                          />
+                        </td>
+
                         {/* Name & Contact */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
@@ -727,11 +866,39 @@ export default function TeacherWorkloadPage() {
                           </span>
                         </td>
 
-                        {/* Assigned Classes */}
+                        {/* Assigned Periods Ratio vs Max Weekly */}
                         <td className="py-3.5 px-4 text-center">
-                          <span className="text-xs font-medium text-slate-600">
-                            {assigned} {assigned === 1 ? "section" : "sections"}
-                          </span>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors",
+                                isOverAllocated
+                                  ? "bg-red-50 text-red-600 border-red-200 ring-1 ring-red-400 font-bold"
+                                  : assignedPeriods === 0
+                                  ? "bg-slate-50 text-slate-500 border-slate-200"
+                                  : "bg-indigo-50 text-indigo-700 border-indigo-100"
+                              )}
+                              title={
+                                isOverAllocated
+                                  ? `Over capacity! Assigned ${assignedPeriods} periods exceeds maximum ${weekly} periods.`
+                                  : `${assignedPeriods} of ${weekly} max periods assigned.`
+                              }
+                            >
+                              {isOverAllocated && (
+                                <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                              )}
+                              <span>{assignedPeriods} / {weekly} periods</span>
+                            </span>
+                            {isOverAllocated ? (
+                              <span className="text-[10px] font-bold text-red-600">
+                                +{assignedPeriods - weekly} over limit
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                {weekly - assignedPeriods} available
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Workload Health */}
@@ -844,15 +1011,18 @@ export default function TeacherWorkloadPage() {
 
               <div className="grid grid-cols-6 gap-2">
                 {[
-                  { id: "mon", label: "Mon", val: periodsMon, setter: setPeriodsMon },
-                  { id: "tue", label: "Tue", val: periodsTue, setter: setPeriodsTue },
-                  { id: "wed", label: "Wed", val: periodsWed, setter: setPeriodsWed },
-                  { id: "thu", label: "Thu", val: periodsThu, setter: setPeriodsThu },
-                  { id: "fri", label: "Fri", val: periodsFri, setter: setPeriodsFri },
-                  { id: "sat", label: "Sat", val: periodsSat, setter: setPeriodsSat },
+                  { id: "mon", label: "Mo", name: "Monday", val: periodsMon, setter: setPeriodsMon },
+                  { id: "tue", label: "Tu", name: "Tuesday", val: periodsTue, setter: setPeriodsTue },
+                  { id: "wed", label: "We", name: "Wednesday", val: periodsWed, setter: setPeriodsWed },
+                  { id: "thu", label: "Th", name: "Thursday", val: periodsThu, setter: setPeriodsThu },
+                  { id: "fri", label: "Fr", name: "Friday", val: periodsFri, setter: setPeriodsFri },
+                  { id: "sat", label: "Sa", name: "Saturday", val: periodsSat, setter: setPeriodsSat },
                 ].map((day) => (
                   <div key={day.id} className="flex flex-col items-center space-y-1">
-                    <span className="text-[11px] font-bold text-slate-600 px-1.5 py-0.5 rounded bg-slate-100 w-full text-center">
+                    <span
+                      title={day.name}
+                      className="text-[11px] font-bold text-slate-600 px-1.5 py-0.5 rounded bg-slate-100 w-full text-center"
+                    >
                       {day.label}
                     </span>
                     <Input
@@ -991,39 +1161,202 @@ export default function TeacherWorkloadPage() {
             <div className="flex items-center gap-2 text-indigo-600 mb-1">
               <Zap className="w-5 h-5 text-indigo-600" />
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-                School-Wide Batch Configuration
+                Bulk Workload Configuration
               </span>
             </div>
             <DialogTitle className="text-lg font-bold text-slate-900">
-              Set Default Workloads for All Teachers
+              Set Default Limits
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Apply uniform day-by-day and weekly capacity limits to all {teachers.length} teaching staff members.
+              Apply standard daily limits and weekly capacity across selected or all listed teachers.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-              <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
-              <span>
-                This will update period thresholds for all active teachers across the school.
+            {/* Target Scope Selection */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Target Teachers</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {selectedTeacherIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkScope("selected")}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left text-xs transition-all",
+                      bulkScope === "selected"
+                        ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold ring-1 ring-indigo-500 shadow-2xs"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                    )}
+                  >
+                    <div className="text-[10px] text-indigo-600 uppercase tracking-wider font-bold">Selected</div>
+                    <div className="text-sm font-extrabold">{selectedTeacherIds.length} <span className="text-xs font-medium text-slate-500">Staff</span></div>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setBulkScope("filtered")}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left text-xs transition-all",
+                    bulkScope === "filtered"
+                      ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold ring-1 ring-indigo-500 shadow-2xs"
+                      : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  )}
+                >
+                  <div className="text-[10px] text-indigo-600 uppercase tracking-wider font-bold">Filtered View</div>
+                  <div className="text-sm font-extrabold">{filteredTeachers.length} <span className="text-xs font-medium text-slate-500">Staff</span></div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkScope("all")}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left text-xs transition-all",
+                    bulkScope === "all"
+                      ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold ring-1 ring-indigo-500 shadow-2xs"
+                      : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  )}
+                >
+                  <div className="text-[10px] text-indigo-600 uppercase tracking-wider font-bold">All School</div>
+                  <div className="text-sm font-extrabold">{teachers.length} <span className="text-xs font-medium text-slate-500">Staff</span></div>
+                </button>
+              </div>
+            </div>
+
+            {/* Standard Daily Limit Control */}
+            <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="bulkStandardDaily" className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  Standard Daily Limit (Periods / Day)
+                </Label>
+                <span className="text-[11px] font-semibold text-indigo-600">
+                  e.g., 5 periods/day
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="bulkStandardDaily"
+                  type="number"
+                  min={0}
+                  max={15}
+                  value={bulkStandardDaily}
+                  onChange={(e) => handleStandardDailyChange(parseInt(e.target.value) || 0)}
+                  className="h-9 text-sm font-bold text-center w-24 bg-white border-indigo-200 text-indigo-950"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleStandardDailyChange(bulkStandardDaily)}
+                  className="h-9 text-xs bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-semibold"
+                >
+                  Apply {bulkStandardDaily} to Mo – Sa
+                </Button>
+              </div>
+              <p className="text-[11px] text-indigo-700/80">
+                Instantly updates daily capacity across all days (Mo, Tu, We, Th, Fr, Sa) and sets standard weekly ceiling.
+              </p>
+            </div>
+
+            {/* Presets */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-indigo-600" />
+                Standard Presets
               </span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkStandardDaily(5);
+                    setBulkMon(5);
+                    setBulkTue(5);
+                    setBulkWed(5);
+                    setBulkThu(5);
+                    setBulkFri(5);
+                    setBulkSat(5);
+                    setBulkWeekly(25);
+                    setBulkConsecutive(3);
+                  }}
+                  className="px-2 py-1 rounded text-xs bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-slate-700 font-medium transition"
+                >
+                  Standard (5/day · 25w · 3c)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkStandardDaily(5);
+                    setBulkMon(5);
+                    setBulkTue(5);
+                    setBulkWed(5);
+                    setBulkThu(5);
+                    setBulkFri(5);
+                    setBulkSat(0);
+                    setBulkWeekly(25);
+                    setBulkConsecutive(3);
+                  }}
+                  className="px-2 py-1 rounded text-xs bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-slate-700 font-medium transition"
+                >
+                  5-Day Week (Sa Off · 25w)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkStandardDaily(6);
+                    setBulkMon(6);
+                    setBulkTue(6);
+                    setBulkWed(6);
+                    setBulkThu(6);
+                    setBulkFri(6);
+                    setBulkSat(4);
+                    setBulkWeekly(34);
+                    setBulkConsecutive(4);
+                  }}
+                  className="px-2 py-1 rounded text-xs bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-slate-700 font-medium transition"
+                >
+                  Intensive (6d · Sa 4 · 34w)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkStandardDaily(4);
+                    setBulkMon(4);
+                    setBulkTue(0);
+                    setBulkWed(4);
+                    setBulkThu(0);
+                    setBulkFri(4);
+                    setBulkSat(0);
+                    setBulkWeekly(12);
+                    setBulkConsecutive(2);
+                  }}
+                  className="px-2 py-1 rounded text-xs bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-slate-700 font-medium transition"
+                >
+                  Part-Time (Mo/We/Fr 4 · 12w)
+                </button>
+              </div>
             </div>
 
             {/* 6 Day inputs for batch */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Daily Limits (Mon – Sat)</Label>
+              <div className="flex justify-between items-center">
+                <Label className="text-xs font-semibold text-slate-700">Daily Limits (Mo – Sa)</Label>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Total Daily Sum: <strong className="text-indigo-600 font-semibold">{bulkMon + bulkTue + bulkWed + bulkThu + bulkFri + bulkSat}</strong>
+                </span>
+              </div>
               <div className="grid grid-cols-6 gap-2">
                 {[
-                  { label: "Mon", val: bulkMon, setter: setBulkMon },
-                  { label: "Tue", val: bulkTue, setter: setBulkTue },
-                  { label: "Wed", val: bulkWed, setter: setBulkWed },
-                  { label: "Thu", val: bulkThu, setter: setBulkThu },
-                  { label: "Fri", val: bulkFri, setter: setBulkFri },
-                  { label: "Sat", val: bulkSat, setter: setBulkSat },
+                  { label: "Mo", name: "Monday", val: bulkMon, setter: setBulkMon },
+                  { label: "Tu", name: "Tuesday", val: bulkTue, setter: setBulkTue },
+                  { label: "We", name: "Wednesday", val: bulkWed, setter: setBulkWed },
+                  { label: "Th", name: "Thursday", val: bulkThu, setter: setBulkThu },
+                  { label: "Fr", name: "Friday", val: bulkFri, setter: setBulkFri },
+                  { label: "Sa", name: "Saturday", val: bulkSat, setter: setBulkSat },
                 ].map((d, i) => (
                   <div key={i} className="flex flex-col items-center space-y-1">
-                    <span className="text-[11px] font-bold text-slate-600 px-1.5 py-0.5 rounded bg-slate-100 w-full text-center">
+                    <span
+                      title={d.name}
+                      className="text-[11px] font-bold text-slate-600 px-1.5 py-0.5 rounded bg-slate-100 w-full text-center"
+                    >
                       {d.label}
                     </span>
                     <Input
@@ -1032,7 +1365,7 @@ export default function TeacherWorkloadPage() {
                       max={15}
                       value={d.val}
                       onChange={(e) => d.setter(parseInt(e.target.value) || 0)}
-                      className="h-8 text-center text-xs font-semibold px-1 w-full"
+                      className="h-8 text-center text-xs font-semibold px-1 w-full bg-slate-50/50 focus-visible:bg-white"
                     />
                   </div>
                 ))}
@@ -1041,7 +1374,7 @@ export default function TeacherWorkloadPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Weekly Ceiling</Label>
+                <Label className="text-xs font-semibold text-slate-700">Max Weekly Ceiling</Label>
                 <Input
                   type="number"
                   min={1}
@@ -1085,12 +1418,18 @@ export default function TeacherWorkloadPage() {
               {isBulkSaving ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Applying Batch Limits...
+                  Applying Limits...
                 </>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5" />
-                  Apply to All Teachers
+                  Apply Default Limits ({
+                    bulkScope === "selected"
+                      ? `${selectedTeacherIds.length} Selected`
+                      : bulkScope === "filtered"
+                      ? `${filteredTeachers.length} Filtered`
+                      : `All ${teachers.length}`
+                  })
                 </>
               )}
             </Button>

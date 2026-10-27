@@ -30,6 +30,14 @@ export default function InventoryReportsPage() {
   const [replacementsRows, setReplacementsRows] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
 
+  // Helper for safe currency formatting (prevent NaN display)
+  const formatCurrency = (val: any): string => {
+    if (val === null || val === undefined || val === "") return "₹0.00";
+    const num = Number(val);
+    if (isNaN(num)) return "₹0.00";
+    return `₹${num.toFixed(2)}`;
+  };
+
   // Helper for computing date ranges
   const getDateRangeParams = () => {
     const today = new Date();
@@ -139,26 +147,90 @@ export default function InventoryReportsPage() {
     document.body.removeChild(link);
   };
 
+  interface ExportColumnSpec {
+    header: string;
+    extract: (row: any) => string | number;
+  }
+
+  const TAB_COLUMN_SPECS: Record<string, ExportColumnSpec[]> = {
+    sales: [
+      { header: "Date", extract: (r) => r.issue_date || r.date || "" },
+      { header: "Student Name", extract: (r) => r.student_name || "" },
+      { header: "Class & Div", extract: (r) => `${r.class_name || r.student_class || ""} ${r.student_division || ""}`.trim() || "-" },
+      { header: "Item Name", extract: (r) => r.item_name || "" },
+      { header: "Item Code", extract: (r) => r.item_code || "" },
+      { header: "Variant", extract: (r) => `${r.size || r.size_name || ""} / ${r.color || r.color_name || ""}`.replace(/^[\s/]+|[\s/]+$/g, "") || "-" },
+      { header: "Qty", extract: (r) => Number(r.quantity || 0) },
+      { header: "Charging Type", extract: (r) => r.charging_type || "" },
+      { header: "Unit Cost (₹)", extract: (r) => Number(r.unit_cost || 0).toFixed(2) },
+      { header: "Total Cost (₹)", extract: (r) => Number(r.total_cost || 0).toFixed(2) },
+      { header: "Revenue (₹)", extract: (r) => Number(r.charged_amount || 0).toFixed(2) },
+      { header: "Profit (₹)", extract: (r) => Number(r.gross_profit || r.profit || 0).toFixed(2) },
+    ],
+    purchases: [
+      { header: "Date", extract: (r) => r.purchase_date || r.date || "" },
+      { header: "Invoice #", extract: (r) => r.invoice_number || "" },
+      { header: "Supplier", extract: (r) => r.supplier_name || "Direct / Internal" },
+      { header: "Academic Year", extract: (r) => r.academic_year_name || "-" },
+      { header: "Items Count", extract: (r) => Array.isArray(r.items) ? r.items.length : (r.items_count || 1) },
+      { header: "Subtotal (₹)", extract: (r) => Number(r.subtotal || 0).toFixed(2) },
+      { header: "Tax (₹)", extract: (r) => Number(r.tax_amount ?? r.tax ?? 0).toFixed(2) },
+      { header: "Discount (₹)", extract: (r) => Number(r.discount_amount ?? r.discount ?? 0).toFixed(2) },
+      { header: "Grand Total (₹)", extract: (r) => Number(r.grand_total || 0).toFixed(2) },
+      { header: "Status", extract: (r) => r.status || "CONFIRMED" },
+    ],
+    free: [
+      { header: "Date", extract: (r) => r.issue_date || r.date || "" },
+      { header: "Student Name", extract: (r) => r.student_name || "" },
+      { header: "Class & Div", extract: (r) => `${r.class_name || ""} ${r.student_division || ""}`.trim() || "-" },
+      { header: "Item Name", extract: (r) => r.item_name || "" },
+      { header: "Variant", extract: (r) => `${r.size || ""} / ${r.color || ""}`.replace(/^[\s/]+|[\s/]+$/g, "") || "-" },
+      { header: "Qty", extract: (r) => Number(r.quantity || 0) },
+      { header: "Unit Cost (₹)", extract: (r) => Number(r.unit_cost || 0).toFixed(2) },
+      { header: "Absorbed Value (₹)", extract: (r) => Number(r.total_cost || 0).toFixed(2) },
+    ],
+    replacements: [
+      { header: "Date", extract: (r) => r.date || "" },
+      { header: "Student Name", extract: (r) => r.student_name || "" },
+      { header: "Item Name", extract: (r) => r.item_name || "" },
+      { header: "Qty", extract: (r) => Number(r.quantity || 0) },
+      { header: "Reason", extract: (r) => r.reason_display || r.reason || "" },
+      { header: "Status", extract: (r) => r.status || "" },
+      { header: "Admin Remarks", extract: (r) => r.admin_remarks || "-" },
+    ],
+    overview: [
+      { header: "Metric", extract: (r) => r.metric || "" },
+      { header: "Value", extract: (r) => r.value || "" },
+    ]
+  };
+
   const getExportData = () => {
-    if (activeTab === "sales") return { rows: filteredSales, filename: "sales_issues_report" };
-    if (activeTab === "purchases") return { rows: filteredPurchases, filename: "purchases_report" };
-    if (activeTab === "free") return { rows: freeItems, filename: "free_items_report" };
-    if (activeTab === "replacements") return { rows: filteredReplacements, filename: "replacements_report" };
-    return { rows: plSummary ? [plSummary] : [], filename: "inventory_profit_loss_summary" };
+    if (activeTab === "sales") return { rows: filteredSales, filename: "sales_issues_report", specs: TAB_COLUMN_SPECS.sales };
+    if (activeTab === "purchases") return { rows: filteredPurchases, filename: "purchases_report", specs: TAB_COLUMN_SPECS.purchases };
+    if (activeTab === "free") return { rows: freeItems, filename: "free_items_report", specs: TAB_COLUMN_SPECS.free };
+    if (activeTab === "replacements") return { rows: filteredReplacements, filename: "replacements_report", specs: TAB_COLUMN_SPECS.replacements };
+    const ovRows = plSummary ? [
+      { metric: "Total Sales Revenue", value: `₹${Number(plSummary.total_revenue || 0).toLocaleString()}` },
+      { metric: "Confirmed Purchase Cost", value: `₹${Number(plSummary.total_purchases || 0).toLocaleString()}` },
+      { metric: "Cost of Issued Items", value: `₹${Number(plSummary.total_issued_cost || 0).toLocaleString()}` },
+      { metric: "Free Items Subsidy", value: `₹${Number(plSummary.free_items_cost || 0).toLocaleString()}` },
+      { metric: "Gross Profit / Gain", value: `₹${Number(plSummary.gross_profit || 0).toLocaleString()}` },
+      { metric: "Total Items Issued/Sold", value: `${plSummary.total_items_sold || plSummary.issues_count || 0} units` },
+    ] : [];
+    return { rows: ovRows, filename: "inventory_profit_loss_summary", specs: TAB_COLUMN_SPECS.overview };
   };
 
   const exportExcel = async () => {
-    const { rows, filename } = getExportData();
+    const { rows, filename, specs } = getExportData();
     if (!rows.length) return;
     const { Workbook } = await import("exceljs");
     const workbook = new Workbook();
     const sheet = workbook.addWorksheet("Inventory report");
-    const columns = Object.keys(rows[0]);
-    sheet.addRow(columns);
-    rows.forEach((row) => sheet.addRow(columns.map((column) => {
-      const value = row[column];
-      return value && typeof value === "object" ? JSON.stringify(value) : value ?? "";
-    })));
+    const headers = specs.map(s => s.header);
+    sheet.addRow(headers);
+    rows.forEach((row) => {
+      sheet.addRow(specs.map(s => s.extract(row)));
+    });
     sheet.getRow(1).font = { bold: true };
     sheet.columns.forEach((column) => { column.width = Math.min(Math.max(column.header?.length || 12, 14), 32); });
     const buffer = await workbook.xlsx.writeBuffer();
@@ -172,23 +244,22 @@ export default function InventoryReportsPage() {
   };
 
   const exportPDF = async () => {
-    const { rows, filename } = getExportData();
+    const { rows, filename, specs } = getExportData();
     if (!rows.length) return;
     const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
     const pdf = new jsPDF({ orientation: "landscape" });
-    const columns = Object.keys(rows[0]);
+    const headers = specs.map(s => s.header);
+    const dataRows = rows.map((row) => specs.map(s => String(s.extract(row) ?? "")));
     autoTable(pdf, {
-      head: [columns],
-      body: rows.map((row) => columns.map((column) => {
-        const value = row[column];
-        return value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
-      })),
+      head: [headers],
+      body: dataRows,
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [79, 70, 229] },
       margin: { top: 16 },
     });
     pdf.save(`${filename}_${new Date().toISOString().split("T")[0]}.pdf`);
   };
+
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -542,12 +613,17 @@ export default function InventoryReportsPage() {
                           {r.charging_type}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right text-slate-500 font-mono">₹{Number(r.total_cost).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-800 font-mono">₹{Number(r.charged_amount).toFixed(2)}</td>
-                      <td className={`py-3 px-4 text-right font-bold font-mono ${Number(r.gross_profit) >= 0 ? "text-teal-600" : "text-rose-600"}`}>
-                        ₹{Number(r.gross_profit).toFixed(2)}
+                      <td className="py-3 px-4 text-right text-slate-500 font-mono">
+                        {formatCurrency(r.total_cost)}
+                        {Number(r.quantity) > 1 && Number(r.unit_cost) > 0 && (
+                          <div className="text-[10px] text-slate-400 font-mono">({formatCurrency(r.unit_cost)}/ea)</div>
+                        )}
                       </td>
-                      <td className="py-3 px-4 text-right font-semibold text-slate-700">{r.profit_margin_pct}%</td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-800 font-mono">{formatCurrency(r.charged_amount)}</td>
+                      <td className={`py-3 px-4 text-right font-bold font-mono ${Number(r.gross_profit || 0) >= 0 ? "text-teal-600" : "text-rose-600"}`}>
+                        {formatCurrency(r.gross_profit)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-semibold text-slate-700">{r.profit_margin_pct ?? 0}%</td>
                     </tr>
                   ))
                 )}
@@ -585,7 +661,7 @@ export default function InventoryReportsPage() {
                 ) : (
                   filteredPurchases.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-indigo-700">{p.purchase_order_number}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-indigo-700">{p.purchase_order_number || p.invoice_number || `PO-${p.id}`}</td>
                       <td className="py-3 px-4 text-slate-500">{p.purchase_date}</td>
                       <td className="py-3 px-4 font-semibold text-slate-800">{p.supplier_name || "N/A"}</td>
                       <td className="py-3 px-4 font-mono text-slate-600">{p.invoice_number || "—"}</td>
@@ -600,10 +676,10 @@ export default function InventoryReportsPage() {
                           {p.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono">₹{Number(p.subtotal).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">₹{Number(p.tax_amount).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">₹{Number(p.discount_amount).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900 font-mono">₹{Number(p.grand_total).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right font-mono">{formatCurrency(p.subtotal)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-500">{formatCurrency(p.tax_amount ?? p.tax)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-500">{formatCurrency(p.discount_amount ?? p.discount)}</td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-900 font-mono">{formatCurrency(p.grand_total)}</td>
                     </tr>
                   ))
                 )}
@@ -640,8 +716,8 @@ export default function InventoryReportsPage() {
                       <td className="py-3 px-4 text-slate-600">{r.class_name}</td>
                       <td className="py-3 px-4 font-medium text-indigo-900">{r.item_name}</td>
                       <td className="py-3 px-4 text-center font-bold text-slate-900">{r.quantity}</td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600">₹{Number(r.unit_cost).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-purple-700 font-mono">₹{Number(r.total_cost).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-600">{formatCurrency(r.unit_cost)}</td>
+                      <td className="py-3 px-4 text-right font-bold text-purple-700 font-mono">{formatCurrency(r.total_cost)}</td>
                     </tr>
                   ))
                 )}

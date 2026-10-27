@@ -10,12 +10,14 @@ import {
   CalendarCheck,
   ClipboardList,
   Banknote,
+  Boxes,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/librarian", icon: LayoutDashboard },
   { title: "Library Management", href: "/librarian/library", icon: BookOpen },
+  { title: "Request Supplies", href: "/librarian/stock-request", icon: Boxes },
   { title: "My Attendance", href: "/librarian/attendance", icon: ClipboardList },
   { title: "My Leaves", href: "/librarian/leaves", icon: CalendarCheck },
   { title: "My Payslips", href: "/librarian/payslips", icon: Banknote },

@@ -4,6 +4,11 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import ReceiptModal from "./ReceiptModal";
 import ReceiptHistoryModal from "./ReceiptHistoryModal";
 import { DatePicker } from "@/components/ui/date-picker";
+import CashDenominationCalculator, {
+  CashDenominationState,
+  INITIAL_CASH_STATE,
+  calculateCashDetails,
+} from "@/components/fees/cash-denomination-calculator";
 import {
   Users,
   IndianRupee,
@@ -838,15 +843,19 @@ const CollectFeeModal = ({
     note: "",
   });
 
+  const [cashState, setCashState] = useState<CashDenominationState>(INITIAL_CASH_STATE);
+
   useEffect(() => {
     if (fee) {
-      const isGovtDefault = Boolean(fee.is_rte_govt_claim && parseFloat(fee.balance_amount || "0") <= 0);
+      const studentBal = parseFloat(fee.balance_amount || "0");
+      const govtBal = Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount || "0") - parseFloat(fee.rte_govt_paid_amount || "0"));
+      const isGovtDefault = Boolean(fee.is_rte_govt_claim && studentBal <= 0 && govtBal > 0);
       const initialPayer = isGovtDefault ? "government" : "student";
       setPayerType(initialPayer);
       
       const defaultAmount = initialPayer === "government"
-        ? (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
-        : (fee.balance_amount || "0.00");
+        ? govtBal.toFixed(2)
+        : Math.max(0, studentBal).toFixed(2);
 
       setForm({
         amount: defaultAmount,
@@ -856,6 +865,8 @@ const CollectFeeModal = ({
         receipt_number: "",
         note: initialPayer === "government" ? "RTE Government reimbursement payment" : "",
       });
+
+      setCashState(INITIAL_CASH_STATE);
     }
   }, [fee]);
 
@@ -871,18 +882,36 @@ const CollectFeeModal = ({
         note: "RTE Government reimbursement payment",
       }));
     } else {
+      const studentBal = Math.max(0, parseFloat(fee.balance_amount || "0"));
       setForm((prev) => ({
         ...prev,
-        amount: fee.balance_amount || "0.00",
+        amount: studentBal.toFixed(2),
         payment_mode: "cash",
         note: "",
       }));
     }
+    setCashState(INITIAL_CASH_STATE);
   };
+
+  const currentBalance =
+    payerType === "government"
+      ? Math.max(
+          0,
+          parseFloat(fee?.rte_govt_claim_amount || fee?.amount || "0") -
+            parseFloat(fee?.rte_govt_paid_amount || "0")
+        )
+      : Math.max(0, parseFloat(fee?.balance_amount || "0"));
+
+  const isZeroBalance = !fee || currentBalance <= 0;
+
+  const currentAmountNum = isZeroBalance ? 0 : (parseFloat(form.amount || "0") || 0);
+  const isCashMode = form.payment_mode === "cash";
+  const cashCalculation = calculateCashDetails(cashState, currentAmountNum);
+  const isCashInsufficient = !isZeroBalance && isCashMode && currentAmountNum > 0 && cashCalculation.totalReceived < currentAmountNum;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fee) return;
+    if (!fee || isZeroBalance) return;
     const errs: Record<string, string> = {};
     if (!form.amount || parseFloat(form.amount) <= 0) errs.amount = "Invalid amount";
     if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
@@ -892,17 +921,29 @@ const CollectFeeModal = ({
        errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
     }
 
+    if (isCashMode && currentAmountNum > 0 && cashCalculation.totalReceived < currentAmountNum) {
+      errs.amount = `Total cash received (₹${cashCalculation.totalReceived.toLocaleString("en-IN")}) is less than amount to collect (₹${currentAmountNum.toLocaleString("en-IN")}).`;
+    }
+
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
     try {
       const { collectStudentFeePayment } = await import("@/lib/fees/fee-generation");
-      const result = await collectStudentFeePayment({
+      const payload: any = {
         student_fee: fee.id,
         payer_type: payerType,
-        ...form
-      });
+        ...form,
+      };
+
+      if (isCashMode) {
+        payload.payment_details = cashCalculation.payloadJson;
+        const cashNote = `[Cash Recd: ₹${cashCalculation.totalReceived.toLocaleString("en-IN")}, Change Ret: ₹${cashCalculation.changeToReturn.toLocaleString("en-IN")}]`;
+        payload.note = form.note ? `${form.note} ${cashNote}` : cashNote;
+      }
+
+      const result = await collectStudentFeePayment(payload);
       if (result.success) {
         setToast({ type: "success", message: payerType === "government" ? "Government RTE claim payment recorded!" : "Fee collected successfully!" });
         const receiptNo = result.data?.receipt_number;
@@ -996,6 +1037,16 @@ const CollectFeeModal = ({
         </div>
       )}
 
+      {isZeroBalance && (
+        <div className="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-in fade-in duration-200">
+          <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+          <div>
+            <p className="font-bold text-emerald-900">✅ This fee is already fully paid (Balance is ₹0.00).</p>
+            <p className="text-[11px] font-normal text-emerald-700 mt-0.5">No outstanding dues remain for this record. Further payments are disabled.</p>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${toast.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
           {toast.type === "success" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
@@ -1006,11 +1057,25 @@ const CollectFeeModal = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <FormField label={payerType === "government" ? "Govt Reimbursement Amount (₹)" : "Amount to Collect (₹)"} error={errors.amount} required>
-            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" />
+            <input
+              type="number"
+              className={`${inputClass} ${isZeroBalance ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+              value={isZeroBalance ? "0.00" : form.amount}
+              onChange={(e) => !isZeroBalance && update("amount", e.target.value)}
+              disabled={isZeroBalance}
+              readOnly={isZeroBalance}
+              min="0"
+              step="0.01"
+            />
           </FormField>
           
           <FormField label="Payment Mode" error={errors.payment_mode} required>
-             <select className={inputClass} value={form.payment_mode} onChange={(e) => update("payment_mode", e.target.value)}>
+             <select
+               className={`${inputClass} ${isZeroBalance ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+               value={form.payment_mode}
+               onChange={(e) => update("payment_mode", e.target.value)}
+               disabled={isZeroBalance}
+             >
                 {payerType === "government" ? (
                   <>
                     <option value="govt_rte">Government Direct Credit (RTGS/Treasury)</option>
@@ -1029,6 +1094,18 @@ const CollectFeeModal = ({
              </select>
           </FormField>
         </div>
+
+        {/* ── Conditional Cash Denomination Breakdown Section ── */}
+        {!isZeroBalance && form.payment_mode === "cash" && (
+          <div className="animate-in fade-in duration-200">
+            <CashDenominationCalculator
+              amountToCollect={form.amount}
+              cashState={cashState}
+              onChange={setCashState}
+              onReset={() => setCashState(INITIAL_CASH_STATE)}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField label="Payment Date" error={errors.payment_date} required>
@@ -1050,9 +1127,45 @@ const CollectFeeModal = ({
         </FormField>
 
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-          <button type="submit" disabled={loading} className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${payerType === "government" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-blue-600 hover:bg-blue-700"}`}>
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Recording...</> : (payerType === "government" ? "Record Govt Reimbursement" : "Collect Payment")}
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            {isZeroBalance ? "Close" : "Cancel"}
+          </button>
+          <button
+            type="submit"
+            disabled={loading || isZeroBalance || isCashInsufficient}
+            title={
+              isZeroBalance
+                ? "This fee is already fully paid"
+                : isCashInsufficient
+                ? `Received cash is less than amount to collect (Short by ₹${(
+                    currentAmountNum - cashCalculation.totalReceived
+                  ).toLocaleString("en-IN")})`
+                : undefined
+            }
+            className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors ${
+              isZeroBalance
+                ? "bg-gray-400 cursor-not-allowed"
+                : isCashInsufficient
+                ? "bg-gray-400"
+                : payerType === "government"
+                ? "bg-indigo-600 hover:bg-indigo-700"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {loading ? (
+              <><Loader2 size={16} className="animate-spin" /> Recording...</>
+            ) : isZeroBalance ? (
+              <>
+                <CheckCircle2 size={16} className="text-emerald-300" />
+                Fully Paid (₹0.00)
+              </>
+            ) : isCashInsufficient ? (
+              `Short by ₹${(currentAmountNum - cashCalculation.totalReceived).toLocaleString("en-IN")}`
+            ) : payerType === "government" ? (
+              "Record Govt Reimbursement"
+            ) : (
+              "Collect Payment"
+            )}
           </button>
         </div>
       </form>
@@ -1088,6 +1201,8 @@ const CollectMultipleFeesModal = ({
     note: "",
   });
 
+  const [cashState, setCashState] = useState<CashDenominationState>(INITIAL_CASH_STATE);
+
   useEffect(() => {
     if (fees.length > 0) {
       const isGovt = fees.every(f => f.is_rte_govt_claim && parseFloat(f.balance_amount || "0") <= 0);
@@ -1098,6 +1213,7 @@ const CollectMultipleFeesModal = ({
         transaction_id: "",
         note: isGovt ? `RTE Government claim reimbursement for ${fees.length} installments` : `Combined payment for ${fees.length} fee items`,
       });
+      setCashState(INITIAL_CASH_STATE);
     }
   }, [fees]);
 
@@ -1116,6 +1232,7 @@ const CollectMultipleFeesModal = ({
         note: `Combined payment for ${fees.length} fee items`,
       }));
     }
+    setCashState(INITIAL_CASH_STATE);
   };
 
   const totalCalculatedAmount = fees.reduce((sum, f) => {
@@ -1126,6 +1243,10 @@ const CollectMultipleFeesModal = ({
     }
     return sum + parseFloat(f.balance_amount || "0");
   }, 0);
+
+  const isCashMode = form.payment_mode === "cash";
+  const cashCalculation = calculateCashDetails(cashState, totalCalculatedAmount);
+  const isCashInsufficient = isCashMode && totalCalculatedAmount > 0 && cashCalculation.totalReceived < totalCalculatedAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1138,6 +1259,10 @@ const CollectMultipleFeesModal = ({
 
     if (["cheque", "upi", "card"].includes(form.payment_mode) && !form.transaction_id) {
        errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
+    }
+
+    if (isCashInsufficient) {
+      errs.amount = `Total cash received (₹${cashCalculation.totalReceived.toLocaleString("en-IN")}) is less than amount to collect (₹${totalCalculatedAmount.toLocaleString("en-IN")}).`;
     }
 
     setErrors(errs);
@@ -1158,11 +1283,19 @@ const CollectMultipleFeesModal = ({
           : f.balance_amount,
       }));
 
-      const result = await bulkCollectStudentFeePayments({
+      const payload: any = {
         items,
         payer_type: payerType,
-        ...form
-      });
+        ...form,
+      };
+
+      if (isCashMode) {
+        payload.payment_details = cashCalculation.payloadJson;
+        const cashNote = `[Cash Recd: ₹${cashCalculation.totalReceived.toLocaleString("en-IN")}, Change Ret: ₹${cashCalculation.changeToReturn.toLocaleString("en-IN")}]`;
+        payload.note = form.note ? `${form.note} ${cashNote}` : cashNote;
+      }
+
+      const result = await bulkCollectStudentFeePayments(payload);
 
       if (result.success && result.data) {
         setToast({ type: "success", message: `Successfully collected ${fees.length} fees! Generating combined receipt...` });
@@ -1337,6 +1470,18 @@ const CollectMultipleFeesModal = ({
           </div>
         </div>
 
+        {/* ── Conditional Cash Denomination Breakdown Section ── */}
+        {form.payment_mode === "cash" && (
+          <div className="animate-in fade-in duration-200">
+            <CashDenominationCalculator
+              amountToCollect={totalCalculatedAmount}
+              cashState={cashState}
+              onChange={setCashState}
+              onReset={() => setCashState(INITIAL_CASH_STATE)}
+            />
+          </div>
+        )}
+
         <div className="flex gap-2 pt-2 border-t border-gray-100">
           <button
             type="button"
@@ -1347,11 +1492,30 @@ const CollectMultipleFeesModal = ({
           </button>
           <button
             type="submit"
-            disabled={loading || totalCalculatedAmount <= 0}
-            className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-colors shadow-sm shadow-blue-200 flex items-center justify-center gap-1.5"
+            disabled={loading || totalCalculatedAmount <= 0 || isCashInsufficient}
+            title={
+              isCashInsufficient
+                ? `Received cash is less than total amount to collect (Short by ₹${(
+                    totalCalculatedAmount - cashCalculation.totalReceived
+                  ).toLocaleString("en-IN")})`
+                : undefined
+            }
+            className={`flex-1 py-2 text-xs font-semibold text-white rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isCashInsufficient
+                ? "bg-gray-400"
+                : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+            }`}
           >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-            {loading ? "Processing..." : `Collect ₹${totalCalculatedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} & Get Receipt`}
+            {loading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Printer size={14} />
+            )}
+            {loading
+              ? "Processing..."
+              : isCashInsufficient
+              ? `Short by ₹${(totalCalculatedAmount - cashCalculation.totalReceived).toLocaleString("en-IN")}`
+              : `Collect ₹${totalCalculatedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} & Get Receipt`}
           </button>
         </div>
       </form>
