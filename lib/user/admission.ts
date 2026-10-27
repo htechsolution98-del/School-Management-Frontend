@@ -164,3 +164,70 @@ export async function getAdmissionReceipt(admission_number: string) {
   }
   return data
 }
+
+export interface PublicCheckParentResponse {
+  requires_otp: boolean;
+  exists: boolean;
+  message: string;
+  otp?: string;
+}
+
+export interface VerifyParentOTPResponse {
+  success: boolean;
+  message: string;
+  parent?: {
+    id?: number;
+    parent_user_id?: number;
+    father_name?: string;
+    mother_name?: string;
+    surname?: string;
+    guardian_name?: string;
+    address?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    pincode?: string;
+    email?: string;
+    field_values?: Record<string, string>;
+  };
+  siblings?: {
+    id: number;
+    name: string;
+    gr_no?: string;
+    class_name?: string;
+    admission_number?: string;
+  }[];
+}
+
+export async function checkPublicParent(mobile_number: string): Promise<PublicCheckParentResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/public-check-parent/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mobile_number }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.message || "Failed to check mobile number");
+  }
+  return data;
+}
+
+export async function verifyParentOTP(mobile_number: string, otp: string): Promise<VerifyParentOTPResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/verify-parent-otp/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mobile_number, otp }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.message || "Invalid or expired OTP");
+  }
+  return data;
+}
+

@@ -160,6 +160,11 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
   const totalDiscount = payments.reduce((sum, p) => sum + parseFloat(p.fee_discount || "0"), 0);
   const totalReceived = payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
+  const cashPayment =
+    payments.find((p) => p.payment_details || p.payment_mode?.toLowerCase() === "cash") ||
+    primaryPayment;
+  const cashInfo = formatCashBreakdown(cashPayment);
+
   return (
     <div id="printable-receipt" className="space-y-5 text-gray-900">
       <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
@@ -321,11 +326,26 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
         <Info label="Clearance Status" value={paymentStatus.label} />
       </div>
 
-      {primaryPayment.note && (
+      {(cashInfo.hasBreakdown || cashInfo.cleanNote) && (
         <>
           <SectionTitle icon={FileText} title="Note" />
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-            {primaryPayment.note}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-xs md:text-sm text-gray-800 space-y-1">
+            {cashInfo.hasBreakdown && (
+              <p className="font-semibold text-gray-900 tracking-tight">
+                {cashInfo.breakdown}
+              </p>
+            )}
+            {cashInfo.cleanNote && (
+              <p
+                className={
+                  cashInfo.hasBreakdown
+                    ? "text-gray-600 text-xs italic pt-1 border-t border-gray-200/60"
+                    : "text-gray-700"
+                }
+              >
+                {cashInfo.cleanNote}
+              </p>
+            )}
           </div>
         </>
       )}
@@ -524,4 +544,91 @@ function parseDate(value?: string | null) {
 function capitalize(value?: string | null) {
   if (!value) return "-";
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/**
+ * Format Cash Denomination Breakdown from payment_details or note
+ * Example output: Cash Breakdown: ₹500x2, ₹100x1 (Total Given: ₹1100 | Change Returned: ₹100)
+ */
+export function formatCashBreakdown(payment?: Payment | null): {
+  breakdown: string;
+  hasBreakdown: boolean;
+  cleanNote: string;
+} {
+  if (!payment) return { breakdown: "", hasBreakdown: false, cleanNote: "" };
+
+  let details: any = payment.payment_details;
+  if (typeof details === "string") {
+    try {
+      details = JSON.parse(details);
+    } catch {
+      details = null;
+    }
+  }
+
+  const noteDenominations = [500, 200, 100, 50, 20, 10];
+  const coinDenominations = [20, 10, 5, 2, 1];
+
+  const breakdownParts: string[] = [];
+  let totalGiven = 0;
+  let returnChange = 0;
+
+  if (details && typeof details === "object") {
+    // 1. Check notes (500, 200, 100, 50, 20, 10)
+    for (const note of noteDenominations) {
+      const qty = Number(
+        details[String(note)] ??
+        details.notes?.[String(note)] ??
+        details.notes?.[note] ??
+        0
+      );
+      if (qty > 0) {
+        breakdownParts.push(`₹${note}x${qty}`);
+      }
+    }
+
+    // 2. Check coins (20, 10, 5, 2, 1)
+    for (const coin of coinDenominations) {
+      const qty = Number(
+        details[`coin_${coin}`] ??
+        details.coins?.[String(coin)] ??
+        details.coins?.[coin] ??
+        (coin <= 5 ? details[String(coin)] : 0) ??
+        0
+      );
+      if (qty > 0) {
+        breakdownParts.push(`₹${coin}x${qty}`);
+      }
+    }
+
+    totalGiven = Number(details.total_received ?? details.totalReceived ?? 0);
+    returnChange = Number(details.return_change ?? details.change_to_return ?? details.changeToReturn ?? 0);
+  }
+
+  // Strip generic "[Cash Recd: ₹..., Change Ret: ₹...]" from the existing note
+  let cleanNote = (payment.note || "").replace(/\[Cash Recd:[^\]]+\]/gi, "").trim();
+
+  if (breakdownParts.length > 0) {
+    let breakdown = `Cash Breakdown: ${breakdownParts.join(", ")}`;
+    if (totalGiven > 0) {
+      breakdown += ` (Total Given: ₹${totalGiven} | Change Returned: ₹${returnChange})`;
+    }
+    return { breakdown, hasBreakdown: true, cleanNote };
+  }
+
+  // Fallback: If payment mode was cash and note contains "[Cash Recd: ..., Change Ret: ...]"
+  const cashRecdMatch = (payment.note || "").match(
+    /\[Cash Recd:\s*₹?([0-9,.]+),\s*Change Ret:\s*₹?([0-9,.]+)\]/i
+  );
+  if (
+    (payment.payment_mode?.toLowerCase() === "cash" || payment.payment_mode === "cash") &&
+    cashRecdMatch
+  ) {
+    const recd = cashRecdMatch[1].replace(/,/g, "");
+    const ret = cashRecdMatch[2].replace(/,/g, "");
+    const breakdown = `Cash Breakdown: (Total Given: ₹${recd} | Change Returned: ₹${ret})`;
+    return { breakdown, hasBreakdown: true, cleanNote };
+  }
+
+  return { breakdown: "", hasBreakdown: false, cleanNote };
 }

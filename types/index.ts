@@ -29,6 +29,8 @@ export interface CurrentUserProfile {
   id: number;
   username: string;
   name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string | null;
   mobile: string | null;
   role: string | null;

@@ -670,8 +670,9 @@ export function
   return (
     <div
       data-resizing={resizing}
-      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] ${resizing ? "cursor-col-resize select-none" : ""
-        }`}
+      className={`app-workspace flex h-screen w-full overflow-hidden bg-[#F5F7FC] text-[#142044] print:h-auto print:overflow-visible print:bg-transparent ${
+        resizing ? "cursor-col-resize select-none" : ""
+      }`}
     >
       {/* Desktop Gradient Sidebar */}
       <motion.aside
@@ -679,7 +680,7 @@ export function
         animate={{ width: sidebarWidth }}
         initial={false}
         transition={{ duration: reducedMotion || resizing ? 0 : 0.15 }}
-        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#1E40AF] via-[#1D4ED8] to-[#172554] shadow-xl lg:flex overflow-hidden"
+        className="workspace-navigation relative hidden h-full shrink-0 flex-col bg-gradient-to-b from-[#5436F5] via-[#4527D6] to-[#392BC9] shadow-xl lg:flex overflow-hidden print:hidden"
       >
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
@@ -722,9 +723,9 @@ export function
       </motion.aside>
 
       {/* Main Workspace Area */}
-      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
-        {/* Top Header Bar: Royal Blue gradient on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#1E40AF]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(30,64,175,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none relative z-50">
+      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden print:h-auto print:overflow-visible print:block">
+        {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
               {!logoImgError && activeLogo ? (
@@ -921,13 +922,17 @@ export function
         </header>
 
         {/* Global School Subscription / Free Trial Status Notification (Shown only to School Trustees) */}
-        {roleTitle === "Trustee" && <TrialBanner />}
+        {roleTitle === "Trustee" && (
+          <div className="print:hidden">
+            <TrialBanner />
+          </div>
+        )}
 
         {/* Content Body: Snug pb-20 on mobile clears the 64px floating glass bar without creating excessive empty space */}
         <main
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F6F7FC]",
-            noPadding ? "p-0 pb-16 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-16 lg:pb-5",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
             mainClassName
           )}
         >
@@ -938,7 +943,7 @@ export function
         {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Exact Reference Match) */}
         <nav
           aria-label="Mobile Bottom Navigation"
-          className="glass-bottom-nav lg:hidden"
+          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden print:hidden"
         >
           <div className="flex items-center justify-around px-2 py-1.5 w-full">
             {mobileNavItems.map((item, idx) => {

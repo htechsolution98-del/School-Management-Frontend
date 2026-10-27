@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Script from "next/script";
 import { toast } from "sonner";
@@ -17,11 +17,30 @@ import {
   Sparkles,
   Shield,
   AlertCircle,
+  Users,
+  KeyRound,
+  RefreshCw,
+  PhoneCall,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AdmissionFieldInput } from "@/components/clerk/admission-field";
-import { normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, type AdmissionField } from "@/lib/admission-validation";
-import { useEffect } from "react";
+import { AdmissionFieldInput, type MobileVerificationStatus } from "@/components/clerk/admission-field";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  normalizeAdmissionValue,
+  validateAdmissionField,
+  validateAdmissionFile,
+  isPhoneField,
+  type AdmissionField,
+} from "@/lib/admission-validation";
 import {
   getTempUsers,
   getPublicFormFields,
@@ -33,6 +52,8 @@ import {
   createOfflinePayment,
   getAdmissionReceipt,
   submitDocuments,
+  checkPublicParent,
+  verifyParentOTP,
 } from "@/lib/user";
 
 // ────────────────────────────────────────────
@@ -967,6 +988,253 @@ function MultiStepForm({
   const [submitting, setSubmitting] = useState(false);
   const [docSubmitting, setDocSubmitting] = useState(false);
 
+  // ── Sibling Detection & OTP Verification States ──
+  const primaryPhoneField = useMemo(() => {
+    if (!formData?.sections) return null;
+    const allFields = formData.sections.flatMap((s: any) => s.fields || s.form_fields || []);
+    return (
+      allFields.find((f: AdmissionField) => f.map_to_student_field === "mobile" || /mobile/i.test(f.label)) ||
+      allFields.find(isPhoneField) ||
+      null
+    );
+  }, [formData]);
+
+  const [mobileStatus, setMobileStatus] = useState<MobileVerificationStatus>(() => {
+    if (child?.admission_number && !String(child.admission_number).startsWith("NEW-")) {
+      return "verified_new";
+    }
+    return "unchecked";
+  });
+  const [verifyingMobile, setVerifyingMobile] = useState(false);
+  const [verifiedMobileNumber, setVerifiedMobileNumber] = useState<string>(() => {
+    if (primaryPhoneField && child?.savedFormValues?.[primaryPhoneField.id]) {
+      return String(child.savedFormValues[primaryPhoneField.id]).replace(/\D/g, "");
+    }
+    return "";
+  });
+
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [tempOtpMobile, setTempOtpMobile] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [activePhoneFieldId, setActivePhoneFieldId] = useState<number | null>(null);
+
+  const [siblingConfirmModalOpen, setSiblingConfirmModalOpen] = useState(false);
+  const [siblingData, setSiblingData] = useState<{
+    parent: any;
+    siblings: any[];
+    mobile: string;
+  } | null>(null);
+
+  const handleVerifyMobile = useCallback(
+    async (field?: AdmissionField) => {
+      const targetField = field || primaryPhoneField;
+      if (!targetField) return;
+
+      const rawVal = formValues[targetField.id];
+      const clean = String(rawVal || "").replace(/\D/g, "");
+
+      if (clean.length !== 10) {
+        toast.error("Please enter a valid 10-digit mobile number before verifying.");
+        return;
+      }
+
+      setVerifyingMobile(true);
+      setActivePhoneFieldId(targetField.id);
+      try {
+        const data = await checkPublicParent(clean);
+        if (data.requires_otp) {
+          console.log("[OTP SIBLING VERIFICATION] Mobile:", clean, "-> OTP:", data.otp);
+          setTempOtpMobile(clean);
+          setDevOtp(data.otp || null);
+          setOtpValue("");
+          setOtpError("");
+          setMobileStatus("duplicate_found");
+          setOtpModalOpen(true);
+          toast.info("This mobile number is already registered. Please enter the 6-digit OTP sent to your number.");
+        } else {
+          setMobileStatus("verified_new");
+          setVerifiedMobileNumber(clean);
+          setSiblingData(null);
+          setDevOtp(null);
+          toast.success("Mobile number verified as new (No existing records found).");
+        }
+      } catch (err: any) {
+        console.error("Error verifying mobile:", err);
+        toast.error(err?.message || "Failed to check mobile number. Please try again.");
+      } finally {
+        setVerifyingMobile(false);
+      }
+    },
+    [primaryPhoneField, formValues]
+  );
+
+  const handlePhoneBlur = useCallback(
+    (field: AdmissionField) => {
+      const rawVal = formValues[field.id];
+      const clean = String(rawVal || "").replace(/\D/g, "");
+      if (clean.length === 10 && clean !== verifiedMobileNumber && mobileStatus === "unchecked") {
+        void handleVerifyMobile(field);
+      }
+    },
+    [formValues, verifiedMobileNumber, mobileStatus, handleVerifyMobile]
+  );
+
+  const handlePhoneChange = useCallback(
+    (fieldId: number, value: string) => {
+      const allFields = formData?.sections?.flatMap((s: any) => s.fields || s.form_fields || []) || [];
+      const changedField = allFields.find((f: any) => f.id === fieldId);
+      if (changedField && isPhoneField(changedField)) {
+        const clean = String(value || "").replace(/\D/g, "");
+        if (clean !== verifiedMobileNumber) {
+          setMobileStatus("unchecked");
+        }
+      }
+    },
+    [formData, verifiedMobileNumber]
+  );
+
+  const handleCancelOtp = () => {
+    setOtpModalOpen(false);
+    setOtpValue("");
+    setOtpError("");
+    setDevOtp(null);
+    const targetId = activePhoneFieldId || primaryPhoneField?.id;
+    if (targetId) {
+      setFormValues((prev: any) => ({ ...prev, [targetId]: "" }));
+    }
+    setMobileStatus("unchecked");
+    setVerifiedMobileNumber("");
+    toast.error("Mobile number cleared. Please use a different number or verify OTP to link as sibling.");
+  };
+
+  const handleResendOtp = async () => {
+    if (!tempOtpMobile) return;
+    setOtpError("");
+    try {
+      const data = await checkPublicParent(tempOtpMobile);
+      if (data.otp) {
+        console.log("[OTP SIBLING VERIFICATION RESENT] Mobile:", tempOtpMobile, "-> OTP:", data.otp);
+        setDevOtp(data.otp);
+      }
+      toast.success("A new OTP has been sent to your mobile number.");
+    } catch (err: any) {
+      setOtpError(err?.message || "Failed to resend OTP.");
+      toast.error(err?.message || "Failed to resend OTP.");
+    }
+  };
+
+  const handleVerifyOtpSubmit = async () => {
+    const cleanOtp = otpValue.replace(/\D/g, "").trim();
+    if (cleanOtp.length !== 6) {
+      setOtpError("Please enter the complete 6-digit OTP.");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setOtpError("");
+    try {
+      const res = await verifyParentOTP(tempOtpMobile, cleanOtp);
+      if (res.success) {
+        setOtpModalOpen(false);
+        setVerifiedMobileNumber(tempOtpMobile);
+        setSiblingData({
+          parent: res.parent,
+          siblings: res.siblings || [],
+          mobile: tempOtpMobile,
+        });
+        setSiblingConfirmModalOpen(true);
+        toast.success("OTP verified successfully!");
+      } else {
+        setOtpError(res.message || "Invalid or expired OTP.");
+        toast.error(res.message || "Invalid OTP.");
+      }
+    } catch (err: any) {
+      console.error("Error verifying OTP:", err);
+      setOtpError(err?.message || "Invalid or expired OTP. Please try again.");
+      toast.error(err?.message || "Invalid OTP");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleConfirmSibling = () => {
+    if (!siblingData) return;
+
+    const p = siblingData.parent || {};
+    const pValues = p.field_values || {};
+    const allFields = formData?.sections?.flatMap((s: any) => s.fields || s.form_fields || []) || [];
+    const updates: Record<number, any> = {};
+    const clearedErrors: Record<number, string> = { ...errors };
+
+    for (const f of allFields) {
+      const mapping = (f.map_to_student_field || "").toLowerCase();
+      const lbl = (f.label || "").toLowerCase();
+
+      // Skip student-specific fields! Do NOT overwrite student name, DOB, Aadhaar, gender, etc.
+      if (
+        mapping === "name" ||
+        mapping === "first_name" ||
+        mapping === "date_of_birth" ||
+        mapping === "aadhar_number" ||
+        mapping === "gender" ||
+        /student\s*name|first\s*name|candidate\s*name|dob|birth|gender|aadh?aar/i.test(lbl)
+      ) {
+        continue;
+      }
+
+      let matchedValue: string | undefined = undefined;
+
+      if (mapping === "father_name" || (/father/i.test(lbl) && !/mobile|phone|occup|qualif|email/i.test(lbl))) {
+        matchedValue = p.father_name || pValues.father_name;
+      } else if (mapping === "mother_name" || (/mother/i.test(lbl) && !/mobile|phone|occup|qualif|email/i.test(lbl))) {
+        matchedValue = p.mother_name || pValues.mother_name;
+      } else if (mapping === "surname" || /surname|last\s*name/i.test(lbl)) {
+        matchedValue = p.surname || pValues.surname;
+      } else if (/guardian/i.test(lbl) && !/mobile|phone|occup|relation/i.test(lbl)) {
+        matchedValue = p.guardian_name || p.father_name || pValues.guardian_name;
+      } else if (/address/i.test(lbl)) {
+        matchedValue = p.address || pValues.address;
+      } else if (/city|village|town/i.test(lbl)) {
+        matchedValue = p.city || pValues.city;
+      } else if (/district/i.test(lbl)) {
+        matchedValue = p.district || pValues.district;
+      } else if (/state/i.test(lbl)) {
+        matchedValue = p.state || pValues.state;
+      } else if (/pin(code)?/i.test(lbl)) {
+        matchedValue = p.pincode || pValues.pincode;
+      } else if (/email/i.test(lbl) && !/student/i.test(lbl)) {
+        matchedValue = p.email || pValues.email;
+      }
+
+      if (matchedValue !== undefined && matchedValue !== "") {
+        updates[f.id] = matchedValue;
+        delete clearedErrors[f.id];
+      }
+    }
+
+    setFormValues((prev: any) => ({ ...prev, ...updates }));
+    setErrors(clearedErrors);
+    setMobileStatus("sibling_linked");
+    setSiblingConfirmModalOpen(false);
+    toast.success("Parent & address details auto-filled successfully!");
+  };
+
+  const handleRejectSibling = () => {
+    setSiblingConfirmModalOpen(false);
+    const targetId = activePhoneFieldId || primaryPhoneField?.id;
+    if (targetId) {
+      setFormValues((prev: any) => ({ ...prev, [targetId]: "" }));
+    }
+    setMobileStatus("unchecked");
+    setVerifiedMobileNumber("");
+    setSiblingData(null);
+    setDevOtp(null);
+    toast.info("Mobile number cleared. Please use a different number.");
+  };
+
   const [applicationId, setApplicationId] = useState(
     child.admission_number || child.id,
   );
@@ -1167,6 +1435,26 @@ function MultiStepForm({
 
   const handleStepOneSubmit = async () => {
     if (submitting) return;
+
+    if (primaryPhoneField) {
+      const phoneVal = String(formValues[primaryPhoneField.id] || "").replace(/\D/g, "");
+      if (!phoneVal || phoneVal.length !== 10) {
+        toast.error("Please enter a valid 10-digit mobile number.");
+        setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Valid 10-digit mobile number is required" }));
+        return;
+      }
+      if (mobileStatus !== "verified_new" && mobileStatus !== "sibling_linked") {
+        toast.error("Please verify your mobile number before proceeding.");
+        setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Mobile number must be verified" }));
+        return;
+      }
+      if (phoneVal !== verifiedMobileNumber) {
+        toast.error("Mobile number was changed. Please re-verify before proceeding.");
+        setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Mobile number re-verification required" }));
+        return;
+      }
+    }
+
     const isValid = validateStepOne();
     if (!isValid) return;
 
@@ -1381,6 +1669,11 @@ function MultiStepForm({
                     setFormValues={setFormValues}
                     errors={errors}
                     setErrors={setErrors}
+                    mobileStatus={mobileStatus}
+                    verifyingMobile={verifyingMobile}
+                    onVerifyMobile={handleVerifyMobile}
+                    onPhoneBlur={handlePhoneBlur}
+                    onPhoneChange={handlePhoneChange}
                   />
                 )}
                 {step === 2 && (
@@ -1474,6 +1767,267 @@ function MultiStepForm({
           </footer>
         </div>
       </div>
+
+      {/* ── OTP Verification Modal ── */}
+      <Dialog
+        open={otpModalOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCancelOtp();
+        }}
+      >
+        <DialogContent className="max-w-md rounded-3xl p-6 sm:p-8 bg-white border border-slate-100 shadow-2xl">
+          <DialogHeader className="space-y-3 text-center sm:text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-inner">
+                <KeyRound size={22} />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900 tracking-tight">
+                  Verify Mobile Number
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                  This mobile number is already registered. Please enter the 6-digit OTP sent to your number to retrieve your details.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-5 my-2">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-2">
+                <PhoneCall size={14} className="text-indigo-600" />
+                <span className="text-xs font-semibold text-slate-600">Registered Number:</span>
+              </div>
+              <Badge variant="outline" className="font-mono text-xs font-bold bg-white text-slate-800 px-2.5 py-0.5 border-slate-200">
+                +91 {tempOtpMobile}
+              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
+                Enter 6-Digit OTP
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otpValue}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  setOtpValue(val);
+                  if (otpError) setOtpError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && otpValue.length === 6 && !verifyingOtp) {
+                    handleVerifyOtpSubmit();
+                  }
+                }}
+                placeholder="• • • • • •"
+                className="text-center text-2xl font-mono tracking-[0.5em] font-black h-14 rounded-2xl border-slate-200 focus-visible:ring-indigo-500 text-slate-900"
+                autoFocus
+              />
+              {otpError && (
+                <p className="text-xs font-semibold text-rose-500 text-center flex items-center justify-center gap-1.5 mt-1.5">
+                  <AlertCircle size={14} />
+                  <span>{otpError}</span>
+                </p>
+              )}
+            </div>
+
+            {devOtp && (
+              <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[10px] uppercase tracking-wider bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">DEV</span>
+                  <span>Test OTP: <strong className="font-mono font-bold">{devOtp}</strong></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpValue(devOtp);
+                    if (otpError) setOtpError("");
+                  }}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>Didn't receive the OTP?</span>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                className="font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+              >
+                <RefreshCw size={12} />
+                <span>Resend OTP</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelOtp}
+              disabled={verifyingOtp}
+              className="w-full sm:w-auto rounded-xl text-xs font-semibold px-4 h-11 border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              Cancel / Use Different Number
+            </Button>
+            <Button
+              type="button"
+              onClick={handleVerifyOtpSubmit}
+              disabled={verifyingOtp || otpValue.replace(/\D/g, "").length !== 6}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
+            >
+              {verifyingOtp ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={14} />
+                  <span>Verify OTP</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Sibling Detection & Auto-Fill Confirmation Modal ── */}
+      <Dialog
+        open={siblingConfirmModalOpen}
+        onOpenChange={(open) => {
+          if (!open) handleRejectSibling();
+        }}
+      >
+        <DialogContent className="max-w-lg rounded-3xl p-6 sm:p-8 bg-white border border-slate-100 shadow-2xl">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0 shadow-inner">
+                <Users size={22} />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900 tracking-tight">
+                  Existing Sibling / Family Detected
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                  Mobile number <span className="font-semibold text-slate-800">{siblingData?.mobile}</span> is already registered with an existing student.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 my-2">
+            {/* Existing Students List */}
+            {siblingData?.siblings && siblingData.siblings.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Existing Student(s) in School
+                </span>
+                <div className="space-y-1.5">
+                  {siblingData.siblings.map((sib: any) => (
+                    <div
+                      key={sib.id}
+                      className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60 last:border-none"
+                    >
+                      <div className="font-semibold text-slate-800 flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-indigo-600" />
+                        <span>{sib.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-500">
+                        {sib.class_name && (
+                          <Badge variant="outline" className="text-[10px] font-medium py-0 px-2 bg-white text-slate-700">
+                            {sib.class_name}
+                          </Badge>
+                        )}
+                        {sib.gr_no && (
+                          <span className="text-[11px] font-mono text-slate-600">GR: {sib.gr_no}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Parent Details Preview Card */}
+            {siblingData?.parent && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-xs space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900">
+                  Parent & Address Details to Auto-fill
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-slate-700">
+                  {siblingData.parent.father_name && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Father Name:</span>
+                      <span className="font-semibold">{siblingData.parent.father_name}</span>
+                    </div>
+                  )}
+                  {siblingData.parent.mother_name && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Mother Name:</span>
+                      <span className="font-semibold">{siblingData.parent.mother_name}</span>
+                    </div>
+                  )}
+                  {siblingData.parent.surname && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Surname:</span>
+                      <span className="font-semibold">{siblingData.parent.surname}</span>
+                    </div>
+                  )}
+                  {(siblingData.parent.city || siblingData.parent.pincode) && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">City / PIN:</span>
+                      <span className="font-semibold">
+                        {[siblingData.parent.city, siblingData.parent.pincode].filter(Boolean).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {siblingData.parent.address && (
+                    <div className="col-span-2">
+                      <span className="text-slate-400 block text-[10px]">Address:</span>
+                      <span className="font-medium truncate block">{siblingData.parent.address}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 text-xs space-y-1">
+              <p className="font-bold text-blue-950">
+                Do you want to apply as a sibling and auto-fill your existing address/parent details?
+              </p>
+              <p className="text-[11px] text-blue-800">
+                Student-specific fields (first name, birth date, Aadhaar, gender) will remain clear for you to enter.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRejectSibling}
+              className="w-full sm:w-auto rounded-xl text-xs font-semibold px-4 h-11 border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              No, use different number
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmSibling}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
+            >
+              <Sparkles size={14} />
+              <span>Yes, auto-fill sibling</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
@@ -1488,6 +2042,11 @@ function StudentDetailsStep({
   setFormValues,
   errors,
   setErrors,
+  mobileStatus,
+  verifyingMobile,
+  onVerifyMobile,
+  onPhoneBlur,
+  onPhoneChange,
 }: {
   child: any;
   formData: any;
@@ -1495,6 +2054,11 @@ function StudentDetailsStep({
   setFormValues: any;
   errors: any;
   setErrors: any;
+  mobileStatus?: MobileVerificationStatus;
+  verifyingMobile?: boolean;
+  onVerifyMobile?: (field?: AdmissionField) => void;
+  onPhoneBlur?: (field: AdmissionField) => void;
+  onPhoneChange?: (fieldId: number, value: string) => void;
 }) {
   const [classOptions, setClassOptions] = useState<any[]>([]);
 
@@ -1506,6 +2070,9 @@ function StudentDetailsStep({
         delete updated[fieldId];
         return updated;
       });
+    }
+    if (onPhoneChange) {
+      onPhoneChange(fieldId, value);
     }
   };
 
@@ -1574,6 +2141,7 @@ function StudentDetailsStep({
                     field.map_to_student_field === "school_class"
                       ? { ...field, options: classOptions }
                       : field;
+                  const isPhone = isPhoneField(updatedField);
 
                   return (
                     <motion.div
@@ -1588,6 +2156,10 @@ function StudentDetailsStep({
                         value={formValues?.[field.id] ?? ""}
                         error={errors[field.id]}
                         onChange={(value: string) => handleChange(field.id, value)}
+                        onBlur={isPhone && onPhoneBlur ? () => onPhoneBlur(updatedField) : undefined}
+                        mobileStatus={isPhone ? mobileStatus : undefined}
+                        isVerifyingMobile={isPhone ? verifyingMobile : undefined}
+                        onVerifyMobile={isPhone && onVerifyMobile ? () => onVerifyMobile(updatedField) : undefined}
                       />
                     </motion.div>
                   );
@@ -1642,8 +2214,38 @@ function SectionCompletionBar({
 // ─────────────────────────────────────────────
 // DynamicField
 // ─────────────────────────────────────────────
-function DynamicField({ field, value, onChange, error }: { field: AdmissionField; value: string; onChange: (value: string) => void; error?: string }) {
-  return <AdmissionFieldInput field={field} value={value} error={error} prefix="online-admission" onChange={value => onChange(String(value))} />;
+function DynamicField({
+  field,
+  value,
+  onChange,
+  onBlur,
+  error,
+  mobileStatus,
+  isVerifyingMobile,
+  onVerifyMobile,
+}: {
+  field: AdmissionField;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  error?: string;
+  mobileStatus?: MobileVerificationStatus;
+  isVerifyingMobile?: boolean;
+  onVerifyMobile?: () => void;
+}) {
+  return (
+    <AdmissionFieldInput
+      field={field}
+      value={value}
+      error={error}
+      prefix="online-admission"
+      onChange={value => onChange(String(value))}
+      onBlur={onBlur}
+      mobileStatus={mobileStatus}
+      isVerifyingMobile={isVerifyingMobile}
+      onVerifyMobile={onVerifyMobile}
+    />
+  );
 }
 
 function DocumentsStep({

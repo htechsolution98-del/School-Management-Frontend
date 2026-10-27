@@ -75,6 +75,7 @@ export interface TeacherWorkload {
   max_weekly_periods: number;
   max_consecutive_periods: number;
   assigned_classes_count: number;
+  assigned_periods?: number;
   is_active: boolean;
   created_at?: string | null;
   updated_at?: string | null;

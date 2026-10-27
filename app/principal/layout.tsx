@@ -25,6 +25,7 @@ import {
   GraduationCap,
   History,
   Banknote,
+  Boxes,
   Bell,
 } from "lucide-react";
 
@@ -76,6 +77,7 @@ const sidebarLinks = [
   { title: "Staff Attendance", href: "/principal/staff-attendance", icon: UserCheck },
   { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
   { title: "Support & Helpdesk", href: "/principal/support", icon: CalendarCheck },
+  { title: "Request Supplies", href: "/principal/stock-request", icon: Boxes },
   { title: "Account Settings", href: "/principal/settings", icon: Settings },
 ];
 

@@ -12,8 +12,10 @@ import {
   Search,
   Calendar,
   Eye,
+  FileDown,
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { toast } from "sonner";
 
 const isValidIndianMobileNumber = (value: string): boolean =>
   value === "" || /^[6-9][0-9]{9}$/.test(value);
@@ -27,6 +29,7 @@ export default function PurchasesAndSuppliersPage() {
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdfId, setDownloadingPdfId] = useState<number | null>(null);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,31 +177,54 @@ export default function PurchasesAndSuppliersPage() {
 
   const handleSavePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Maximum Stock Capacity Validation (Row 53)
+    const itemQuantities: Record<number, number> = {};
+    for (const line of purchaseForm.items) {
+      if (line.item) {
+        const itemId = Number(line.item);
+        const qty = Number(line.quantity) || 0;
+        itemQuantities[itemId] = (itemQuantities[itemId] || 0) + qty;
+      }
+    }
+
+    for (const [itemIdStr, purchaseQty] of Object.entries(itemQuantities)) {
+      const itemObj = items.find((it) => it.id === Number(itemIdStr));
+      if (itemObj && itemObj.maximum_stock_level != null) {
+        const maxStock = Number(itemObj.maximum_stock_level);
+        const currentStock = Number(itemObj.current_stock || 0);
+        if (currentStock + purchaseQty > maxStock) {
+          toast.error(`Purchase exceeds maximum stock capacity of ${maxStock} for ${itemObj.item_name}.`);
+          return;
+        }
+      }
+    }
+
     setSubmitting(true);
     try {
       const grandTotal = calculateGrandTotal();
       const payload = {
-        supplier: Number(purchaseForm.supplier),
-        academic_year: Number(purchaseForm.academic_year),
-        invoice_number: purchaseForm.invoice_number,
-        purchase_date: purchaseForm.purchase_date,
+        supplier: purchaseForm.supplier ? Number(purchaseForm.supplier) : null,
+        academic_year: purchaseForm.academic_year ? Number(purchaseForm.academic_year) : null,
+        invoice_number: purchaseForm.invoice_number ? purchaseForm.invoice_number.trim() : "",
+        purchase_date: purchaseForm.purchase_date || null,
         subtotal: grandTotal,
         discount: "0.00",
         tax: "0.00",
         grand_total: grandTotal,
         payment_status: purchaseForm.payment_status,
         status: "CONFIRMED", // Auto restocks inventory upon creation
-        notes: purchaseForm.notes,
-        items: purchaseForm.items.map(it => ({
-          item: Number(it.item),
+        notes: purchaseForm.notes || "",
+        items: (purchaseForm.items || []).map((it) => ({
+          item: it.item ? Number(it.item) : null,
           size: it.size ? Number(it.size) : null,
           color: it.color ? Number(it.color) : null,
-          quantity: Number(it.quantity),
-          unit_cost: it.unit_cost,
-          tax: it.tax,
-          discount: it.discount,
-          total_amount: it.total_amount,
-        }))
+          quantity: (it.quantity as any) !== "" && it.quantity !== null && !isNaN(Number(it.quantity)) ? Number(it.quantity) : null,
+          unit_cost: it.unit_cost !== "" && it.unit_cost !== null && !isNaN(Number(it.unit_cost)) ? it.unit_cost : null,
+          tax: it.tax || "0.00",
+          discount: it.discount || "0.00",
+          total_amount: it.total_amount || "0.00",
+        })),
       };
 
       await inventoryApi.post("/purchases/", payload);
@@ -212,19 +238,45 @@ export default function PurchasesAndSuppliersPage() {
     }
   };
 
+  const handleDownloadInvoicePdf = async (purchase: any) => {
+    if (!purchase || !purchase.id) return;
+    setDownloadingPdfId(purchase.id);
+    try {
+      const res = await inventoryApi.get(`/purchases/${purchase.id}/invoice-pdf/`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Purchase_Invoice_${purchase.invoice_number || purchase.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      showSuccess("Purchase invoice PDF downloaded successfully");
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+      showApiError(err, "Failed to download purchase invoice PDF.");
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
   const handleSaveSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidIndianMobileNumber(supplierFormData.phone)) {
-      showApiError(
-        new Error("Enter exactly 10 digits for an Indian mobile number, starting with 6–9."),
-        "Invalid phone number."
-      );
-      return;
-    }
 
     setSubmitting(true);
     try {
-      const payload = { ...supplierFormData, phone: supplierFormData.phone };
+      const payload = {
+        supplier_name: (supplierFormData.supplier_name || "").trim(),
+        contact_person: (supplierFormData.contact_person || "").trim(),
+        phone: (supplierFormData.phone || "").trim(),
+        email: (supplierFormData.email || "").trim(),
+        address: (supplierFormData.address || "").trim(),
+        gst_number: (supplierFormData.gst_number || "").trim(),
+      };
       if (editingSupplierId !== null) {
         await inventoryApi.patch(`/suppliers/${editingSupplierId}/`, payload);
         showSuccess("Supplier updated successfully");
@@ -438,17 +490,32 @@ export default function PurchasesAndSuppliersPage() {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedPurchase(p);
-                              setIsDetailsModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm"
-                            title="View purchase breakdown"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            View
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleDownloadInvoicePdf(p)}
+                              disabled={downloadingPdfId === p.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 transition-all shadow-xs disabled:opacity-50"
+                              title="Download Invoice PDF"
+                            >
+                              {downloadingPdfId === p.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                              ) : (
+                                <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                              )}
+                              <span>PDF</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedPurchase(p);
+                                setIsDetailsModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm"
+                              title="View purchase breakdown"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              View
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -530,7 +597,7 @@ export default function PurchasesAndSuppliersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSavePurchase} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSavePurchase} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -609,6 +676,35 @@ export default function PurchasesAndSuppliersPage() {
                         <tr key={idx} className="bg-white dark:bg-slate-900">
                           {(() => {
                             const selectedItem = items.find((item) => item.id === Number(row.item));
+
+                            // Item-specific sizes filter
+                            const availableSizes: any[] = (() => {
+                              if (!selectedItem || !selectedItem.has_size) return [];
+                              const allowed = selectedItem.allowed_sizes;
+                              if (Array.isArray(allowed) && allowed.length > 0) {
+                                const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+                                return sizes.filter((s: any) => s.is_active && allowedIds.includes(s.id));
+                              }
+                              if (Array.isArray(selectedItem.allowed_size_details) && selectedItem.allowed_size_details.length > 0) {
+                                return selectedItem.allowed_size_details;
+                              }
+                              return sizes.filter((s: any) => s.is_active);
+                            })();
+
+                            // Item-specific colors filter
+                            const availableColors: any[] = (() => {
+                              if (!selectedItem || !selectedItem.has_color) return [];
+                              const allowed = selectedItem.allowed_colors;
+                              if (Array.isArray(allowed) && allowed.length > 0) {
+                                const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+                                return colors.filter((c: any) => c.is_active && allowedIds.includes(c.id));
+                              }
+                              if (Array.isArray(selectedItem.allowed_color_details) && selectedItem.allowed_color_details.length > 0) {
+                                return selectedItem.allowed_color_details;
+                              }
+                              return colors.filter((c: any) => c.is_active);
+                            })();
+
                             return <>
                           <td className="p-2">
                             <select
@@ -625,26 +721,34 @@ export default function PurchasesAndSuppliersPage() {
                           </td>
                           <td className="p-2">
                             <select
+                              disabled={!selectedItem || !selectedItem.has_size}
                               required={!!selectedItem?.has_size}
                               value={row.size}
                               onChange={(e) => handleItemChange(idx, "size", e.target.value)}
-                              className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                              className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
                             >
-                              <option value="">{selectedItem?.has_size ? "Select" : "None"}</option>
-                              {sizes.filter((s) => s.is_active).map((s) => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
+                              <option value="">
+                                {!selectedItem ? "Select item" : !selectedItem.has_size ? "None (No Size)" : "Select Size"}
+                              </option>
+                              {availableSizes.map((s: any) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} {s.size_type && s.size_type !== "General" ? `(${s.size_type})` : ""}
+                                </option>
                               ))}
                             </select>
                           </td>
                           <td className="p-2">
                             <select
+                              disabled={!selectedItem || !selectedItem.has_color}
                               required={!!selectedItem?.has_color}
                               value={row.color}
                               onChange={(e) => handleItemChange(idx, "color", e.target.value)}
-                              className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                              className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
                             >
-                              <option value="">{selectedItem?.has_color ? "Select" : "None"}</option>
-                              {colors.filter((c) => c.is_active).map((c) => (
+                              <option value="">
+                                {!selectedItem ? "Select item" : !selectedItem.has_color ? "None (No Color)" : "Select Color"}
+                              </option>
+                              {availableColors.map((c: any) => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                               ))}
                             </select>
@@ -737,7 +841,7 @@ export default function PurchasesAndSuppliersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveSupplier} className="p-6 space-y-4">
+            <form onSubmit={handleSaveSupplier} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Supplier / Vendor Name <span className="text-red-500">*</span>
@@ -939,7 +1043,21 @@ export default function PurchasesAndSuppliersPage() {
               <div className="text-xs text-slate-500">
                 {selectedPurchase.items?.length || 0} Line item{(selectedPurchase.items?.length || 0) === 1 ? "" : "s"}
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadInvoicePdf(selectedPurchase)}
+                  disabled={downloadingPdfId === selectedPurchase.id}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
+                  title="Download Official Purchase Invoice PDF"
+                >
+                  {downloadingPdfId === selectedPurchase.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileDown className="w-4 h-4" />
+                  )}
+                  Download Invoice PDF
+                </button>
                 <div className="text-right">
                   <span className="text-xs text-slate-400 block">Grand Total</span>
                   <span className="text-xl font-bold text-slate-900 dark:text-white">

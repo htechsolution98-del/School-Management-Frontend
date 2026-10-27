@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   UserCheck,
   Plus,
@@ -10,12 +10,16 @@ import {
   Boxes,
   Loader2,
   X,
-  ShieldAlert
+  ShieldAlert,
+  ClipboardList,
+  RotateCw,
+  Filter,
+  AlertCircle
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess, showWarning } from "@/lib/inventory-client";
 
 export default function StudentItemIssuePage() {
-  const [activeTab, setActiveTab] = useState<"single" | "bulk" | "entitlements">("single");
+  const [activeTab, setActiveTab] = useState<"single" | "bulk" | "entitlements" | "ledger">("single");
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
@@ -24,6 +28,12 @@ export default function StudentItemIssuePage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [entitlements, setEntitlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Student Issue Ledger state
+  const [ledgerIssues, setLedgerIssues] = useState<any[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [ledgerClassFilter, setLedgerClassFilter] = useState("");
 
   // Single Issue Form
   const [singleStudentSearch, setSingleStudentSearch] = useState("");
@@ -46,6 +56,11 @@ export default function StudentItemIssuePage() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
+  const totalRequired = useMemo(
+    () => selectedStudentIds.length * (bulkQtyPerStudent || 0),
+    [selectedStudentIds.length, bulkQtyPerStudent]
+  );
+
   // Entitlement Generator Modal
   const [isEntitlementModalOpen, setIsEntitlementModalOpen] = useState(false);
   const [entitleYear, setEntitleYear] = useState("");
@@ -56,6 +71,7 @@ export default function StudentItemIssuePage() {
 
   useEffect(() => {
     fetchInitialData();
+    fetchLedgerIssues();
   }, []);
 
   useEffect(() => {
@@ -63,6 +79,19 @@ export default function StudentItemIssuePage() {
       fetchClassStudents();
     }
   }, [bulkClass, bulkDivision]);
+
+  const fetchLedgerIssues = async () => {
+    setLedgerLoading(true);
+    try {
+      const res = await inventoryApi.get("/issues/");
+      const list = Array.isArray(res.data) ? res.data : res.data.results || [];
+      setLedgerIssues(list);
+    } catch (err) {
+      console.error("Failed to load issue ledger:", err);
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -109,6 +138,7 @@ export default function StudentItemIssuePage() {
       setLoading(false);
     }
   };
+
 
   const fetchClassStudents = async () => {
     try {
@@ -278,6 +308,42 @@ export default function StudentItemIssuePage() {
     bulkItemObj
   );
 
+  const singleAvailableSizes = useMemo(() => {
+    if (!selectedItemObj || !selectedItemObj.has_size) return [];
+    if (selectedItemObj.allowed_sizes && selectedItemObj.allowed_sizes.length > 0) {
+      const allowed = new Set(selectedItemObj.allowed_sizes.map((s: any) => (typeof s === "object" ? s.id : s)));
+      return sizes.filter((s) => s.is_active && allowed.has(s.id));
+    }
+    return sizes.filter((s) => s.is_active);
+  }, [selectedItemObj, sizes]);
+
+  const singleAvailableColors = useMemo(() => {
+    if (!selectedItemObj || !selectedItemObj.has_color) return [];
+    if (selectedItemObj.allowed_colors && selectedItemObj.allowed_colors.length > 0) {
+      const allowed = new Set(selectedItemObj.allowed_colors.map((c: any) => (typeof c === "object" ? c.id : c)));
+      return colors.filter((c) => c.is_active && allowed.has(c.id));
+    }
+    return colors.filter((c) => c.is_active);
+  }, [selectedItemObj, colors]);
+
+  const bulkAvailableSizes = useMemo(() => {
+    if (!bulkItemObj || !bulkItemObj.has_size) return [];
+    if (bulkItemObj.allowed_sizes && bulkItemObj.allowed_sizes.length > 0) {
+      const allowed = new Set(bulkItemObj.allowed_sizes.map((s: any) => (typeof s === "object" ? s.id : s)));
+      return sizes.filter((s) => s.is_active && allowed.has(s.id));
+    }
+    return sizes.filter((s) => s.is_active);
+  }, [bulkItemObj, sizes]);
+
+  const bulkAvailableColors = useMemo(() => {
+    if (!bulkItemObj || !bulkItemObj.has_color) return [];
+    if (bulkItemObj.allowed_colors && bulkItemObj.allowed_colors.length > 0) {
+      const allowed = new Set(bulkItemObj.allowed_colors.map((c: any) => (typeof c === "object" ? c.id : c)));
+      return colors.filter((c) => c.is_active && allowed.has(c.id));
+    }
+    return colors.filter((c) => c.is_active);
+  }, [bulkItemObj, colors]);
+
   const handleSingleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) {
@@ -290,13 +356,45 @@ export default function StudentItemIssuePage() {
     }
     setSingleSubmitting(true);
     try {
+      const issuedQty = Number(singleQty);
+      const itemId = Number(singleItem);
+      const sId = singleSize ? Number(singleSize) : null;
+      const cId = singleColor ? Number(singleColor) : null;
+
+      // Real-time optimistic UI stock update
+      setItems((prevItems) =>
+        prevItems.map((it) => {
+          if (it.id === itemId) {
+            return {
+              ...it,
+              current_stock: Math.max(0, (it.current_stock ?? 0) - issuedQty),
+            };
+          }
+          return it;
+        })
+      );
+
+      setSingleVariantMatrix((prevMatrix) =>
+        prevMatrix.map((entry) => {
+          const matchesSize = sId === null || entry.size_id === sId;
+          const matchesColor = cId === null || entry.color_id === cId;
+          if (matchesSize && matchesColor) {
+            return {
+              ...entry,
+              available_stock: Math.max(0, (entry.available_stock || 0) - issuedQty),
+            };
+          }
+          return entry;
+        })
+      );
+
       const payload = {
         student: selectedStudent.id,
-        item: Number(singleItem),
+        item: itemId,
         academic_year: Number(academicYears[0].id),
-        quantity: Number(singleQty),
-        size: singleSize ? Number(singleSize) : null,
-        color: singleColor ? Number(singleColor) : null,
+        quantity: issuedQty,
+        size: sId,
+        color: cId,
         issue_reason: singleReason,
       };
 
@@ -304,9 +402,16 @@ export default function StudentItemIssuePage() {
       showSuccess("Item Issued", `Item successfully issued to ${selectedStudent.name || ""} ${selectedStudent.surname || ""}!`);
       setSelectedStudent(null);
       setSingleStudentSearch("");
+
+      // Real-time server sync without full page reload
       fetchInitialData();
+      fetchSingleItemVariantStock(singleItem);
+      fetchLedgerIssues();
     } catch (err: any) {
       showApiError(err, "Failed to issue item.");
+      // Rollback or sync on failure
+      fetchInitialData();
+      fetchSingleItemVariantStock(singleItem);
     } finally {
       setSingleSubmitting(false);
     }
@@ -331,24 +436,63 @@ export default function StudentItemIssuePage() {
 
     setBulkSubmitting(true);
     try {
+      const itemId = Number(bulkItem);
+      const sId = bulkSize ? Number(bulkSize) : null;
+      const cId = bulkColor ? Number(bulkColor) : null;
+
+      // Real-time optimistic UI stock update
+      setItems((prevItems) =>
+        prevItems.map((it) => {
+          if (it.id === itemId) {
+            return {
+              ...it,
+              current_stock: Math.max(0, (it.current_stock ?? 0) - totalReq),
+            };
+          }
+          return it;
+        })
+      );
+
+      setBulkVariantMatrix((prevMatrix) =>
+        prevMatrix.map((entry) => {
+          const matchesSize = sId === null || entry.size_id === sId;
+          const matchesColor = cId === null || entry.color_id === cId;
+          if (matchesSize && matchesColor) {
+            return {
+              ...entry,
+              available_stock: Math.max(0, (entry.available_stock || 0) - totalReq),
+            };
+          }
+          return entry;
+        })
+      );
+
       const payload = {
-        item: Number(bulkItem),
+        item: itemId,
         academic_year: Number(academicYears[0].id),
         student_ids: selectedStudentIds,
         quantity_per_student: bulkQtyPerStudent,
-        size: bulkSize ? Number(bulkSize) : null,
-        color: bulkColor ? Number(bulkColor) : null,
+        size: sId,
+        color: cId,
       };
 
       const res = await inventoryApi.post("/issues/bulk-issue/", payload);
       showSuccess("Bulk Issue Complete", res.data.message || "Bulk issue completed successfully!");
+      setSelectedStudentIds([]);
+
+      // Real-time server sync without full page reload
       fetchInitialData();
+      fetchBulkItemVariantStock(bulkItem);
+      fetchLedgerIssues();
     } catch (err: any) {
       showApiError(err, "Bulk issue failed.");
+      fetchInitialData();
+      fetchBulkItemVariantStock(bulkItem);
     } finally {
       setBulkSubmitting(false);
     }
   };
+
 
   const handleGenerateEntitlements = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,6 +526,21 @@ export default function StudentItemIssuePage() {
       s.gr_no?.toString().includes(q)
     );
   });
+
+  const filteredLedger = ledgerIssues.filter((rec) => {
+    if (ledgerClassFilter) {
+      const cls = (rec.student_class || "").toLowerCase();
+      if (!cls.includes(ledgerClassFilter.toLowerCase())) return false;
+    }
+    if (!ledgerSearch) return true;
+    const q = ledgerSearch.toLowerCase();
+    const stName = (rec.student_name || "").toLowerCase();
+    const itName = (rec.item_name || "").toLowerCase();
+    const itCode = (rec.item_code || "").toLowerCase();
+    const roll = String(rec.student_roll || "").toLowerCase();
+    return stName.includes(q) || itName.includes(q) || itCode.includes(q) || roll.includes(q);
+  });
+
 
   return (
     <div className="space-y-6">
@@ -448,7 +607,19 @@ export default function StudentItemIssuePage() {
         >
           <Boxes className="w-4 h-4" /> Entitlement Registry ({entitlements.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab("ledger")}
+          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === "ledger"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400"
+              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" /> Student Issue Ledger ({ledgerIssues.length})
+        </button>
       </div>
+
 
       {/* Tab 1: Single Student Issue */}
       {activeTab === "single" && (
@@ -527,7 +698,7 @@ export default function StudentItemIssuePage() {
               )}
             </div>
 
-            <form onSubmit={handleSingleIssue} className="space-y-4">
+            <form onSubmit={handleSingleIssue} noValidate className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -570,13 +741,14 @@ export default function StudentItemIssuePage() {
                     Size Variant
                   </label>
                   <select
+                    disabled={!selectedItemObj?.has_size}
                     required={!!selectedItemObj?.has_size}
                     value={singleSize}
                     onChange={(e) => setSingleSize(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900"
                   >
-                    <option value="">{selectedItemObj?.has_size ? "Select size" : "Standard / None"}</option>
-                    {sizes.filter((s) => s.is_active).map((s) => {
+                    <option value="">{selectedItemObj?.has_size ? "Select size" : "None / Not Applicable"}</option>
+                    {singleAvailableSizes.map((s) => {
                       const { disabled, stock } = isOptionDisabled(
                         singleVariantMatrix,
                         "size",
@@ -598,13 +770,14 @@ export default function StudentItemIssuePage() {
                     Color Variant
                   </label>
                   <select
+                    disabled={!selectedItemObj?.has_color}
                     required={!!selectedItemObj?.has_color}
                     value={singleColor}
                     onChange={(e) => setSingleColor(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900"
                   >
-                    <option value="">{selectedItemObj?.has_color ? "Select color" : "Standard / None"}</option>
-                    {colors.filter((c) => c.is_active).map((c) => {
+                    <option value="">{selectedItemObj?.has_color ? "Select color" : "None / Not Applicable"}</option>
+                    {singleAvailableColors.map((c) => {
                       const { disabled, stock } = isOptionDisabled(
                         singleVariantMatrix,
                         "color",
@@ -628,29 +801,64 @@ export default function StudentItemIssuePage() {
                   <input
                     type="number"
                     min="1"
-                    max={Math.max(1, currentSingleStock)}
                     required
                     value={singleQty}
                     onChange={(e) => setSingleQty(Number(e.target.value))}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    className={`w-full px-3.5 py-2 text-sm rounded-xl border bg-slate-50 dark:bg-slate-950 focus:outline-none transition-colors ${
+                      singleQty > currentSingleStock || singleQty <= 0
+                        ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-red-600 dark:text-red-400"
+                        : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
+                    }`}
                   />
-                  <p className={`text-[11px] mt-1 ${currentSingleStock < singleQty || currentSingleStock <= 0 ? "text-red-500 font-medium" : "text-slate-400"}`}>
-                    {singleVariantLoading ? (
-                      "Checking variant stock..."
-                    ) : currentSingleStock <= 0 ? (
-                      "Selected variant is out of stock (0 available)"
-                    ) : (
-                      `Max available: ${currentSingleStock} ${selectedItemObj?.unit || "units"}`
-                    )}
-                  </p>
+                  {singleQty > currentSingleStock ? (
+                    <p className="text-[11px] mt-1 text-red-500 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 inline shrink-0" />
+                      Quantity exceeds available stock ({currentSingleStock} available)
+                    </p>
+                  ) : singleQty <= 0 ? (
+                    <p className="text-[11px] mt-1 text-red-500 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 inline shrink-0" />
+                      Quantity must be greater than 0
+                    </p>
+                  ) : (
+                    <p className="text-[11px] mt-1 text-slate-400">
+                      {singleVariantLoading ? (
+                        "Checking variant stock..."
+                      ) : currentSingleStock <= 0 ? (
+                        "Selected variant is out of stock (0 available)"
+                      ) : (
+                        `Max available: ${currentSingleStock} ${selectedItemObj?.unit || "units"}`
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end">
                 <button
                   type="submit"
-                  disabled={singleSubmitting || !selectedStudent || academicYears.length === 0 || currentSingleStock < singleQty || currentSingleStock <= 0}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
+                  disabled={
+                    singleSubmitting ||
+                    !selectedStudent ||
+                    !singleItem ||
+                    academicYears.length === 0 ||
+                    singleQty > currentSingleStock ||
+                    singleQty <= 0 ||
+                    isNaN(singleQty) ||
+                    currentSingleStock <= 0
+                  }
+                  className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all ${
+                    singleSubmitting ||
+                    !selectedStudent ||
+                    !singleItem ||
+                    academicYears.length === 0 ||
+                    singleQty > currentSingleStock ||
+                    singleQty <= 0 ||
+                    isNaN(singleQty) ||
+                    currentSingleStock <= 0
+                      ? "bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 cursor-not-allowed opacity-60"
+                      : "bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-indigo-500/20 cursor-pointer"
+                  }`}
                 >
                   {singleSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Confirm Issue & Deduct Stock
@@ -742,13 +950,17 @@ export default function StudentItemIssuePage() {
                   <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{currentBulkStock} units</div>
                 </div>
                 <div className="text-right pl-3 border-l border-slate-200 dark:border-slate-800">
-                  <div className="text-[10px] uppercase font-bold text-slate-400">Selected Req</div>
-                  <div className={`text-lg font-bold ${
-                    (selectedStudentIds.length * bulkQtyPerStudent) > currentBulkStock
-                      ? "text-red-600"
-                      : "text-blue-600"
+                  <div className={`text-[10px] uppercase font-bold transition-colors ${
+                    totalRequired > currentBulkStock ? "text-red-500 font-black" : "text-slate-400"
                   }`}>
-                    {selectedStudentIds.length * bulkQtyPerStudent} units
+                    SELECTED REQ
+                  </div>
+                  <div className={`text-lg font-bold transition-colors ${
+                    totalRequired > currentBulkStock
+                      ? "text-red-500"
+                      : "text-blue-600 dark:text-blue-400"
+                  }`}>
+                    {totalRequired} units
                   </div>
                 </div>
               </div>
@@ -794,13 +1006,14 @@ export default function StudentItemIssuePage() {
                 Size Variant
               </label>
               <select
+                disabled={!bulkItemObj?.has_size}
                 required={!!bulkItemObj?.has_size}
                 value={bulkSize}
                 onChange={(e) => setBulkSize(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900"
               >
-                <option value="">{bulkItemObj?.has_size ? "Select size" : "Standard / None"}</option>
-                {sizes.filter((s) => s.is_active).map((s) => {
+                <option value="">{bulkItemObj?.has_size ? "Select size" : "None / Not Applicable"}</option>
+                {bulkAvailableSizes.map((s) => {
                   const { disabled, stock } = isOptionDisabled(
                     bulkVariantMatrix,
                     "size",
@@ -820,13 +1033,14 @@ export default function StudentItemIssuePage() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Variant</label>
               <select
+                disabled={!bulkItemObj?.has_color}
                 required={!!bulkItemObj?.has_color}
                 value={bulkColor}
                 onChange={(e) => setBulkColor(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900"
               >
-                <option value="">{bulkItemObj?.has_color ? "Select color" : "Standard / None"}</option>
-                {colors.filter((color) => color.is_active).map((color) => {
+                <option value="">{bulkItemObj?.has_color ? "Select color" : "None / Not Applicable"}</option>
+                {bulkAvailableColors.map((color) => {
                   const { disabled, stock } = isOptionDisabled(
                     bulkVariantMatrix,
                     "color",
@@ -845,16 +1059,25 @@ export default function StudentItemIssuePage() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Qty / Student
+                Qty / Student <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 min="1"
-                max={Math.max(1, Math.floor(currentBulkStock / Math.max(1, selectedStudentIds.length || 1)))}
                 value={bulkQtyPerStudent}
                 onChange={(e) => setBulkQtyPerStudent(Number(e.target.value))}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                className={`w-full px-3.5 py-2 text-sm rounded-xl border bg-slate-50 dark:bg-slate-950 focus:outline-none transition-colors ${
+                  totalRequired > currentBulkStock || bulkQtyPerStudent <= 0
+                    ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-red-600 dark:text-red-400"
+                    : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
+                }`}
               />
+              {totalRequired > currentBulkStock && selectedStudentIds.length > 0 && (
+                <p className="text-[11px] mt-1 text-red-500 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 inline shrink-0" />
+                  Total required ({totalRequired}) exceeds available stock ({currentBulkStock})
+                </p>
+              )}
             </div>
           </div>
 
@@ -938,8 +1161,24 @@ export default function StudentItemIssuePage() {
             <button
               type="button"
               onClick={handleBulkIssue}
-              disabled={bulkSubmitting || selectedStudentIds.length === 0 || academicYears.length === 0 || currentBulkStock < (selectedStudentIds.length * bulkQtyPerStudent) || currentBulkStock <= 0}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
+              disabled={
+                bulkSubmitting ||
+                selectedStudentIds.length === 0 ||
+                totalRequired > currentBulkStock ||
+                bulkQtyPerStudent <= 0 ||
+                currentBulkStock <= 0 ||
+                academicYears.length === 0
+              }
+              className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all ${
+                bulkSubmitting ||
+                selectedStudentIds.length === 0 ||
+                totalRequired > currentBulkStock ||
+                bulkQtyPerStudent <= 0 ||
+                currentBulkStock <= 0 ||
+                academicYears.length === 0
+                  ? "bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 cursor-not-allowed opacity-60"
+                  : "bg-[#5826df] hover:bg-[#4a1ec2] text-white shadow-indigo-500/20 cursor-pointer"
+              }`}
             >
               {bulkSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Issue to {selectedStudentIds.length} Selected Students
@@ -1006,6 +1245,133 @@ export default function StudentItemIssuePage() {
         </div>
       )}
 
+      {/* Tab 4: Student Issue Ledger */}
+      {activeTab === "ledger" && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm space-y-4 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                Student Issuance Ledger
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Comprehensive historical audit of all inventory items and variants issued to students.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search student or item..."
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  className="pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              {/* Class Filter */}
+              <select
+                value={ledgerClassFilter}
+                onChange={(e) => setLedgerClassFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              >
+                <option value="">All Classes</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.school_class || c.class_name || c.name}>
+                    {c.school_class || c.class_name || c.name || `Class ${c.id}`}
+                  </option>
+                ))}
+              </select>
+
+              {/* Refresh button */}
+              <button
+                onClick={fetchLedgerIssues}
+                disabled={ledgerLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="Refresh Ledger"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${ledgerLoading ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {ledgerLoading ? (
+            <div className="text-center py-16 text-slate-400">
+              <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-blue-600" />
+              <div className="text-sm font-medium">Loading Student Issuance Ledger...</div>
+            </div>
+          ) : filteredLedger.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-40" />
+              <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No Issuance Records Found</div>
+              <p className="text-xs mt-1">Issue items to students individually or in bulk to build the ledger.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-5 -mb-5">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4">Student Name</th>
+                    <th className="py-3.5 px-4">Class & Div</th>
+                    <th className="py-3.5 px-4">Item Issued</th>
+                    <th className="py-3.5 px-4">Variant (Size/Color)</th>
+                    <th className="py-3.5 px-4">Quantity</th>
+                    <th className="py-3.5 px-4">Issue Date</th>
+                    <th className="py-3.5 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {filteredLedger.map((rec) => (
+                    <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-900 dark:text-white">
+                          {rec.student_name || "—"}
+                        </div>
+                        {rec.student_roll && (
+                          <div className="text-[11px] text-slate-400">Roll: {rec.student_roll}</div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium">
+                        {`${rec.student_class || "—"}${rec.student_division ? ` - ${rec.student_division}` : ""}`}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-900 dark:text-white">
+                          {rec.item_name}
+                        </div>
+                        {rec.item_code && (
+                          <div className="text-[11px] text-slate-400 font-mono">{rec.item_code}</div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                        {rec.size_name || rec.color_name
+                          ? `${rec.size_name || "—"} / ${rec.color_name || "—"}`
+                          : "Standard / None"}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {rec.quantity} units
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-500">
+                        {rec.issue_date}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          {rec.status || "ISSUED"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+
       {/* Generate Entitlement Modal */}
       {isEntitlementModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1017,7 +1383,7 @@ export default function StudentItemIssuePage() {
               </button>
             </div>
 
-            <form onSubmit={handleGenerateEntitlements} className="p-6 space-y-4">
+            <form onSubmit={handleGenerateEntitlements} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Academic Year <span className="text-red-500">*</span>

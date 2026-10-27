@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import { toast } from "sonner";
 
 export default function StockAndLedgerPage() {
   const [activeTab, setActiveTab] = useState<"balances" | "ledger" | "audit">("balances");
@@ -91,16 +92,17 @@ export default function StockAndLedgerPage() {
 
   const handleSaveOpening = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setSubmitting(true);
     try {
       const payload = {
-        item: Number(openingForm.item),
-        academic_year: Number(openingForm.academic_year),
+        item: openingForm.item ? Number(openingForm.item) : null,
+        academic_year: openingForm.academic_year ? Number(openingForm.academic_year) : null,
         size: openingForm.size ? Number(openingForm.size) : null,
         color: openingForm.color ? Number(openingForm.color) : null,
-        quantity: Number(openingForm.quantity),
-        unit_cost: openingForm.unit_cost,
-        remarks: openingForm.remarks,
+        quantity: (openingForm.quantity as any) !== "" && openingForm.quantity !== null && !isNaN(Number(openingForm.quantity)) ? Number(openingForm.quantity) : null,
+        unit_cost: openingForm.unit_cost !== "" && openingForm.unit_cost !== null && !isNaN(Number(openingForm.unit_cost)) ? openingForm.unit_cost : null,
+        remarks: openingForm.remarks || "",
       };
 
       await inventoryApi.post("/stock-transactions/opening-stock/", payload);
@@ -116,16 +118,18 @@ export default function StockAndLedgerPage() {
 
   const handleSaveAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setSubmitting(true);
     try {
       const payload = {
-        item: Number(adjustForm.item),
+        item: adjustForm.item ? Number(adjustForm.item) : null,
         size: adjustForm.size ? Number(adjustForm.size) : null,
         color: adjustForm.color ? Number(adjustForm.color) : null,
         adjustment_type: adjustForm.adjustment_type,
-        quantity: Number(adjustForm.quantity),
-        reason: adjustForm.reason,
-        remarks: adjustForm.remarks,
+        quantity: (adjustForm.quantity as any) !== "" && adjustForm.quantity !== null && !isNaN(Number(adjustForm.quantity)) ? Number(adjustForm.quantity) : null,
+        reason: (adjustForm.reason || "").trim(),
+        remarks: adjustForm.remarks || "",
+        adjustment_date: new Date().toISOString().split("T")[0],
       };
 
       await inventoryApi.post("/adjustments/", payload);
@@ -159,14 +163,121 @@ export default function StockAndLedgerPage() {
       t.remarks?.toLowerCase().includes(q)
     );
   });
+  const formatAuditDetails = (detailsData: any): string => {
+    if (!detailsData) return "N/A";
+
+    let parsed: any = detailsData;
+    if (typeof detailsData === "string") {
+      try {
+        parsed = JSON.parse(detailsData);
+      } catch {
+        return detailsData.trim() || "N/A";
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return String(parsed ?? "N/A");
+    }
+
+    const parts: string[] = [];
+
+    if (parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== "") {
+      parts.push(`Qty: ${parsed.quantity}`);
+    }
+
+    if (parsed.transaction_type) {
+      parts.push(`Type: ${parsed.transaction_type}`);
+    } else if (parsed.action) {
+      parts.push(`Type: ${parsed.action}`);
+    }
+
+    if (parsed.item_name) {
+      parts.push(`Item: ${parsed.item_name}`);
+    } else if (parsed.item_id !== undefined && parsed.item_id !== null) {
+      const matched = items.find((it) => it.id === Number(parsed.item_id));
+      parts.push(matched ? `Item: ${matched.item_name}` : `Item: #${parsed.item_id}`);
+    }
+
+    if (parsed.reference_id !== undefined && parsed.reference_id !== null && parsed.reference_id !== "") {
+      parts.push(`Ref: ${parsed.reference_id}`);
+    }
+
+    if (parsed.reason) {
+      parts.push(`Reason: ${parsed.reason}`);
+    }
+
+    if (parts.length > 0) {
+      return parts.join(" | ");
+    }
+
+    const fallbackEntries = Object.entries(parsed)
+      .filter(([_, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? JSON.stringify(v) : v}`);
+
+    return fallbackEntries.length > 0 ? fallbackEntries.join(" | ") : "N/A";
+  };
+
   const filteredAuditLogs = auditLogs.filter((entry) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return `${entry.user_name || ""} ${entry.action || ""} ${entry.entity_type || ""} ${entry.entity_id || ""} ${JSON.stringify(entry.new_values || {})}`.toLowerCase().includes(q);
+    const detailsText = formatAuditDetails(entry.details || entry.new_values || entry.old_values);
+    return `${entry.user_name || ""} ${entry.action || ""} ${entry.entity_type || ""} ${entry.entity_id || ""} ${detailsText} ${JSON.stringify(entry.new_values || {})}`.toLowerCase().includes(q);
   });
 
   const selectedOpeningItem = items.find((item) => item.id === Number(openingForm.item));
   const selectedAdjustmentItem = items.find((item) => item.id === Number(adjustForm.item));
+
+  const availableOpeningSizes: any[] = (() => {
+    if (!selectedOpeningItem || !selectedOpeningItem.has_size) return [];
+    const allowed = selectedOpeningItem.allowed_sizes;
+    if (Array.isArray(allowed) && allowed.length > 0) {
+      const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+      return sizes.filter((s: any) => s.is_active && allowedIds.includes(s.id));
+    }
+    if (Array.isArray(selectedOpeningItem.allowed_size_details) && selectedOpeningItem.allowed_size_details.length > 0) {
+      return selectedOpeningItem.allowed_size_details;
+    }
+    return sizes.filter((s: any) => s.is_active);
+  })();
+
+  const availableOpeningColors: any[] = (() => {
+    if (!selectedOpeningItem || !selectedOpeningItem.has_color) return [];
+    const allowed = selectedOpeningItem.allowed_colors;
+    if (Array.isArray(allowed) && allowed.length > 0) {
+      const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+      return colors.filter((c: any) => c.is_active && allowedIds.includes(c.id));
+    }
+    if (Array.isArray(selectedOpeningItem.allowed_color_details) && selectedOpeningItem.allowed_color_details.length > 0) {
+      return selectedOpeningItem.allowed_color_details;
+    }
+    return colors.filter((c: any) => c.is_active);
+  })();
+
+  const availableAdjustmentSizes: any[] = (() => {
+    if (!selectedAdjustmentItem || !selectedAdjustmentItem.has_size) return [];
+    const allowed = selectedAdjustmentItem.allowed_sizes;
+    if (Array.isArray(allowed) && allowed.length > 0) {
+      const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+      return sizes.filter((s: any) => s.is_active && allowedIds.includes(s.id));
+    }
+    if (Array.isArray(selectedAdjustmentItem.allowed_size_details) && selectedAdjustmentItem.allowed_size_details.length > 0) {
+      return selectedAdjustmentItem.allowed_size_details;
+    }
+    return sizes.filter((s: any) => s.is_active);
+  })();
+
+  const availableAdjustmentColors: any[] = (() => {
+    if (!selectedAdjustmentItem || !selectedAdjustmentItem.has_color) return [];
+    const allowed = selectedAdjustmentItem.allowed_colors;
+    if (Array.isArray(allowed) && allowed.length > 0) {
+      const allowedIds = allowed.map((x: any) => typeof x === "object" ? x.id : Number(x));
+      return colors.filter((c: any) => c.is_active && allowedIds.includes(c.id));
+    }
+    if (Array.isArray(selectedAdjustmentItem.allowed_color_details) && selectedAdjustmentItem.allowed_color_details.length > 0) {
+      return selectedAdjustmentItem.allowed_color_details;
+    }
+    return colors.filter((c: any) => c.is_active);
+  })();
 
   return (
     <div className="space-y-6">
@@ -394,13 +505,27 @@ export default function StockAndLedgerPage() {
                 <tr><th className="py-3.5 px-4">Date</th><th className="py-3.5 px-4">User</th><th className="py-3.5 px-4">Action</th><th className="py-3.5 px-4">Entity</th><th className="py-3.5 px-4">Details</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filteredAuditLogs.map((entry) => <tr key={entry.id}>
-                  <td className="py-3.5 px-4">{new Date(entry.created_at).toLocaleString()}</td>
-                  <td className="py-3.5 px-4">{entry.user_name || "System"}</td>
-                  <td className="py-3.5 px-4">{entry.action}</td>
-                  <td className="py-3.5 px-4">{entry.entity_type} #{entry.entity_id}</td>
-                  <td className="py-3.5 px-4 font-mono text-xs">{JSON.stringify(entry.new_values || {})}</td>
-                </tr>)}
+                {filteredAuditLogs.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-400">
+                      {new Date(entry.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+                      {entry.user_name || "System"}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                        {entry.action}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                      {entry.entity_type} #{entry.entity_id}
+                    </td>
+                    <td className="py-3.5 px-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      {formatAuditDetails(entry.details || entry.new_values || entry.old_values)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -418,7 +543,7 @@ export default function StockAndLedgerPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveOpening} className="p-6 space-y-4">
+            <form onSubmit={handleSaveOpening} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Item <span className="text-red-500">*</span>
@@ -442,14 +567,17 @@ export default function StockAndLedgerPage() {
                     Size Variant {selectedOpeningItem?.has_size ? "*" : "(Optional)"}
                   </label>
                   <select
+                    disabled={!selectedOpeningItem || !selectedOpeningItem.has_size}
                     required={!!selectedOpeningItem?.has_size}
                     value={openingForm.size}
                     onChange={(e) => setOpeningForm({ ...openingForm, size: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
                   >
-                    <option value="">{selectedOpeningItem?.has_size ? "Select size" : "None / Standard"}</option>
-                    {sizes.filter((s) => s.is_active).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                    <option value="">
+                      {!selectedOpeningItem ? "Select item first" : !selectedOpeningItem.has_size ? "None / Standard" : "Select size"}
+                    </option>
+                    {availableOpeningSizes.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name} {s.size_type && s.size_type !== "General" ? `(${s.size_type})` : ""}</option>
                     ))}
                   </select>
                 </div>
@@ -458,13 +586,16 @@ export default function StockAndLedgerPage() {
                     Color {selectedOpeningItem?.has_color ? "*" : "(Optional)"}
                   </label>
                   <select
+                    disabled={!selectedOpeningItem || !selectedOpeningItem.has_color}
                     required={!!selectedOpeningItem?.has_color}
                     value={openingForm.color}
                     onChange={(e) => setOpeningForm({ ...openingForm, color: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
                   >
-                    <option value="">{selectedOpeningItem?.has_color ? "Select color" : "None / Standard"}</option>
-                    {colors.filter((c) => c.is_active).map((c) => (
+                    <option value="">
+                      {!selectedOpeningItem ? "Select item first" : !selectedOpeningItem.has_color ? "None / Standard" : "Select color"}
+                    </option>
+                    {availableOpeningColors.map((c: any) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -539,7 +670,7 @@ export default function StockAndLedgerPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveAdjustment} className="p-6 space-y-4">
+            <form onSubmit={handleSaveAdjustment} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Item <span className="text-red-500">*</span>
@@ -560,14 +691,38 @@ export default function StockAndLedgerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Size Variant {selectedAdjustmentItem?.has_size ? "*" : "(Optional)"}</label>
-                  <select required={!!selectedAdjustmentItem?.has_size} value={adjustForm.size} onChange={(e) => setAdjustForm({ ...adjustForm, size: e.target.value })} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                    <option value="">{selectedAdjustmentItem?.has_size ? "Select size" : "None / Standard"}</option>{sizes.filter((size) => size.is_active).map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
+                  <select
+                    disabled={!selectedAdjustmentItem || !selectedAdjustmentItem.has_size}
+                    required={!!selectedAdjustmentItem?.has_size}
+                    value={adjustForm.size}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, size: e.target.value })}
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  >
+                    <option value="">
+                      {!selectedAdjustmentItem ? "Select item first" : !selectedAdjustmentItem.has_size ? "None / Standard" : "Select size"}
+                    </option>
+                    {availableAdjustmentSizes.map((size: any) => (
+                      <option key={size.id} value={size.id}>
+                        {size.name} {size.size_type && size.size_type !== "General" ? `(${size.size_type})` : ""}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Variant {selectedAdjustmentItem?.has_color ? "*" : "(Optional)"}</label>
-                  <select required={!!selectedAdjustmentItem?.has_color} value={adjustForm.color} onChange={(e) => setAdjustForm({ ...adjustForm, color: e.target.value })} className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                    <option value="">{selectedAdjustmentItem?.has_color ? "Select color" : "None / Standard"}</option>{colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
+                  <select
+                    disabled={!selectedAdjustmentItem || !selectedAdjustmentItem.has_color}
+                    required={!!selectedAdjustmentItem?.has_color}
+                    value={adjustForm.color}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, color: e.target.value })}
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  >
+                    <option value="">
+                      {!selectedAdjustmentItem ? "Select item first" : !selectedAdjustmentItem.has_color ? "None / Standard" : "Select color"}
+                    </option>
+                    {availableAdjustmentColors.map((color: any) => (
+                      <option key={color.id} value={color.id}>{color.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>

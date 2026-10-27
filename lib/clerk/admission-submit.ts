@@ -14,8 +14,8 @@ async function responseData(response: Response): Promise<Record<string, unknown>
   return data;
 }
 
-export async function submitAdmission({ form, values, academicYear, documents = {}, isRte = false, rteDocument }: {
-  form: AdmissionConfig; values: AdmissionValues; academicYear?: string; documents?: Record<number, File>; isRte?: boolean; rteDocument?: File | null;
+export async function submitAdmission({ form, values, academicYear, documents = {}, isRte = false, rteDocument, parentId }: {
+  form: AdmissionConfig; values: AdmissionValues; academicYear?: string; documents?: Record<number, File>; isRte?: boolean; rteDocument?: File | null; parentId?: number | string | null;
 }) {
   const fields = admissionFields(form);
   const fieldValues = fields.map(field => ({ field: field.id, value: String(normalizeAdmissionValue(field, values[field.id])) }));
@@ -25,6 +25,7 @@ export async function submitAdmission({ form, values, academicYear, documents = 
   body.append("form", String(form.id));
   body.append("field_values", JSON.stringify(fieldValues));
   body.append("is_rte", String(isRte));
+  if (parentId) body.append("parent_id", String(parentId));
   if (academicYear) body.append("academic_year", academicYear);
   if (/^\d+$/.test(classValue)) body.append("school_class", classValue);
   for (const [id, file] of Object.entries(documents)) body.append(`document_${id}`, file);

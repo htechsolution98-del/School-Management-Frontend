@@ -259,6 +259,7 @@ export interface BulkCollectFeePayload {
   payment_date?: string;
   transaction_id?: string;
   note?: string;
+  payment_details?: any;
 }
 
 export async function bulkCollectStudentFeePayments(payload: BulkCollectFeePayload): Promise<ApiResponse<{

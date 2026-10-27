@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  CheckCircle2,
+  XCircle,
+  Check,
+  ShieldCheck,
+  Loader2,
+  AlertTriangle,
+} from "lucide-react";
 import {
   fieldOptions,
   isBirthField,
@@ -17,22 +26,36 @@ import {
 } from "@/lib/admission-validation";
 import { toInputDate } from "@/lib/table-utils";
 
+export type MobileVerificationStatus =
+  | "unchecked"
+  | "verified_new"
+  | "duplicate_found"
+  | "sibling_linked";
+
 export function AdmissionFieldInput({
   field,
   value,
   onChange,
+  onBlur,
   error,
   disabled,
   prefix = "field-input",
   classes = [],
+  mobileStatus,
+  isVerifyingMobile,
+  onVerifyMobile,
 }: {
   field: AdmissionField;
   value: unknown;
   onChange: (value: string | boolean) => void;
+  onBlur?: () => void;
   error?: string;
   disabled?: boolean;
   prefix?: string;
   classes?: { id: number; school_class: string; name?: string }[];
+  mobileStatus?: MobileVerificationStatus;
+  isVerifyingMobile?: boolean;
+  onVerifyMobile?: () => void;
 }) {
   const id = `${prefix}-${field.id}`;
   const [latestBirthDate] = useState(() => {
@@ -43,6 +66,7 @@ export function AdmissionFieldInput({
   const common = {
     id,
     disabled,
+    onBlur,
     "aria-invalid": !!error,
     "aria-describedby": error ? `${id}-error` : undefined,
     className: `w-full rounded-lg border bg-white px-3 py-2 text-sm ${error ? "border-red-400" : "border-slate-200"}`,
@@ -160,12 +184,111 @@ export function AdmissionFieldInput({
           rows={3}
           onChange={(event) => onChange(event.target.value)}
         />
+      ) : isPhoneField(field) ? (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Input
+                {...common}
+                className={`w-full rounded-lg border bg-white px-3 py-2 text-sm pr-9 transition-colors ${
+                  mobileStatus === "duplicate_found"
+                    ? "border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500"
+                    : mobileStatus === "verified_new" || mobileStatus === "sibling_linked"
+                    ? "border-emerald-500 ring-1 ring-emerald-500 focus-visible:ring-emerald-500"
+                    : error
+                    ? "border-red-400"
+                    : "border-slate-200"
+                }`}
+                type="tel"
+                inputMode="numeric"
+                placeholder={placeholderText}
+                value={stringValue}
+                maxLength={maxLen}
+                onChange={handleTextChange}
+                onBlur={onBlur}
+              />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                {mobileStatus === "duplicate_found" && (
+                  <span title="Existing record found with this mobile" className="text-red-500 flex items-center">
+                    <XCircle className="h-4 w-4 text-red-500 fill-red-50" />
+                  </span>
+                )}
+                {(mobileStatus === "verified_new" || mobileStatus === "sibling_linked") && (
+                  <span title={mobileStatus === "sibling_linked" ? "Sibling Linked" : "Verified New"} className="text-emerald-600 flex items-center">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 fill-emerald-50" />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant={
+                mobileStatus === "verified_new" || mobileStatus === "sibling_linked"
+                  ? "outline"
+                  : mobileStatus === "duplicate_found"
+                  ? "destructive"
+                  : "default"
+              }
+              size="sm"
+              disabled={disabled || isVerifyingMobile || stringValue.replace(/\D/g, "").length !== 10}
+              onClick={onVerifyMobile}
+              className={`h-9 px-3 text-xs font-semibold rounded-lg shrink-0 gap-1.5 transition-all ${
+                mobileStatus === "verified_new" || mobileStatus === "sibling_linked"
+                  ? "border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                  : mobileStatus === "duplicate_found"
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "office-primary text-white"
+              }`}
+            >
+              {isVerifyingMobile ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Checking...</span>
+                </>
+              ) : mobileStatus === "verified_new" || mobileStatus === "sibling_linked" ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Verified</span>
+                </>
+              ) : mobileStatus === "duplicate_found" ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span>Re-verify</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Verify</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {mobileStatus === "duplicate_found" && (
+            <p className="text-[11px] font-medium text-red-600 flex items-center gap-1">
+              <XCircle className="h-3.5 w-3.5 shrink-0" />
+              Existing family found with this mobile. Auto-fill as sibling or change number.
+            </p>
+          )}
+          {mobileStatus === "verified_new" && (
+            <p className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              Verified as new mobile number.
+            </p>
+          )}
+          {mobileStatus === "sibling_linked" && (
+            <p className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              Linked to existing family / sibling.
+            </p>
+          )}
+        </div>
       ) : (
         <Input
           {...common}
-          type={isEmailField(field) ? "email" : isPhoneField(field) ? "tel" : "text"}
+          type={isEmailField(field) ? "email" : "text"}
           inputMode={
-            isPhoneField(field) ||
             isAadhaarAdmissionField(field) ||
             isUdiseAdmissionField(field) ||
             isAbcAdmissionField(field) ||

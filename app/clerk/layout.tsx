@@ -25,14 +25,20 @@ import {
   BarChart3,
   ClipboardList,
   ShieldCheck,
-  Bell,
+  Boxes,
+  Banknote,
+  Contact,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
-  { title: "Notifications", href: "/clerk/notifications", icon: Bell },
+  {
+    title: "ID Card Management",
+    href: "/clerk/id-cards",
+    icon: Contact,
+  },
   {
     title: "Certificates & G.R.",
     href: "/clerk/docs",
@@ -99,6 +105,9 @@ const sidebarLinks = [
   { title: "Assign Teacher", href: "/clerk/assign-teacher", icon: Plus },
   { title: "Teacher Workload", href: "/clerk/teacher-workload", icon: SlidersHorizontal },
   { title: "Timetable", href: "/clerk/timetable", icon: Calendar },
+  { title: "Daily Cash Register", href: "/fees/cash-register", icon: Banknote },
+  { title: "Account Ledger", href: "/fees/account-ledger", icon: BookOpen },
+  { title: "Request Supplies", href: "/clerk/stock-request", icon: Boxes },
   { title: "Announcements", href: "/clerk/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/clerk/events", icon: CalendarDays },
   { title: "Leave Requests", href: "/clerk/leave-requests", icon: CalendarCheck },

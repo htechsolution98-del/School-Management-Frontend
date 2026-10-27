@@ -13,6 +13,7 @@ import {
   BarChart3,
   CalendarCheck,
   Banknote,
+  ClipboardList,
   Bell,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -26,6 +27,7 @@ const sidebarLinks = [
   { title: "Pricing & Fee Mapping", href: "/inventory/pricing", icon: BadgePercent },
   { title: "Purchases & Suppliers", href: "/inventory/purchases", icon: Truck },
   { title: "Stock & Ledger", href: "/inventory/stock", icon: Boxes },
+  { title: "Staff Requisitions", href: "/inventory/requisitions", icon: ClipboardList },
   { title: "Student Item Issues", href: "/inventory/issue", icon: UserCheck },
   { title: "Replacements & Returns", href: "/inventory/replacements", icon: RefreshCw },
   { title: "Reports & Analytics", href: "/inventory/reports", icon: BarChart3 },

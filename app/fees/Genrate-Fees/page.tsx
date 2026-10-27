@@ -2,6 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
+import CashDenominationCalculator, {
+  CashDenominationState,
+  INITIAL_CASH_STATE,
+  calculateCashDetails,
+} from "@/components/fees/cash-denomination-calculator";
 import {
   Users,
   IndianRupee,
@@ -50,7 +55,7 @@ import {
   type FeeWiseClass,
 } from "@/lib/fees";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
-import ReceiptModal from "../student-ledger/ReceiptModal";
+import ReceiptModal, { formatCashBreakdown } from "../student-ledger/ReceiptModal";
 
 // Status Badge Component
 const StatusBadge = ({ status }: { status: StudentFee["status"] }) => {
@@ -292,12 +297,12 @@ const CreateFeeModal = ({
       ...students.filter((s) => s.school_class && s.class_name).map((s) => [String(s.school_class), s.class_name!] as [string, string]),
     ]).entries(),
   ).map(([id, name]) => ({ id, name }));
-  const filteredFeeClasses = form.selected_class 
+  const filteredFeeClasses = form.selected_class
     ? feeWiseClasses.filter((fc) => String(fc.school_class) === form.selected_class)
     : feeWiseClasses;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Basic validation
     const errs: Record<string, string> = {};
     if (!form.student) errs.student = "Student is required";
@@ -401,9 +406,9 @@ const CreateFeeModal = ({
                 const lName = s.surname === "null" ? "" : (s.surname || "");
                 const fthName = s.father_name === "null" ? "" : (s.father_name || "");
                 const fullName = [fName, lName].filter(Boolean).join(" ");
-                return { 
-                  value: String(s.id), 
-                  label: `${fullName || "Student #" + s.id} - Father: ${fthName || "N/A"}` 
+                return {
+                  value: String(s.id),
+                  label: `${fullName || "Student #" + s.id} - Father: ${fthName || "N/A"}`
                 };
               })}
             error={!!errors.student}
@@ -534,7 +539,7 @@ function CustomDropdown({
     if (!open) setSearchQuery("");
   }, [open]);
 
-  const filteredOptions = searchable 
+  const filteredOptions = searchable
     ? options.filter((o) => o.label.toLowerCase().includes(searchQuery.toLowerCase()))
     : options;
 
@@ -823,7 +828,7 @@ const CollectFeeModal = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payerType, setPayerType] = useState<"student" | "government">("student");
-  
+
   const [form, setForm] = useState({
     amount: "",
     payment_mode: "cash",
@@ -833,15 +838,19 @@ const CollectFeeModal = ({
     note: "",
   });
 
+  const [cashState, setCashState] = useState<CashDenominationState>(INITIAL_CASH_STATE);
+
   useEffect(() => {
     if (fee) {
-      const isGovtDefault = Boolean(fee.is_rte_govt_claim && parseFloat(fee.balance_amount || "0") <= 0);
+      const studentBal = parseFloat(fee.balance_amount || "0");
+      const govtBal = Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount || "0") - parseFloat(fee.rte_govt_paid_amount || "0"));
+      const isGovtDefault = Boolean(fee.is_rte_govt_claim && studentBal <= 0 && govtBal > 0);
       const initialPayer = isGovtDefault ? "government" : "student";
       setPayerType(initialPayer);
-      
+
       const defaultAmount = initialPayer === "government"
-        ? (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
-        : (fee.balance_amount || "0.00");
+        ? govtBal.toFixed(2)
+        : Math.max(0, studentBal).toFixed(2);
 
       setForm({
         amount: defaultAmount,
@@ -851,6 +860,8 @@ const CollectFeeModal = ({
         receipt_number: "",
         note: initialPayer === "government" ? "RTE Government reimbursement payment" : "",
       });
+
+      setCashState(INITIAL_CASH_STATE);
     }
   }, [fee]);
 
@@ -866,25 +877,47 @@ const CollectFeeModal = ({
         note: "RTE Government reimbursement payment",
       }));
     } else {
+      const studentBal = Math.max(0, parseFloat(fee.balance_amount || "0"));
       setForm((prev) => ({
         ...prev,
-        amount: fee.balance_amount || "0.00",
+        amount: studentBal.toFixed(2),
         payment_mode: "cash",
         note: "",
       }));
     }
+    setCashState(INITIAL_CASH_STATE);
   };
+
+  const currentBalance =
+    payerType === "government"
+      ? Math.max(
+          0,
+          parseFloat(fee?.rte_govt_claim_amount || fee?.amount || "0") -
+            parseFloat(fee?.rte_govt_paid_amount || "0")
+        )
+      : Math.max(0, parseFloat(fee?.balance_amount || "0"));
+
+  const isZeroBalance = !fee || currentBalance <= 0;
+
+  const currentAmountNum = isZeroBalance ? 0 : (parseFloat(form.amount || "0") || 0);
+  const isCashMode = form.payment_mode === "cash";
+  const cashCalculation = calculateCashDetails(cashState, currentAmountNum);
+  const isCashInsufficient = !isZeroBalance && isCashMode && currentAmountNum > 0 && cashCalculation.totalReceived < currentAmountNum;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fee) return;
+    if (!fee || isZeroBalance) return;
     const errs: Record<string, string> = {};
     if (!form.amount || parseFloat(form.amount) <= 0) errs.amount = "Invalid amount";
     if (!form.payment_mode) errs.payment_mode = "Payment mode is required";
     if (!form.payment_date) errs.payment_date = "Payment date is required";
-    
+
     if (["cheque", "upi", "card", "govt_rte"].includes(form.payment_mode) && !form.transaction_id && form.payment_mode !== "govt_rte") {
-       errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
+      errs.transaction_id = form.payment_mode === "cheque" ? "Cheque No. is required" : "Reference No. is required";
+    }
+
+    if (isCashMode && currentAmountNum > 0 && cashCalculation.totalReceived < currentAmountNum) {
+      errs.amount = `Total cash received (₹${cashCalculation.totalReceived.toLocaleString("en-IN")}) is less than amount to collect (₹${currentAmountNum.toLocaleString("en-IN")}).`;
     }
 
     setErrors(errs);
@@ -893,11 +926,19 @@ const CollectFeeModal = ({
     setLoading(true);
     try {
       const { collectStudentFeePayment } = await import("@/lib/fees/fee-generation");
-      const result = await collectStudentFeePayment({
+      const payload: any = {
         student_fee: fee.id,
         payer_type: payerType,
-        ...form
-      });
+        ...form,
+      };
+
+      if (isCashMode) {
+        payload.payment_details = cashCalculation.payloadJson;
+        const cashNote = `[Cash Recd: ₹${cashCalculation.totalReceived.toLocaleString("en-IN")}, Change Ret: ₹${cashCalculation.changeToReturn.toLocaleString("en-IN")}]`;
+        payload.note = form.note ? `${form.note} ${cashNote}` : cashNote;
+      }
+
+      const result = await collectStudentFeePayment(payload);
       if (result.success) {
         setToast({ type: "success", message: payerType === "government" ? "Government RTE claim payment recorded!" : "Fee collected successfully!" });
         setTimeout(() => {
@@ -908,7 +949,7 @@ const CollectFeeModal = ({
         setToast({ type: "error", message: result.error || "Failed to collect fee" });
       }
     } catch (error: any) {
-       setToast({ type: "error", message: error.message || "Failed to collect fee" });
+      setToast({ type: "error", message: error.message || "Failed to collect fee" });
     } finally {
       setLoading(false);
     }
@@ -923,43 +964,43 @@ const CollectFeeModal = ({
     <Modal isOpen={isOpen} onClose={onClose} title={payerType === "government" ? "Record RTE Government Claim Payment" : "Collect Student Fee"}>
       {fee && (
         <div className="bg-blue-50 rounded-xl p-4 mb-5 border border-blue-100 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-semibold text-gray-900">{fee.student_name}</p>
-                {fee.is_rte_govt_claim && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
-                    RTE Student Claim
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500">{fee.class_name} • {formatBillingPeriod(fee.billing_period)}</p>
-            </div>
-            <div className="text-right">
-              {payerType === "government" ? (
-                <>
-                  <p className="text-xs text-indigo-600 font-semibold uppercase tracking-wider">Govt Claim Receivable</p>
-                  <p className="text-lg font-bold text-indigo-700">
-                    {formatCurrency(
-                      (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
-                    )}
-                  </p>
-                  <p className="text-[10px] text-gray-500">Status: {fee.rte_govt_status || "pending"}</p>
-                </>
-              ) : (
-                <>
-                  <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">
-                      {formatCurrency(fee.amount)} BASE 
-                      {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`} 
-                      {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
-                      =
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">Student Balance</p>
-                  <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
-                </>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-semibold text-gray-900">{fee.student_name}</p>
+              {fee.is_rte_govt_claim && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                  RTE Student Claim
+                </span>
               )}
             </div>
+            <p className="text-sm text-gray-500">{fee.class_name} • {formatBillingPeriod(fee.billing_period)}</p>
+          </div>
+          <div className="text-right">
+            {payerType === "government" ? (
+              <>
+                <p className="text-xs text-indigo-600 font-semibold uppercase tracking-wider">Govt Claim Receivable</p>
+                <p className="text-lg font-bold text-indigo-700">
+                  {formatCurrency(
+                    (parseFloat(fee.rte_govt_claim_amount || fee.amount) - parseFloat(fee.rte_govt_paid_amount || "0")).toFixed(2)
+                  )}
+                </p>
+                <p className="text-[10px] text-gray-500">Status: {fee.rte_govt_status || "pending"}</p>
+              </>
+            ) : (
+              <>
+                <div className="mb-1 flex items-center justify-end gap-1 text-red-500 text-right">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider">
+                    {formatCurrency(fee.amount)} BASE
+                    {parseFloat(fee.fine_amount || "0") > 0 && ` + ${formatCurrency(fee.fine_amount || "0")} PENALTY`}
+                    {parseFloat(fee.discount_amount || "0") > 0 && ` - ${formatCurrency(fee.discount_amount || "0")} DISCOUNT`}
+                    =
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Student Balance</p>
+                <p className="text-lg font-bold text-red-600">{formatCurrency(fee.balance_amount)}</p>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -968,25 +1009,33 @@ const CollectFeeModal = ({
           <button
             type="button"
             onClick={() => handlePayerChange("government")}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
-              payerType === "government"
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${payerType === "government"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             🏛️ Government RTE Claim
           </button>
           <button
             type="button"
             onClick={() => handlePayerChange("student")}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
-              payerType === "student"
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${payerType === "student"
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             👤 Student / Guardian
           </button>
+        </div>
+      )}
+
+      {isZeroBalance && (
+        <div className="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-in fade-in duration-200">
+          <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+          <div>
+            <p className="font-bold text-emerald-900">✅ This fee is already fully paid (Balance is ₹0.00).</p>
+            <p className="text-[11px] font-normal text-emerald-700 mt-0.5">No outstanding dues remain for this record. Further payments are disabled.</p>
+          </div>
         </div>
       )}
 
@@ -1000,42 +1049,68 @@ const CollectFeeModal = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <FormField label={payerType === "government" ? "Govt Reimbursement Amount (₹)" : "Amount to Collect (₹)"} error={errors.amount} required>
-            <input type="number" className={inputClass} value={form.amount} onChange={(e) => update("amount", e.target.value)} min="0" step="0.01" />
+            <input
+              type="number"
+              className={`${inputClass} ${isZeroBalance ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+              value={isZeroBalance ? "0.00" : form.amount}
+              onChange={(e) => !isZeroBalance && update("amount", e.target.value)}
+              disabled={isZeroBalance}
+              readOnly={isZeroBalance}
+              min="0"
+              step="0.01"
+            />
           </FormField>
-          
+
           <FormField label="Payment Mode" error={errors.payment_mode} required>
-             <select className={inputClass} value={form.payment_mode} onChange={(e) => update("payment_mode", e.target.value)}>
-                {payerType === "government" ? (
-                  <>
-                    <option value="govt_rte">Government Direct Credit (RTGS/Treasury)</option>
-                    <option value="cheque">Cheque / Demand Draft</option>
-                    <option value="upi">UPI / Online</option>
-                    <option value="cash">Cash Voucher</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="cash">Cash</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="upi">UPI</option>
-                    <option value="card">Card</option>
-                  </>
-                )}
-             </select>
+            <select
+              className={`${inputClass} ${isZeroBalance ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+              value={form.payment_mode}
+              onChange={(e) => update("payment_mode", e.target.value)}
+              disabled={isZeroBalance}
+            >
+              {payerType === "government" ? (
+                <>
+                  <option value="govt_rte">Government Direct Credit (RTGS/Treasury)</option>
+                  <option value="cheque">Cheque / Demand Draft</option>
+                  <option value="upi">UPI / Online</option>
+                  <option value="cash">Cash Voucher</option>
+                </>
+              ) : (
+                <>
+                  <option value="cash">Cash</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                </>
+              )}
+            </select>
           </FormField>
         </div>
 
+        {/* ── Conditional Cash Denomination Breakdown Section ── */}
+        {!isZeroBalance && form.payment_mode === "cash" && (
+          <div className="animate-in fade-in duration-200">
+            <CashDenominationCalculator
+              amountToCollect={form.amount}
+              cashState={cashState}
+              onChange={setCashState}
+              onReset={() => setCashState(INITIAL_CASH_STATE)}
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <FormField label="Payment Date" error={errors.payment_date} required>
-             <DatePicker value={form.payment_date} onChange={(val) => update("payment_date", val)} className="w-full" />
+            <DatePicker value={form.payment_date} onChange={(val) => update("payment_date", val)} className="w-full" />
           </FormField>
           <FormField label="Receipt / Sanction No. (Optional)" error={errors.receipt_number}>
-             <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
+            <input type="text" className={inputClass} value={form.receipt_number} onChange={(e) => update("receipt_number", e.target.value)} />
           </FormField>
         </div>
 
         {(form.payment_mode === "cheque" || form.payment_mode === "upi" || form.payment_mode === "card" || form.payment_mode === "govt_rte") && (
           <FormField label={form.payment_mode === "cheque" ? "Cheque No. *" : form.payment_mode === "govt_rte" ? "Govt Claim / Sanction Order Ref No." : "Reference / Transaction No. *"} error={errors.transaction_id}>
-             <input type="text" className={inputClass} value={form.transaction_id} onChange={(e) => update("transaction_id", e.target.value)} />
+            <input type="text" className={inputClass} value={form.transaction_id} onChange={(e) => update("transaction_id", e.target.value)} />
           </FormField>
         )}
 
@@ -1044,9 +1119,45 @@ const CollectFeeModal = ({
         </FormField>
 
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-          <button type="submit" disabled={loading} className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${payerType === "government" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-blue-600 hover:bg-blue-700"}`}>
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Recording...</> : (payerType === "government" ? "Record Govt Reimbursement" : "Collect Payment")}
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            {isZeroBalance ? "Close" : "Cancel"}
+          </button>
+          <button
+            type="submit"
+            disabled={loading || isZeroBalance || isCashInsufficient}
+            title={
+              isZeroBalance
+                ? "This fee is already fully paid"
+                : isCashInsufficient
+                ? `Received cash is less than amount to collect (Short by ₹${(
+                  currentAmountNum - cashCalculation.totalReceived
+                ).toLocaleString("en-IN")})`
+                : undefined
+            }
+            className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors ${
+              isZeroBalance
+                ? "bg-gray-400 cursor-not-allowed"
+                : isCashInsufficient
+                ? "bg-gray-400"
+                : payerType === "government"
+                  ? "bg-indigo-600 hover:bg-indigo-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+          >
+            {loading ? (
+              <><Loader2 size={16} className="animate-spin" /> Recording...</>
+            ) : isZeroBalance ? (
+              <>
+                <CheckCircle2 size={16} className="text-emerald-300" />
+                Fully Paid (₹0.00)
+              </>
+            ) : isCashInsufficient ? (
+              `Short by ₹${(currentAmountNum - cashCalculation.totalReceived).toLocaleString("en-IN")}`
+            ) : payerType === "government" ? (
+              "Record Govt Reimbursement"
+            ) : (
+              "Collect Payment"
+            )}
           </button>
         </div>
       </form>
@@ -1069,7 +1180,7 @@ const ViewFeeModal = ({
   onViewReceipt?: (receiptNo: string) => void;
 }) => {
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
-  
+
   if (!fee) return null;
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Fee Details">
@@ -1172,13 +1283,13 @@ const ViewFeeModal = ({
                       <p className="text-xs text-gray-500 capitalize">{payment.payment_mode} • {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString("en-IN") : "—"}</p>
                     </div>
                     <div className="text-right">
-                       {payment.is_bounced ? (
-                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">Bounced</span>
-                       ) : (!payment.is_verified && payment.payment_mode.toLowerCase() === 'cheque' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">Pending Clearance</span>
-                       ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">Cleared</span>
-                       ))}
+                      {payment.is_bounced ? (
+                        <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">Bounced</span>
+                      ) : (!payment.is_verified && payment.payment_mode.toLowerCase() === 'cheque' ? (
+                        <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">Pending Clearance</span>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">Cleared</span>
+                      ))}
                     </div>
                   </div>
                   {(payment.transaction_id || payment.receipt_number) && (
@@ -1197,8 +1308,21 @@ const ViewFeeModal = ({
                       )}
                     </div>
                   )}
-                  {payment.note && <p className="text-xs text-gray-500 mt-1 italic">{payment.note}</p>}
-                  
+                  {(() => {
+                    const cb = formatCashBreakdown(payment);
+                    if (!cb.hasBreakdown && !cb.cleanNote) return null;
+                    return (
+                      <div className="mt-1.5 space-y-0.5">
+                        {cb.hasBreakdown && (
+                          <p className="text-xs font-semibold text-gray-800">{cb.breakdown}</p>
+                        )}
+                        {cb.cleanNote && (
+                          <p className="text-xs text-gray-500 italic">{cb.cleanNote}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Action Buttons for Pending Cheques */}
                   {!payment.is_verified && !payment.is_bounced && payment.payment_mode.toLowerCase() === 'cheque' && onSuccess && (
                     <div className="flex gap-2 mt-3 pt-3 border-t border-orange-200/50">
@@ -1210,8 +1334,8 @@ const ViewFeeModal = ({
                           const res = await clearStudentFeePayment(payment.id);
                           setProcessingPayment(null);
                           if (res.success) {
-                             onSuccess();
-                             onClose();
+                            onSuccess();
+                            onClose();
                           } else alert(res.error || "Failed to clear cheque.");
                         }}
                         disabled={!!processingPayment}
@@ -1228,8 +1352,8 @@ const ViewFeeModal = ({
                           const res = await bounceStudentFeePayment(payment.id);
                           setProcessingPayment(null);
                           if (res.success) {
-                             onSuccess();
-                             onClose();
+                            onSuccess();
+                            onClose();
                           } else alert(res.error || "Failed to bounce cheque.");
                         }}
                         disabled={!!processingPayment}
@@ -1376,546 +1500,546 @@ export default function GenerateFeesPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Student Fee</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Manage student fees, billing and discounts
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Student Fee</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Manage student fees, billing and discounts
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-500"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+          <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <Download size={15} /> Export
+          </button>
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Create Fee
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          title="Total Students"
+          value={totalStudents.toLocaleString()}
+          subtitle="Active students"
+          icon={Users}
+          iconBg="bg-blue-500"
+        />
+        <StatCard
+          title="Total Outstanding"
+          value={`₹${(totalOutstanding / 100000).toFixed(2)}L`}
+          subtitle="Pending amount"
+          icon={IndianRupee}
+          iconBg="bg-purple-500"
+          valueColor="text-purple-600"
+        />
+        <StatCard
+          title="Total Collected"
+          value={`₹${(totalCollected / 1000).toFixed(1)}K`}
+          subtitle="This academic year"
+          icon={TrendingUp}
+          iconBg="bg-green-500"
+          valueColor="text-green-600"
+        />
+        <StatCard
+          title="Overdue Fees"
+          value={`₹${(overdueFees / 1000).toFixed(1)}K`}
+          subtitle="Requires attention"
+          icon={AlertCircle}
+          iconBg="bg-orange-500"
+          valueColor="text-orange-600"
+        />
+      </div>
+
+      {/* Main Table Card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 px-5 pt-4">
+          {(["monthly", "single"] as const).map((tab) => (
             <button
-              onClick={loadData}
-              disabled={loading}
-              className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-500"
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                setCurrentPage(1);
+              }}
+              className={`pb-3 px-4 text-sm font-medium border-b-2 transition-all -mb-px ${activeTab === tab
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              {tab === "monthly" ? "Monthly Fees" : "Single Fees"}
             </button>
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-              <Download size={15} /> Export
-            </button>
-            <button
-              onClick={() => setCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-            >
-              <Plus size={16} /> Create Fee
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard
-            title="Total Students"
-            value={totalStudents.toLocaleString()}
-            subtitle="Active students"
-            icon={Users}
-            iconBg="bg-blue-500"
-          />
-          <StatCard
-            title="Total Outstanding"
-            value={`₹${(totalOutstanding / 100000).toFixed(2)}L`}
-            subtitle="Pending amount"
-            icon={IndianRupee}
-            iconBg="bg-purple-500"
-            valueColor="text-purple-600"
-          />
-          <StatCard
-            title="Total Collected"
-            value={`₹${(totalCollected / 1000).toFixed(1)}K`}
-            subtitle="This academic year"
-            icon={TrendingUp}
-            iconBg="bg-green-500"
-            valueColor="text-green-600"
-          />
-          <StatCard
-            title="Overdue Fees"
-            value={`₹${(overdueFees / 1000).toFixed(1)}K`}
-            subtitle="Requires attention"
-            icon={AlertCircle}
-            iconBg="bg-orange-500"
-            valueColor="text-orange-600"
-          />
-        </div>
-
-        {/* Main Table Card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-100 px-5 pt-4">
-            {(["monthly", "single"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
+        {/* Filters */}
+        <div className="p-4 border-b border-gray-50">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Class Filter */}
+            <div className="relative flex-1 min-w-0">
+              <GraduationCap
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <select
+                className="w-full pl-9 pr-8 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white appearance-none"
+                value={filterClass}
+                onChange={(e) => {
+                  setFilterClass(e.target.value);
                   setCurrentPage(1);
                 }}
-                className={`pb-3 px-4 text-sm font-medium border-b-2 transition-all -mb-px ${activeTab === tab
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
               >
-                {tab === "monthly" ? "Monthly Fees" : "Single Fees"}
-              </button>
-            ))}
-          </div>
+                <option value="">All Classes</option>
+                {uniqueClasses.map((c) => (
+                  <option key={c} value={c}>
+                    {c
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Filters */}
-          <div className="p-4 border-b border-gray-50">
-            <div className="flex flex-col sm:flex-row gap-3">
-              {/* Class Filter */}
+            {/* Period Filter */}
+            {activeTab === "monthly" && (
               <div className="relative flex-1 min-w-0">
-                <GraduationCap
-                  size={15}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-                <select
-                  className="w-full pl-9 pr-8 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white appearance-none"
-                  value={filterClass}
-                  onChange={(e) => {
-                    setFilterClass(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <option value="">All Classes</option>
-                  {uniqueClasses.map((c) => (
-                    <option key={c} value={c}>
-                      {c
-                        .replace(/_/g, " ")
-                        .replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Period Filter */}
-              {activeTab === "monthly" && (
-                <div className="relative flex-1 min-w-0">
-                  <CalendarDays
-                    size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="month"
-                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                    value={filterPeriod}
-                    onChange={(e) => {
-                      setFilterPeriod(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Search */}
-              <div className="relative flex-1 min-w-0 sm:max-w-xs">
-                <Search
+                <CalendarDays
                   size={15}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 />
                 <input
-                  type="text"
-                  placeholder="Search student..."
-                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={searchQuery}
+                  type="month"
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  value={filterPeriod}
                   onChange={(e) => {
-                    setSearchQuery(e.target.value);
+                    setFilterPeriod(e.target.value);
                     setCurrentPage(1);
                   }}
                 />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
               </div>
+            )}
+
+            {/* Search */}
+            <div className="relative flex-1 min-w-0 sm:max-w-xs">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Search student..."
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto pb-32">
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 size={32} className="animate-spin text-blue-500" />
-              </div>
-            ) : paginatedFees.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                <Filter size={40} className="mb-3 opacity-50" />
-                <p className="font-medium">No fees found</p>
-                <p className="text-sm mt-1">Try adjusting your filters</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    {[
-                      "Student",
-                      "Class & Section",
-                      "Billing Period",
-                      "Due Date",
-                      "Amount (₹)",
-                      "Discount (₹)",
-                      "Payable (₹)",
-                      "Paid (₹)",
-                      "Balance (₹)",
-                      "Status",
-                      "Action",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {paginatedFees.map((fee) => (
-                    <tr
-                      key={fee.id}
-                      className="hover:bg-gray-50/50 transition-colors group"
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto pb-32">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={32} className="animate-spin text-blue-500" />
+            </div>
+          ) : paginatedFees.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Filter size={40} className="mb-3 opacity-50" />
+              <p className="font-medium">No fees found</p>
+              <p className="text-sm mt-1">Try adjusting your filters</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  {[
+                    "Student",
+                    "Class & Section",
+                    "Billing Period",
+                    "Due Date",
+                    "Amount (₹)",
+                    "Discount (₹)",
+                    "Payable (₹)",
+                    "Paid (₹)",
+                    "Balance (₹)",
+                    "Status",
+                    "Action",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <StudentAvatar name={fee.student_name} />
-                          <div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-sm font-semibold text-gray-900">
-                                {fee.student_name}
-                              </p>
-                              {fee.is_rte_govt_claim && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                  RTE
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              ID#{fee.student.toString().padStart(3, "0")}
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {paginatedFees.map((fee) => (
+                  <tr
+                    key={fee.id}
+                    className="hover:bg-gray-50/50 transition-colors group"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <StudentAvatar name={fee.student_name} />
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {fee.student_name}
                             </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-700 font-medium capitalize">
-                          {fee.class_name?.replace(/_/g, " ")}
-                        </p>
-                        <p className="text-xs text-gray-400">A Section</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        {fee.billing_period ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
-                            {formatBillingPeriod(fee.billing_period)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {formatDisplayDate(fee.due_date)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                        ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-green-600">
-                        {parseFloat(fee.discount_amount ?? "0") > 0 ? (
-                          `₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}`
-                        ) : (
-                          <span className="text-gray-400 font-normal">
-                            ₹0.00
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                        ₹
-                        {parseFloat(fee.payable_amount).toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-green-600">
-                        ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-red-600">
-                        ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={fee.status} />
-                        {fee.is_rte_govt_claim && (
-                          <div className="text-[10px] text-indigo-700 font-semibold mt-0.5">
-                            Govt: {fee.rte_govt_status || 'pending'}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleView(fee)}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleCollect(fee)}
-                            className="p-1.5 hover:bg-green-50 rounded-lg transition-colors text-gray-400 hover:text-green-600"
-                          >
-                            <IndianRupee size={15} />
-                          </button>
-                          {fee.status !== "paid" && (
-                            <button
-                              onClick={() => handleDiscount(fee)}
-                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
-                            >
-                              <Percent size={15} />
-                            </button>
-                          )}
-                          <div className="relative">
-                            <button
-                              onClick={() =>
-                                setOpenMenuId(
-                                  openMenuId === fee.id ? null : fee.id,
-                                )
-                              }
-                              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
-                            >
-                              <MoreVertical size={15} />
-                            </button>
-                            {openMenuId === fee.id && (
-                              <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 py-1">
-                                <button
-                                  onClick={() => handleView(fee)}
-                                  className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Eye size={14} /> View
-                                </button>
-                                <button
-                                  onClick={() => handleCollect(fee)}
-                                  className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <IndianRupee size={14} /> Collect
-                                </button>
-                                {fee.status !== "paid" && (
-                                  <button
-                                    onClick={() => handleDiscount(fee)}
-                                    className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                  >
-                                    <Percent size={14} /> Discount
-                                  </button>
-                                )}
-                                <hr className="my-1 border-gray-100" />
-                                <button
-                                  onClick={async () => {
-                                    await deleteStudentFee(fee.id);
-                                    setFees((prev) =>
-                                      prev.filter((f) => f.id !== fee.id),
-                                    );
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <X size={14} /> Delete
-                                </button>
-                              </div>
+                            {fee.is_rte_govt_claim && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                RTE
+                              </span>
                             )}
                           </div>
+                          <p className="text-xs text-gray-400">
+                            ID#{fee.student.toString().padStart(3, "0")}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden divide-y divide-gray-100">
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 size={32} className="animate-spin text-blue-500" />
-              </div>
-            ) : paginatedFees.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                <Filter size={32} className="mb-2 opacity-50" />
-                <p className="text-sm font-medium">No fees found</p>
-              </div>
-            ) : (
-              paginatedFees.map((fee) => (
-                <div
-                  key={fee.id}
-                  className="p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <StudentAvatar name={fee.student_name} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {fee.student_name}
-                        </p>
-                        <p className="text-xs text-gray-400 capitalize">
-                          {fee.class_name?.replace(/_/g, " ")}
-                        </p>
-                        {fee.billing_period && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-medium mt-1">
-                            {formatBillingPeriod(fee.billing_period)}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                    <StatusBadge status={fee.status} />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-4 gap-2">
-                    <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] uppercase text-gray-400">Amount</p>
-                      <p className="text-xs font-bold text-gray-900">
-                        ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-gray-700 font-medium capitalize">
+                        {fee.class_name?.replace(/_/g, " ")}
                       </p>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] uppercase text-gray-400">Payable</p>
-                      <p className="text-xs font-bold text-blue-600">
-                        ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] uppercase text-gray-400">Paid</p>
-                      <p className="text-xs font-bold text-green-600">
-                        ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-2 text-center">
-                      <p className="text-[10px] uppercase text-gray-400">Balance</p>
-                      <p className="text-xs font-bold text-red-600">
-                        ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => handleView(fee)}
-                      className="flex-1 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Eye size={12} /> View
-                    </button>
-                    {fee.status !== "paid" && (
-                      <button
-                        onClick={() => handleDiscount(fee)}
-                        className="flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 transition-colors"
-                      >
-                        <Percent size={12} /> Discount
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Pagination */}
-          {filteredFees.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <p className="text-xs text-gray-500">
-                Showing{" "}
-                {Math.min(
-                  (currentPage - 1) * ITEMS_PER_PAGE + 1,
-                  filteredFees.length,
-                )}{" "}
-                to {Math.min(currentPage * ITEMS_PER_PAGE, filteredFees.length)}{" "}
-                of {filteredFees.length} entries
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let page = i + 1;
-                  if (totalPages > 5) {
-                    if (currentPage > 3) page = currentPage - 2 + i;
-                    if (currentPage > totalPages - 2) page = totalPages - 4 + i;
-                  }
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-8 h-8 text-sm rounded-lg font-medium transition-colors ${currentPage === page
-                        ? "bg-blue-600 text-white"
-                        : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
+                      <p className="text-xs text-gray-400">A Section</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      {fee.billing_period ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                          {formatBillingPeriod(fee.billing_period)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {formatDisplayDate(fee.due_date)}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                      ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                      {parseFloat(fee.discount_amount ?? "0") > 0 ? (
+                        `₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}`
+                      ) : (
+                        <span className="text-gray-400 font-normal">
+                          ₹0.00
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                      ₹
+                      {parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-green-600">
+                      ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-red-600">
+                      ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={fee.status} />
+                      {fee.is_rte_govt_claim && (
+                        <div className="text-[10px] text-indigo-700 font-semibold mt-0.5">
+                          Govt: {fee.rte_govt_status || 'pending'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleView(fee)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleCollect(fee)}
+                          className="p-1.5 hover:bg-green-50 rounded-lg transition-colors text-gray-400 hover:text-green-600"
+                        >
+                          <IndianRupee size={15} />
+                        </button>
+                        {fee.status !== "paid" && (
+                          <button
+                            onClick={() => handleDiscount(fee)}
+                            className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                          >
+                            <Percent size={15} />
+                          </button>
+                        )}
+                        <div className="relative">
+                          <button
+                            onClick={() =>
+                              setOpenMenuId(
+                                openMenuId === fee.id ? null : fee.id,
+                              )
+                            }
+                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+                          {openMenuId === fee.id && (
+                            <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 py-1">
+                              <button
+                                onClick={() => handleView(fee)}
+                                className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Eye size={14} /> View
+                              </button>
+                              <button
+                                onClick={() => handleCollect(fee)}
+                                className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <IndianRupee size={14} /> Collect
+                              </button>
+                              {fee.status !== "paid" && (
+                                <button
+                                  onClick={() => handleDiscount(fee)}
+                                  className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Percent size={14} /> Discount
+                                </button>
+                              )}
+                              <hr className="my-1 border-gray-100" />
+                              <button
+                                onClick={async () => {
+                                  await deleteStudentFee(fee.id);
+                                  setFees((prev) =>
+                                    prev.filter((f) => f.id !== fee.id),
+                                  );
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <X size={14} /> Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
-        {/* Discount Summary */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">
-            Discount Summary
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Tag size={18} className="text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Total Discount Given</p>
-                <p className="text-base font-bold text-gray-900">
-                  ₹
-                  {totalDiscount.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                  })}
-                </p>
-                <p className="text-xs text-gray-400">This month</p>
-              </div>
+        {/* Mobile Card View */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 size={32} className="animate-spin text-blue-500" />
             </div>
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Users size={18} className="text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Discounted Fees</p>
-                <p className="text-base font-bold text-gray-900">
-                  {discountedStudents}
-                </p>
-                <p className="text-xs text-gray-400">Students</p>
-              </div>
+          ) : paginatedFees.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <Filter size={32} className="mb-2 opacity-50" />
+              <p className="text-sm font-medium">No fees found</p>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl col-span-2 sm:col-span-1">
-              <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Percent size={18} className="text-white" />
+          ) : (
+            paginatedFees.map((fee) => (
+              <div
+                key={fee.id}
+                className="p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <StudentAvatar name={fee.student_name} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {fee.student_name}
+                      </p>
+                      <p className="text-xs text-gray-400 capitalize">
+                        {fee.class_name?.replace(/_/g, " ")}
+                      </p>
+                      {fee.billing_period && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-medium mt-1">
+                          {formatBillingPeriod(fee.billing_period)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <StatusBadge status={fee.status} />
+                </div>
+
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-[10px] uppercase text-gray-400">Amount</p>
+                    <p className="text-xs font-bold text-gray-900">
+                      ₹{parseFloat(fee.amount).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-2 text-center">
+                    <p className="text-[10px] uppercase text-gray-400">Payable</p>
+                    <p className="text-xs font-bold text-blue-600">
+                      ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <p className="text-[10px] uppercase text-gray-400">Paid</p>
+                    <p className="text-xs font-bold text-green-600">
+                      ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
+                    <p className="text-[10px] uppercase text-gray-400">Balance</p>
+                    <p className="text-xs font-bold text-red-600">
+                      ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => handleView(fee)}
+                    className="flex-1 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Eye size={12} /> View
+                  </button>
+                  {fee.status !== "paid" && (
+                    <button
+                      onClick={() => handleDiscount(fee)}
+                      className="flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Percent size={12} /> Discount
+                    </button>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">Average Discount</p>
-                <p className="text-base font-bold text-gray-900">
-                  ₹{avgDiscount.toFixed(2)}
-                </p>
-                <p className="text-xs text-gray-400">Per student</p>
-              </div>
-            </div>
-          </div>
-          <button className="mt-4 w-full sm:w-auto float-right flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-            View All Discounts →
-          </button>
+            ))
+          )}
         </div>
 
-        {/* Click outside to close menu */}
+        {/* Pagination */}
+        {filteredFees.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">
+              Showing{" "}
+              {Math.min(
+                (currentPage - 1) * ITEMS_PER_PAGE + 1,
+                filteredFees.length,
+              )}{" "}
+              to {Math.min(currentPage * ITEMS_PER_PAGE, filteredFees.length)}{" "}
+              of {filteredFees.length} entries
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let page = i + 1;
+                if (totalPages > 5) {
+                  if (currentPage > 3) page = currentPage - 2 + i;
+                  if (currentPage > totalPages - 2) page = totalPages - 4 + i;
+                }
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 text-sm rounded-lg font-medium transition-colors ${currentPage === page
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Discount Summary */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          Discount Summary
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
+            <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Tag size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Total Discount Given</p>
+              <p className="text-base font-bold text-gray-900">
+                ₹
+                {totalDiscount.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-xs text-gray-400">This month</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Users size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Discounted Fees</p>
+              <p className="text-base font-bold text-gray-900">
+                {discountedStudents}
+              </p>
+              <p className="text-xs text-gray-400">Students</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl col-span-2 sm:col-span-1">
+            <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Percent size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Average Discount</p>
+              <p className="text-base font-bold text-gray-900">
+                ₹{avgDiscount.toFixed(2)}
+              </p>
+              <p className="text-xs text-gray-400">Per student</p>
+            </div>
+          </div>
+        </div>
+        <button className="mt-4 w-full sm:w-auto float-right flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+          View All Discounts →
+        </button>
+      </div>
+
+      {/* Click outside to close menu */}
       {openMenuId !== null && (
         <div
           className="fixed inset-0 z-10"
