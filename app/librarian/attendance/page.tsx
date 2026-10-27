@@ -19,8 +19,13 @@ import {
   Check,
   X,
   History,
+  Search,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
 import {
   getTodayAttendance,
   markAttendance,
@@ -160,8 +165,39 @@ export default function LibrarianAttendancePage() {
     return { totalDays, presentDays, rate };
   }, [history]);
 
+  // Attendance History search & pagination
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "PRESENT" | "HALF_DAY" | "ABSENT">("ALL");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+  const [selectedMobileRecord, setSelectedMobileRecord] = useState<AttendanceRecord | null>(null);
+
+  const filteredHistory = useMemo(() => {
+    return history.filter((r) => {
+      if (historyStatusFilter !== "ALL" && r.status !== historyStatusFilter) return false;
+      if (!historySearch.trim()) return true;
+      const q = historySearch.trim().toLowerCase();
+      const dateStr = r.attendance_date ? new Date(r.attendance_date).toLocaleDateString() : "";
+      return (
+        dateStr.toLowerCase().includes(q) ||
+        (r.status ? r.status.toLowerCase().includes(q) : false) ||
+        (r.check_in && r.check_in.toLowerCase().includes(q)) ||
+        (r.check_out && r.check_out.toLowerCase().includes(q))
+      );
+    });
+  }, [history, historySearch, historyStatusFilter]);
+
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return filteredHistory.slice(start, start + historyPageSize);
+  }, [filteredHistory, historyPage, historyPageSize]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historySearch, historyStatusFilter]);
+
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* Toast */}
       <AnimatePresence>
         {notification && (
@@ -186,14 +222,14 @@ export default function LibrarianAttendancePage() {
       </AnimatePresence>
 
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-8 text-white shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-indigo-200 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles className="h-3.5 w-3.5" /> Staff Duty & Attendance Panel
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121B34] p-3.5 sm:p-5 text-white shadow-sm border border-[#1A2648]">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#182346] text-[#93C5FD] text-[10px] font-bold tracking-wider uppercase border border-[#233366]">
+              <Sparkles className="h-3 w-3 text-[#93C5FD]" /> Staff Duty & Attendance Panel
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Librarian Attendance</h1>
-            <p className="text-indigo-200 max-w-xl text-sm md:text-base">
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight truncate">Librarian Attendance</h1>
+            <p className="text-white/70 text-[11px] sm:text-xs leading-relaxed line-clamp-2 max-w-md">
               Daily check-in / check-out, geofenced duty confirmation, working hours tracking, and monthly attendance history.
             </p>
           </div>
@@ -202,9 +238,9 @@ export default function LibrarianAttendancePage() {
             variant="outline"
             onClick={loadData}
             disabled={loading}
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white self-start md:self-auto"
+            className="border-white/15 bg-white/10 text-white hover:bg-white/15 text-xs h-8 px-3 rounded-xl self-start md:self-auto cursor-pointer"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
@@ -235,9 +271,9 @@ export default function LibrarianAttendancePage() {
 
       {/* TAB 1: DAILY PUNCH */}
       {activeTab === "punch" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-4">
           {/* Main Punch Clock Card */}
-          <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-200/80 p-8 shadow-sm flex flex-col justify-between space-y-8">
+          <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-3.5 sm:p-6 shadow-2xs flex flex-col justify-between space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
@@ -335,8 +371,8 @@ export default function LibrarianAttendancePage() {
           </div>
 
           {/* Side Summary Card */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm space-y-4">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
               <h3 className="font-bold text-gray-900 text-base">Monthly Overview</h3>
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between py-2 border-b border-gray-100">
@@ -366,81 +402,272 @@ export default function LibrarianAttendancePage() {
         </div>
       )}
 
-      {/* TAB 2: HISTORY */}
+      {/* TAB 2: HISTORY (SUPERADMIN UNIFIED TABLE CARD) */}
       {activeTab === "history" && (
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+          {/* Header Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Attendance History Log</h3>
-              <p className="text-xs text-gray-500">Previous punch-in / punch-out records and verified shift hours.</p>
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <Clock className="h-4 w-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900">Attendance Log</h3>
+                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                  {filteredHistory.length} {filteredHistory.length === 1 ? "Record" : "Records"}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Personal attendance records, check-in timestamps, GPS coordinates, and shift durations
+              </p>
             </div>
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-              Total {history.length} records
-            </span>
+
+            <Button
+              variant="outline"
+              onClick={loadData}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh Log
+            </Button>
           </div>
 
-          {loading ? (
-            <div className="py-12 flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+          {/* Filter and Search Bar Directly on Top of Table Data */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+            {/* Search */}
+            <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => {
+                  setHistorySearch(e.target.value);
+                  setHistoryPage(1);
+                }}
+                placeholder="Search history by date, status, or time…"
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+              />
             </div>
-          ) : history.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-xs">
-              No previous attendance records found.
+
+            {/* Dropdown Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={historyStatusFilter}
+                onChange={(e) => {
+                  setHistoryStatusFilter(e.target.value as "ALL" | "PRESENT" | "HALF_DAY" | "ABSENT");
+                  setHistoryPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PRESENT">Present Only</option>
+                <option value="HALF_DAY">Half Day Only</option>
+                <option value="ABSENT">Absent Only</option>
+              </select>
+
+              <select
+                value={historyPageSize}
+                onChange={(e) => {
+                  setHistoryPageSize(Number(e.target.value));
+                  setHistoryPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+              >
+                <option value={5}>5 per page</option>
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table Content */}
+          {loading ? (
+            <div className="py-12 flex flex-col items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              <p className="text-xs text-slate-400 mt-2 font-medium">Loading attendance history...</p>
+            </div>
+          ) : filteredHistory.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-xs">
+              {historySearch || historyStatusFilter !== "ALL"
+                ? "No attendance records match your search or filter criteria."
+                : "No previous attendance records found."}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-gray-50 text-gray-500 uppercase font-semibold border-b border-gray-100">
-                  <tr>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Check In</th>
-                    <th className="py-3 px-4">Check Out</th>
-                    <th className="py-3 px-4">Duration</th>
-                    <th className="py-3 px-4">Punch GPS</th>
-                    <th className="py-3 px-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {history.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50/50">
-                      <td className="py-3 px-4 font-medium text-gray-900">
-                        {record.attendance_date ? new Date(record.attendance_date).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-emerald-700 font-mono">
-                        {fmtApiTime(record.check_in)}
-                      </td>
-                      <td className="py-3 px-4 text-rose-700 font-mono">
-                        {fmtApiTime(record.check_out)}
-                      </td>
-                      <td className="py-3 px-4 text-gray-700">
-                        {calcDuration(record.check_in || null, record.check_out || null)}
-                      </td>
-                      <td className="py-3 px-4 text-[11px] text-gray-500">
-                        {record.check_in_latitude != null && record.check_in_longitude != null ? `In: ${record.check_in_latitude}, ${record.check_in_longitude}` : "In: not recorded"}
-                        <br />
-                        {record.check_out_latitude != null && record.check_out_longitude != null ? `Out: ${record.check_out_latitude}, ${record.check_out_longitude}` : "Out: not recorded"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            record.status === "PRESENT"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : record.status === "HALF_DAY"
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
-                          }`}
-                        >
-                          {record.status}
-                        </span>
-                      </td>
+            <>
+              {/* Desktop Full Table (Single Row, Separate Columns) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      <th className="p-4 text-center w-12">#</th>
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Punch In</th>
+                      <th className="p-4">Punch Out</th>
+                      <th className="p-4">Shift Duration</th>
+                      <th className="p-4">GPS Coordinates</th>
+                      <th className="p-4 text-center">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                    {paginatedHistory.map((record, idx) => (
+                      <tr key={record.id} className="hover:bg-slate-50/70 transition-colors group">
+                        <td className="p-4 text-center text-slate-400 font-mono text-[11px]">
+                          {(historyPage - 1) * historyPageSize + idx + 1}
+                        </td>
+                        <td className="p-4 font-bold text-slate-900 whitespace-nowrap">
+                          {record.attendance_date ? new Date(record.attendance_date).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="p-4 text-emerald-700 font-mono font-bold whitespace-nowrap">
+                          {fmtApiTime(record.check_in)}
+                        </td>
+                        <td className="p-4 text-rose-700 font-mono font-bold whitespace-nowrap">
+                          {fmtApiTime(record.check_out)}
+                        </td>
+                        <td className="p-4 text-slate-700 font-medium whitespace-nowrap">
+                          {calcDuration(record.check_in || null, record.check_out || null)}
+                        </td>
+                        <td className="p-4 text-[11px] text-slate-500 font-mono whitespace-nowrap">
+                          {record.check_in_latitude != null && record.check_in_longitude != null
+                            ? `GPS: ${Number(record.check_in_latitude).toFixed(4)}, ${Number(record.check_in_longitude).toFixed(4)}`
+                            : "Not recorded"}
+                        </td>
+                        <td className="p-4 text-center whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                              record.status === "PRESENT"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : record.status === "HALF_DAY"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}
+                          >
+                            {record.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Single Row Compact View (Tap to Open Bottom Sheet) */}
+              <div className="divide-y divide-slate-100 block md:hidden">
+                {paginatedHistory.map((record) => (
+                  <div
+                    key={record.id}
+                    onClick={() => setSelectedMobileRecord(record)}
+                    className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-sm truncate">
+                          {record.attendance_date ? new Date(record.attendance_date).toLocaleDateString() : "—"}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                          In: {fmtApiTime(record.check_in)} • Out: {fmtApiTime(record.check_out)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          record.status === "PRESENT"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : record.status === "HALF_DAY"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-rose-50 text-rose-700 border border-rose-200"
+                        }`}
+                      >
+                        {record.status}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-slate-300" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Superadmin Style Bottom Pagination */}
+              <TablePagination
+                currentPage={historyPage}
+                totalItems={filteredHistory.length}
+                pageSize={historyPageSize}
+                onPageChange={setHistoryPage}
+                onPageSizeChange={setHistoryPageSize}
+                itemLabel="records"
+              />
+            </>
           )}
         </div>
       )}
+
+      {/* Mobile Bottom Drawer for Attendance Details */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileRecord}
+        onClose={() => setSelectedMobileRecord(null)}
+        title={selectedMobileRecord?.attendance_date ? `Attendance: ${new Date(selectedMobileRecord.attendance_date).toLocaleDateString()}` : "Attendance Record"}
+        subtitle="Staff Duty Verification"
+        badge={
+          selectedMobileRecord ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                selectedMobileRecord.status === "PRESENT"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : selectedMobileRecord.status === "HALF_DAY"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                  : "bg-rose-50 text-rose-700 border border-rose-200"
+              }`}
+            >
+              {selectedMobileRecord.status}
+            </span>
+          ) : undefined
+        }
+      >
+        {selectedMobileRecord && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Punch In Time</p>
+                <p className="text-xs font-mono font-bold text-emerald-700 mt-0.5">
+                  {fmtApiTime(selectedMobileRecord.check_in)}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Punch Out Time</p>
+                <p className="text-xs font-mono font-bold text-rose-700 mt-0.5">
+                  {fmtApiTime(selectedMobileRecord.check_out)}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Shift Duration</p>
+                <p className="text-xs font-bold text-gray-900 mt-0.5">
+                  {calcDuration(selectedMobileRecord.check_in || null, selectedMobileRecord.check_out || null)}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Status</p>
+                <p className="text-xs font-bold text-gray-900 mt-0.5">{selectedMobileRecord.status}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 col-span-2">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Geofence / Punch Coordinates</p>
+                <p className="text-xs font-mono text-gray-600 mt-0.5">
+                  Check-in GPS: {selectedMobileRecord.check_in_latitude != null && selectedMobileRecord.check_in_longitude != null
+                    ? `${selectedMobileRecord.check_in_latitude}, ${selectedMobileRecord.check_in_longitude}`
+                    : "Not recorded"}
+                </p>
+                <p className="text-xs font-mono text-gray-600 mt-0.5">
+                  Check-out GPS: {selectedMobileRecord.check_out_latitude != null && selectedMobileRecord.check_out_longitude != null
+                    ? `${selectedMobileRecord.check_out_latitude}, ${selectedMobileRecord.check_out_longitude}`
+                    : "Not recorded"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </MobileBottomDrawer>
+
       <StaffBiometricCaptureDialog
         isOpen={showFaceModal}
         actionLabel={pendingAction === "out" ? "Check Out" : "Check In"}

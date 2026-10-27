@@ -13,11 +13,13 @@ import {
   BarChart3,
   CalendarCheck,
   Banknote,
+  Bell,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
+  { title: "Notifications", href: "/inventory/notifications", icon: Bell },
   { title: "My Attendance", href: "/inventory/attendance", icon: UserCheck },
   { title: "Categories & Variants", href: "/inventory/categories", icon: Tags },
   { title: "Items Master", href: "/inventory/items", icon: Package },

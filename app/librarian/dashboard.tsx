@@ -14,6 +14,7 @@ import {
   Loader2,
   TrendingUp,
   AlertTriangle,
+  AlertOctagon,
   BookmarkPlus,
   ShieldCheck,
   ArrowRight,
@@ -127,15 +128,26 @@ export default function LibrarianDashboard() {
   const availableHolds = useMemo(() => reservations.filter((r) => r.status === "AVAILABLE"), [reservations]);
 
   const totalFinesSettled = useMemo(() => {
+    if (feeCollection?.total_fees_collected !== undefined) return Number(feeCollection.total_fees_collected);
     return loans.reduce((sum, l) => sum + Number(l.fine_paid_amount || 0), 0);
-  }, [loans]);
+  }, [loans, feeCollection]);
 
   const totalFinesDue = useMemo(() => {
+    if (feeCollection?.total_pending_dues !== undefined) return Number(feeCollection.total_pending_dues);
     return loans.reduce((sum, l) => {
       const remaining = Number(l.total_fine || 0) - Number(l.fine_paid_amount || 0);
       return sum + Math.max(0, remaining);
     }, 0);
-  }, [loans]);
+  }, [loans, feeCollection]);
+
+  const lostDamagedCount = useMemo(() => {
+    const fromAudit = (inventoryAudit?.damaged_copies || 0) + (inventoryAudit?.lost_copies || 0);
+    const fromDamageRecords = feeCollection?.damage_records?.length || 0;
+    const fromLoans = loans.filter(
+      (l) => l.status === "DAMAGED" || l.status === "LOST" || ["MINOR_DAMAGE", "MAJOR_DAMAGE", "LOST"].includes(l.condition_on_return || "")
+    ).length;
+    return Math.max(fromAudit, fromDamageRecords, fromLoans);
+  }, [inventoryAudit, feeCollection, loans]);
 
   const recentTransactions = useMemo(() => {
     return [...loans].sort((a, b) => b.id - a.id).slice(0, 5);
@@ -156,7 +168,7 @@ export default function LibrarianDashboard() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* Toast */}
       {notification && (
         <div
@@ -169,154 +181,209 @@ export default function LibrarianDashboard() {
         </div>
       )}
 
-      {/* SUPERADMIN-STYLE HERO HEADER BANNER */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-10 text-white shadow-2xl border border-indigo-900/40">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.25),rgba(255,255,255,0))]" />
-        
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Library Operations Command Center
+      {/* ─── 1. WELCOME HERO BANNER (Teacher-style compact mobile proportion) ─── */}
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121B34] p-3.5 sm:p-5 text-white shadow-sm border border-[#1A2648]">
+        <div className="flex items-center justify-between gap-3 relative z-10">
+          <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#182346] text-[#93C5FD] text-[10px] font-bold tracking-wider uppercase border border-[#233366]">
+              <Sparkles className="h-3 w-3 text-[#93C5FD]" /> LIBRARY OPERATIONS COMMAND CENTER
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight truncate">
               Library Intelligence & Circulation
             </h1>
-            <p className="text-indigo-200/80 max-w-2xl text-sm sm:text-base leading-relaxed">
+            <p className="text-white/70 text-[11px] sm:text-xs leading-relaxed line-clamp-2 max-w-md">
               Real-time physical copy tracking, circulating loan velocity, overdue fine assessments, hold reservations, and institutional clearance.
             </p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
-            <Link href="/librarian/library">
-              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 gap-2 font-semibold">
-                <BookOpen className="h-4 w-4" /> Open Operations Desk
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              onClick={loadDashboardData}
-              disabled={loading}
-              className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-          </div>
+        <div className="grid grid-cols-[1fr_auto] sm:flex sm:items-center sm:justify-end gap-2 mt-3 pt-2.5 border-t border-white/10 relative z-10">
+          <Link
+            href="/librarian/library"
+            className="py-2 px-3 sm:px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] sm:text-xs font-bold flex items-center justify-between sm:justify-center gap-2 shadow-sm shadow-blue-600/30 transition-all active:scale-95"
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              <BookOpen className="w-3.5 h-3.5 text-white shrink-0" />
+              <span className="truncate">Open Operations Desk</span>
+            </span>
+            <span className="text-white/80 font-bold sm:hidden">›</span>
+          </Link>
+          <button
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="py-2 px-3 sm:px-4 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-white shrink-0 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
 
-      {/* KPI METRIC CARDS ROW (Superadmin Aesthetics) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* ─── 2. KPI METRIC CARDS ROW (Responsive: 2-col on mobile, 4-col on tablet, 8-col on desktop) ─── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
         {/* Card 1: Books */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Catalogue Titles</span>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform">
-              <BookOpen className="h-5 w-5" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Titles</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-slate-900">{books.length}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{totalCopies} physical</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{books.length}</div>
-            <p className="text-xs text-slate-400 mt-0.5">{totalCopies} physical copies</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-emerald-600 font-semibold">{availableCopies} available</span>
-            <span className="text-slate-400 font-medium">In stock</span>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-emerald-600 font-bold truncate">{availableCopies} avail</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">In stock</span>
           </div>
         </div>
 
         {/* Card 2: Active Loans */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Loans</span>
-            <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600 group-hover:scale-110 transition-transform">
-              <BookMarked className="h-5 w-5" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Active Loans</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                <BookMarked className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-slate-900">{activeLoans.length}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Borrowers</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{activeLoans.length}</div>
-            <p className="text-xs text-slate-400 mt-0.5">Currently borrowed</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-sky-600 font-semibold">Circulating</span>
-            <span className="text-slate-400 font-medium">Loans</span>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-sky-600 font-bold truncate">Circulating</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Loans</span>
           </div>
         </div>
 
         {/* Card 3: Overdue Loans */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-rose-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider">Overdue Alert</span>
-            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 group-hover:scale-110 transition-transform">
-              <AlertTriangle className="h-5 w-5" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-rose-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-rose-600 uppercase tracking-wider truncate">Overdue</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-rose-600">{overdueLoans.length}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Past return date</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-rose-600">{overdueLoans.length}</div>
-            <p className="text-xs text-slate-400 mt-0.5">Past due return date</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-rose-100 flex items-center justify-between text-[11px]">
-            <span className="text-rose-600 font-semibold">Action required</span>
-            <span className="text-slate-400 font-medium">Immediate</span>
+          <div className="mt-2 pt-2 border-t border-rose-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-rose-600 font-bold truncate">Urgent</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Action</span>
           </div>
         </div>
 
         {/* Card 4: Hold Queue */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hold Queue</span>
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-110 transition-transform">
-              <BookmarkPlus className="h-5 w-5" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Hold Queue</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <BookmarkPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-slate-900">{waitingReservations.length}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{availableHolds.length} ready pickup</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{waitingReservations.length}</div>
-            <p className="text-xs text-slate-400 mt-0.5">{availableHolds.length} ready for pickup</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-purple-600 font-semibold">Active holds</span>
-            <span className="text-slate-400 font-medium">Waiting</span>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-purple-600 font-bold truncate">Active holds</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Queue</span>
           </div>
         </div>
 
-        {/* Card 5: Fines Collected */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fines Collected</span>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
-              <DollarSign className="h-5 w-5" />
+        {/* Card 5: Lost & Damaged */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-red-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-red-600 uppercase tracking-wider truncate">Lost & Damaged</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <AlertOctagon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-red-600">{lostDamagedCount}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Damaged or lost copies</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-emerald-600">₹{totalFinesSettled.toFixed(0)}</div>
-            <p className="text-xs text-slate-400 mt-0.5">₹{totalFinesDue.toFixed(0)} pending due</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-emerald-600 font-semibold">Revenue recorded</span>
-            <span className="text-slate-400 font-medium">Receipts</span>
+          <div className="mt-2 pt-2 border-t border-red-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-red-600 font-bold truncate">Stock Loss</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Audit</span>
           </div>
         </div>
 
-        {/* Card 6: Clearance Blocked */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clearance Dues</span>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform">
-              <FileCheck className="h-5 w-5" />
+        {/* Card 6: Pending Dues & Penalties */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-amber-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wider truncate">Dues & Fines</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-amber-700">₹{totalFinesDue.toFixed(0)}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Pending collection</p>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-amber-600">{pendingClearance.length}</div>
-            <p className="text-xs text-slate-400 mt-0.5">Students with dues</p>
+          <div className="mt-2 pt-2 border-t border-amber-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-amber-700 font-bold truncate">Uncollected</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Penalties</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-amber-600 font-semibold">TC / Exam hold</span>
-            <span className="text-slate-400 font-medium">Section 22</span>
+        </div>
+
+        {/* Card 7: Settled Fines Revenue */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Fines Settled</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-emerald-600">₹{totalFinesSettled.toFixed(0)}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Total collected</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-emerald-600 font-bold truncate">Settled</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Receipts</span>
+          </div>
+        </div>
+
+        {/* Card 8: Clearance Blocked */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-3 sm:p-3.5 border border-[#EBF0F8] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Clearance Dues</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-slate-800">{pendingClearance.length}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Students blocked</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
+            <span className="text-rose-600 font-bold truncate">TC / Exam hold</span>
+            <span className="text-slate-400 font-medium shrink-0 ml-1">Section 22</span>
           </div>
         </div>
       </div>
 
-      {/* QUICK LAUNCH OPERATIONAL HUBS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* ─── 3. QUICK LAUNCH OPERATIONAL HUBS ─── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
         <Link
           href="/librarian/library?tab=catalog"
           className="p-4 rounded-2xl bg-white border border-slate-200/70 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all flex flex-col justify-between group shadow-sm"
@@ -397,9 +464,9 @@ export default function LibrarianDashboard() {
       </div>
 
       {/* MID ROW: ANALYTICS VISUALIZERS & LEADERBOARDS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-4">
         {/* Most Borrowed Titles Ranking */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3.5 sm:p-5 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -449,7 +516,7 @@ export default function LibrarianDashboard() {
         </div>
 
         {/* Category Strength Breakdown */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3.5 sm:p-5 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -500,7 +567,7 @@ export default function LibrarianDashboard() {
         </div>
 
         {/* Physical Inventory Health Audit */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3.5 sm:p-5 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -556,28 +623,28 @@ export default function LibrarianDashboard() {
       </div>
 
       {/* LOWER ROW: URGENT OVERDUE LOANS & READY FOR PICKUP HOLDS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-4">
         {/* Urgent Overdue Attention List */}
-        <div className="bg-white rounded-3xl border border-rose-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-rose-50 text-rose-600">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-rose-200/80 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="p-1.5 sm:p-2 rounded-xl bg-rose-50 text-rose-600 shrink-0">
                 <AlertTriangle className="h-4 w-4" />
               </span>
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Overdue Loans Attention</h3>
-                <p className="text-xs text-slate-500">Books exceeding loan duration requiring immediate return</p>
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">Overdue Loans Attention</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500 truncate">Immediate return required</p>
               </div>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-800">
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 shrink-0">
               {overdueLoans.length} Loans
             </span>
           </div>
 
           {overdueLoans.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-              <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-1.5" />
-              No overdue loans currently active. Outstanding circulation is 100% on schedule!
+            <div className="p-5 sm:p-6 text-center text-xs text-slate-400 bg-slate-50/60 rounded-xl sm:rounded-2xl border border-dashed border-slate-200">
+              <CheckCircle2 className="h-7 w-7 text-emerald-500 mx-auto mb-1.5" />
+              No overdue loans currently active!
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
@@ -587,19 +654,19 @@ export default function LibrarianDashboard() {
                   Math.floor((Date.now() - new Date(loan.due_date).getTime()) / (1000 * 60 * 60 * 24))
                 );
                 return (
-                  <div key={loan.id ?? `overdue-${idx}`} className="py-3 flex items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-slate-900 line-clamp-1">{loan.book_title}</div>
-                      <div className="text-slate-500">
+                  <div key={loan.id ?? `overdue-${idx}`} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5">
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">{loan.book_title}</div>
+                      <div className="text-[11px] sm:text-xs text-slate-500 truncate">
                         Borrower: <strong>{loan.student_name || loan.staff_name}</strong> · GR: {loan.student_gr_no || "N/A"}
                       </div>
-                      <div className="text-[11px] text-rose-600 font-semibold">
+                      <div className="text-[10px] sm:text-[11px] text-rose-600 font-semibold">
                         Due: {new Date(loan.due_date).toLocaleDateString()} ({overdueDays} days late)
                       </div>
                     </div>
 
-                    <Link href={`/librarian/library?tab=issues`}>
-                      <Button size="sm" variant="outline" className="text-xs h-8 border-rose-200 text-rose-700 hover:bg-rose-50">
+                    <Link href={`/librarian/library?tab=issues`} className="shrink-0">
+                      <Button size="sm" variant="outline" className="text-xs h-7 sm:h-8 border-rose-200 text-rose-700 hover:bg-rose-50 px-2.5">
                         Collect
                       </Button>
                     </Link>
@@ -611,15 +678,15 @@ export default function LibrarianDashboard() {
         </div>
 
         {/* Ready for Pickup Holds & Sweeper */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="p-1.5 sm:p-2 rounded-xl bg-purple-50 text-purple-600 shrink-0">
                 <BookmarkPlus className="h-4 w-4" />
               </span>
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Reserved Holds Ready</h3>
-                <p className="text-xs text-slate-500">Returned copies held for reservation queue pickup</p>
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">Reserved Holds Ready</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500 truncate">Waiting for pickup</p>
               </div>
             </div>
             <Button
@@ -627,30 +694,30 @@ export default function LibrarianDashboard() {
               variant="outline"
               onClick={handleSweepHolds}
               disabled={sweepLoading}
-              className="text-xs h-8 border-purple-200 text-purple-700 hover:bg-purple-50"
+              className="text-[11px] sm:text-xs h-7 sm:h-8 border-purple-200 text-purple-700 hover:bg-purple-50 px-2 sm:px-2.5 shrink-0"
             >
-              <RefreshCw className={`h-3 w-3 mr-1 ${sweepLoading ? "animate-spin" : ""}`} /> Sweep 48h Holds
+              <RefreshCw className={`h-3 w-3 mr-1 ${sweepLoading ? "animate-spin" : ""}`} /> Sweep 48h
             </Button>
           </div>
 
           {availableHolds.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <div className="p-5 sm:p-6 text-center text-xs text-slate-400 bg-slate-50/60 rounded-xl sm:rounded-2xl border border-dashed border-slate-200">
               No holds currently waiting for pickup.
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
               {availableHolds.slice(0, 4).map((hold, idx) => (
-                <div key={hold.id ?? `hold-${idx}`} className="py-3 flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-slate-900 line-clamp-1">{hold.book_title}</div>
-                    <div className="text-slate-500">Reserved for: <strong>{hold.student_name}</strong></div>
-                    <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> Ready at circulation desk
+                <div key={hold.id ?? `hold-${idx}`} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">{hold.book_title}</div>
+                    <div className="text-[11px] sm:text-xs text-slate-500 truncate">Reserved for: <strong>{hold.student_name}</strong></div>
+                    <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> Ready at desk
                     </div>
                   </div>
-                  <Link href="/librarian/library?tab=reservations">
-                    <Button size="sm" className="text-xs h-8 bg-purple-600 hover:bg-purple-700 text-white">
-                      Issue Hold
+                  <Link href="/librarian/library?tab=reservations" className="shrink-0">
+                    <Button size="sm" className="text-xs h-7 sm:h-8 bg-purple-600 hover:bg-purple-700 text-white px-2.5">
+                      Issue
                     </Button>
                   </Link>
                 </div>
@@ -661,15 +728,15 @@ export default function LibrarianDashboard() {
       </div>
 
       {/* RECENT CIRCULATION STREAM */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-slate-900 text-base">Recent Borrowing Activity</h3>
-            <p className="text-xs text-slate-500">Live stream of the latest book loans, returns, and renewals</p>
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">Recent Borrowing Activity</h3>
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate">Latest loans, returns, and renewals</p>
           </div>
-          <Link href="/librarian/library?tab=issues">
-            <Button variant="ghost" size="sm" className="text-xs text-indigo-600 hover:text-indigo-700">
-              View All History <ChevronRight className="h-4 w-4 ml-1" />
+          <Link href="/librarian/library?tab=issues" className="shrink-0">
+            <Button variant="ghost" size="sm" className="text-xs text-indigo-600 hover:text-indigo-700 h-7 sm:h-8 px-2 sm:px-3">
+              View All <ChevronRight className="h-3.5 w-3.5 ml-1" />
             </Button>
           </Link>
         </div>

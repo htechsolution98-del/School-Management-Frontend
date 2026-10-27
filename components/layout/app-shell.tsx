@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowLeft,
+  ArrowRight,
   Banknote,
   Bell,
   BookOpen,
@@ -112,11 +114,23 @@ function settleWidth(width: number) {
   return width < COMPACT_MAX ? MIN_WIDTH : Math.max(EXPANDED_MIN, width);
 }
 
-/** Finds the deepest link matching the current path so nested groups resolve. */
-function findActive(links: SidebarLink[], pathname: string): SidebarLink | undefined {
+/** Finds the deepest link matching the current path and query so nested groups resolve. */
+function findActive(links: SidebarLink[], pathname: string, currentQuery = ""): SidebarLink | undefined {
   const leaves = links.flatMap(link => link.subLinks?.length ? link.subLinks : [link]);
-  return leaves.filter(link => pathname === link.href || (!link.exact && link !== links[0] && pathname.startsWith(`${link.href}/`)))
-    .sort((a, b) => b.href.length - a.href.length)[0];
+  const fullPath = currentQuery ? `${pathname}${currentQuery}` : pathname;
+
+  // 1. Exact match with query params if fullPath matches link.href
+  const exactMatch = leaves.find(link => link.href === fullPath);
+  if (exactMatch) return exactMatch;
+
+  // 2. Base pathname match for links without query params
+  return leaves.filter(link => {
+    const [base, query] = link.href.split("?");
+    if (query) {
+      return fullPath === link.href;
+    }
+    return pathname === base || (!link.exact && link !== links[0] && pathname.startsWith(`${base}/`));
+  }).sort((a, b) => b.href.length - a.href.length)[0];
 }
 
 function formatSchoolDisplayName(name?: string | null): string {
@@ -140,6 +154,7 @@ export function
     noPadding,
     mainClassName,
   }: AppShellProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
   const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
@@ -178,7 +193,7 @@ export function
   const [signingOut, setSigningOut] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
-  const { notifications, readIds, unreadCount, markAsRead } = useAnnouncementSocket();
+  const { notifications, readIds, unreadCount, markAsRead, markAllAsRead } = useAnnouncementSocket();
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<AnnouncementResponse | null>(null);
@@ -186,6 +201,37 @@ export function
   const [schoolName, setSchoolName] = useState<string | null>(null);
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [logoImgError, setLogoImgError] = useState(false);
+
+  const getNotificationsUrl = useCallback(() => {
+    const pathPrefix = (pathname || "").split("/")[1]?.toLowerCase();
+    const knownRoles = [
+      "librarian",
+      "teacher",
+      "clerk",
+      "principal",
+      "trustee",
+      "fees",
+      "inventory",
+      "student",
+      "parent",
+      "superadmin",
+      "admin",
+    ];
+    if (pathPrefix && knownRoles.includes(pathPrefix)) {
+      return `/${pathPrefix}/notifications`;
+    }
+    if (roleTitle) {
+      const roleNormalized = roleTitle.toLowerCase().replace(/[^a-z]/g, "");
+      if (knownRoles.includes(roleNormalized)) {
+        return `/${roleNormalized}/notifications`;
+      }
+    }
+    const userRole = (profile?.role || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (userRole && knownRoles.includes(userRole)) {
+      return `/${userRole}/notifications`;
+    }
+    return "/librarian/notifications";
+  }, [pathname, roleTitle, profile?.role]);
 
   useEffect(() => {
     let mounted = true;
@@ -219,12 +265,30 @@ export function
     } catch { /* ignore */ }
   }, []);
 
+  const [currentQuery, setCurrentQuery] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentQuery(window.location.search);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      if (typeof window !== "undefined") {
+        setCurrentQuery(window.location.search);
+      }
+    };
+    window.addEventListener("popstate", handleLocationChange);
+    return () => window.removeEventListener("popstate", handleLocationChange);
+  }, []);
+
   // Auto-expand the group that owns the active page.
   useEffect(() => {
-    const active = findActive(links, pathname);
+    const active = findActive(links, pathname, currentQuery);
     const owner = links.find(link => active && link.subLinks?.includes(active));
     if (owner) setOpenGroup(owner.title);
-  }, [pathname, links]);
+  }, [pathname, currentQuery, links]);
 
   const updateWidth = useCallback((width: number) => {
     const next = clampWidth(width);
@@ -260,7 +324,7 @@ export function
     };
     const outside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target?.closest?.("#notification-detail-modal")) return;
+      if (target?.closest?.("#notification-detail-modal") || target?.closest?.("#mobile-notifications-panel")) return;
       if (!notificationRef.current?.contains(target)) setNotificationsOpen(false);
     };
     document.addEventListener("keydown", onKey);
@@ -278,7 +342,7 @@ export function
   };
 
   const subtitle = roleTitle || "Clerk";
-  const activeLink = findActive(links, pathname);
+  const activeLink = findActive(links, pathname, currentQuery);
 
   const getBadgeColor = (title: string, index: number) => {
     const lower = title.toLowerCase().trim();
@@ -416,7 +480,14 @@ export function
                         <Link
                           key={`${sub.href}-${sub.title}`}
                           href={sub.href}
-                          onClick={onNavigate}
+                          onClick={() => {
+                            if (sub.href.includes("?")) {
+                              setCurrentQuery(sub.href.substring(sub.href.indexOf("?")));
+                            } else {
+                              setCurrentQuery("");
+                            }
+                            onNavigate?.();
+                          }}
                           aria-current={subActive ? "page" : undefined}
                           className={childClasses(subActive)}
                         >
@@ -531,8 +602,8 @@ export function
   );
 
   const sortedNotifications = [...notifications].sort((a, b) => {
-    const aRead = readIds.includes(a.id);
-    const bRead = readIds.includes(b.id);
+    const aRead = readIds.some((rId) => String(rId) === String(a.id));
+    const bRead = readIds.some((rId) => String(rId) === String(b.id));
     if (aRead !== bRead) return aRead ? 1 : -1;
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
@@ -653,7 +724,7 @@ export function
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
         {/* Top Header Bar: Royal Blue gradient on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#1E40AF]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(30,64,175,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none z-20">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#1E40AF]/20 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1E40AF] via-[#1D4ED8] to-[#2563EB] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-[0_10px_28px_rgba(30,64,175,0.25)] lg:shadow-sm rounded-b-[28px] lg:rounded-b-none relative z-50">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
               {!logoImgError && activeLogo ? (
@@ -680,33 +751,81 @@ export function
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Page Tutorial Help Button */}
+            <PageTutorialDialog
+              roleTitle={roleTitle}
+              isSuperAdmin={
+                roleTitle === "Super Admin" ||
+                Boolean(profile?.is_superuser) ||
+                (profile?.roles || (profile?.role ? [profile.role] : [])).some((r) =>
+                  ["super_admin", "superadmin", "super-admin"].includes(String(r).toLowerCase().trim())
+                )
+              }
+            />
+
             {/* Notification Bell */}
-            <div ref={notificationRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen((value) => !value)}
+            <div ref={notificationRef} className="relative z-50">
+              {/* Mobile View: Direct redirection to Notification Page */}
+              <Link
+                href={getNotificationsUrl()}
                 aria-label="Notifications"
-                aria-expanded={notificationsOpen}
-                className="relative flex h-9 w-9 items-center justify-center rounded-full text-white lg:text-slate-600 hover:bg-white/10 lg:hover:bg-slate-50 transition-colors cursor-pointer"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10 active:scale-95 transition-all lg:hidden cursor-pointer"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-                  {unreadCount > 0 ? unreadCount : 3}
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+
+              {/* Desktop View: Opens Notification Dropdown */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNotificationsOpen((value) => !value);
+                }}
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                className="relative hidden lg:flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
+
+              {/* Desktop Notification Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl">
-                  <p className="flex items-center gap-2 border-b border-slate-100 p-4 text-sm font-semibold text-slate-900">
-                    <Bell className="h-4 w-4 text-[#2563EB]" />
-                    Notifications
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
-                      {unreadCount > 0 ? unreadCount : 3} new
-                    </span>
-                  </p>
-                  <div className="max-h-80 overflow-y-auto">
+                <div className="hidden lg:block absolute right-0 z-[9999] mt-2 w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-100 p-3.5 sm:p-4 text-sm font-semibold text-slate-900 bg-slate-50/50">
+                    <p className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-[#2563EB]" />
+                      Notifications
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
+                        {unreadCount} new
+                      </span>
+                    </p>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllAsRead();
+                        }}
+                        className="text-[11px] font-medium text-[#2563EB] hover:underline cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
                     {sortedNotifications.length ? (
                       sortedNotifications.map((notification) => {
-                        const isRead = readIds.includes(notification.id);
+                        const isRead = readIds.some((rId) => String(rId) === String(notification.id));
                         return (
                           <button
                             key={notification.id}
@@ -715,20 +834,23 @@ export function
                               setSelectedNotification(notification);
                               markAsRead(notification.id);
                             }}
-                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${isRead ? "" : "bg-blue-50/40"
-                              }`}
+                            className={`flex w-full gap-3 p-3.5 text-left transition-colors hover:bg-slate-50 cursor-pointer ${
+                              isRead ? "" : "bg-blue-50/40"
+                            }`}
                           >
                             <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRead ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-[#2563EB]"
-                                }`}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                                isRead ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-[#2563EB]"
+                              }`}
                             >
                               <Megaphone className="h-4 w-4" />
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center justify-between gap-1">
                                 <span
-                                  className={`truncate text-xs ${isRead ? "font-medium text-slate-600" : "font-semibold text-slate-900"
-                                    }`}
+                                  className={`truncate text-xs ${
+                                    isRead ? "font-medium text-slate-600" : "font-semibold text-slate-900"
+                                  }`}
                                 >
                                   {notification.title}
                                 </span>
@@ -757,6 +879,16 @@ export function
                         <p className="mt-0.5 text-xs">You&apos;ll be alerted when a new notice is sent.</p>
                       </div>
                     )}
+                  </div>
+                  <div className="border-t border-slate-100 p-2.5 bg-slate-50/80 text-center">
+                    <Link
+                      href={getNotificationsUrl()}
+                      onClick={() => setNotificationsOpen(false)}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[#2563EB] hover:text-[#1D4ED8] hover:underline"
+                    >
+                      <span>Open Full Notification Hub</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
               )}
@@ -812,15 +944,18 @@ export function
             {mobileNavItems.map((item, idx) => {
               const pathLower = pathname.toLowerCase();
               const itemHrefLower = (item.href || "").toLowerCase();
-              const isActive =
-                pathLower === itemHrefLower ||
-                (itemHrefLower &&
-                  itemHrefLower !== "/" &&
-                  itemHrefLower !== "/teacher" &&
-                  itemHrefLower !== "/clerk" &&
-                  itemHrefLower !== "/student" &&
-                  pathLower.startsWith(`${itemHrefLower}/`)) ||
-                (item.title === "Attendance" && (pathLower.includes("attendance")));
+              const isDashboard =
+                item.title.toLowerCase() === "dashboard" ||
+                itemHrefLower === "/" ||
+                itemHrefLower.split("/").filter(Boolean).length <= 1;
+
+              const isActive = isDashboard
+                ? pathLower === itemHrefLower
+                : pathLower === itemHrefLower ||
+                  (itemHrefLower &&
+                    itemHrefLower !== "/" &&
+                    pathLower.startsWith(`${itemHrefLower}/`)) ||
+                  (item.title === "Attendance" && pathLower.includes("attendance"));
               const Icon = item.icon;
 
               return (

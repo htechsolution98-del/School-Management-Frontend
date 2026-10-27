@@ -11,6 +11,24 @@ export interface AnnouncementPayload {
   target_class?: number | string | null;
   target_division?: string | null;
   target_student?: number | string | null;
+  target_user?: number | string | null;
+}
+
+export interface AnnouncementRecipient {
+  id: number;
+  student_id?: number;
+  user_id?: number;
+  name: string;
+  role: string;
+  father_name?: string;
+  mother_name?: string;
+  mobile?: string;
+  student_name?: string;
+  student_roll?: string | number;
+  roll_no?: string | number;
+  class_name?: string;
+  division?: string;
+  details?: string;
 }
 
 export interface AnnouncementResponse {
@@ -33,6 +51,8 @@ export interface AnnouncementResponse {
   target_division?: string | null;
   target_student?: number | string | null;
   target_student_name?: string | null;
+  target_user?: number | string | null;
+  target_user_name?: string | null;
 }
 
 export async function getAnnouncements(): Promise<AnnouncementResponse[]> {
@@ -84,5 +104,22 @@ export async function deleteAnnouncement(id: number): Promise<void> {
     },
     "Failed to delete announcement."
   );
+}
+
+export async function getAnnouncementRecipients(
+  role: string,
+  query?: string,
+  extra?: { class_id?: number | string | null; division?: string | null; student_id?: number | string | null }
+): Promise<AnnouncementRecipient[]> {
+  const base = API_ENDPOINTS.ANNOUNCEMENT.replace(/\/$/, "");
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
+  if (query) params.set("q", query);
+  if (extra?.class_id) params.set("class_id", String(extra.class_id));
+  if (extra?.division && extra.division !== "ALL") params.set("division", extra.division);
+  if (extra?.student_id) params.set("student_id", String(extra.student_id));
+
+  const url = `${base}-recipients/?${params.toString()}`;
+  return apiFetch<AnnouncementRecipient[]>(url, { method: "GET" }, "Failed to fetch announcement recipients.");
 }
 

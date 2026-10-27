@@ -464,7 +464,7 @@ export function EventsCalendarHub({
     : "Stay updated with official school academic calendars, public holidays, exams, and celebrations.";
 
   return (
-    <div className="space-y-3.5 sm:space-y-5 min-w-0 max-w-7xl mx-auto w-full">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
         <div className="space-y-1 w-full min-w-0 flex-1">

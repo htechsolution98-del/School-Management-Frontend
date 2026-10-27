@@ -152,7 +152,7 @@ export function MyPayslipsView({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 pb-3 lg:pb-8 space-y-6 w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 pb-24 lg:pb-8 space-y-4 sm:space-y-6 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ── Top Header (Shown Directly on the Page, Border-b, Hero Artwork on Right) ── */}
       <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5 pt-1">
         {/* Background Artwork on the Right with Smooth Multi-Directional Gradient */}

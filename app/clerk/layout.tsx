@@ -25,12 +25,14 @@ import {
   BarChart3,
   ClipboardList,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
+  { title: "Notifications", href: "/clerk/notifications", icon: Bell },
   {
     title: "Certificates & G.R.",
     href: "/clerk/docs",
