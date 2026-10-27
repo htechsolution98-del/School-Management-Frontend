@@ -9,13 +9,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[#2563EB] text-white shadow-sm shadow-blue-600/20 hover:bg-[#1D4ED8] active:bg-[#1E40AF]",
+        default: "bg-[#2563EB] text-white shadow-sm shadow-blue-600/20 hover:bg-[#1D4ED8] hover:text-white active:bg-[#1E40AF]",
         outline:
-          "border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-blue-50 hover:text-[#2563EB] hover:border-blue-200",
+          "border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300",
         secondary:
           "bg-blue-50 text-[#2563EB] border border-blue-100/80 hover:bg-blue-100 hover:text-[#1D4ED8]",
         ghost:
-          "text-slate-700 hover:bg-blue-50 hover:text-[#2563EB]",
+          "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
         destructive:
           "bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 hover:text-rose-800 focus-visible:ring-rose-500/20",
         link: "text-[#2563EB] underline-offset-4 hover:underline",
@@ -59,11 +59,17 @@ function Button({
     ? (React.Children.only(children) as React.ReactElement)
     : undefined
 
+  const isStrClass = typeof className === "string"
+  const resolvedVariant =
+    variant === "default" && isStrClass && (className.includes("bg-white") || className.includes("border-slate") || className.includes("text-slate-700"))
+      ? "outline"
+      : variant
+
   return (
     <ButtonPrimitive
       data-slot="button"
       suppressHydrationWarning={suppressHydrationWarning}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant: resolvedVariant, size, className }))}
       render={render}
       nativeButton={!asChild} // add this after error 
       {...props}

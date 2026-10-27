@@ -411,9 +411,6 @@ export const PageTutorialDialog: React.FC<PageTutorialDialogProps> = ({
                             <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#2563EB] shrink-0" />
                             <span>{roleTitle ? `${roleTitle} Guide` : "Guide"}</span>
                           </span>
-                          <span className="px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-mono bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] min-[360px]:max-w-[160px] sm:max-w-none truncate">
-                            {tutorial?.route_path || selectedRoute}
-                          </span>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">

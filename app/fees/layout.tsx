@@ -13,6 +13,7 @@ import {
   Settings,
   Clock,
   Banknote,
+  Bell,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -22,6 +23,11 @@ const sidebarLinks = [
     href: "/fees", 
     icon: LayoutDashboard,
     exact: true,
+  },
+  { 
+    title: "Notifications", 
+    href: "/fees/notifications", 
+    icon: Bell,
   },
   { 
     title: "My Attendance", 

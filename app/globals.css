@@ -424,3 +424,11 @@ body:has(.app-workspace)::-webkit-scrollbar,
     background: rgba(255, 255, 255, 0.96);
   }
 }
+
+/* Ensure toasts and notifications are ALWAYS on top above all modals, dialogs, drawers */
+[data-sonner-toaster],
+.toaster,
+[data-sonner-toast],
+.cn-toast {
+  z-index: 999999 !important;
+}

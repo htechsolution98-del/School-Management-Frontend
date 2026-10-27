@@ -38,6 +38,9 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     if (profile.school?.name) {
       localStorage.setItem("school_name", profile.school.name);
     }
+    if (profile.id) {
+      localStorage.setItem("user_id", String(profile.id));
+    }
     if (profile.school?.id) {
       localStorage.setItem("school_id", String(profile.school.id));
     }

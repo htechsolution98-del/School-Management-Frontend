@@ -20,10 +20,12 @@ import {
   Banknote,
   Layers,
   ReceiptText,
+  Bell,
 } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/trustee", icon: LayoutDashboard },
+  { title: "Notifications", href: "/trustee/notifications", icon: Bell },
   {
     title: "Staff Management",
     href: "/trustee/staff-management",
