@@ -26,6 +26,7 @@ import {
   History,
   Banknote,
   Boxes,
+  Bell,
 } from "lucide-react";
 
 const sidebarLinks = [
