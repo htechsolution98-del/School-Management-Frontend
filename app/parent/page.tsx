@@ -156,7 +156,7 @@ export default function ParentDashboard() {
   }, [activeChild, attendanceAlerts]);
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-28 lg:pb-8">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-3 lg:pb-8">
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#142044] via-[#1E2E62] to-[#392BC9] p-4 sm:p-6 lg:p-7 text-white shadow-lg border border-[#392BC9]/30">
         <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-[#5436F5]/25 blur-3xl" />

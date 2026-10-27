@@ -9,7 +9,11 @@ import { forceLogout, getAccessToken, fetchWithAuth } from "@/lib/auth";
 const LOCAL_STORAGE_KEY = "announcement_notifications";
 const READ_IDS_KEY = "read_announcement_ids";
 
-function isTargetAudienceForUser(announcement: AnnouncementResponse, userRoles: string[]) {
+function isTargetAudienceForUser(
+  announcement: AnnouncementResponse,
+  userRoles: string[],
+  currentUserId?: string | null
+) {
   // Check if announcement has expired
   if (announcement.expires_at) {
     const expiry = new Date(announcement.expires_at);
@@ -18,11 +22,19 @@ function isTargetAudienceForUser(announcement: AnnouncementResponse, userRoles: 
     }
   }
 
+  // If announcement is targeted to a specific individual user (e.g., approved leave, payslip)
+  if (announcement.target_user !== undefined && announcement.target_user !== null) {
+    if (currentUserId) {
+      return String(announcement.target_user) === String(currentUserId);
+    }
+    return false;
+  }
+
   const normUserRoles = userRoles.map((r) => (r || "").toUpperCase().trim());
   const normTarget = (announcement.announcement_for || "").toUpperCase().trim();
   const isEveryone = String(announcement.is_everyone) === "true" || announcement.is_everyone === true;
 
-  // Management always sees all announcements
+  // Management always sees general/role announcements for their school
   if (
     normUserRoles.includes("SUPER_ADMIN") ||
     normUserRoles.includes("SUPERADMIN") ||
@@ -39,42 +51,69 @@ function isTargetAudienceForUser(announcement: AnnouncementResponse, userRoles: 
     return true;
   }
 
-  // Staff category check
-  const isStaffUser =
-    normUserRoles.includes("TEACHER") ||
-    normUserRoles.includes("CLERK") ||
-    normUserRoles.includes("ASSISTANT CLERK") ||
-    normUserRoles.includes("ASSISTANT_CLERK") ||
-    normUserRoles.includes("LIBRARIAN") ||
-    normUserRoles.includes("FEES") ||
-    normUserRoles.includes("FEES MANAGEMENT") ||
-    normUserRoles.includes("INVENTORY");
-
-  if (normTarget === "TEACHER" && (normUserRoles.includes("TEACHER") || isStaffUser)) {
+  // Split multi-role comma-separated values (e.g. "STUDENT,TEACHER" or "CLERK,LIBRARIAN")
+  const targetRoles = normTarget.split(",").map((r) => r.trim()).filter(Boolean);
+  if (targetRoles.includes("ALL")) {
     return true;
   }
 
-  if (normTarget === "CLERK" && (normUserRoles.includes("CLERK") || normUserRoles.includes("ASSISTANT CLERK") || normUserRoles.includes("ASSISTANT_CLERK"))) {
-    return true;
-  }
-
-  if (normTarget === "FEE-MANAGER" && (normUserRoles.includes("FEES") || normUserRoles.includes("FEES MANAGEMENT") || normUserRoles.includes("CLERK"))) {
-    return true;
-  }
-
-  if (normTarget === "PARENT" && (normUserRoles.includes("PARENT") || normUserRoles.includes("PARENTS"))) {
-    return true;
-  }
-
-  if (normTarget === "STUDENT" && normUserRoles.includes("STUDENT")) {
-    return true;
-  }
-
-  if (normTarget === "TRANSPORT" && (normUserRoles.includes("TRANSPORT") || normUserRoles.includes("TRANSPORTATION") || normUserRoles.includes("DRIVER"))) {
-    return true;
-  }
-
-  return normUserRoles.includes(normTarget);
+  return targetRoles.some((target) => {
+    if (target === "STUDENTS_PARENTS" || target === "STUDENT_PARENT") {
+      return (
+        normUserRoles.includes("STUDENT") ||
+        normUserRoles.includes("PARENT") ||
+        normUserRoles.includes("PARENTS")
+      );
+    }
+    if (target === "TEACHER") {
+      return normUserRoles.includes("TEACHER");
+    }
+    if (target === "LIBRARIAN") {
+      return normUserRoles.includes("LIBRARIAN");
+    }
+    if (target === "CLERK") {
+      return (
+        normUserRoles.includes("CLERK") ||
+        normUserRoles.includes("ASSISTANT CLERK") ||
+        normUserRoles.includes("ASSISTANT_CLERK")
+      );
+    }
+    if (target === "FEE-MANAGER" || target === "FEES" || target === "ACCOUNTANT") {
+      return (
+        normUserRoles.includes("FEES") ||
+        normUserRoles.includes("FEES MANAGEMENT") ||
+        normUserRoles.includes("FEE-MANAGER") ||
+        normUserRoles.includes("ACCOUNTANT")
+      );
+    }
+    if (target === "PRINCIPAL") {
+      return (
+        normUserRoles.includes("PRINCIPAL") ||
+        normUserRoles.includes("VICE PRINCIPAL")
+      );
+    }
+    if (target === "TRUSTEE") {
+      return (
+        normUserRoles.includes("TRUSTEE") ||
+        normUserRoles.includes("ADMIN(TRUSTEE)") ||
+        normUserRoles.includes("ADMIN")
+      );
+    }
+    if (target === "PARENT" || target === "PARENTS") {
+      return normUserRoles.includes("PARENT") || normUserRoles.includes("PARENTS");
+    }
+    if (target === "STUDENT" || target === "STUDENTS") {
+      return normUserRoles.includes("STUDENT");
+    }
+    if (target === "TRANSPORT") {
+      return (
+        normUserRoles.includes("TRANSPORT") ||
+        normUserRoles.includes("TRANSPORTATION") ||
+        normUserRoles.includes("DRIVER")
+      );
+    }
+    return normUserRoles.includes(target);
+  });
 }
 
 export function useAnnouncementSocket() {
@@ -96,18 +135,73 @@ export function useAnnouncementSocket() {
     }
   }, []);
 
-  // Initialize notifications from localStorage & fetch active announcements from API
-  useEffect(() => {
+  // 2. Fetch fresh announcements from HTTP API
+  const fetchFreshAnnouncements = useCallback(async () => {
     let userRoles: string[] = [];
+    let currentUserId: string | null = null;
     if (typeof window !== "undefined") {
       try {
         const rolesJson = localStorage.getItem("roles");
         if (rolesJson) {
           userRoles = JSON.parse(rolesJson) as string[];
         }
+        currentUserId = localStorage.getItem("user_id");
       } catch { /* ignore */ }
+    }
 
-      // 1. Instantly load from localStorage for fast initial paint
+    try {
+      const freshList = await getAnnouncements();
+      // Filter by user role target audience & direct target user
+      const filtered = freshList.filter((ann) => isTargetAudienceForUser(ann, userRoles, currentUserId));
+
+      // For parent users, also fetch student attendance notifications
+      let parentAttNotices: AnnouncementResponse[] = [];
+      const isParentRole = userRoles.some((r) =>
+        ["parent", "parents"].includes((r || "").toLowerCase().trim())
+      );
+      if (isParentRole) {
+        try {
+          const attRes = await fetchWithAuth(`${API_BASE_URL}/attendance-notification/`);
+          if (attRes.ok) {
+            const attData = await attRes.json();
+            if (Array.isArray(attData)) {
+              parentAttNotices = attData.map((a: any, idx: number) => ({
+                id: typeof a.id === "number" ? a.id : (Number(a.id) || (idx + 990000)),
+                title: a.title ? a.title.toUpperCase() : "ATTENDANCE NOTIFICATION",
+                description: a.message,
+                created_at: a.created_at,
+                announcement_for: "PARENT",
+              }));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Merge & Sort: newest first
+      const combined = [...parentAttNotices, ...filtered];
+      const sorted = combined.sort((a, b) => {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
+
+      setNotifications(sorted);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sorted));
+        const rIds = getReadIds();
+        setReadIds(rIds);
+        const unread = sorted.filter((n) => !rIds.some((r) => String(r) === String(n.id))).length;
+        setUnreadCount(unread);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch fresh announcements from API:", err);
+    }
+  }, [getReadIds]);
+
+  // Initialize notifications from localStorage & fetch active announcements from API
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (stored) {
@@ -115,7 +209,7 @@ export function useAnnouncementSocket() {
           setNotifications(parsed);
           const rIds = getReadIds();
           setReadIds(rIds);
-          const unread = parsed.filter((n) => !rIds.includes(n.id)).length;
+          const unread = parsed.filter((n) => !rIds.some((r) => String(r) === String(n.id))).length;
           setUnreadCount(unread);
         }
       } catch (err) {
@@ -123,60 +217,8 @@ export function useAnnouncementSocket() {
       }
     }
 
-    // 2. Fetch fresh announcements from HTTP API
-    const fetchFreshAnnouncements = async () => {
-      try {
-        const freshList = await getAnnouncements();
-        // Filter by user role target audience
-        const filtered = freshList.filter((ann) => isTargetAudienceForUser(ann, userRoles));
-
-        // For parent users, also fetch student attendance notifications
-        let parentAttNotices: AnnouncementResponse[] = [];
-        const isParentRole = userRoles.some((r) =>
-          ["parent", "parents"].includes((r || "").toLowerCase().trim())
-        );
-        if (isParentRole) {
-          try {
-            const attRes = await fetchWithAuth(`${API_BASE_URL}/attendance-notification/`);
-            if (attRes.ok) {
-              const attData = await attRes.json();
-              if (Array.isArray(attData)) {
-                parentAttNotices = attData.map((a: any, idx: number) => ({
-                  id: typeof a.id === "number" ? a.id : (Number(a.id) || (idx + 990000)),
-                  title: a.title ? a.title.toUpperCase() : "ATTENDANCE NOTIFICATION",
-                  description: a.message,
-                  created_at: a.created_at,
-                  announcement_for: "PARENT",
-                }));
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        // Merge & Sort: newest first
-        const combined = [...parentAttNotices, ...filtered];
-        const sorted = combined.sort((a, b) => {
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        });
-
-        setNotifications(sorted);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sorted));
-          const rIds = getReadIds();
-          setReadIds(rIds);
-          const unread = sorted.filter((n) => !rIds.includes(n.id)).length;
-          setUnreadCount(unread);
-          localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
-        }
-      } catch (err) {
-        console.warn("Failed to fetch fresh announcements from API:", err);
-      }
-    };
-
     fetchFreshAnnouncements();
-  }, [getReadIds]);
+  }, [getReadIds, fetchFreshAnnouncements]);
 
   const saveNotifications = useCallback((newNotifications: AnnouncementResponse[], newUnread: number) => {
     setNotifications(newNotifications);
@@ -203,13 +245,17 @@ export function useAnnouncementSocket() {
     if (typeof window !== "undefined") {
       try {
         const rIds = getReadIds();
-        if (!rIds.includes(id)) {
+        const strId = String(id);
+        const exists = rIds.some((existing) => String(existing) === strId);
+        if (!exists) {
           const updatedReadIds = [...rIds, id];
           localStorage.setItem(READ_IDS_KEY, JSON.stringify(updatedReadIds));
           setReadIds(updatedReadIds);
           
           setNotifications((prev) => {
-            const unread = prev.filter((n) => !updatedReadIds.includes(n.id)).length;
+            const unread = prev.filter(
+              (n) => !updatedReadIds.some((r) => String(r) === String(n.id))
+            ).length;
             setUnreadCount(unread);
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
             return prev;
@@ -303,20 +349,24 @@ export function useAnnouncementSocket() {
           created_by_name: data.created_by_name,
           created_by_role: data.created_by_role,
           can_manage: data.can_manage ?? false,
+          target_user: data.target_user,
+          target_user_name: data.target_user_name,
         };
 
         // Determine if target audience matches current user's roles
         let userRoles: string[] = [];
+        let currentUserId: string | null = null;
         if (typeof window !== "undefined") {
           try {
             const rolesJson = localStorage.getItem("roles");
             if (rolesJson) {
               userRoles = JSON.parse(rolesJson) as string[];
             }
+            currentUserId = localStorage.getItem("user_id");
           } catch { /* ignore */ }
         }
 
-        if (isTargetAudienceForUser(announcement, userRoles)) {
+        if (isTargetAudienceForUser(announcement, userRoles, currentUserId)) {
           // Dispatch custom event for real-time reactive UI updates
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("announcement_received", { detail: announcement }));
@@ -336,7 +386,7 @@ export function useAnnouncementSocket() {
               ? prev.map((p) => (p.id === announcement.id ? announcement : p))
               : [announcement, ...prev].slice(0, 50);
             const readIds = getReadIds();
-            const unread = updated.filter((n) => !readIds.includes(n.id)).length;
+            const unread = updated.filter((n) => !readIds.some((r) => String(r) === String(n.id))).length;
             setUnreadCount(unread);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
@@ -387,5 +437,6 @@ export function useAnnouncementSocket() {
     markAsRead,
     markAllAsRead,
     clearNotifications,
+    refresh: fetchFreshAnnouncements,
   };
 }

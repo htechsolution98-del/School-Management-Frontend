@@ -17,10 +17,10 @@ import Link from "next/link";
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const PALETTE = [
-  { bg:"#eef2ff", text:"#4f46e5", dot:"#6366f1" },
+  { bg:"#eff6ff", text:"#1d4ed8", dot:"#2563eb" },
   { bg:"#ecfdf5", text:"#059669", dot:"#10b981" },
   { bg:"#fff7ed", text:"#d97706", dot:"#f59e0b" },
-  { bg:"#fdf2f8", text:"#9333ea", dot:"#a855f7" },
+  { bg:"#f0fdfa", text:"#0d9488", dot:"#14b8a6" },
   { bg:"#fff1f2", text:"#e11d48", dot:"#f43f5e" },
   { bg:"#f0f9ff", text:"#0284c7", dot:"#38bdf8" },
 ];
@@ -411,15 +411,14 @@ export default function ClassTeacherExamsPage() {
   const statCards = [
     { l: "Total Exams", v: loading ? "—" : String(exams.length), I: CalendarRange, from: "from-indigo-50", border: "border-indigo-100/60", ibg: "bg-indigo-100/50", ic: "text-indigo-600" },
     { l: "Published Results", v: loading ? "—" : String(pubCount), I: CheckCircle2, from: "from-emerald-50", border: "border-emerald-100/60", ibg: "bg-emerald-100/50", ic: "text-emerald-600" },
-    { l: "Students Enrolled", v: loading ? "—" : String(totalStudents), I: Users, from: "from-violet-50", border: "border-violet-100/60", ibg: "bg-violet-100/50", ic: "text-violet-600" },
+    { l: "Students Enrolled", v: loading ? "—" : String(totalStudents), I: Users, from: "from-blue-50", border: "border-blue-100/60", ibg: "bg-blue-100/50", ic: "text-blue-600" },
     { l: "Avg Class Score", v: loading ? "—" : avgScore ? `${avgScore}%` : "N/A", I: TrendingUp, from: "from-amber-50", border: "border-amber-100/60", ibg: "bg-amber-100/50", ic: "text-amber-600" },
   ];
 
   return (
-    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 relative overflow-x-hidden" style={{ fontFamily: "Outfit,sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*,*::before,*::after{box-sizing:border-box}`}</style>
+    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-6 lg:pb-8 flex flex-col gap-6 relative overflow-x-hidden text-slate-800 dark:text-slate-100">
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-80 h-80 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-80 h-80 bg-blue-200/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 z-10">

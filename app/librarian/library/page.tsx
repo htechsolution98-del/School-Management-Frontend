@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -16,6 +17,8 @@ import {
   ArrowRightLeft,
   RotateCcw,
   Users,
+  User,
+  Power,
   Calendar,
   Layers,
   Sparkles,
@@ -26,6 +29,7 @@ import {
   Filter,
   BookmarkPlus,
   QrCode,
+  AlertOctagon,
   ShieldAlert,
   Sliders,
   MapPin,
@@ -52,13 +56,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
+import { toast } from "sonner";
 import {
   Book,
   BookIssued,
   LibrarySetting,
   BookCategory,
   Author,
-  Publisher,
   Rack,
   Shelf,
   BookCopy,
@@ -81,22 +87,22 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  toggleCategoryActive,
   getAuthors,
   createAuthor,
   updateAuthor,
   deleteAuthor,
-  getPublishers,
-  createPublisher,
-  updatePublisher,
-  deletePublisher,
+  toggleAuthorActive,
   getRacks,
   createRack,
   updateRack,
   deleteRack,
+  toggleRackActive,
   getShelves,
   createShelf,
   updateShelf,
   deleteShelf,
+  toggleShelfActive,
   getBookCopies,
   generateBookCopies,
   transferBookCopy,
@@ -122,6 +128,12 @@ import {
   InventoryAuditData,
 } from "@/lib/library";
 import { getSchoolClasses } from "@/lib/clerk/classes";
+import { CategoryCombobox } from "@/components/library/CategoryCombobox";
+import { ConfirmDeleteModal } from "@/components/library/ConfirmDeleteModal";
+import { ManageCopiesModal } from "@/components/library/ManageCopiesModal";
+import { PrintBarcodeStickerModal } from "@/components/library/PrintBarcodeStickerModal";
+import { BarcodeSvg } from "@/components/library/BarcodeSvg";
+import { LibraryFineReceiptModal } from "@/components/library/LibraryFineReceiptModal";
 
 function toTitleCase(str: string | undefined | null): string {
   if (!str) return "";
@@ -144,6 +156,8 @@ function toTitleCase(str: string | undefined | null): string {
 }
 
 export default function LibrarianDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<
     "catalog" | "circulation" | "clearance" | "reservations" | "reports" | "masters" | "settings" | "history"
   >("catalog");
@@ -154,7 +168,6 @@ export default function LibrarianDashboard() {
   const [reservations, setReservations] = useState<BookReservation[]>([]);
   const [categories, setCategories] = useState<BookCategory[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [racks, setRacks] = useState<Rack[]>([]);
   const [shelves, setShelves] = useState<Shelf[]>([]);
   const [students, setStudents] = useState<LibraryStudent[]>([]);
@@ -171,14 +184,50 @@ export default function LibrarianDashboard() {
   const [categorySearch, setCategorySearch] = useState("");
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Author filter in Catalog
+  const [authorFilter, setAuthorFilter] = useState("ALL");
+  const [isAuthorDropdownOpen, setIsAuthorDropdownOpen] = useState(false);
+  const [authorSearch, setAuthorSearch] = useState("");
+  const authorDropdownRef = useRef<HTMLDivElement>(null);
+
   // Particular Book filter in Catalog
   const [particularBookFilter, setParticularBookFilter] = useState("ALL");
   const [isParticularBookDropdownOpen, setIsParticularBookDropdownOpen] = useState(false);
   const [particularBookSearch, setParticularBookSearch] = useState("");
   const particularBookDropdownRef = useRef<HTMLDivElement>(null);
-  const [catalogViewMode, setCatalogViewMode] = useState<"grid" | "table">("grid");
+  // Catalog Table Pagination & Mobile Drawer
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPageSize, setCatalogPageSize] = useState(10);
+  const [selectedMobileBook, setSelectedMobileBook] = useState<Book | null>(null);
 
-  // Circulation Desk Search & Filters
+  // Circulation Table Pagination & Mobile Drawer
+  const [circulationPage, setCirculationPage] = useState(1);
+  const [circulationPageSize, setCirculationPageSize] = useState(10);
+  const [selectedMobileLoan, setSelectedMobileLoan] = useState<BookIssued | null>(null);
+
+  // History Table Pagination & Mobile Drawer
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+  const [selectedMobileHistory, setSelectedMobileHistory] = useState<BookIssued | null>(null);
+
+  // Reservations Table Pagination & Mobile Drawer
+  const [reservationsPage, setReservationsPage] = useState(1);
+  const [reservationsPageSize, setReservationsPageSize] = useState(10);
+  const [reservationsSearch, setReservationsSearch] = useState("");
+  const [reservationsStatusFilter, setReservationsStatusFilter] = useState("ALL");
+  const [selectedMobileReservation, setSelectedMobileReservation] = useState<BookReservation | null>(null);
+
+  // Clearance Table Pagination & Mobile Drawer
+  const [clearancePage, setClearancePage] = useState(1);
+  const [clearancePageSize, setClearancePageSize] = useState(10);
+  const [clearanceTableSearch, setClearanceTableSearch] = useState("");
+  const [selectedMobileClearance, setSelectedMobileClearance] = useState<any | null>(null);
+
+  // Masters Table Pagination & Mobile Drawer
+  const [mastersPage, setMastersPage] = useState(1);
+  const [mastersPageSize, setMastersPageSize] = useState(10);
+  const [mastersSearch, setMastersSearch] = useState("");
+  const [selectedMobileMaster, setSelectedMobileMaster] = useState<any | null>(null);
   const [circulationSearch, setCirculationSearch] = useState("");
   const [circulationBookFilter, setCirculationBookFilter] = useState("ALL");
   const [circulationCategoryFilter, setCirculationCategoryFilter] = useState("ALL");
@@ -189,6 +238,7 @@ export default function LibrarianDashboard() {
   const [historyBookFilter, setHistoryBookFilter] = useState("ALL");
   const [historyCategoryFilter, setHistoryCategoryFilter] = useState("ALL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
+  const [historyPaymentTypeFilter, setHistoryPaymentTypeFilter] = useState("ALL");
 
   // Multi-Student Book Issue State
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
@@ -197,7 +247,48 @@ export default function LibrarianDashboard() {
   const [isIssueBookDropdownOpen, setIsIssueBookDropdownOpen] = useState(false);
   const issueBookDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [masterSubTab, setMasterSubTab] = useState<"categories" | "authors" | "publishers" | "racks">("racks");
+  const [masterSubTab, setMasterSubTab] = useState<"categories" | "authors" | "racks">("racks");
+
+  // Sync tab with URL search parameter (?tab=...) from sidebar navigation
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    if (
+      tabParam &&
+      [
+        "masters",
+        "catalog",
+        "circulation",
+        "reservations",
+        "history",
+        "clearance",
+        "reports",
+        "settings",
+      ].includes(tabParam)
+    ) {
+      setActiveTab(tabParam as any);
+      if (tabParam === "masters" && !masterSubTab) {
+        setMasterSubTab("racks");
+      }
+    }
+  }, [searchParams, masterSubTab]);
+
+  const handleTabChange = (
+    newTab:
+      | "masters"
+      | "catalog"
+      | "circulation"
+      | "clearance"
+      | "reservations"
+      | "reports"
+      | "settings"
+      | "history"
+  ) => {
+    setActiveTab(newTab);
+    if (newTab === "masters" && !masterSubTab) {
+      setMasterSubTab("racks");
+    }
+    router.replace(`/librarian/library?tab=${newTab}`, { scroll: false });
+  };
 
   // Circulation Issue Modal Student/Staff cascading filter & search states
   const [issueClassFilter, setIssueClassFilter] = useState("");
@@ -224,13 +315,42 @@ export default function LibrarianDashboard() {
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState<BookIssued | null>(null);
+  const [returnError, setReturnError] = useState("");
   const [showCopiesModal, setShowCopiesModal] = useState<Book | null>(null);
   const [bookCopiesList, setBookCopiesList] = useState<BookCopy[]>([]);
   const [showMasterModal, setShowMasterModal] = useState<string | null>(null);
   const [editingMaster, setEditingMaster] = useState<{
-    type: "category" | "author" | "publisher" | "rack" | "shelf";
+    type: "category" | "author" | "rack" | "shelf";
     id: number;
   } | null>(null);
+
+  // Custom Delete Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemName?: string;
+    itemType?: "rack" | "shelf" | "book" | "copy" | "reservation" | "custom";
+    description?: string;
+    consequences?: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => {},
+  });
+
+  // Barcode Sticker & Labels Printable Modal State
+  const [printStickerModal, setPrintStickerModal] = useState<{
+    isOpen: boolean;
+    copy?: BookCopy | null;
+    book?: Book | null;
+    allCopies?: BookCopy[];
+  }>({
+    isOpen: false,
+  });
 
   // Fine Payment & Printable Receipt Modal
   const [finePaymentModal, setFinePaymentModal] = useState<BookIssued | null>(null);
@@ -268,6 +388,7 @@ export default function LibrarianDashboard() {
   const [studentActivity, setStudentActivity] = useState<any[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsSubTab, setReportsSubTab] = useState<"audit" | "borrowed" | "trends" | "overdue" | "fees">("audit");
+  const [feeReportSubView, setFeeReportSubView] = useState<"dues" | "damage" | "collected">("dues");
 
   // Return condition form
   const [returnForm, setReturnForm] = useState({
@@ -275,7 +396,7 @@ export default function LibrarianDashboard() {
     remarks: "",
     damage_fee: 0,
     lost_fee: 0,
-    pay_now: false,
+    pay_now: true,
     payment_method: "Cash",
   });
 
@@ -295,7 +416,6 @@ export default function LibrarianDashboard() {
     category: "",
     category_ref: "",
     author_ref: "",
-    publisher_ref: "",
     rack: "",
     shelf: "",
     edition: "",
@@ -338,6 +458,11 @@ export default function LibrarianDashboard() {
 
   const showToast = (type: "success" | "error", message: string) => {
     setNotification({ type, message });
+    if (type === "success") {
+      toast.success(message);
+    } else {
+      toast.error(message);
+    }
     setTimeout(() => setNotification(null), 4500);
   };
 
@@ -350,7 +475,6 @@ export default function LibrarianDashboard() {
         reservationsData,
         catsData,
         authorsData,
-        pubsData,
         racksData,
         shelvesData,
         studentsData,
@@ -363,7 +487,6 @@ export default function LibrarianDashboard() {
         getReservations().catch(() => []),
         getCategories().catch(() => []),
         getAuthors().catch(() => []),
-        getPublishers().catch(() => []),
         getRacks().catch(() => []),
         getShelves().catch(() => []),
         getLibraryStudents().catch(() => []),
@@ -381,11 +504,23 @@ export default function LibrarianDashboard() {
           edition: b.edition ? toTitleCase(b.edition) : "",
         }))
       );
-      setIssuedRecords(issuedData);
-      setReservations(reservationsData);
+      const sortedIssued = (issuedData || []).slice().sort((a: any, b: any) => {
+        const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
+        const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
+      setIssuedRecords(sortedIssued);
+
+      const sortedReservations = (reservationsData || []).slice().sort((a: any, b: any) => {
+        const timeA = a.reservation_date ? new Date(a.reservation_date).getTime() : 0;
+        const timeB = b.reservation_date ? new Date(b.reservation_date).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
+      setReservations(sortedReservations);
       setCategories(catsData);
       setAuthors(authorsData);
-      setPublishers(pubsData);
       setRacks(racksData);
       setShelves(shelvesData);
 
@@ -441,7 +576,17 @@ export default function LibrarianDashboard() {
 
     const now = new Date();
     const overdueCount = activeLoans.filter((r) => new Date(r.due_date) < now).length;
-    const totalFinesCollected = issuedRecords.reduce((acc, r) => acc + Number(r.total_fine || r.late_fees || 0), 0);
+    const totalFinesCollected = issuedRecords.reduce(
+      (acc, r) => acc + Number(r.fine_paid_amount || (r.status === "RETURNED" ? (r.total_fine || 0) : 0)),
+      0
+    );
+    const totalPendingDues = issuedRecords.reduce((acc, r) => {
+      const remaining = Number(r.total_fine || 0) - Number(r.fine_paid_amount || 0);
+      return acc + Math.max(0, remaining);
+    }, 0);
+    const lostDamagedCount = issuedRecords.filter(
+      (r) => r.status === "DAMAGED" || r.status === "LOST" || ["MINOR_DAMAGE", "MAJOR_DAMAGE", "LOST"].includes(r.condition_on_return || "")
+    ).length;
     const waitingReservationsCount = reservations.filter((r) => r.status === "WAITING").length;
 
     return {
@@ -451,6 +596,8 @@ export default function LibrarianDashboard() {
       activeLoansCount,
       overdueCount,
       totalFinesCollected,
+      totalPendingDues,
+      lostDamagedCount,
       waitingReservationsCount,
     };
   }, [books, issuedRecords, reservations]);
@@ -486,6 +633,37 @@ export default function LibrarianDashboard() {
     return categoryNames.filter((cat) => cat.toLowerCase().includes(q));
   }, [categoryNames, categorySearch]);
 
+  // Book authors list
+  const authorNames = useMemo(() => {
+    const set = new Set<string>();
+    books.forEach((b) => {
+      if (b.author) set.add(toTitleCase(b.author));
+    });
+    authors.forEach((a) => {
+      if (a.name) set.add(toTitleCase(a.name));
+    });
+    return ["ALL", ...Array.from(set)];
+  }, [books, authors]);
+
+  // Book count per author for badge counters
+  const authorCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: books.length };
+    books.forEach((b) => {
+      const auth = toTitleCase(b.author);
+      if (auth) {
+        counts[auth] = (counts[auth] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [books]);
+
+  // Filtered authors within the dropdown search
+  const filteredAuthorNames = useMemo(() => {
+    if (!authorSearch.trim()) return authorNames;
+    const q = authorSearch.toLowerCase().trim();
+    return authorNames.filter((auth) => auth.toLowerCase().includes(q));
+  }, [authorNames, authorSearch]);
+
   // Click outside to close dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -494,6 +672,12 @@ export default function LibrarianDashboard() {
         !categoryDropdownRef.current.contains(event.target as Node)
       ) {
         setIsCategoryDropdownOpen(false);
+      }
+      if (
+        authorDropdownRef.current &&
+        !authorDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAuthorDropdownOpen(false);
       }
       if (
         studentDropdownRef.current &&
@@ -529,6 +713,7 @@ export default function LibrarianDashboard() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsCategoryDropdownOpen(false);
+        setIsAuthorDropdownOpen(false);
         setIsParticularBookDropdownOpen(false);
         setIsStudentDropdownOpen(false);
         setIsStaffDropdownOpen(false);
@@ -680,7 +865,7 @@ export default function LibrarianDashboard() {
     });
   }, [books, issueCategoryFilter, issueBookSearch]);
 
-  // Filtered books (Search, Category, and Particular Book)
+  // Filtered books (Search, Category, Author, and Particular Book)
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
       const matchesSearch =
@@ -691,18 +876,25 @@ export default function LibrarianDashboard() {
       const matchesCat =
         categoryFilter === "ALL" ||
         toTitleCase(b.category) === categoryFilter;
+      const matchesAuth =
+        authorFilter === "ALL" ||
+        toTitleCase(b.author) === authorFilter;
       const matchesBook =
         particularBookFilter === "ALL" ||
         String(b.id) === String(particularBookFilter);
-      return matchesSearch && matchesCat && matchesBook;
+      return matchesSearch && matchesCat && matchesAuth && matchesBook;
     });
-  }, [books, searchQuery, categoryFilter, particularBookFilter]);
+  }, [books, searchQuery, categoryFilter, authorFilter, particularBookFilter]);
 
-  // Books available for the Particular Book dropdown (filtered by category if one is active)
+  // Books available for the Particular Book dropdown (filtered by category and author if active)
   const availableBooksForParticularDropdown = useMemo(() => {
-    const list = categoryFilter === "ALL" 
-      ? books 
-      : books.filter((b) => toTitleCase(b.category) === categoryFilter);
+    let list = books;
+    if (categoryFilter !== "ALL") {
+      list = list.filter((b) => toTitleCase(b.category) === categoryFilter);
+    }
+    if (authorFilter !== "ALL") {
+      list = list.filter((b) => toTitleCase(b.author) === authorFilter);
+    }
     if (!particularBookSearch.trim()) return list;
     const q = particularBookSearch.toLowerCase().trim();
     return list.filter(
@@ -711,7 +903,7 @@ export default function LibrarianDashboard() {
         b.author.toLowerCase().includes(q) ||
         (b.isbn && b.isbn.toLowerCase().includes(q))
     );
-  }, [books, categoryFilter, particularBookSearch]);
+  }, [books, categoryFilter, authorFilter, particularBookSearch]);
 
   // Selected particular book object helper
   const selectedParticularBook = useMemo(() => {
@@ -719,13 +911,29 @@ export default function LibrarianDashboard() {
     return books.find((b) => String(b.id) === String(particularBookFilter)) || null;
   }, [books, particularBookFilter]);
 
-  // Active vs History circulation
+  // Active vs History circulation (Current to Past: newest first)
   const activeLoans = useMemo(() => {
-    return issuedRecords.filter((r) => r.status === "ISSUED");
+    return issuedRecords
+      .filter((r) => r.status === "ISSUED")
+      .slice()
+      .sort((a, b) => {
+        const timeA = a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0;
+        const timeB = b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
   }, [issuedRecords]);
 
   const historyLoans = useMemo(() => {
-    return issuedRecords.filter((r) => r.status !== "ISSUED");
+    return issuedRecords
+      .filter((r) => r.status !== "ISSUED")
+      .slice()
+      .sort((a, b) => {
+        const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
+        const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.id) - Number(a.id);
+      });
   }, [issuedRecords]);
 
   // Unique books currently in active loans
@@ -815,6 +1023,8 @@ export default function LibrarianDashboard() {
         (item.staff_name && item.staff_name.toLowerCase().includes(q)) ||
         (item.student_gr_no && item.student_gr_no.toLowerCase().includes(q)) ||
         (item.accession_no && item.accession_no.toLowerCase().includes(q)) ||
+        (item.payment_method && item.payment_method.toLowerCase().includes(q)) ||
+        (item.payment_receipt_no && item.payment_receipt_no.toLowerCase().includes(q)) ||
         (item.remarks && item.remarks.toLowerCase().includes(q));
 
       const matchesBook =
@@ -825,13 +1035,184 @@ export default function LibrarianDashboard() {
         historyCategoryFilter === "ALL" ||
         toTitleCase(item.book_category) === historyCategoryFilter;
 
+      const isDamaged =
+        item.status === "DAMAGED" ||
+        item.condition_on_return === "MINOR_DAMAGE" ||
+        item.condition_on_return === "MAJOR_DAMAGE" ||
+        Number(item.damage_fees || 0) > 0;
+
       const matchesStatus =
         historyStatusFilter === "ALL" ||
-        item.status === historyStatusFilter;
+        (historyStatusFilter === "DAMAGED" ? isDamaged : item.status === historyStatusFilter);
 
-      return matchesSearch && matchesBook && matchesCategory && matchesStatus;
+      const totalFine = Number(item.total_fine || 0);
+      const paidFine = Number(item.fine_paid_amount || 0);
+      const isPaid = item.is_fine_paid || (totalFine > 0 && paidFine >= totalFine);
+      const pMethod = (item.payment_method || "").toLowerCase();
+
+      let matchesPaymentType = true;
+      if (historyPaymentTypeFilter === "CASH") {
+        matchesPaymentType = pMethod === "cash";
+      } else if (historyPaymentTypeFilter === "ONLINE") {
+        matchesPaymentType = pMethod === "online" || pMethod === "upi" || pMethod === "card";
+      } else if (historyPaymentTypeFilter === "PAID") {
+        matchesPaymentType = totalFine > 0 && isPaid;
+      } else if (historyPaymentTypeFilter === "UNPAID") {
+        matchesPaymentType = totalFine > 0 && !isPaid;
+      } else if (historyPaymentTypeFilter === "NO_FINE") {
+        matchesPaymentType = totalFine <= 0;
+      }
+
+      return matchesSearch && matchesBook && matchesCategory && matchesStatus && matchesPaymentType;
     });
-  }, [historyLoans, historySearch, historyBookFilter, historyCategoryFilter, historyStatusFilter]);
+  }, [historyLoans, historySearch, historyBookFilter, historyCategoryFilter, historyStatusFilter, historyPaymentTypeFilter]);
+
+  // Catalog pagination slice
+  const paginatedBooks = useMemo(() => {
+    const start = (catalogPage - 1) * catalogPageSize;
+    return filteredBooks.slice(start, start + catalogPageSize);
+  }, [filteredBooks, catalogPage, catalogPageSize]);
+
+  useEffect(() => {
+    setCatalogPage(1);
+  }, [searchQuery, categoryFilter, authorFilter, particularBookFilter]);
+
+  // Circulation pagination slice
+  const paginatedActiveLoans = useMemo(() => {
+    const start = (circulationPage - 1) * circulationPageSize;
+    return filteredActiveLoans.slice(start, start + circulationPageSize);
+  }, [filteredActiveLoans, circulationPage, circulationPageSize]);
+
+  useEffect(() => {
+    setCirculationPage(1);
+  }, [circulationSearch, circulationBookFilter, circulationCategoryFilter, circulationStatusFilter]);
+
+  // History pagination slice
+  const paginatedHistoryLoans = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return filteredHistoryLoans.slice(start, start + historyPageSize);
+  }, [filteredHistoryLoans, historyPage, historyPageSize]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historySearch, historyBookFilter, historyCategoryFilter, historyStatusFilter, historyPaymentTypeFilter]);
+
+  // Reservations filtered and paginated slices
+  const filteredReservations = useMemo(() => {
+    return reservations.filter((r) => {
+      if (reservationsStatusFilter !== "ALL" && r.status !== reservationsStatusFilter) return false;
+      if (!reservationsSearch.trim()) return true;
+      const q = reservationsSearch.trim().toLowerCase();
+      return (
+        (r.book_title && r.book_title.toLowerCase().includes(q)) ||
+        (r.student_name && r.student_name.toLowerCase().includes(q)) ||
+        (r.student_gr_no && r.student_gr_no.toLowerCase().includes(q))
+      );
+    });
+  }, [reservations, reservationsSearch, reservationsStatusFilter]);
+
+  const paginatedReservations = useMemo(() => {
+    const start = (reservationsPage - 1) * reservationsPageSize;
+    return filteredReservations.slice(start, start + reservationsPageSize);
+  }, [filteredReservations, reservationsPage, reservationsPageSize]);
+
+  useEffect(() => {
+    setReservationsPage(1);
+  }, [reservationsSearch, reservationsStatusFilter]);
+
+  // Clearance filtered and paginated slices
+  const filteredPendingClearanceList = useMemo(() => {
+    if (!clearanceTableSearch.trim()) return pendingClearanceList;
+    const q = clearanceTableSearch.trim().toLowerCase();
+    return pendingClearanceList.filter((st) => {
+      return (
+        (st.student_name && st.student_name.toLowerCase().includes(q)) ||
+        (st.gr_no && String(st.gr_no).toLowerCase().includes(q)) ||
+        (st.class_name && st.class_name.toLowerCase().includes(q))
+      );
+    });
+  }, [pendingClearanceList, clearanceTableSearch]);
+
+  const paginatedClearance = useMemo(() => {
+    const start = (clearancePage - 1) * clearancePageSize;
+    return filteredPendingClearanceList.slice(start, start + clearancePageSize);
+  }, [filteredPendingClearanceList, clearancePage, clearancePageSize]);
+
+  useEffect(() => {
+    setClearancePage(1);
+  }, [clearanceTableSearch]);
+
+  // Masters filtered and paginated slices
+  const filteredCategories = useMemo(() => {
+    const q = mastersSearch.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.description && c.description.toLowerCase().includes(q))
+    );
+  }, [categories, mastersSearch]);
+
+  const paginatedCategories = useMemo(() => {
+    const start = (mastersPage - 1) * mastersPageSize;
+    return filteredCategories.slice(start, start + mastersPageSize);
+  }, [filteredCategories, mastersPage, mastersPageSize]);
+
+  const filteredAuthors = useMemo(() => {
+    const q = mastersSearch.trim().toLowerCase();
+    if (!q) return authors;
+    return authors.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.code && a.code.toLowerCase().includes(q)) ||
+        (a.biography && a.biography.toLowerCase().includes(q))
+    );
+  }, [authors, mastersSearch]);
+
+  const paginatedAuthors = useMemo(() => {
+    const start = (mastersPage - 1) * mastersPageSize;
+    return filteredAuthors.slice(start, start + mastersPageSize);
+  }, [filteredAuthors, mastersPage, mastersPageSize]);
+
+  const filteredRacks = useMemo(() => {
+    const q = mastersSearch.trim().toLowerCase();
+    if (!q) return racks;
+    return racks.filter(
+      (r) =>
+        r.rack_name.toLowerCase().includes(q) ||
+        r.rack_code.toLowerCase().includes(q)
+    );
+  }, [racks, mastersSearch]);
+
+  const paginatedRacks = useMemo(() => {
+    const start = (mastersPage - 1) * mastersPageSize;
+    return filteredRacks.slice(start, start + mastersPageSize);
+  }, [filteredRacks, mastersPage, mastersPageSize]);
+
+  useEffect(() => {
+    setMastersPage(1);
+  }, [mastersSearch, masterSubTab]);
+
+  // Helper to check for duplicate ISBN in real-time
+  const checkIsbnDuplicate = useCallback(
+    (enteredIsbn: string, currentBookId?: number | null) => {
+      const trimmed = (enteredIsbn || "").trim();
+      if (!trimmed) return "";
+      const cleanEntered = trimmed.replace(/[-\s]/g, "").toLowerCase();
+      const duplicate = books.find((b) => {
+        if (currentBookId && b.id === currentBookId) return false;
+        if (!b.isbn) return false;
+        const cleanExisting = b.isbn.trim().replace(/[-\s]/g, "").toLowerCase();
+        return cleanExisting === cleanEntered;
+      });
+      if (duplicate) {
+        return `A book with ISBN "${trimmed}" already exists: "${toTitleCase(duplicate.title)}" by ${toTitleCase(duplicate.author)} (Book ID #${duplicate.id}). Each book must have a unique ISBN.`;
+      }
+      return "";
+    },
+    [books]
+  );
 
   // Validation function for Book form
   const validateBookForm = () => {
@@ -865,6 +1246,14 @@ export default function LibrarianDashboard() {
       errors.category = "Category / Subject must contain letters, cannot be numbers only.";
     }
 
+    const trimmedIsbn = bookForm.isbn?.trim() || "";
+    if (trimmedIsbn) {
+      const duplicateError = checkIsbnDuplicate(trimmedIsbn, editingBook?.id);
+      if (duplicateError) {
+        errors.isbn = duplicateError;
+      }
+    }
+
     if (!bookForm.rack || !String(bookForm.rack).trim()) {
       errors.rack = "Please select a Rack Location.";
     }
@@ -895,7 +1284,11 @@ export default function LibrarianDashboard() {
     const errors = validateBookForm();
     if (Object.keys(errors).length > 0) {
       setBookFormErrors(errors);
-      showToast("error", "Please fill in all mandatory fields marked with an asterisk (*).");
+      if (errors.isbn) {
+        showToast("error", errors.isbn);
+      } else {
+        showToast("error", "Please fill in all mandatory fields marked with an asterisk (*).");
+      }
       return;
     }
     setBookFormErrors({});
@@ -909,7 +1302,6 @@ export default function LibrarianDashboard() {
         category: toTitleCase(bookForm.category),
         category_ref: bookForm.category_ref ? Number(bookForm.category_ref) : null,
         author_ref: bookForm.author_ref ? Number(bookForm.author_ref) : null,
-        publisher_ref: bookForm.publisher_ref ? Number(bookForm.publisher_ref) : null,
         rack: bookForm.rack ? Number(bookForm.rack) : null,
         shelf: bookForm.shelf ? Number(bookForm.shelf) : null,
         edition: bookForm.edition ? toTitleCase(bookForm.edition) : "",
@@ -933,25 +1325,82 @@ export default function LibrarianDashboard() {
       setBookFormErrors({});
       await loadAllData();
     } catch (err: any) {
-      showToast("error", err.message || "Failed to save book.");
+      const msg = err.message || "Failed to save book.";
+      showToast("error", msg);
+      if (msg.toLowerCase().includes("isbn")) {
+        setBookFormErrors((prev) => ({ ...prev, isbn: msg }));
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
   // Handlers: Delete Book
-  const handleDeleteBook = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this book?")) return;
-    setActionLoading(true);
-    try {
-      await deleteBook(id);
-      showToast("success", "Book removed from catalogue.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to delete book.");
-    } finally {
-      setActionLoading(false);
+  const handleDeleteBook = (target: Book | number, fallbackTitle?: string) => {
+    const bookId = typeof target === "number" ? target : target.id;
+    const title = typeof target === "object" ? target.title : fallbackTitle || `Book #${bookId}`;
+    const bookObj = typeof target === "object" ? target : books.find((b) => b.id === bookId);
+    const copiesCount = bookObj?.total_copies || 0;
+    const isIssued = bookObj ? bookObj.available_copies < bookObj.total_copies : false;
+
+    if (isIssued) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Cannot Delete Book On Loan",
+        itemName: title,
+        itemType: "book",
+        description: `Book "${title}" is currently issued to students or staff.`,
+        consequences: "All borrowed copies must be returned and cleared before this book can be deleted.",
+        confirmText: "Understood",
+        cancelText: "Close",
+        isDestructive: false,
+        onConfirm: () => {},
+      });
+      return;
     }
+
+    if (copiesCount > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Cannot Delete Book With Inventory Copies",
+        itemName: title,
+        itemType: "book",
+        description: `Book "${title}" has ${copiesCount} physical inventory copies in circulation. Books with existing data cannot be deleted.`,
+        consequences: "To delete this book master, you must first dispose of or clear its physical copies in the Copies modal.",
+        confirmText: "Manage Copies",
+        cancelText: "Cancel",
+        isDestructive: false,
+        onConfirm: () => {
+          if (bookObj) handleOpenCopies(bookObj);
+        },
+      });
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Book Title?",
+      itemName: title,
+      itemType: "book",
+      description: `Are you sure you want to delete book master "${title}" (ID #${bookId})?`,
+      consequences:
+        "This book has 0 physical copies and will be permanently removed from your catalogue.",
+      confirmText: "Delete Book",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await deleteBook(bookId);
+          showToast("success", `"${title}" removed from catalogue.`);
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to delete book.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: Issue Book (Supports single student and multi-student according to stock)
@@ -1030,8 +1479,9 @@ export default function LibrarianDashboard() {
       setIssueErrors({});
       await loadAllData();
     } catch (err: any) {
+      const errorMsg = err.message || "Failed to issue book.";
+      const backendErrors: Record<string, string> = { general: errorMsg };
       if (err.fieldErrors && typeof err.fieldErrors === "object") {
-        const backendErrors: Record<string, string> = {};
         for (const [key, val] of Object.entries(err.fieldErrors)) {
           if (Array.isArray(val) && val.length > 0) {
             backendErrors[key] = String(val[0]);
@@ -1039,12 +1489,9 @@ export default function LibrarianDashboard() {
             backendErrors[key] = val;
           }
         }
-        if (backendErrors.non_field_errors) {
-          showToast("error", backendErrors.non_field_errors);
-        }
-        setIssueErrors((prev) => ({ ...prev, ...backendErrors }));
       }
-      showToast("error", err.message || "Failed to issue book.");
+      setIssueErrors((prev) => ({ ...prev, ...backendErrors }));
+      showToast("error", backendErrors.non_field_errors || errorMsg);
     } finally {
       setActionLoading(false);
     }
@@ -1053,6 +1500,7 @@ export default function LibrarianDashboard() {
   // Handlers: Return Book with Condition & Pay Now
   const handleFinalizeReturn = async () => {
     if (!showReturnModal) return;
+    setReturnError("");
     setActionLoading(true);
     try {
       const res = await returnBookWithCondition(showReturnModal.id, {
@@ -1068,9 +1516,22 @@ export default function LibrarianDashboard() {
         : "";
       showToast("success", `Book marked as ${res.status}${fineMsg}`);
       setShowReturnModal(null);
+      if (returnForm.pay_now && Number(res.total_fine) > 0) {
+        setReceiptModal({
+          detail: "Fine Settled on Return",
+          receipt_no: res.payment_receipt_no || `LIB-RCP-${res.id}`,
+          amount_paid: String(res.fine_paid_amount || res.total_fine),
+          remaining_due: "0.00",
+          is_fine_paid: true,
+          record: res,
+        });
+      }
       await loadAllData();
+      loadReportsData();
     } catch (err: any) {
-      showToast("error", err.message || "Failed to return book.");
+      const msg = err.message || "Failed to return book.";
+      setReturnError(msg);
+      showToast("error", msg);
     } finally {
       setActionLoading(false);
     }
@@ -1078,13 +1539,21 @@ export default function LibrarianDashboard() {
 
   // Handlers: Pay Fine
   const handleOpenPayFine = (record: BookIssued) => {
-    const total = Number(record.total_fine || 0);
+    const late = Number(record.late_fees || 0);
+    const damage = Number(record.damage_fees || 0);
+    const lost = Number(record.lost_fees || 0);
+    const explicitTotal = Number(record.total_fine || 0);
+    const total = explicitTotal > 0 ? explicitTotal : (late + damage + lost);
     const paid = Number(record.fine_paid_amount || 0);
-    const remaining = Math.max(0, total - paid);
+    const remaining =
+      record.fine_remaining !== undefined && record.fine_remaining !== null && Number(record.fine_remaining) > 0
+        ? Number(record.fine_remaining)
+        : Math.max(0, total - paid);
+
     setFinePaymentError("");
     setFinePaymentModal(record);
     setFinePaymentForm({
-      amount: String(remaining),
+      amount: remaining > 0 ? String(remaining.toFixed(2)) : "0",
       payment_method: "Cash",
       remarks: "",
     });
@@ -1097,8 +1566,18 @@ export default function LibrarianDashboard() {
       setFinePaymentError("Please enter a valid fine amount to collect (minimum ₹1).");
       return;
     }
-    const maxPayable = Math.max(0, Number(finePaymentModal.total_fine) - Number(finePaymentModal.fine_paid_amount || 0));
-    if (Number(finePaymentForm.amount) > maxPayable) {
+    const late = Number(finePaymentModal.late_fees || 0);
+    const damage = Number(finePaymentModal.damage_fees || 0);
+    const lost = Number(finePaymentModal.lost_fees || 0);
+    const explicitTotal = Number(finePaymentModal.total_fine || 0);
+    const total = explicitTotal > 0 ? explicitTotal : (late + damage + lost);
+    const paid = Number(finePaymentModal.fine_paid_amount || 0);
+    const maxPayable =
+      finePaymentModal.fine_remaining !== undefined && finePaymentModal.fine_remaining !== null && Number(finePaymentModal.fine_remaining) > 0
+        ? Number(finePaymentModal.fine_remaining)
+        : Math.max(0, total - paid);
+
+    if (Number(finePaymentForm.amount) > maxPayable + 0.01) {
       setFinePaymentError(`Payment amount cannot exceed the pending balance of ₹${maxPayable.toFixed(2)}.`);
       return;
     }
@@ -1113,11 +1592,14 @@ export default function LibrarianDashboard() {
       setFinePaymentModal(null);
       setReceiptModal(result);
       await loadAllData();
+      loadReportsData();
       if (selectedStudentClearance) {
         handleSearchStudentClearance(selectedStudentClearance.student_id);
       }
     } catch (err: any) {
-      showToast("error", err.message || "Failed to collect fine payment.");
+      const errorMsg = err.message || "Failed to collect fine payment.";
+      setFinePaymentError(errorMsg);
+      showToast("error", errorMsg);
     } finally {
       setActionLoading(false);
     }
@@ -1138,18 +1620,31 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Mark Lost
-  const handleMarkLost = async (id: number) => {
-    if (!confirm("Are you sure you want to mark this book as LOST? A replacement fee will be charged.")) return;
-    setActionLoading(true);
-    try {
-      await markBookLost(id);
-      showToast("success", "Book marked as Lost and penalty calculated.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to mark book lost.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleMarkLost = (id: number, bookTitle?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Mark Book as Lost?",
+      itemName: bookTitle || `Loan Record #${id}`,
+      itemType: "copy",
+      description: "Are you sure you want to mark this issued book as LOST?",
+      consequences:
+        "The physical copy status will become LOST, and a book replacement penalty fee will be billed to the borrower according to library policy.",
+      confirmText: "Mark as Lost",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await markBookLost(id);
+          showToast("success", "Book marked as Lost and penalty fee recorded.");
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to mark book lost.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: View Copies
@@ -1229,22 +1724,36 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Dispose Copy
-  const handleDisposeCopy = async (copyId: number) => {
-    if (!confirm("Are you sure you want to DISPOSE this physical copy? Historical transaction records will be preserved.")) return;
-    setActionLoading(true);
-    try {
-      await deleteBookCopy(copyId);
-      showToast("success", "Physical copy marked as DISPOSED.");
-      if (showCopiesModal) {
-        const updated = await getBookCopies(showCopiesModal.id);
-        setBookCopiesList(updated);
-      }
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to dispose copy.");
-    } finally {
-      setActionLoading(false);
-    }
+  const handleDisposeCopy = (copyId: number, accessionNo?: string) => {
+    const accLabel = accessionNo || `Copy #${copyId}`;
+    setConfirmModal({
+      isOpen: true,
+      title: "Dispose Physical Copy?",
+      itemName: accLabel,
+      itemType: "copy",
+      description: `Are you sure you want to DISPOSE physical copy "${accLabel}"?`,
+      consequences:
+        "This copy will be retired from circulation inventory. Historical checkout and clearance logs will be retained for audit tracking.",
+      confirmText: "Dispose Copy",
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await deleteBookCopy(copyId);
+          showToast("success", `Physical copy "${accLabel}" marked as DISPOSED.`);
+          if (showCopiesModal) {
+            const updated = await getBookCopies(showCopiesModal.id);
+            setBookCopiesList(updated);
+          }
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to dispose copy.");
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handlers: Save Settings
@@ -1263,7 +1772,7 @@ export default function LibrarianDashboard() {
   };
 
   // Handlers: Save Master (Create or Update)
-  const openAddMasterModal = (type: "category" | "author" | "publisher" | "rack" | "shelf", defaultParentRack?: number) => {
+  const openAddMasterModal = (type: "category" | "author" | "rack" | "shelf", defaultParentRack?: number) => {
     setEditingMaster(null);
     setMasterErrors({});
     setMasterForm({
@@ -1275,15 +1784,13 @@ export default function LibrarianDashboard() {
     setShowMasterModal(type);
   };
 
-  const openEditMasterModal = (type: "category" | "author" | "publisher" | "rack" | "shelf", item: any) => {
+  const openEditMasterModal = (type: "category" | "author" | "rack" | "shelf", item: any) => {
     setEditingMaster({ type, id: item.id });
     setMasterErrors({});
     if (type === "category") {
       setMasterForm({ name: item.name, code: item.code || "", extra: item.description || "", extra2: "" });
     } else if (type === "author") {
       setMasterForm({ name: item.name, code: item.code || "", extra: item.biography || "", extra2: "" });
-    } else if (type === "publisher") {
-      setMasterForm({ name: item.name, code: item.code || "", extra: item.contact_no || "", extra2: item.email || "" });
     } else if (type === "rack") {
       setMasterForm({ name: item.rack_name, code: item.rack_code || "", extra: item.description || "", extra2: "" });
     } else if (type === "shelf") {
@@ -1333,20 +1840,6 @@ export default function LibrarianDashboard() {
         } else {
           await createAuthor(payload);
           showToast("success", "Author added!");
-        }
-      } else if (showMasterModal === "publisher") {
-        const payload = {
-          name: masterForm.name.trim(),
-          code: masterForm.code.trim() || undefined,
-          contact_no: masterForm.extra,
-          email: masterForm.extra2,
-        };
-        if (editingMaster) {
-          await updatePublisher(editingMaster.id, payload);
-          showToast("success", "Publisher updated!");
-        } else {
-          await createPublisher(payload);
-          showToast("success", "Publisher added!");
         }
       } else if (showMasterModal === "rack") {
         if (editingMaster) {
@@ -1526,34 +2019,112 @@ export default function LibrarianDashboard() {
     }
   };
 
-  const handleDeleteMaster = async (type: "category" | "author" | "publisher" | "rack" | "shelf", id: number) => {
-    if (!confirm(`Are you sure you want to delete this ${type}? It will be deactivated safely.`)) return;
+  const handleToggleActiveMaster = async (
+    type: "category" | "author" | "rack" | "shelf",
+    id: number,
+    name: string,
+    currentActive: boolean
+  ) => {
     setActionLoading(true);
     try {
-      if (type === "category") await deleteCategory(id);
-      else if (type === "author") await deleteAuthor(id);
-      else if (type === "publisher") await deletePublisher(id);
-      else if (type === "rack") await deleteRack(id);
-      else if (type === "shelf") await deleteShelf(id);
-      showToast("success", `${type} deactivated successfully.`);
+      let res: any;
+      if (type === "category") res = await toggleCategoryActive(id);
+      else if (type === "author") res = await toggleAuthorActive(id);
+      else if (type === "rack") res = await toggleRackActive(id);
+      else if (type === "shelf") res = await toggleShelfActive(id);
+
+      const isNowActive = res?.is_active ?? !currentActive;
+      showToast(
+        "success",
+        `${type.charAt(0).toUpperCase() + type.slice(1)} "${name}" is now ${isNowActive ? "Activated" : "Deactivated"}.`
+      );
       await loadAllData();
     } catch (err: any) {
-      showToast("error", err.message || `Failed to delete ${type}.`);
+      showToast("error", err.message || `Failed to change status of ${type}.`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Handlers: Cancel & Sweep Reservations
-  const handleCancelReservation = async (id: number) => {
-    if (!confirm("Cancel this student reservation?")) return;
-    try {
-      await cancelReservation(id);
-      showToast("success", "Reservation cancelled.");
-      await loadAllData();
-    } catch (err: any) {
-      showToast("error", err.message || "Failed to cancel.");
+  const handleDeleteMaster = (
+    type: "category" | "author" | "rack" | "shelf",
+    id: number,
+    name?: string,
+    hasDataCount: number = 0
+  ) => {
+    const typeLabel =
+      type === "rack" ? "Rack" : type === "shelf" ? "Shelf" : type.charAt(0).toUpperCase() + type.slice(1);
+    const itemLabel = name || `${typeLabel} #${id}`;
+
+    if (hasDataCount > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: `Cannot Delete ${typeLabel}`,
+        itemName: itemLabel,
+        itemType: type === "rack" ? "rack" : type === "shelf" ? "shelf" : "custom",
+        description: `"${itemLabel}" currently contains ${hasDataCount} associated book(s) or record(s). Items containing active data cannot be deleted.`,
+        consequences: `To maintain library catalogue integrity, items with data cannot be permanently removed. You can deactivate it instead to prevent new assignments while keeping existing data safe.`,
+        confirmText: `Deactivate ${typeLabel} Instead`,
+        cancelText: "Cancel",
+        isDestructive: false,
+        onConfirm: async () => {
+          await handleToggleActiveMaster(type, id, itemLabel, true);
+        },
+      });
+      return;
     }
+
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete ${typeLabel}?`,
+      itemName: itemLabel,
+      itemType: type === "rack" ? "rack" : type === "shelf" ? "shelf" : "custom",
+      description: `Are you sure you want to permanently delete ${typeLabel} "${itemLabel}"?`,
+      consequences: `This ${typeLabel} contains 0 records and will be permanently removed. This action cannot be undone.`,
+      confirmText: `Delete ${typeLabel}`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          if (type === "category") await deleteCategory(id);
+          else if (type === "author") await deleteAuthor(id);
+          else if (type === "rack") await deleteRack(id);
+          else if (type === "shelf") await deleteShelf(id);
+          showToast("success", `${typeLabel} deleted successfully.`);
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || `Failed to delete ${typeLabel}.`);
+          throw err;
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  };
+
+  // Handlers: Cancel & Sweep Reservations
+  const handleCancelReservation = (id: number, bookTitle?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Cancel Student Hold Reservation?",
+      itemName: bookTitle || `Hold Reservation #${id}`,
+      itemType: "reservation",
+      description: "Are you sure you want to cancel this student book hold reservation?",
+      consequences:
+        "The student will be removed from the waitlist queue, and the next waiting student will become eligible for lending.",
+      confirmText: "Cancel Reservation",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await cancelReservation(id);
+          showToast("success", "Reservation cancelled.");
+          await loadAllData();
+        } catch (err: any) {
+          showToast("error", err.message || "Failed to cancel reservation.");
+          throw err;
+        }
+      },
+    });
   };
 
   const handleSweepHoldExpiries = async () => {
@@ -1641,8 +2212,9 @@ export default function LibrarianDashboard() {
     }
   }, [activeTab, loadPendingClearance, loadReportsData]);
 
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50/20 text-slate-800 p-4 md:p-8">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans text-slate-800">
       {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
@@ -1650,7 +2222,7 @@ export default function LibrarianDashboard() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white font-medium ${
+            className={`fixed top-5 right-5 z-[999999] flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white font-medium ${
               notification.type === "success" ? "bg-emerald-600 shadow-emerald-500/20" : "bg-rose-600 shadow-rose-500/20"
             }`}
           >
@@ -1660,9 +2232,9 @@ export default function LibrarianDashboard() {
         )}
       </AnimatePresence>
 
-      <div className="w-full space-y-4">
+      <div className="w-full space-y-3 sm:space-y-4">
         {/* Sleek Top Header Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-3.5 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3.5">
             <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
               <BookOpen className="h-5 w-5" />
@@ -1696,7 +2268,6 @@ export default function LibrarianDashboard() {
                   category: "",
                   category_ref: "",
                   author_ref: "",
-                  publisher_ref: "",
                   rack: "",
                   shelf: "",
                   edition: "",
@@ -1724,22 +2295,11 @@ export default function LibrarianDashboard() {
             >
               <ArrowRightLeft className="h-3.5 w-3.5" /> Issue Book
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={loadAllData}
-              disabled={loading}
-              className="border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs h-9 px-3 rounded-xl gap-1.5 bg-white"
-              title="Refresh all library records"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
           </div>
         </div>
 
-        {/* Six Telemetry Statistics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Eight Telemetry Statistics Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 sm:gap-3">
           {/* Card 1: Total Titles */}
           <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1.5">
@@ -1777,7 +2337,7 @@ export default function LibrarianDashboard() {
           {/* Card 3: Active Loans */}
           <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Issued Active</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Issued</span>
               <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
                 <ArrowRightLeft className="h-3.5 w-3.5" />
               </div>
@@ -1786,7 +2346,7 @@ export default function LibrarianDashboard() {
               <div className="text-xl font-black text-blue-600">{stats.activeLoansCount}</div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-blue-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                <span>In circulation</span>
+                <span>Circulating</span>
               </div>
             </div>
           </div>
@@ -1803,261 +2363,138 @@ export default function LibrarianDashboard() {
               <div className="text-xl font-black text-rose-600">{stats.overdueCount}</div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-rose-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                <span>Past due date</span>
+                <span>Past due</span>
               </div>
             </div>
           </div>
 
           {/* Card 5: Hold Queue */}
-          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between">
+          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Reservations</span>
-              <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Holds</span>
+              <div className="h-7 w-7 rounded-lg bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center">
                 <BookmarkPlus className="h-3.5 w-3.5" />
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-amber-600">{stats.waitingReservationsCount}</div>
-              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-amber-700 truncate">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+              <div className="text-xl font-black text-purple-600">{stats.waitingReservationsCount}</div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-purple-700 truncate">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
                 <span>Waitlist</span>
               </div>
             </div>
           </div>
 
-          {/* Card 6: Fine Revenue */}
-          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all flex flex-col justify-between">
+          {/* Card 6: Lost & Damaged */}
+          <div className="rounded-xl border border-red-200/80 bg-white p-3 shadow-2xs hover:shadow-md hover:border-red-400 transition-all flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dues / Fines</span>
-              <div className="h-7 w-7 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 flex items-center justify-center">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-600">Lost & Damaged</span>
+              <div className="h-7 w-7 rounded-lg bg-red-50 text-red-600 border border-red-100 flex items-center justify-center">
+                <AlertOctagon className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="text-xl font-black text-red-600">{stats.lostDamagedCount}</div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-red-600 truncate">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                <span>Stock audit loss</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 7: Pending Dues */}
+          <div className="rounded-xl border border-amber-200/80 bg-white p-3 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending Dues</span>
+              <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+                <Receipt className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="text-xl font-black text-amber-700">₹{stats.totalPendingDues.toLocaleString("en-IN")}</div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-amber-700 truncate">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                <span>Unsettled fines</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 8: Fines Collected */}
+          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Fines Settled</span>
+              <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
                 <DollarSign className="h-3.5 w-3.5" />
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-purple-700">₹{stats.totalFinesCollected.toLocaleString("en-IN")}</div>
-              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-purple-700 truncate">
-                <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
-                <span>Pending dues</span>
+              <div className="text-xl font-black text-emerald-600">₹{stats.totalFinesCollected.toLocaleString("en-IN")}</div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-emerald-700 truncate">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span>Settled revenue</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main Workspace Layout: In-Page Stepper Sidebar on Left + Active Content on Right */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* IN-PAGE STEPPER SIDEBAR (LEFT) */}
-          <aside className="w-full lg:w-64 xl:w-72 shrink-0 lg:sticky lg:top-4 space-y-3">
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 space-y-2">
-              <div className="px-2 pt-1 pb-2.5 flex items-center justify-between border-b border-slate-100">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200">
-                    <Sparkles className="h-3 w-3 text-indigo-500" /> Library Operations
-                  </div>
-                  <h3 className="font-extrabold text-slate-900 text-sm mt-1">Workflow Steps</h3>
-                </div>
-                <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  8 Modules
-                </span>
-              </div>
 
-              {/* Vertical Stepper Navigation */}
-              <nav className="space-y-1">
-                {[
-                  {
-                    id: "masters",
-                    step: "1",
-                    label: "Racks & Locations",
-                    subLabel: "Storage layout & shelves",
-                    icon: Layers,
-                    badge: `${racks.length} Racks`,
-                  },
-                  {
-                    id: "catalog",
-                    step: "2",
-                    label: "Book Catalog",
-                    subLabel: "Titles, barcodes & stock",
-                    icon: BookOpen,
-                    count: books.length,
-                  },
-                  {
-                    id: "circulation",
-                    step: "3",
-                    label: "Circulation Desk",
-                    subLabel: "Active loans & counter desk",
-                    icon: ArrowRightLeft,
-                    count: activeLoans.length,
-                  },
-                  {
-                    id: "reservations",
-                    step: "4",
-                    label: "Hold Queue",
-                    subLabel: "Student waitlists & pickups",
-                    icon: BookmarkPlus,
-                    count: reservations.length,
-                  },
-                  {
-                    id: "history",
-                    step: "5",
-                    label: "Loan History",
-                    subLabel: "Returned, lost & damaged logs",
-                    icon: Clock,
-                    count: historyLoans.length,
-                  },
-                  {
-                    id: "clearance",
-                    step: "6",
-                    label: "Student Clearance",
-                    subLabel: "NOC certificates & fine check",
-                    icon: ShieldCheck,
-                  },
-                  {
-                    id: "reports",
-                    step: "7",
-                    label: "Reports & Audit",
-                    subLabel: "Audits & circulation trends",
-                    icon: BarChart3,
-                  },
-                  {
-                    id: "settings",
-                    step: "8",
-                    label: "Library Rules",
-                    subLabel: "Loan limits, grace & fees",
-                    icon: Sliders,
-                  },
-                ].map((step) => {
-                  const isActive = activeTab === step.id;
-                  return (
-                    <button
-                      key={step.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveTab(step.id as any);
-                        if (step.id === "masters" && !masterSubTab) {
-                          setMasterSubTab("racks");
-                        }
-                      }}
-                      className={`w-full group relative flex items-start gap-2.5 p-2.5 rounded-xl text-left transition-all duration-150 border ${
-                        isActive
-                          ? "bg-indigo-50/90 border-indigo-200/90 shadow-2xs text-indigo-950 font-bold before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:bg-indigo-600 before:rounded-r"
-                          : "bg-white hover:bg-slate-50/80 border-transparent text-slate-700 hover:border-slate-200/60"
-                      }`}
-                    >
-                      {/* Step Number Circle */}
-                      <div
-                        className={`h-7 w-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
-                          isActive
-                            ? "bg-indigo-600 text-white shadow-xs"
-                            : "bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-700"
-                        }`}
-                      >
-                        {step.step}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span
-                            className={`text-xs font-extrabold truncate ${
-                              isActive ? "text-indigo-950" : "text-slate-800"
-                            }`}
-                          >
-                            {step.label}
-                          </span>
-                          {step.count !== undefined && (
-                            <span
-                              className={`px-1.5 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                                isActive ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {step.count}
-                            </span>
-                          )}
-                          {step.badge && (
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                                isActive ? "bg-purple-200/70 text-purple-900" : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {step.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p
-                          className={`text-[11px] truncate mt-0.5 ${
-                            isActive ? "text-indigo-700/80 font-medium" : "text-slate-400"
-                          }`}
-                        >
-                          {step.subLabel}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* In-Page Sidebar Operational Tip Card */}
-            <div className="bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-purple-50/40 rounded-2xl border border-indigo-100/90 p-3.5 space-y-1.5 text-xs text-indigo-900">
-              <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                <span>Recommended Sequence</span>
-              </div>
-              <p className="text-[11px] text-indigo-800/80 leading-relaxed">
-                Step 1 (Racks) &rarr; Step 2 (Books) &rarr; Step 3 (Lend). Define physical racks &amp; shelves before assigning copies!
-              </p>
-            </div>
-          </aside>
-
-          {/* MAIN CONTENT WORKSPACE (RIGHT) */}
-          <main className="flex-1 min-w-0 w-full space-y-4">
-            {/* Contextual Active Step Header */}
+        {/* MAIN WORKSPACE CONTENT AREA (FULL WIDTH - NO DUAL SIDEBAR) */}
+        <div className="w-full min-w-0 space-y-4">
+          {/* Contextual Active Step Header (Only for non-table tabs) */}
+          {(activeTab === "reports" || activeTab === "settings") && (
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
-                    {activeTab === "masters" && "Step 1 of 8"}
-                    {activeTab === "catalog" && "Step 2 of 8"}
-                    {activeTab === "circulation" && "Step 3 of 8"}
-                    {activeTab === "reservations" && "Step 4 of 8"}
-                    {activeTab === "history" && "Step 5 of 8"}
-                    {activeTab === "clearance" && "Step 6 of 8"}
                     {activeTab === "reports" && "Step 7 of 8"}
                     {activeTab === "settings" && "Step 8 of 8"}
                   </span>
                   <span className="text-xs font-semibold text-slate-400">
-                    {activeTab === "masters" && "Storage & Locations Setup"}
-                    {activeTab === "catalog" && "Book Titles & Barcode Register"}
-                    {activeTab === "circulation" && "Counter Desk & Active Lending"}
-                    {activeTab === "reservations" && "Student Waitlist & Holds"}
-                    {activeTab === "history" && "Completed Return & Lost Archives"}
-                    {activeTab === "clearance" && "Student Dues & NOC Issuance"}
-                    {activeTab === "reports" && "Audit & Utilization Analytics"}
-                    {activeTab === "settings" && "Circulation Rules & Policies"}
+                    {activeTab === "reports" && "Circulation statistics & inventory valuation reports"}
+                    {activeTab === "settings" && "Loan durations, limits & late fine policies"}
                   </span>
                 </div>
                 <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
-                  {activeTab === "masters" && <Layers className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "catalog" && <BookOpen className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "circulation" && <ArrowRightLeft className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "reservations" && <BookmarkPlus className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "history" && <Clock className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "clearance" && <ShieldCheck className="h-5 w-5 text-indigo-600" />}
                   {activeTab === "reports" && <BarChart3 className="h-5 w-5 text-indigo-600" />}
                   {activeTab === "settings" && <Sliders className="h-5 w-5 text-indigo-600" />}
-
-                  {activeTab === "masters" && "Racks & Locations"}
-                  {activeTab === "catalog" && "Book Catalog"}
-                  {activeTab === "circulation" && "Circulation Desk (Active Loans)"}
-                  {activeTab === "reservations" && "Hold Queue (Student Reservations)"}
-                  {activeTab === "history" && "Loan History (Completed Records)"}
-                  {activeTab === "clearance" && "Library Clearance Desk"}
-                  {activeTab === "reports" && "Reports & Inventory Audit"}
-                  {activeTab === "settings" && "Library Rules & Policy Settings"}
+                  {activeTab === "reports" && "Reports & Audit"}
+                  {activeTab === "settings" && "Rules & Policies"}
                 </h2>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={loadAllData}
+                disabled={loading}
+                className="text-xs border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
+                title="Reload current data"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          )}
 
-              {/* Action Buttons in Header */}
-              <div className="flex items-center gap-2 shrink-0">
-                {activeTab === "catalog" && (
+          {/* TAB 1: CATALOGUE (SUPERADMIN UNIFIED TABLE CARD) */}
+          {activeTab === "catalog" && (
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              {/* Header Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Book Catalog</h3>
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                      {filteredBooks.length} {filteredBooks.length === 1 ? "Book" : "Books"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Manage books, copies, rack placements & barcode generation
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     onClick={() => {
@@ -2071,7 +2508,6 @@ export default function LibrarianDashboard() {
                         category: "",
                         category_ref: "",
                         author_ref: "",
-                        publisher_ref: "",
                         rack: "",
                         shelf: "",
                         edition: "",
@@ -2084,545 +2520,151 @@ export default function LibrarianDashboard() {
                       });
                       setShowAddBookModal(true);
                     }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
                   >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Add New Book
+                    <Plus className="h-3.5 w-3.5" /> Add New Book
                   </Button>
-                )}
-                {activeTab === "circulation" && (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setIssueForm({ book: "", book_copy: "", student: "", due_date: "" });
-                      setIssueErrors({});
-                      setShowIssueModal(true);
-                    }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs"
-                  >
-                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" /> Issue Book
-                  </Button>
-                )}
-                {activeTab === "reservations" && (
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={handleSweepHoldExpiries}
-                    disabled={actionLoading}
-                    className="text-xs border-amber-300 text-amber-800 hover:bg-amber-50 rounded-xl"
+                    onClick={loadAllData}
+                    disabled={loading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                    title="Reload catalog"
                   >
-                    <Clock className="h-3.5 w-3.5 mr-1.5 text-amber-600" /> Sweep Expired Holds (48h)
+                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                   </Button>
-                )}
-                {activeTab === "masters" && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => openAddMasterModal("rack")}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Rack
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openAddMasterModal("shelf")}
-                      className="border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs rounded-xl"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Shelf
-                    </Button>
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={loadAllData}
-                  disabled={loading}
-                  className="text-xs border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
-                  title="Reload current data"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                </Button>
+                </div>
               </div>
-            </div>
 
-            {/* TAB 1: CATALOGUE */}
-            {activeTab === "catalog" && (
-              <div className="space-y-4">
-                {/* Search & Category Filter Toolbar */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-3 h-4 w-4 text-indigo-500" />
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by book title, author, or ISBN barcode..."
-                      className="pl-10 h-10 rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-indigo-600/20 text-xs sm:text-sm bg-slate-50/50 hover:bg-white focus:bg-white transition-colors"
-                    />
-                  </div>
-
-                  {/* Filters & View Switcher */}
-                  <div className="flex items-center flex-wrap sm:flex-nowrap gap-2 shrink-0">
-                    {/* Category Filter Dropdown */}
-                    <div className="relative" ref={categoryDropdownRef}>
-                      <button
-                        type="button"
-                        id="category-filter-dropdown-btn"
-                        onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
-                        className={`h-10 flex items-center gap-2 px-3.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all shadow-2xs ${
-                          categoryFilter !== "ALL"
-                            ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-500/10 font-bold"
-                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <Layers className={`h-4 w-4 shrink-0 ${categoryFilter !== "ALL" ? "text-indigo-600" : "text-slate-400"}`} />
-                        <span className="truncate max-w-[120px] sm:max-w-[160px]">
-                          {categoryFilter === "ALL" ? "All Categories" : categoryFilter}
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                            categoryFilter !== "ALL"
-                              ? "bg-indigo-200/80 text-indigo-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {categoryCounts[categoryFilter] ?? (categoryFilter === "ALL" ? books.length : 0)}
-                        </span>
-                        {categoryFilter !== "ALL" && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCategoryFilter("ALL");
-                            }}
-                            className="p-0.5 rounded-md hover:bg-indigo-200 text-indigo-700 transition-colors"
-                            title="Reset to All Categories"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </span>
-                        )}
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
-                            isCategoryDropdownOpen ? "rotate-180 text-indigo-600" : ""
-                          }`}
-                        />
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {isCategoryDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-72 max-w-[90vw] bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                          {categoryNames.length > 5 && (
-                            <div className="relative mb-2 px-1">
-                              <Search className="absolute left-3.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={categorySearch}
-                                onChange={(e) => setCategorySearch(e.target.value)}
-                                placeholder="Search category..."
-                                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                                autoFocus
-                              />
-                              {categorySearch && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCategorySearch("")}
-                                  className="absolute right-3 top-2 text-slate-400 hover:text-slate-600"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
-                            {(!categorySearch.trim() || "all categories".includes(categorySearch.toLowerCase().trim())) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCategoryFilter("ALL");
-                                  setIsCategoryDropdownOpen(false);
-                                  setCategorySearch("");
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-                                  categoryFilter === "ALL"
-                                    ? "bg-indigo-600 text-white"
-                                    : "text-slate-700 hover:bg-slate-100"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className={`h-3.5 w-3.5 ${categoryFilter === "ALL" ? "text-white" : "text-indigo-500"}`} />
-                                  <span>All Categories</span>
-                                </div>
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                    categoryFilter === "ALL" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {books.length}
-                                </span>
-                              </button>
-                            )}
-
-                            {filteredCategoryNames
-                              .filter((cat) => cat !== "ALL")
-                              .map((cat) => {
-                                const isSelected = categoryFilter === cat;
-                                const count = categoryCounts[cat] || 0;
-                                return (
-                                  <button
-                                    key={cat}
-                                    type="button"
-                                    onClick={() => {
-                                      setCategoryFilter(cat);
-                                      setIsCategoryDropdownOpen(false);
-                                      setCategorySearch("");
-                                    }}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-                                      isSelected
-                                        ? "bg-indigo-600 text-white"
-                                        : "text-slate-700 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-2 truncate">
-                                      <span
-                                        className={`h-2 w-2 rounded-full shrink-0 ${
-                                          isSelected ? "bg-white" : count > 0 ? "bg-indigo-500" : "bg-slate-300"
-                                        }`}
-                                      />
-                                      <span className="truncate">{cat}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                          isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                                        }`}
-                                      >
-                                        {count}
-                                      </span>
-                                      {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-
-                            {filteredCategoryNames.filter((cat) => cat !== "ALL").length === 0 &&
-                              categorySearch.trim() &&
-                              !"all categories".includes(categorySearch.toLowerCase().trim()) && (
-                                <div className="text-center py-4 text-xs text-slate-400 font-medium">
-                                  No categories matching &quot;{categorySearch}&quot;
-                                </div>
-                              )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Particular Book Filter Dropdown */}
-                    <div className="relative" ref={particularBookDropdownRef}>
-                      <button
-                        type="button"
-                        id="particular-book-filter-btn"
-                        onClick={() => setIsParticularBookDropdownOpen((prev) => !prev)}
-                        className={`h-10 flex items-center gap-2 px-3.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all shadow-2xs ${
-                          particularBookFilter !== "ALL"
-                            ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-500/10 font-bold"
-                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <BookMarked className={`h-4 w-4 shrink-0 ${particularBookFilter !== "ALL" ? "text-indigo-600" : "text-slate-400"}`} />
-                        <span className="truncate max-w-[120px] sm:max-w-[160px]">
-                          {selectedParticularBook ? selectedParticularBook.title : "All Books"}
-                        </span>
-                        {selectedParticularBook ? (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-200/80 text-indigo-800">
-                            {selectedParticularBook.available_copies}/{selectedParticularBook.total_copies}
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600">
-                            {books.length}
-                          </span>
-                        )}
-                        {particularBookFilter !== "ALL" && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setParticularBookFilter("ALL");
-                            }}
-                            className="p-0.5 rounded-md hover:bg-indigo-200 text-indigo-700 transition-colors"
-                            title="Reset to All Books"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </span>
-                        )}
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
-                            isParticularBookDropdownOpen ? "rotate-180 text-indigo-600" : ""
-                          }`}
-                        />
-                      </button>
-
-                      {/* Particular Book Dropdown Menu */}
-                      {isParticularBookDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-80 max-w-[92vw] bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                          <div className="relative mb-2 px-1">
-                            <Search className="absolute left-3.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                            <input
-                              type="text"
-                              value={particularBookSearch}
-                              onChange={(e) => setParticularBookSearch(e.target.value)}
-                              placeholder="Search particular book title/author..."
-                              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                              autoFocus
-                            />
-                            {particularBookSearch && (
-                              <button
-                                type="button"
-                                onClick={() => setParticularBookSearch("")}
-                                className="absolute right-3 top-2 text-slate-400 hover:text-slate-600"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                            {(!particularBookSearch.trim() || "all books".includes(particularBookSearch.toLowerCase().trim())) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setParticularBookFilter("ALL");
-                                  setIsParticularBookDropdownOpen(false);
-                                  setParticularBookSearch("");
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-                                  particularBookFilter === "ALL"
-                                    ? "bg-indigo-600 text-white"
-                                    : "text-slate-700 hover:bg-slate-100"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className={`h-3.5 w-3.5 ${particularBookFilter === "ALL" ? "text-white" : "text-indigo-500"}`} />
-                                  <span>All Books</span>
-                                </div>
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                    particularBookFilter === "ALL" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {books.length}
-                                </span>
-                              </button>
-                            )}
-
-                            {availableBooksForParticularDropdown.map((b) => {
-                              const isSelected = String(particularBookFilter) === String(b.id);
-                              return (
-                                <button
-                                  key={b.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setParticularBookFilter(String(b.id));
-                                    setIsParticularBookDropdownOpen(false);
-                                    setParticularBookSearch("");
-                                  }}
-                                  className={`w-full flex items-start justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
-                                    isSelected
-                                      ? "bg-indigo-600 text-white"
-                                      : "text-slate-700 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  <div className="truncate pr-2">
-                                    <div className="font-bold truncate">{b.title}</div>
-                                    <div className={`text-[10px] truncate ${isSelected ? "text-indigo-100" : "text-slate-400"}`}>
-                                      {b.author} • {b.category}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
-                                        isSelected
-                                          ? "bg-white/20 text-white"
-                                          : b.available_copies > 0
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                          : "bg-rose-50 text-rose-700 border border-rose-100"
-                                      }`}
-                                    >
-                                      Stock: {b.available_copies}
-                                    </span>
-                                    {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
-                                  </div>
-                                </button>
-                              );
-                            })}
-
-                            {availableBooksForParticularDropdown.length === 0 && (
-                              <div className="text-center py-4 text-xs text-slate-400 font-medium">
-                                No books found matching &quot;{particularBookSearch}&quot;
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Grid / Table View Switcher */}
-                    <div className="flex items-center h-10 bg-slate-100 p-1 rounded-xl border border-slate-200/80 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setCatalogViewMode("grid")}
-                        className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                          catalogViewMode === "grid"
-                            ? "bg-white text-indigo-700 shadow-xs"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                        title="Card Grid View"
-                      >
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Grid</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCatalogViewMode("table")}
-                        className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                          catalogViewMode === "table"
-                            ? "bg-white text-indigo-700 shadow-xs"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                        title="Detailed Table View"
-                      >
-                        <List className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Table</span>
-                      </button>
-                    </div>
-                  </div>
+              {/* Filter and Search Bar Directly on Top of Table Data */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+                {/* Search */}
+                <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCatalogPage(1);
+                    }}
+                    placeholder="Search by book title, author, or ISBN barcode…"
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                  />
                 </div>
 
-                {/* Active Filters Bar */}
-                {(categoryFilter !== "ALL" || particularBookFilter !== "ALL" || searchQuery) && (
-                  <div className="flex items-center flex-wrap gap-2 px-1 text-xs">
-                    <span className="text-slate-400 font-semibold text-[11px]">Active Filters:</span>
-                    {categoryFilter !== "ALL" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
-                        Category: {categoryFilter}
-                        <button type="button" onClick={() => setCategoryFilter("ALL")} className="hover:text-indigo-900">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-                    {particularBookFilter !== "ALL" && selectedParticularBook && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
-                        Book: {selectedParticularBook.title}
-                        <button type="button" onClick={() => setParticularBookFilter("ALL")} className="hover:text-indigo-900">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-                    {searchQuery && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-medium">
-                        Search: &quot;{searchQuery}&quot;
-                        <button type="button" onClick={() => setSearchQuery("")} className="hover:text-slate-900">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCategoryFilter("ALL");
-                        setParticularBookFilter("ALL");
-                        setSearchQuery("");
-                      }}
-                      className="text-[11px] font-bold text-rose-600 hover:underline ml-2"
-                    >
-                      Reset All Filters
-                    </button>
-                  </div>
-                )}
+                {/* Dropdown Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => {
+                      setCategoryFilter(e.target.value);
+                      setCatalogPage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  >
+                    <option value="ALL">All Categories</option>
+                    {categoryNames.filter((cat) => cat !== "ALL").map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
 
-                {/* Books Display: Table or Grid View */}
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
-                    <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-                    <p className="text-xs text-slate-500 mt-2 font-medium">Loading library catalogue...</p>
-                  </div>
-                ) : filteredBooks.length === 0 ? (
-                  <div className="text-center p-12 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <BookOpen className="h-10 w-10 text-slate-300 mx-auto" />
-                    <h3 className="text-base font-bold text-slate-800 mt-2">No books found</h3>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                      Try adjusting your search query, clearing filters, or register a new book to the catalogue.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setEditingBook(null);
-                        setBookFormErrors({});
-                        setBookForm({
-                          title: "",
-                          subtitle: "",
-                          isbn: "",
-                          author: "",
-                          category: "",
-                          category_ref: "",
-                          author_ref: "",
-                          publisher_ref: "",
-                          rack: "",
-                          shelf: "",
-                          edition: "",
-                          publication_year: new Date().getFullYear(),
-                          language: "English",
-                          pages: 200,
-                          price: 150,
-                          total_copies: 1,
-                          description: "",
-                        });
-                        setShowAddBookModal(true);
-                      }}
-                      className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Add New Book Now
-                    </Button>
-                  </div>
-                ) : catalogViewMode === "table" ? (
-                  /* ================= DETAILED TABLE VIEW ================= */
-                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                  <select
+                    value={authorFilter}
+                    onChange={(e) => {
+                      setAuthorFilter(e.target.value);
+                      setCatalogPage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  >
+                    <option value="ALL">All Authors</option>
+                    {authorNames.filter((auth) => auth !== "ALL").map((auth) => (
+                      <option key={auth} value={auth}>
+                        {auth}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={catalogPageSize}
+                    onChange={(e) => {
+                      setCatalogPageSize(Number(e.target.value));
+                      setCatalogPage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  >
+                    <option value={5}>5 per page</option>
+                    <option value={10}>10 per page</option>
+                    <option value={20}>20 per page</option>
+                    <option value={50}>50 per page</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Table Content */}
+              {loading ? (
+                <div className="py-12 flex flex-col items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                  <p className="text-xs text-slate-400 mt-2 font-medium">Loading library catalogue...</p>
+                </div>
+              ) : filteredBooks.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs">
+                  {searchQuery || categoryFilter !== "ALL" || authorFilter !== "ALL"
+                    ? "No books match your search or filter criteria."
+                    : "No books registered in the catalogue."}
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Full Data Table (Separate Columns, Single Row) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-500">
-                            <th className="py-3.5 px-4">Book Title &amp; Details</th>
+                            <th className="py-3.5 px-3 text-center w-12">#</th>
+                            <th className="py-3.5 px-4">Book Title</th>
+                            <th className="py-3.5 px-4">Author</th>
                             <th className="py-3.5 px-4">Category</th>
+                            <th className="py-3.5 px-4">ISBN / Code</th>
                             <th className="py-3.5 px-4">Storage Location</th>
-                            <th className="py-3.5 px-4">Stock Status</th>
+                            <th className="py-3.5 px-4 text-center">Stock (Avail / Total)</th>
+                            <th className="py-3.5 px-4 text-right">Price</th>
                             <th className="py-3.5 px-4 text-right">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredBooks.map((book) => (
-                            <tr key={book.id} className="hover:bg-slate-50/60 transition-colors group">
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {paginatedBooks.map((book, idx) => (
+                            <tr key={book.id} className="hover:bg-slate-50/70 transition-colors group">
+                              <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                {(catalogPage - 1) * catalogPageSize + idx + 1}
+                              </td>
                               <td className="py-3.5 px-4">
-                                <div className="flex items-start gap-3">
-                                  <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
                                     <BookOpen className="h-4 w-4" />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm">
+                                    <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm truncate max-w-xs">
                                       {toTitleCase(book.title)}
                                     </p>
-                                    <p className="text-[11px] text-slate-500">
-                                      by <span className="font-semibold text-slate-700">{toTitleCase(book.author)}</span>
-                                      {book.publication_year && <span> • {book.publication_year}</span>}
-                                      {book.isbn && <span className="font-mono text-slate-400"> • ISBN {book.isbn}</span>}
-                                    </p>
+                                    {book.subtitle && (
+                                      <p className="text-[10px] text-slate-400 truncate max-w-xs">{toTitleCase(book.subtitle)}</p>
+                                    )}
                                   </div>
                                 </div>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 font-semibold">
+                                {toTitleCase(book.author)}
                               </td>
                               <td className="py-3.5 px-4 whitespace-nowrap">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
                                   {toTitleCase(book.category) || "General"}
                                 </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap font-mono text-slate-600 text-xs">
+                                {book.isbn || "—"}
                               </td>
                               <td className="py-3.5 px-4 whitespace-nowrap">
                                 <div className="flex items-center gap-1.5 text-[11px]">
@@ -2640,35 +2682,33 @@ export default function LibrarianDashboard() {
                                   )}
                                 </div>
                               </td>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="space-y-1">
+                              <td className="py-3.5 px-4 whitespace-nowrap text-center">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                    book.available_copies > 0
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                                  }`}
+                                >
                                   <span
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                      book.available_copies > 0
-                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                                    className={`h-1.5 w-1.5 rounded-full ${
+                                      book.available_copies > 0 ? "bg-emerald-500" : "bg-rose-500"
                                     }`}
-                                  >
-                                    <span
-                                      className={`h-1.5 w-1.5 rounded-full ${
-                                        book.available_copies > 0 ? "bg-emerald-500" : "bg-rose-500"
-                                      }`}
-                                    />
-                                    {book.available_copies > 0 ? `${book.available_copies} Available` : "Checked Out"}
-                                  </span>
-                                  <div className="text-[10px] text-slate-400 font-medium">
-                                    {book.available_copies} of {book.total_copies} total copies
-                                  </div>
-                                </div>
+                                  />
+                                  {book.available_copies} / {book.total_copies}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-right font-bold text-slate-800 font-mono">
+                                ₹{Number(book.price || 0).toLocaleString("en-IN")}
                               </td>
                               <td className="py-3.5 px-4 whitespace-nowrap text-right">
-                                <div className="inline-flex items-center gap-1.5">
+                                <div className="inline-flex items-center gap-1.5 justify-end">
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleOpenCopies(book)}
                                     className="h-8 px-2.5 text-xs gap-1 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 font-bold rounded-lg"
-                                    title="Manage individual barcode copies"
+                                    title="Manage copies & barcodes"
                                   >
                                     <QrCode className="h-3.5 w-3.5 text-indigo-600" />
                                     <span>Copies ({book.total_copies})</span>
@@ -2691,8 +2731,7 @@ export default function LibrarianDashboard() {
                                       className="h-8 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg gap-1 shadow-xs"
                                       title={`Issue this book (${book.available_copies} copies available)`}
                                     >
-                                      <ArrowRightLeft className="h-3.5 w-3.5" />
-                                      <span>Issue</span>
+                                      <ArrowRightLeft className="h-3.5 w-3.5" /> Issue
                                     </Button>
                                   )}
 
@@ -2710,7 +2749,6 @@ export default function LibrarianDashboard() {
                                         category: toTitleCase(book.category),
                                         category_ref: book.category_ref ? String(book.category_ref) : "",
                                         author_ref: book.author_ref ? String(book.author_ref) : "",
-                                        publisher_ref: book.publisher_ref ? String(book.publisher_ref) : "",
                                         rack: book.rack ? String(book.rack) : "",
                                         shelf: book.shelf ? String(book.shelf) : "",
                                         edition: toTitleCase(book.edition || ""),
@@ -2724,16 +2762,16 @@ export default function LibrarianDashboard() {
                                       setShowAddBookModal(true);
                                     }}
                                     className="h-8 w-8 p-0 text-slate-500 hover:text-indigo-600 rounded-lg"
-                                    title="Edit Title"
+                                    title="Edit Book Details"
                                   >
                                     <Edit className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => handleDeleteBook(book.id)}
+                                    onClick={() => handleDeleteBook(book)}
                                     className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 rounded-lg"
-                                    title="Delete Title"
+                                    title="Delete Book"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
@@ -2744,467 +2782,361 @@ export default function LibrarianDashboard() {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                ) : (
-                  /* ================= MODERN CARD GRID VIEW ================= */
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredBooks.map((book) => (
-                      <div
-                        key={book.id}
-                        className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between overflow-hidden group relative"
-                      >
-                        {/* Top Accent Gradient Stripe */}
-                        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600" />
 
-                        <div className="p-4 sm:p-5 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold tracking-wide">
-                              {toTitleCase(book.category) || "General"}
-                            </span>
+                    {/* Mobile Single Row Compact View (Tap to Open Bottom Sheet) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {paginatedBooks.map((book) => (
+                        <div
+                          key={book.id}
+                          onClick={() => setSelectedMobileBook(book)}
+                          className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 text-sm truncate">
+                                {toTitleCase(book.title)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                              <span className="truncate">{toTitleCase(book.author)}</span>
+                              <span>•</span>
+                              <span className="text-indigo-600 font-semibold">{toTitleCase(book.category) || "General"}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 book.available_copies > 0
                                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : "bg-rose-50 text-rose-700 border border-rose-200"
                               }`}
                             >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  book.available_copies > 0 ? "bg-emerald-500" : "bg-rose-500"
-                                }`}
-                              />
-                              {book.available_copies > 0 ? `${book.available_copies} Available` : "Checked Out"}
+                              {book.available_copies > 0 ? `${book.available_copies}/${book.total_copies} Avail` : "Out of Stock"}
                             </span>
-                          </div>
-
-                          <div>
-                            <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                              {toTitleCase(book.title)}
-                            </h3>
-                            {book.subtitle && (
-                              <p className="text-xs text-slate-500 italic line-clamp-1 mt-0.5">{toTitleCase(book.subtitle)}</p>
-                            )}
-                            <p className="text-xs text-slate-600 font-semibold mt-1">By {toTitleCase(book.author)}</p>
-                          </div>
-
-                          {/* Rack / Shelf badges */}
-                          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                            {book.rack_code && (
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 font-medium">
-                                <MapPin className="h-3 w-3 text-amber-600" /> Rack {book.rack_code}
-                              </span>
-                            )}
-                            {book.shelf_code && (
-                              <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-2 py-0.5 rounded-md border border-sky-200 font-medium">
-                                Shelf {book.shelf_code}
-                              </span>
-                            )}
-                            {book.isbn && (
-                              <span className="text-slate-400 font-mono text-[10px]">ISBN {book.isbn}</span>
-                            )}
+                            <ChevronRight className="h-4 w-4 text-slate-400" />
                           </div>
                         </div>
+                      ))}
+                    </div>
 
-                        <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex items-center justify-between border-t border-slate-100">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenCopies(book)}
-                            className="text-xs gap-1.5 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 font-bold rounded-xl"
-                          >
-                            <QrCode className="h-3.5 w-3.5 text-indigo-600" /> Copies ({book.total_copies})
-                          </Button>
-
-                          <div className="flex items-center gap-1">
-                            {book.available_copies > 0 && (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setIssueForm({
-                                    book: String(book.id),
-                                    book_copy: "",
-                                    student: "",
-                                    due_date: "",
-                                  });
-                                  setSelectedStudentIds([]);
-                                  setIssueErrors({});
-                                  setShowIssueModal(true);
-                                }}
-                                className="h-8 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-lg border border-indigo-200/80 gap-1 transition-all"
-                                title={`Issue this book (${book.available_copies} copies available)`}
-                              >
-                                <ArrowRightLeft className="h-3.5 w-3.5 text-indigo-600" />
-                                <span>Issue</span>
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditingBook(book);
-                                setBookFormErrors({});
-                                setBookForm({
-                                  title: toTitleCase(book.title),
-                                  subtitle: toTitleCase(book.subtitle || ""),
-                                  isbn: book.isbn || "",
-                                  author: toTitleCase(book.author),
-                                  category: toTitleCase(book.category),
-                                  category_ref: book.category_ref ? String(book.category_ref) : "",
-                                  author_ref: book.author_ref ? String(book.author_ref) : "",
-                                  publisher_ref: book.publisher_ref ? String(book.publisher_ref) : "",
-                                  rack: book.rack ? String(book.rack) : "",
-                                  shelf: book.shelf ? String(book.shelf) : "",
-                                  edition: toTitleCase(book.edition || ""),
-                                  publication_year: book.publication_year || new Date().getFullYear(),
-                                  language: book.language || "English",
-                                  pages: book.pages || 200,
-                                  price: Number(book.price) || 0,
-                                  total_copies: book.total_copies,
-                                  description: book.description || "",
-                                });
-                                setShowAddBookModal(true);
-                              }}
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-indigo-600 rounded-lg"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteBook(book.id)}
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 rounded-lg"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Add New Book Placeholder Card to eliminate awkward blank space */}
-                    {!searchQuery && categoryFilter === "ALL" && particularBookFilter === "ALL" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingBook(null);
-                          setBookFormErrors({});
-                          setBookForm({
-                            title: "",
-                            subtitle: "",
-                            isbn: "",
-                            author: "",
-                            category: "",
-                            category_ref: "",
-                            author_ref: "",
-                            publisher_ref: "",
-                            rack: "",
-                            shelf: "",
-                            edition: "",
-                            publication_year: new Date().getFullYear(),
-                            language: "English",
-                            pages: 200,
-                            price: 150,
-                            total_copies: 1,
-                            description: "",
-                          });
-                          setShowAddBookModal(true);
-                        }}
-                        className="rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20 p-6 flex flex-col items-center justify-center text-center transition-all group min-h-[220px]"
-                      >
-                        <div className="h-11 w-11 rounded-2xl bg-white group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 shadow-2xs flex items-center justify-center transition-all mb-2">
-                          <Plus className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700">Add Another Book</span>
-                        <span className="text-xs text-slate-400 mt-1 max-w-[200px]">
-                          Register a new title, generate barcode copies and assign rack locations
-                        </span>
-                      </button>
-                    )}
-                  </div>
+                    {/* Superadmin Style Bottom Pagination */}
+                    <TablePagination
+                      currentPage={catalogPage}
+                      totalItems={filteredBooks.length}
+                      pageSize={catalogPageSize}
+                      onPageChange={setCatalogPage}
+                      onPageSizeChange={setCatalogPageSize}
+                      itemLabel="books"
+                    />
+                  </>
                 )}
               </div>
             )}
 
-        {/* TAB 2: ACTIVE CIRCULATION */}
+        {/* TAB 2: ACTIVE CIRCULATION (SUPERADMIN UNIFIED TABLE CARD) */}
         {activeTab === "circulation" && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-200/80 bg-white space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base">Active Book Loans Counter</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Currently circulating physical copies requiring return or renewal</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setIssueForm({ book: "", book_copy: "", student: "", due_date: "" });
-                      setSelectedStudentIds([]);
-                      setIssueCategoryFilter("ALL");
-                      setIssueBookSearch("");
-                      setIssueClassFilter("");
-                      setIssueDivisionFilter("");
-                      setStudentSearchQuery("");
-                      setStaffSearchQuery("");
-                      setIsStudentDropdownOpen(false);
-                      setIsStaffDropdownOpen(false);
-                      setShowIssueModal(true);
-                    }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 rounded-xl font-bold shadow-sm"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> New Issue Loan
-                  </Button>
-                </div>
-
-                {/* Circulation Search & Filters Toolbar */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 pt-1">
-                  {/* Search input */}
-                  <div className="md:col-span-5 relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input
-                      value={circulationSearch}
-                      onChange={(e) => setCirculationSearch(e.target.value)}
-                      placeholder="Search borrower, book title, accession no, GR..."
-                      className="pl-9 h-9 text-xs rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                    {circulationSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setCirculationSearch("")}
-                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Filter by Particular Book Dropdown */}
-                  <div className="md:col-span-4">
-                    <select
-                      value={circulationBookFilter}
-                      onChange={(e) => setCirculationBookFilter(e.target.value)}
-                      className={`w-full h-9 rounded-xl border px-3 text-xs font-semibold transition-colors ${
-                        circulationBookFilter !== "ALL"
-                          ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500/20"
-                          : "bg-slate-50 border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <option value="ALL">Filter by Book (All {uniqueActiveLoanBooks.length} titles)</option>
-                      {uniqueActiveLoanBooks.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title} ({b.count} loan{b.count > 1 ? "s" : ""})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Filter by Category Dropdown */}
-                  <div className="md:col-span-3">
-                    <select
-                      value={circulationCategoryFilter}
-                      onChange={(e) => setCirculationCategoryFilter(e.target.value)}
-                      className={`w-full h-9 rounded-xl border px-3 text-xs font-semibold transition-colors ${
-                        circulationCategoryFilter !== "ALL"
-                          ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500/20"
-                          : "bg-slate-50 border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <option value="ALL">Filter by Category (All)</option>
-                      {uniqueActiveLoanCategories.map((c) => (
-                        <option key={c.cat} value={c.cat}>
-                          {c.cat} ({c.count})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Filter Pills & Status Toggle */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => setCirculationStatusFilter("ALL")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        circulationStatusFilter === "ALL"
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      All ({activeLoans.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCirculationStatusFilter("OVERDUE")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        circulationStatusFilter === "OVERDUE"
-                          ? "bg-rose-600 text-white"
-                          : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                      }`}
-                    >
-                      Overdue ({activeLoans.filter((l) => new Date(l.due_date) < new Date()).length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCirculationStatusFilter("DUE_SOON")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        circulationStatusFilter === "DUE_SOON"
-                          ? "bg-amber-600 text-white"
-                          : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                      }`}
-                    >
-                      Due Soon (≤3d)
-                    </button>
-
-                    {(circulationSearch || circulationBookFilter !== "ALL" || circulationCategoryFilter !== "ALL" || circulationStatusFilter !== "ALL") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCirculationSearch("");
-                          setCirculationBookFilter("ALL");
-                          setCirculationCategoryFilter("ALL");
-                          setCirculationStatusFilter("ALL");
-                        }}
-                        className="text-rose-600 font-bold hover:underline ml-2"
-                      >
-                        Reset Filters
-                      </button>
-                    )}
-                  </div>
-
-                  <span className="text-[11px] font-semibold text-slate-400">
-                    Showing {filteredActiveLoans.length} of {activeLoans.length} active loan{activeLoans.length === 1 ? "" : "s"}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+            {/* Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                    <ArrowRightLeft className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">Active Book Loans Counter</h3>
+                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                    {filteredActiveLoans.length} {filteredActiveLoans.length === 1 ? "Loan" : "Loans"}
                   </span>
                 </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Currently circulating physical copies requiring return or renewal
+                </p>
               </div>
 
-              {activeLoans.length === 0 ? (
-                <div className="text-center p-12">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-800 mt-2">All books are safely in the library!</p>
-                  <p className="text-xs text-slate-400 mt-1">No active loans outstanding.</p>
-                </div>
-              ) : filteredActiveLoans.length === 0 ? (
-                <div className="text-center p-12">
-                  <AlertCircle className="h-8 w-8 text-slate-300 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-800 mt-2">No active loans match the selected filters</p>
-                  <p className="text-xs text-slate-400 mt-1">Try clearing or changing your search criteria.</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setCirculationSearch("");
-                      setCirculationBookFilter("ALL");
-                      setCirculationCategoryFilter("ALL");
-                      setCirculationStatusFilter("ALL");
-                    }}
-                    className="mt-3 text-xs"
-                  >
-                    Reset All Filters
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50/90 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Book Title</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Accession No</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Borrower</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Issued Date</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Due Date</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap">Renewals</th>
-                        <th className="px-4 py-3.5 whitespace-nowrap text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredActiveLoans.map((loan) => {
-                        const isOverdue = new Date(loan.due_date) < new Date();
-                        return (
-                          <tr key={loan.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                                  <BookOpen className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setIssueForm({ book: "", book_copy: "", student: "", due_date: "" });
+                    setSelectedStudentIds([]);
+                    setIssueCategoryFilter("ALL");
+                    setIssueBookSearch("");
+                    setIssueClassFilter("");
+                    setIssueDivisionFilter("");
+                    setStudentSearchQuery("");
+                    setStaffSearchQuery("");
+                    setIsStudentDropdownOpen(false);
+                    setIsStaffDropdownOpen(false);
+                    setShowIssueModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New Issue Loan
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={loadAllData}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                  title="Reload loans"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar Directly on Top of Table Data */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+              {/* Search */}
+              <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={circulationSearch}
+                  onChange={(e) => {
+                    setCirculationSearch(e.target.value);
+                    setCirculationPage(1);
+                  }}
+                  placeholder="Search borrower, book title, accession no, GR…"
+                  className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                />
+              </div>
+
+              {/* Dropdown Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={circulationStatusFilter}
+                  onChange={(e) => {
+                    setCirculationStatusFilter(e.target.value as "ALL" | "OVERDUE" | "DUE_SOON");
+                    setCirculationPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="OVERDUE">Overdue Only</option>
+                  <option value="DUE_SOON">Due Soon (≤3d)</option>
+                </select>
+
+                <select
+                  value={circulationBookFilter}
+                  onChange={(e) => {
+                    setCirculationBookFilter(e.target.value);
+                    setCirculationPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[180px] truncate"
+                >
+                  <option value="ALL">All Books</option>
+                  {uniqueActiveLoanBooks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={circulationCategoryFilter}
+                  onChange={(e) => {
+                    setCirculationCategoryFilter(e.target.value);
+                    setCirculationPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
+                >
+                  <option value="ALL">All Categories</option>
+                  {uniqueActiveLoanCategories.map((c) => (
+                    <option key={c.cat} value={c.cat}>
+                      {c.cat}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={circulationPageSize}
+                  onChange={(e) => {
+                    setCirculationPageSize(Number(e.target.value));
+                    setCirculationPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value={5}>5 per page</option>
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table Content */}
+            {activeLoans.length === 0 ? (
+              <div className="text-center p-12">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                <p className="text-sm font-semibold text-slate-800 mt-2">All books are safely in the library!</p>
+                <p className="text-xs text-slate-400 mt-1">No active loans outstanding.</p>
+              </div>
+            ) : filteredActiveLoans.length === 0 ? (
+              <div className="text-center p-12">
+                <AlertCircle className="h-8 w-8 text-slate-300 mx-auto" />
+                <p className="text-sm font-semibold text-slate-800 mt-2">No active loans match the selected filters</p>
+                <p className="text-xs text-slate-400 mt-1">Try clearing or changing your search criteria.</p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop Full Circulation Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50/90 text-slate-600 text-[11px] font-black uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-3.5 px-3 text-center w-12">#</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Book Title</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Borrower Name</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Borrower ID / GR</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Accession No</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Issued Date</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Due Date</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap text-center">Renewals</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {paginatedActiveLoans.map((loan, idx) => {
+                          const isOverdue = new Date(loan.due_date) < new Date();
+                          return (
+                            <tr key={loan.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                {(circulationPage - 1) * circulationPageSize + idx + 1}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                    <BookOpen className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="font-bold text-slate-900 text-sm">{toTitleCase(loan.book_title)}</span>
                                 </div>
-                                <span className="font-bold text-slate-900 text-sm">{toTitleCase(loan.book_title)}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <span className="font-mono text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
-                                {loan.accession_no || `BC-${loan.book}`}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-slate-800">{toTitleCase(loan.staff_name || loan.student_name || "Unknown")}</span>
-                                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800">
+                                {toTitleCase(loan.staff_name || loan.student_name || "Unknown")}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
                                   {loan.staff ? `Staff #${loan.staff}` : `GR: ${loan.student_gr_no || "N/A"}`}
                                 </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-700 text-xs">
-                              {new Date(loan.book_issued_date).toLocaleDateString("en-GB")}
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <div className={`inline-flex items-center gap-1.5 font-bold text-xs ${isOverdue ? "text-rose-600" : "text-slate-700"}`}>
-                                <span>{new Date(loan.due_date).toLocaleDateString("en-GB")}</span>
-                                {isOverdue && (
-                                  <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.5 rounded-full uppercase border border-rose-200">Overdue</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
-                              <span className="bg-slate-100 px-2.5 py-1 rounded-md text-xs font-mono font-medium border border-slate-200">
-                                {loan.renewal_count || 0} / {librarySettings?.max_renewal_count || 2}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-200">
+                                  {loan.accession_no || `BC-${loan.book}`}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-700 text-xs">
+                                {new Date(loan.book_issued_date).toLocaleDateString("en-GB")}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className={`inline-flex items-center gap-1.5 font-bold text-xs ${isOverdue ? "text-rose-600" : "text-slate-700"}`}>
+                                  <span>{new Date(loan.due_date).toLocaleDateString("en-GB")}</span>
+                                  {isOverdue && (
+                                    <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.5 rounded-full uppercase border border-rose-200">Overdue</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-center text-slate-600">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs font-mono font-medium border border-slate-200">
+                                  {loan.renewal_count || 0} / {librarySettings?.max_renewal_count || 2}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleRenewBook(loan.id)}
+                                    disabled={actionLoading}
+                                    className="text-xs h-8 border-slate-200 hover:bg-slate-50 font-bold rounded-lg"
+                                  >
+                                    <RotateCcw className="h-3 w-3 mr-1 text-blue-600" /> Renew
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setShowReturnModal(loan);
+                                      setReturnForm({
+                                        condition: "GOOD",
+                                        remarks: "",
+                                        damage_fee: Number(librarySettings?.damage_penalty || 50),
+                                        lost_fee: Number(librarySettings?.lost_penalty || 100),
+                                        pay_now: true,
+                                        payment_method: "Cash",
+                                      });
+                                    }}
+                                    className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Return
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleMarkLost(loan.id, loan.book_title)}
+                                    className="text-xs h-8 text-rose-600 hover:bg-rose-50 font-bold rounded-lg"
+                                  >
+                                    Lost
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Single Row Compact View */}
+                  <div className="divide-y divide-slate-100 block md:hidden">
+                    {paginatedActiveLoans.map((loan) => {
+                      const isOverdue = new Date(loan.due_date) < new Date();
+                      return (
+                        <div
+                          key={loan.id}
+                          onClick={() => setSelectedMobileLoan(loan)}
+                          className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-slate-900 text-sm truncate block">
+                              {toTitleCase(loan.book_title)}
+                            </span>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                              <span className="truncate">{toTitleCase(loan.staff_name || loan.student_name || "Unknown")}</span>
+                              <span>•</span>
+                              <span className="font-mono text-[11px] text-slate-600">
+                                {loan.staff ? `Staff #${loan.staff}` : `GR: ${loan.student_gr_no || "N/A"}`}
                               </span>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRenewBook(loan.id)}
-                                  disabled={actionLoading}
-                                  className="text-xs h-8 border-slate-200 hover:bg-slate-50 font-bold rounded-lg"
-                                >
-                                  <RotateCcw className="h-3 w-3 mr-1 text-blue-600" /> Renew
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setShowReturnModal(loan);
-                                    setReturnForm({
-                                      condition: "GOOD",
-                                      remarks: "",
-                                      damage_fee: Number(librarySettings?.damage_penalty || 50),
-                                      lost_fee: Number(librarySettings?.lost_penalty || 100),
-                                      pay_now: false,
-                                      payment_method: "CASH",
-                                    });
-                                  }}
-                                  className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs"
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-1" /> Return
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleMarkLost(loan.id)}
-                                  className="text-xs h-8 text-rose-600 hover:bg-rose-50 font-bold rounded-lg"
-                                >
-                                  Lost
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isOverdue
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                              }`}
+                            >
+                              {isOverdue ? "Overdue" : `Due: ${new Date(loan.due_date).toLocaleDateString("en-GB")}`}
+                            </span>
+                            <ChevronRight className="h-4 w-4 text-slate-400" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Superadmin Style Bottom Pagination */}
+                  <TablePagination
+                    currentPage={circulationPage}
+                    totalItems={filteredActiveLoans.length}
+                    pageSize={circulationPageSize}
+                    onPageChange={setCirculationPage}
+                    onPageSizeChange={setCirculationPageSize}
+                    itemLabel="active loans"
+                  />
+                </>
               )}
-            </div>
           </div>
         )}
 
@@ -3686,13 +3618,72 @@ export default function LibrarianDashboard() {
               </div>
             )}
 
-            {/* List of All Students with Pending Dues across school */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-5">
-              <div>
-                <h3 className="font-bold text-slate-900">Students with Outstanding Library Dues</h3>
-                <p className="text-xs text-slate-500">
-                  {pendingClearanceList.length} students currently cannot receive clearance / TC
-                </p>
+            {/* List of All Students with Pending Dues across school (SUPERADMIN UNIFIED TABLE CARD) */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              {/* Header Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 shadow-2xs">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Students with Outstanding Library Dues</h3>
+                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200/60">
+                      {filteredPendingClearanceList.length} {filteredPendingClearanceList.length === 1 ? "Student" : "Students"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Students with unreturned books or pending library fines requiring settlement
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadAllData}
+                    disabled={loading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                    title="Reload dues list"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Filter and Search Bar Directly on Top of Table Data */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+                {/* Search */}
+                <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={clearanceTableSearch}
+                    onChange={(e) => {
+                      setClearanceTableSearch(e.target.value);
+                      setClearancePage(1);
+                    }}
+                    placeholder="Search by student name, GR No, or class…"
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                  />
+                </div>
+
+                {/* Dropdown Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={clearancePageSize}
+                    onChange={(e) => {
+                      setClearancePageSize(Number(e.target.value));
+                      setClearancePage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  >
+                    <option value={5}>5 per page</option>
+                    <option value={10}>10 per page</option>
+                    <option value={20}>20 per page</option>
+                    <option value={50}>50 per page</option>
+                  </select>
+                </div>
               </div>
 
               {pendingClearanceList.length === 0 ? (
@@ -3701,130 +3692,328 @@ export default function LibrarianDashboard() {
                   <p className="text-sm font-semibold text-slate-800 mt-2">All students are 100% cleared!</p>
                   <p className="text-xs text-slate-400 mt-1">No unreturned books or pending fines in the system.</p>
                 </div>
+              ) : filteredPendingClearanceList.length === 0 ? (
+                <div className="text-center p-8 text-xs text-slate-400">
+                  <Search className="h-6 w-6 text-slate-300 mx-auto mb-1" />
+                  No students match "{clearanceTableSearch}"
+                </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3 whitespace-nowrap">Student Name</th>
-                        <th className="px-4 py-3 whitespace-nowrap">GR No</th>
-                        <th className="px-4 py-3 whitespace-nowrap">Class</th>
-                        <th className="px-4 py-3 whitespace-nowrap">Unreturned Books</th>
-                        <th className="px-4 py-3 whitespace-nowrap">Fine Due (₹)</th>
-                        <th className="px-4 py-3 whitespace-nowrap text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {pendingClearanceList.map((st) => (
-                        <tr key={st.student_id} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-900">{st.student_name}</td>
-                          <td className="px-4 py-3 whitespace-nowrap font-mono text-slate-600">{st.gr_no || "N/A"}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-slate-600">{st.class_name || "N/A"}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {st.active_books_count > 0 ? (
-                              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold font-mono">
-                                {st.active_books_count} book(s)
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-rose-600">
-                            {Number(st.pending_fine_total) > 0 ? `₹${st.pending_fine_total}` : "₹0"}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSearchStudentClearance(st.student_id)}
-                              className="h-7 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                            >
-                              View Desk
-                            </Button>
-                          </td>
+                <div>
+                  {/* Desktop Clearance Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200 text-[11px]">
+                        <tr>
+                          <th className="py-3 px-3 text-center w-12">#</th>
+                          <th className="px-4 py-3 whitespace-nowrap">Student Name</th>
+                          <th className="px-4 py-3 whitespace-nowrap">GR No</th>
+                          <th className="px-4 py-3 whitespace-nowrap">Class</th>
+                          <th className="px-4 py-3 whitespace-nowrap">Unreturned Books</th>
+                          <th className="px-4 py-3 whitespace-nowrap">Fine Due (₹)</th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {paginatedClearance.map((st, idx) => (
+                          <tr key={st.student_id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">
+                              {(clearancePage - 1) * clearancePageSize + idx + 1}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-900">{st.student_name}</td>
+                            <td className="px-4 py-3 whitespace-nowrap font-mono text-slate-600">{st.gr_no || "N/A"}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-slate-600">{st.class_name || "N/A"}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {st.active_books_count > 0 ? (
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold font-mono">
+                                  {st.active_books_count} book(s)
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">0</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-rose-600">
+                              {Number(st.pending_fine_total) > 0 ? `₹${st.pending_fine_total}` : "₹0"}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSearchStudentClearance(st.student_id)}
+                                className="h-7 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold rounded-lg"
+                              >
+                                View Desk
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Single Row View */}
+                  <div className="divide-y divide-slate-100 block md:hidden">
+                    {paginatedClearance.map((st) => (
+                      <div
+                        key={st.student_id}
+                        onClick={() => setSelectedMobileClearance(st)}
+                        className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-slate-900 text-sm truncate block">
+                            {st.student_name}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                            <span>GR: {st.gr_no || "N/A"}</span>
+                            <span>•</span>
+                            <span>{st.class_name || "General"}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            Due: ₹{st.pending_fine_total || 0}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Superadmin Style Bottom Pagination */}
+                  <TablePagination
+                    currentPage={clearancePage}
+                    totalItems={filteredPendingClearanceList.length}
+                    pageSize={clearancePageSize}
+                    onPageChange={setClearancePage}
+                    onPageSizeChange={setClearancePageSize}
+                    itemLabel="students"
+                  />
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* TAB 3: RESERVATIONS QUEUE */}
+        {/* TAB 3: RESERVATIONS QUEUE (SUPERADMIN UNIFIED TABLE CARD) */}
         {activeTab === "reservations" && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-                <div>
-                  <h3 className="font-bold text-slate-900">Student Reservation Waiting Queue</h3>
-                  <p className="text-xs text-slate-500">
-                    When a book has 0 available copies, students can place a hold. Holds expire after 48h if uncollected.
-                  </p>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+            {/* Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                    <BookmarkPlus className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">Book Reservations Queue</h3>
+                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                    {filteredReservations.length} {filteredReservations.length === 1 ? "Reservation" : "Reservations"}
+                  </span>
                 </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Student waitlist holds for out-of-stock titles; holds expire automatically after 48h
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleSweepHoldExpiries}
                   disabled={actionLoading}
-                  className="text-xs border-amber-200 text-amber-700 hover:bg-amber-50 gap-1.5 self-start sm:self-auto"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs cursor-pointer"
                 >
                   <Clock className="h-3.5 w-3.5" /> Sweep Expired Holds (48h)
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={loadAllData}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                  title="Reload reservations"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar Directly on Top of Table Data */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+              <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={reservationsSearch}
+                  onChange={(e) => {
+                    setReservationsSearch(e.target.value);
+                    setReservationsPage(1);
+                  }}
+                  placeholder="Search reservation by book title, student name, or GR…"
+                  className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                />
               </div>
 
-              {reservations.length === 0 ? (
-                <div className="text-center p-12">
-                  <BookmarkPlus className="h-8 w-8 text-slate-300 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700 mt-2">No active book reservations.</p>
-                </div>
-              ) : (
-                <div className="mt-4 divide-y divide-slate-100">
-                  {reservations.map((res) => (
-                    <div key={res.id} className="py-3 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{res.book_title}</span>
-                          <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full font-semibold">
-                            Queue Rank #{res.queue_number}
-                          </span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                              res.status === "AVAILABLE"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : res.status === "WAITING"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {res.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          Student: <span className="font-medium text-slate-700">{res.student_name}</span> (GR: {res.student_gr_no}) • Reserved on:{" "}
-                          {new Date(res.reservation_date).toLocaleDateString()}
-                          {res.expiry_date && ` • Expires: ${new Date(res.expiry_date).toLocaleDateString()}`}
-                        </p>
-                      </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={reservationsStatusFilter}
+                  onChange={(e) => {
+                    setReservationsStatusFilter(e.target.value);
+                    setReservationsPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="WAITING">Waiting Queue</option>
+                  <option value="AVAILABLE">Available / Ready</option>
+                  <option value="FULFILLED">Fulfilled</option>
+                  <option value="CANCELLED">Cancelled</option>
+                  <option value="EXPIRED">Expired</option>
+                </select>
 
-                      <div className="flex items-center gap-2">
-                        {res.status === "WAITING" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCancelReservation(res.id)}
-                            className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
-                          >
-                            Cancel
-                          </Button>
-                        )}
+                <select
+                  value={reservationsPageSize}
+                  onChange={(e) => {
+                    setReservationsPageSize(Number(e.target.value));
+                    setReservationsPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value={5}>5 per page</option>
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table Content */}
+            {reservations.length === 0 ? (
+              <div className="text-center p-12">
+                <BookmarkPlus className="h-8 w-8 text-slate-300 mx-auto" />
+                <p className="text-sm font-semibold text-slate-700 mt-2">No active book reservations.</p>
+              </div>
+            ) : filteredReservations.length === 0 ? (
+              <div className="text-center p-12 text-slate-400 text-xs">
+                No reservations match your search or filter criteria.
+              </div>
+            ) : (
+              <>
+                {/* Desktop Full Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <th className="p-4 text-center w-12">#</th>
+                        <th className="p-4 whitespace-nowrap">Book Title</th>
+                        <th className="p-4 whitespace-nowrap">Student Name</th>
+                        <th className="p-4 whitespace-nowrap">GR No</th>
+                        <th className="p-4 whitespace-nowrap text-center">Queue Rank</th>
+                        <th className="p-4 whitespace-nowrap">Reserved Date</th>
+                        <th className="p-4 whitespace-nowrap">Expiry Date</th>
+                        <th className="p-4 whitespace-nowrap text-center">Status</th>
+                        <th className="p-4 whitespace-nowrap text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {paginatedReservations.map((res, idx) => (
+                        <tr key={res.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="p-4 text-center text-slate-400 font-mono text-[11px]">
+                            {(reservationsPage - 1) * reservationsPageSize + idx + 1}
+                          </td>
+                          <td className="p-4 whitespace-nowrap font-bold text-slate-900">
+                            {toTitleCase(res.book_title)}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-slate-800 font-semibold">
+                            {toTitleCase(res.student_name)}
+                          </td>
+                          <td className="p-4 whitespace-nowrap font-mono text-slate-600">
+                            {res.student_gr_no || "N/A"}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-center">
+                            <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                              Rank #{res.queue_number}
+                            </span>
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-slate-600">
+                            {new Date(res.reservation_date).toLocaleDateString("en-GB")}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-slate-600">
+                            {res.expiry_date ? new Date(res.expiry_date).toLocaleDateString("en-GB") : "—"}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-center">
+                            <span
+                              className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                res.status === "AVAILABLE"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : res.status === "WAITING"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {res.status}
+                            </span>
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-right">
+                            {res.status === "WAITING" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelReservation(res.id, res.book_title)}
+                                className="text-xs h-7 text-rose-600 border-rose-200 hover:bg-rose-50 font-bold rounded-lg cursor-pointer"
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Single Row View */}
+                <div className="divide-y divide-slate-100 block md:hidden">
+                  {paginatedReservations.map((res) => (
+                    <div
+                      key={res.id}
+                      onClick={() => setSelectedMobileReservation(res)}
+                      className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-slate-900 text-sm truncate block">
+                          {toTitleCase(res.book_title)}
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                          <span>{toTitleCase(res.student_name)}</span>
+                          <span>•</span>
+                          <span className="font-mono text-[11px]">Rank #{res.queue_number}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            res.status === "AVAILABLE"
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-amber-50 text-amber-800 border border-amber-200"
+                          }`}
+                        >
+                          {res.status}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+
+                {/* Superadmin Style Bottom Pagination */}
+                <TablePagination
+                  currentPage={reservationsPage}
+                  totalItems={filteredReservations.length}
+                  pageSize={reservationsPageSize}
+                  onPageChange={setReservationsPage}
+                  onPageSizeChange={setReservationsPageSize}
+                  itemLabel="reservations"
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -4056,7 +4245,13 @@ export default function LibrarianDashboard() {
                   </div>
                   {overdueAndLate && (
                     <div className="px-3 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-semibold">
-                      Historical Late Return Rate: {Number(overdueAndLate.historical_late_rate || 0).toFixed(1)}%
+                      Historical Late Return Rate: {(() => {
+                        const raw = typeof overdueAndLate.historical_late_rate === "object"
+                          ? overdueAndLate.historical_late_rate?.late_rate_percent
+                          : overdueAndLate.historical_late_rate;
+                        const num = Number(raw);
+                        return isNaN(num) ? "0.0" : num.toFixed(1);
+                      })()}%
                     </div>
                   )}
                 </div>
@@ -4075,40 +4270,70 @@ export default function LibrarianDashboard() {
                           <th className="px-4 py-3">Borrower</th>
                           <th className="px-4 py-3">Due Date</th>
                           <th className="px-4 py-3">Days Overdue</th>
+                          <th className="px-4 py-3">Accrued Due Penalty (₹)</th>
                           <th className="px-4 py-3 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {overdueAndLate.currently_overdue.map((item: any) => (
-                          <tr key={item.loan_id} className="hover:bg-slate-50/50">
-                            <td className="px-4 py-3 font-semibold text-slate-900">{item.book_title}</td>
-                            <td className="px-4 py-3 text-slate-700">{item.borrower_name}</td>
-                            <td className="px-4 py-3 text-rose-600 font-mono">{new Date(item.due_date).toLocaleDateString()}</td>
-                            <td className="px-4 py-3 font-bold text-rose-700">+{item.days_overdue} days</td>
-                            <td className="px-4 py-3 text-right">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  const loan = issuedRecords.find((r) => r.id === item.loan_id);
-                                  if (loan) {
-                                    setShowReturnModal(loan);
-                                    setReturnForm({
-                                      condition: "GOOD",
-                                      remarks: "",
-                                      damage_fee: 0,
-                                      lost_fee: 0,
-                                      pay_now: false,
-                                      payment_method: "Cash",
-                                    });
-                                  }
-                                }}
-                                className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                              >
-                                Process Return
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                        {overdueAndLate.currently_overdue.map((item: any) => {
+                          const matchingLoan = issuedRecords.find((r) => r.id === item.loan_id);
+                          const borrowerName =
+                            item.borrower_name ||
+                            item.student_name ||
+                            matchingLoan?.student_name ||
+                            matchingLoan?.staff_name ||
+                            (matchingLoan?.student_gr_no ? `GR: ${matchingLoan.student_gr_no}` : "") ||
+                            (item.student_id ? `Student #${item.student_id}` : "Borrower");
+
+                          const accruedPenalty = item.due_penalty !== undefined && item.due_penalty !== null
+                            ? Number(item.due_penalty)
+                            : (Number(item.days_overdue || 0) * (Number(librarySettings?.fine_per_day) || 2));
+
+                          return (
+                            <tr key={item.loan_id} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 font-semibold text-slate-900">{item.book_title}</td>
+                              <td className="px-4 py-3 text-slate-700 font-medium">
+                                <div>{toTitleCase(borrowerName)}</div>
+                                {(item.borrower_gr || item.borrower_class) && (
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    {item.borrower_gr ? `GR: ${item.borrower_gr}` : ""} {item.borrower_class ? `• ${item.borrower_class}` : ""}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-rose-600 font-mono">{new Date(item.due_date).toLocaleDateString()}</td>
+                              <td className="px-4 py-3 font-bold text-rose-700">+{item.days_overdue} days</td>
+                              <td className="px-4 py-3 font-mono">
+                                <span className="font-bold text-rose-700 text-sm">₹{accruedPenalty.toFixed(2)}</span>
+                                <span className="text-[10px] text-slate-400 block font-sans">
+                                  +{item.days_overdue}d @ ₹{item.per_day_fee || librarySettings?.fine_per_day || 2}/day
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    const loan = matchingLoan || issuedRecords.find((r) => r.id === item.loan_id);
+                                    if (loan) {
+                                      setReturnError("");
+                                      setShowReturnModal(loan);
+                                      setReturnForm({
+                                        condition: "GOOD",
+                                        remarks: "",
+                                        damage_fee: Number(librarySettings?.damage_penalty || 50),
+                                        lost_fee: Number(librarySettings?.lost_penalty || 100),
+                                        pay_now: true,
+                                        payment_method: "Cash",
+                                      });
+                                    }
+                                  }}
+                                  className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                                >
+                                  Process Return
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -4116,43 +4341,310 @@ export default function LibrarianDashboard() {
               </div>
             )}
 
-            {/* Sub-tab 5: Fee Collection */}
+            {/* Sub-tab 5: Fee Collection & Dues Analysis (Organized in Separate Tables) */}
             {reportsSubTab === "fees" && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-900">Fine Revenue & Late Fee Collection</h3>
-                    <p className="text-xs text-slate-500">Collected fines across all time</p>
+              <div className="space-y-5">
+                {/* 4 Financial KPI Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Settled Revenue</div>
+                    <div className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">
+                      ₹{Number(feeCollection?.total_fees_collected || 0).toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Fines collected & cleared</div>
                   </div>
-                  {feeCollection && (
-                    <div className="text-xl font-bold text-purple-700">
-                      Total: ₹{feeCollection.total_fees_collected || 0}
+
+                  <div className="bg-white p-4 rounded-2xl border border-rose-200 bg-rose-50/20 shadow-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-rose-500">Unsettled Due Penalties</div>
+                    <div className="text-xl sm:text-2xl font-black text-rose-600 mt-1">
+                      ₹{Number(feeCollection?.total_pending_dues || 0).toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Awaiting borrower payment</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Damage Costs Assessed</div>
+                    <div className="text-xl sm:text-2xl font-black text-amber-700 mt-1">
+                      ₹{Number(feeCollection?.total_damage_collected || 0).toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Physical book repair fees</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-indigo-200 bg-indigo-50/20 shadow-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-500">Late Fees Settled</div>
+                    <div className="text-xl sm:text-2xl font-black text-indigo-700 mt-1">
+                      ₹{Number(feeCollection?.total_late_collected || 0).toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Overdue delay settlements</div>
+                  </div>
+                </div>
+
+                {/* Main Unified Table Container with Organized Sub-Tab Switcher */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* Sub-navigation buttons */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFeeReportSubView("dues")}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                          feeReportSubView === "dues"
+                            ? "bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20"
+                            : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Pending Due Penalties ({(feeCollection?.pending_dues || []).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFeeReportSubView("damage")}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                          feeReportSubView === "damage"
+                            ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20"
+                            : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Damage &amp; Lost Cost Audit ({(feeCollection?.damage_records || []).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFeeReportSubView("collected")}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                          feeReportSubView === "collected"
+                            ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                            : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Monthly Trends &amp; Revenue Ledger
+                      </button>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={loadReportsData}
+                      disabled={reportsLoading}
+                      className="text-xs h-8 bg-white border-slate-200"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1 ${reportsLoading ? "animate-spin" : ""}`} /> Refresh
+                    </Button>
+                  </div>
+
+                  {/* TABLE 1: Outstanding Due Penalties */}
+                  {feeReportSubView === "dues" && (
+                    <div>
+                      {(!feeCollection?.pending_dues || feeCollection.pending_dues.length === 0) ? (
+                        <div className="text-center p-10">
+                          <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                          <p className="text-sm font-bold text-slate-800 mt-2">Zero Pending Due Penalties!</p>
+                          <p className="text-xs text-slate-400 mt-0.5">All assessed library fines and damages have been settled.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                              <tr>
+                                <th className="px-4 py-3">#</th>
+                                <th className="px-4 py-3">Borrower Name</th>
+                                <th className="px-4 py-3">Role / Class</th>
+                                <th className="px-4 py-3">Book Title</th>
+                                <th className="px-4 py-3">Return Date</th>
+                                <th className="px-4 py-3">Late Penalty</th>
+                                <th className="px-4 py-3">Damage Cost</th>
+                                <th className="px-4 py-3">Lost Cost</th>
+                                <th className="px-4 py-3">Total Due</th>
+                                <th className="px-4 py-3 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {feeCollection.pending_dues.map((due: any, idx: number) => {
+                                const matchingLoan = issuedRecords.find((r) => r.id === due.id);
+                                return (
+                                  <tr key={due.id} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
+                                    <td className="px-4 py-3 font-bold text-slate-900">{toTitleCase(due.borrower_name)}</td>
+                                    <td className="px-4 py-3 text-slate-600 font-mono">
+                                      {due.borrower_gr ? `GR: ${due.borrower_gr}` : ""} {due.borrower_class ? `(${due.borrower_class})` : ""}
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-slate-800">{due.book_title}</td>
+                                    <td className="px-4 py-3 text-slate-500">
+                                      {due.return_date ? new Date(due.return_date).toLocaleDateString() : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 font-mono text-slate-700">₹{Number(due.late_fees || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-3 font-mono text-amber-700">₹{Number(due.damage_fees || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-3 font-mono text-rose-700">₹{Number(due.lost_fees || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-3 font-mono font-bold text-rose-600">
+                                      <span className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200">
+                                        ₹{Number(due.fine_remaining || due.total_fine || 0).toFixed(2)}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          const rec = matchingLoan || due;
+                                          handleOpenPayFine(rec);
+                                        }}
+                                        className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
+                                      >
+                                        <CreditCard className="h-3 w-3" /> Collect Fine
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TABLE 2: Physical Damage & Lost Cost Audit */}
+                  {feeReportSubView === "damage" && (
+                    <div>
+                      {(!feeCollection?.damage_records || feeCollection.damage_records.length === 0) ? (
+                        <div className="text-center p-10">
+                          <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                          <p className="text-sm font-bold text-slate-800 mt-2">Zero Damaged or Lost Book Records!</p>
+                          <p className="text-xs text-slate-400 mt-0.5">All returned inventory books are in good condition.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                              <tr>
+                                <th className="px-4 py-3">#</th>
+                                <th className="px-4 py-3">Book Title</th>
+                                <th className="px-4 py-3">Accession No</th>
+                                <th className="px-4 py-3">Borrower</th>
+                                <th className="px-4 py-3">Condition on Return</th>
+                                <th className="px-4 py-3">Damage Cost (₹)</th>
+                                <th className="px-4 py-3">Lost Cost (₹)</th>
+                                <th className="px-4 py-3">Total Penalty (₹)</th>
+                                <th className="px-4 py-3">Payment Status</th>
+                                <th className="px-4 py-3 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {feeCollection.damage_records.map((rec: any, idx: number) => {
+                                const matchingLoan = issuedRecords.find((r) => r.id === rec.id);
+                                return (
+                                  <tr key={rec.id} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
+                                    <td className="px-4 py-3 font-semibold text-slate-900">{rec.book_title}</td>
+                                    <td className="px-4 py-3 font-mono text-slate-600">{rec.accession_no || "—"}</td>
+                                    <td className="px-4 py-3 text-slate-700 font-medium">
+                                      {toTitleCase(rec.borrower_name)} {rec.borrower_gr ? `(GR: ${rec.borrower_gr})` : ""}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          rec.condition === "LOST"
+                                            ? "bg-rose-50 text-rose-700 border-rose-200"
+                                            : "bg-amber-50 text-amber-700 border-amber-200"
+                                        }`}
+                                      >
+                                        {rec.condition}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-mono font-bold text-amber-700">
+                                      {Number(rec.damage_fees || 0) > 0 ? `₹${Number(rec.damage_fees).toFixed(2)}` : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 font-mono font-bold text-rose-700">
+                                      {Number(rec.lost_fees || 0) > 0 ? `₹${Number(rec.lost_fees).toFixed(2)}` : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 font-mono font-black text-slate-900">
+                                      ₹{Number(rec.total_fine || 0).toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {rec.is_fine_paid ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          Paid ({rec.payment_method || "Settled"})
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                          Due (Pending)
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      {!rec.is_fine_paid ? (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            const l = matchingLoan || rec;
+                                            handleOpenPayFine(l);
+                                          }}
+                                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
+                                        >
+                                          <CreditCard className="h-3 w-3" /> Collect
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            const l = matchingLoan || rec;
+                                            setReceiptModal({
+                                              detail: "Library Book Damage / Fine Receipt",
+                                              receipt_no: l.payment_receipt_no || `LIB-RCP-${l.id}`,
+                                              amount_paid: String(l.fine_paid_amount || l.total_fine),
+                                              remaining_due: "0.00",
+                                              is_fine_paid: true,
+                                              record: l,
+                                            });
+                                          }}
+                                          className="h-7 text-xs border-slate-200 text-slate-700 font-semibold"
+                                        >
+                                          Receipt
+                                        </Button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TABLE 3: Monthly Breakdown & Revenue Trends */}
+                  {feeReportSubView === "collected" && (
+                    <div>
+                      {(!feeCollection?.monthly_breakdown || feeCollection.monthly_breakdown.length === 0) ? (
+                        <p className="text-xs text-slate-400 py-10 text-center">No fee breakdown records recorded yet.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                              <tr>
+                                <th className="px-4 py-3">Month</th>
+                                <th className="px-4 py-3">Fined Returns Count</th>
+                                <th className="px-4 py-3">Damage Fees Collected (₹)</th>
+                                <th className="px-4 py-3">Late Penalties Collected (₹)</th>
+                                <th className="px-4 py-3 text-right font-bold">Total Revenue (₹)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                              {feeCollection.monthly_breakdown.map((row: any, i: number) => (
+                                <tr key={i} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-3 font-semibold text-slate-900">{row.month}</td>
+                                  <td className="px-4 py-3 text-slate-600">{row.fined_returns || row.late_returns} returns</td>
+                                  <td className="px-4 py-3 text-amber-700 font-mono">₹{Number(row.damage_fees || 0).toFixed(2)}</td>
+                                  <td className="px-4 py-3 text-indigo-700 font-mono">₹{Number(row.late_fees || 0).toFixed(2)}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 text-sm">₹{row.total_fees}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-
-                {feeCollection?.monthly_breakdown?.length > 0 ? (
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
-                      <tr>
-                        <th className="px-4 py-3">Month</th>
-                        <th className="px-4 py-3">Late Returns Count</th>
-                        <th className="px-4 py-3 text-right">Fee Collected (₹)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {feeCollection.monthly_breakdown.map((row: any, i: number) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-semibold text-slate-900">{row.month}</td>
-                          <td className="px-4 py-3 text-slate-600">{row.late_returns} returns</td>
-                          <td className="px-4 py-3 text-right font-bold text-purple-700">₹{row.total_fees}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-xs text-slate-400 py-6 text-center">No fee breakdown records available yet.</p>
-                )}
               </div>
             )}
           </div>
@@ -4161,251 +4653,723 @@ export default function LibrarianDashboard() {
         {/* TAB 4: MASTERS SETUP */}
         {activeTab === "masters" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-              <button
-                onClick={() => setMasterSubTab("categories")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  masterSubTab === "categories" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Categories ({categories.length})
-              </button>
-              <button
-                onClick={() => setMasterSubTab("authors")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  masterSubTab === "authors" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Authors ({authors.length})
-              </button>
-              <button
-                onClick={() => setMasterSubTab("publishers")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  masterSubTab === "publishers" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Publishers ({publishers.length})
-              </button>
-              <button
-                onClick={() => setMasterSubTab("racks")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  masterSubTab === "racks" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Racks & Shelves ({racks.length} Racks)
-              </button>
+            {/* Master Navigation & Sub Tabs */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMasterSubTab("categories");
+                    setMastersSearch("");
+                    setMastersPage(1);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                    masterSubTab === "categories"
+                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                  }`}
+                >
+                  Categories ({categories.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMasterSubTab("authors");
+                    setMastersSearch("");
+                    setMastersPage(1);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                    masterSubTab === "authors"
+                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                  }`}
+                >
+                  Authors ({authors.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMasterSubTab("racks");
+                    setMastersSearch("");
+                    setMastersPage(1);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                    masterSubTab === "racks"
+                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                  }`}
+                >
+                  Racks & Shelves ({racks.length} Racks)
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 capitalize">Manage {masterSubTab}</h3>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (masterSubTab === "categories") openAddMasterModal("category");
-                    else if (masterSubTab === "authors") openAddMasterModal("author");
-                    else if (masterSubTab === "publishers") openAddMasterModal("publisher");
-                    else if (masterSubTab === "racks") openAddMasterModal("rack");
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add New {masterSubTab === "racks" ? "Rack" : masterSubTab === "categories" ? "Category" : masterSubTab === "authors" ? "Author" : "Publisher"}
-                </Button>
+            {/* UNIFIED SUPERADMIN TABLE CARD */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              {/* Header Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                      {masterSubTab === "categories" && <Layers className="h-4 w-4" />}
+                      {masterSubTab === "authors" && <Users className="h-4 w-4" />}
+                      {masterSubTab === "racks" && <MapPin className="h-4 w-4" />}
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {masterSubTab === "categories" && "Book Categories Master"}
+                      {masterSubTab === "authors" && "Book Authors Master"}
+                      {masterSubTab === "racks" && "Racks & Shelves Master"}
+                    </h3>
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                      {masterSubTab === "categories" && `${filteredCategories.length} Categories`}
+                      {masterSubTab === "authors" && `${filteredAuthors.length} Authors`}
+                      {masterSubTab === "racks" && `${filteredRacks.length} Racks`}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {masterSubTab === "categories" && "Define book genres and classification codes"}
+                    {masterSubTab === "authors" && "Manage author profiles, biographies and publication credits"}
+                    {masterSubTab === "racks" && "Configure physical racks, aisles and shelf locations for books"}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (masterSubTab === "categories") openAddMasterModal("category");
+                      else if (masterSubTab === "authors") openAddMasterModal("author");
+                      else if (masterSubTab === "racks") openAddMasterModal("rack");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add New {masterSubTab === "racks" ? "Rack" : masterSubTab === "categories" ? "Category" : "Author"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadAllData}
+                    disabled={loading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                    title="Reload data"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
               </div>
 
+              {/* Filter and Search Bar Directly on Top of Table Data */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+                {/* Search */}
+                <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={mastersSearch}
+                    onChange={(e) => {
+                      setMastersSearch(e.target.value);
+                      setMastersPage(1);
+                    }}
+                    placeholder={`Search ${masterSubTab === "racks" ? "racks by name or code" : masterSubTab === "categories" ? "categories by name or code" : "authors by name"}…`}
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                  />
+                </div>
+
+                {/* Dropdown Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={mastersPageSize}
+                    onChange={(e) => {
+                      setMastersPageSize(Number(e.target.value));
+                      setMastersPage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  >
+                    <option value={5}>5 per page</option>
+                    <option value={10}>10 per page</option>
+                    <option value={20}>20 per page</option>
+                    <option value={50}>50 per page</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Sub-tab 1: Categories Table */}
               {masterSubTab === "categories" && (
-                <div className="space-y-3">
-                  {categories.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No categories created yet. Click above to add one.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {categories.map((c) => (
-                        <div key={c.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{c.name}</div>
-                            {c.code && <div className="text-xs text-slate-400">Code: {c.code}</div>}
-                            {c.description && <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{c.description}</div>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("category", c)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("category", c.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                <>
+                {filteredCategories.length === 0 ? (
+                  <div className="text-center py-12 bg-white">
+                    <Layers className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                    <h3 className="text-base font-bold text-slate-800">No categories found</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      {mastersSearch ? `No categories match "${mastersSearch}".` : "Define book categories to classify your library collection."}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => openAddMasterModal("category")}
+                      className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Category
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Full Table (Single Row, Separate Columns) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                            <th className="py-3.5 px-3 text-center w-12">#</th>
+                            <th className="py-3.5 px-4">Category Name</th>
+                            <th className="py-3.5 px-4">Code</th>
+                            <th className="py-3.5 px-4 text-center">Books Count</th>
+                            <th className="py-3.5 px-4">Description</th>
+                            <th className="py-3.5 px-4 text-center">Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {paginatedCategories.map((c, idx) => {
+                            const count = categoryCounts[toTitleCase(c.name)] || 0;
+                            const isActive = c.is_active !== false;
+                            return (
+                              <tr key={c.id} className="hover:bg-slate-50/70 transition-colors group">
+                                <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                  {(mastersPage - 1) * mastersPageSize + idx + 1}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                      <Layers className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                      {toTitleCase(c.name)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap font-mono text-slate-600">
+                                  {c.code || "—"}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCategoryFilter(toTitleCase(c.name));
+                                      setActiveTab("catalog");
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 transition-colors"
+                                    title="View matching books in catalog"
+                                  >
+                                    <BookOpen className="h-3 w-3" />
+                                    <span>{count} {count === 1 ? "Book" : "Books"}</span>
+                                  </button>
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-500 max-w-xs truncate" title={c.description || ""}>
+                                  {c.description || "—"}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                      isActive
+                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                                    }`}
+                                  >
+                                    {isActive ? "Active" : "Deactivated"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleToggleActiveMaster("category", c.id, c.name, isActive)}
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        isActive
+                                          ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                          : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                      }`}
+                                      title={isActive ? "Deactivate category" : "Activate category"}
+                                    >
+                                      <Power className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openEditMasterModal("category", c)}
+                                      className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                                      title="Edit Category"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteMaster("category", c.id, c.name, count)}
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        count > 0
+                                          ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                                      }`}
+                                      title={count > 0 ? `Contains ${count} book(s). Cannot be deleted. Deactivate instead.` : "Delete Category"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {masterSubTab === "authors" && (
-                <div className="space-y-3">
-                  {authors.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No authors created yet. Click above to add one.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {authors.map((a) => (
-                        <div key={a.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{a.name}</div>
-                            {a.code && <div className="text-xs text-slate-400">Code: {a.code}</div>}
-                            {a.biography && <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{a.biography}</div>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("author", a)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("author", a.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {masterSubTab === "publishers" && (
-                <div className="space-y-3">
-                  {publishers.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4">No publishers created yet. Click above to add one.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {publishers.map((p) => (
-                        <div key={p.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div>
-                            <div className="font-bold text-slate-900">{p.name}</div>
-                            {p.contact_no && <div className="text-xs text-slate-500">📞 {p.contact_no}</div>}
-                            {p.email && <div className="text-xs text-slate-400">✉️ {p.email}</div>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditMasterModal("publisher", p)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteMaster("publisher", p.id)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {masterSubTab === "racks" && (
-                <div className="space-y-3">
-                  {racks.length === 0 ? (
-                    <div className="p-6 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                      <p className="text-xs text-slate-500 mb-2">No physical racks created yet.</p>
-                      <Button
-                        size="sm"
-                        onClick={() => openAddMasterModal("rack")}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Add First Rack
-                      </Button>
-                    </div>
-                  ) : (
-                    racks.map((r) => (
-                      <div key={r.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="font-bold text-slate-900 flex items-center gap-2">
-                            <span>{r.rack_code} — {r.rack_name}</span>
-                            <div className="flex items-center gap-1 ml-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openEditMasterModal("rack", r)}
-                                className="h-6 w-6 p-0 text-slate-400 hover:text-indigo-600"
+                    {/* Mobile Single Row Compact View (Tap to Open Bottom Sheet) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {paginatedCategories.map((c) => {
+                        const count = categoryCounts[toTitleCase(c.name)] || 0;
+                        const isActive = c.is_active !== false;
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => setSelectedMobileMaster({ type: "category", data: c, count })}
+                            className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                <Layers className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-sm truncate">{toTitleCase(c.name)}</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                  {c.code ? `Code: ${c.code} • ` : ""}{count} {count === 1 ? "Book" : "Books"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
                               >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDeleteMaster("rack", r.id)}
-                                className="h-6 w-6 p-0 text-slate-400 hover:text-rose-600"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                                {isActive ? "Active" : "Inactive"}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-slate-300" />
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openAddMasterModal("shelf", r.id)}
-                            className="text-xs h-7 border-slate-200 bg-white"
+                        );
+                      })}
+                    </div>
+
+                    {/* Superadmin Style Bottom Pagination */}
+                    <TablePagination
+                      currentPage={mastersPage}
+                      totalItems={filteredCategories.length}
+                      pageSize={mastersPageSize}
+                      onPageChange={setMastersPage}
+                      onPageSizeChange={setMastersPageSize}
+                      itemLabel="categories"
+                    />
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Sub-tab 2: Authors Table */}
+            {masterSubTab === "authors" && (
+              <>
+                {filteredAuthors.length === 0 ? (
+                  <div className="text-center py-12 bg-white">
+                    <Users className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                    <h3 className="text-base font-bold text-slate-800">No authors found</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      {mastersSearch ? `No authors match "${mastersSearch}".` : "Add author profiles to maintain catalog references."}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => openAddMasterModal("author")}
+                      className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Author
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Full Table (Single Row, Separate Columns) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                            <th className="py-3.5 px-3 text-center w-12">#</th>
+                            <th className="py-3.5 px-4">Author Name</th>
+                            <th className="py-3.5 px-4">Code / Ref</th>
+                            <th className="py-3.5 px-4 text-center">Books Count</th>
+                            <th className="py-3.5 px-4">Biography / Notes</th>
+                            <th className="py-3.5 px-4 text-center">Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {paginatedAuthors.map((a, idx) => {
+                            const count = authorCounts[toTitleCase(a.name)] || 0;
+                            const isActive = a.is_active !== false;
+                            return (
+                              <tr key={a.id} className="hover:bg-slate-50/70 transition-colors group">
+                                <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                  {(mastersPage - 1) * mastersPageSize + idx + 1}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-7 w-7 rounded-lg bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                                      <User className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-bold text-slate-900 group-hover:text-purple-600 transition-colors">
+                                      {toTitleCase(a.name)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap font-mono text-slate-600">
+                                  {a.code || "—"}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAuthorFilter(toTitleCase(a.name));
+                                      setActiveTab("catalog");
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/60 transition-colors"
+                                    title="View books by this author in catalog"
+                                  >
+                                    <User className="h-3 w-3" />
+                                    <span>{count} {count === 1 ? "Book" : "Books"}</span>
+                                  </button>
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-500 max-w-xs truncate" title={a.biography || ""}>
+                                  {a.biography || "—"}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                      isActive
+                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                                    }`}
+                                  >
+                                    {isActive ? "Active" : "Deactivated"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleToggleActiveMaster("author", a.id, a.name, isActive)}
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        isActive
+                                          ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                          : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                      }`}
+                                      title={isActive ? "Deactivate author" : "Activate author"}
+                                    >
+                                      <Power className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openEditMasterModal("author", a)}
+                                      className="h-7 w-7 p-0 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+                                      title="Edit Author"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteMaster("author", a.id, a.name, count)}
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        count > 0
+                                          ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                                      }`}
+                                      title={count > 0 ? `Associated with ${count} book(s). Cannot be deleted. Deactivate instead.` : "Delete Author"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Single Row Compact View (Tap to Open Bottom Sheet) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {paginatedAuthors.map((a) => {
+                        const count = authorCounts[toTitleCase(a.name)] || 0;
+                        const isActive = a.is_active !== false;
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => setSelectedMobileMaster({ type: "author", data: a, count })}
+                            className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
                           >
-                            <Plus className="h-3 w-3 mr-1" /> Add Shelf
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {shelves.filter((s) => s.rack === r.id).length === 0 ? (
-                            <span className="text-[11px] text-slate-400 italic">No shelves added to this rack yet. Click Add Shelf.</span>
-                          ) : (
-                            shelves
-                              .filter((s) => s.rack === r.id)
-                              .map((s) => (
-                                <span key={s.id} className="inline-flex items-center gap-1 bg-white border border-slate-200 text-xs px-2.5 py-1 rounded shadow-2xs font-medium text-slate-700">
-                                  <span>{s.shelf_code} ({s.shelf_name})</span>
-                                  <button
-                                    onClick={() => openEditMasterModal("shelf", s)}
-                                    className="text-slate-400 hover:text-indigo-600 ml-1"
-                                    title="Edit shelf"
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                                <User className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-sm truncate">{toTitleCase(a.name)}</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                  {a.code ? `Ref: ${a.code} • ` : ""}{count} {count === 1 ? "Book" : "Books"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
+                              >
+                                {isActive ? "Active" : "Inactive"}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-slate-300" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Superadmin Style Bottom Pagination */}
+                    <TablePagination
+                      currentPage={mastersPage}
+                      totalItems={filteredAuthors.length}
+                      pageSize={mastersPageSize}
+                      onPageChange={setMastersPage}
+                      onPageSizeChange={setMastersPageSize}
+                      itemLabel="authors"
+                    />
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Sub-tab 3: Racks & Shelves Table */}
+            {masterSubTab === "racks" && (
+              <>
+                {filteredRacks.length === 0 ? (
+                  <div className="text-center py-12 bg-white">
+                    <MapPin className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                    <h3 className="text-base font-bold text-slate-800">No physical racks found</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      {mastersSearch ? `No racks match "${mastersSearch}".` : "Define your library racks to organize book shelving and physical copies."}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => openAddMasterModal("rack")}
+                      className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add First Rack
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Full Table (Single Row, Separate Columns) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                            <th className="py-3.5 px-3 text-center w-12">#</th>
+                            <th className="py-3.5 px-4">Rack Code</th>
+                            <th className="py-3.5 px-4">Rack Name</th>
+                            <th className="py-3.5 px-4">Configured Shelves</th>
+                            <th className="py-3.5 px-4 text-center">Books Stored</th>
+                            <th className="py-3.5 px-4 text-center">Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {paginatedRacks.map((r, idx) => {
+                            const rackShelves = shelves.filter((s) => s.rack === r.id);
+                            const rackBooks = books.filter((b) => b.rack === r.id || b.rack_code === r.rack_code);
+                            const totalRackData = rackShelves.length + rackBooks.length;
+                            const isRackActive = r.is_active !== false;
+                            return (
+                              <tr key={r.id} className="hover:bg-slate-50/70 transition-colors group">
+                                <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                  {(mastersPage - 1) * mastersPageSize + idx + 1}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap font-mono">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+                                    <MapPin className="h-3 w-3 text-amber-600" />
+                                    {r.rack_code}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                  {r.rack_name}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                                    {rackShelves.length === 0 ? (
+                                      <span className="text-slate-400 text-[11px] italic">No shelves added</span>
+                                    ) : (
+                                      rackShelves.map((s) => (
+                                        <span
+                                          key={s.id}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-medium"
+                                        >
+                                          <span className="font-mono font-bold">{s.shelf_code}</span>
+                                          <span className="text-slate-400">({s.shelf_name})</span>
+                                        </span>
+                                      ))
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openAddMasterModal("shelf", r.id)}
+                                      className="h-6 px-1.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 rounded-md"
+                                      title="Add shelf to this rack"
+                                    >
+                                      <Plus className="h-3 w-3 mr-0.5" /> + Shelf
+                                    </Button>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    {rackBooks.length} {rackBooks.length === 1 ? "Book" : "Books"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                      isRackActive
+                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                                    }`}
                                   >
-                                    <Edit className="h-2.5 w-2.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteMaster("shelf", s.id)}
-                                    className="text-slate-400 hover:text-rose-600"
-                                    title="Delete shelf"
-                                  >
-                                    <Trash2 className="h-2.5 w-2.5" />
-                                  </button>
-                                </span>
-                              ))
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+                                    {isRackActive ? "Active" : "Deactivated"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleToggleActiveMaster("rack", r.id, r.rack_name, isRackActive)}
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        isRackActive ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                      }`}
+                                      title={isRackActive ? "Deactivate rack" : "Activate rack"}
+                                    >
+                                      <Power className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openEditMasterModal("rack", r)}
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-indigo-600 rounded-lg"
+                                      title="Edit rack"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        handleDeleteMaster(
+                                          "rack",
+                                          r.id,
+                                          `${r.rack_code} — ${r.rack_name}`,
+                                          totalRackData
+                                        )
+                                      }
+                                      className={`h-7 w-7 p-0 rounded-lg ${
+                                        totalRackData > 0
+                                          ? "text-slate-300 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                                          : "text-slate-400 hover:text-rose-600 rounded-lg"
+                                      }`}
+                                      title={
+                                        totalRackData > 0
+                                          ? `Contains ${rackShelves.length} shelves and ${rackBooks.length} books. Cannot be deleted. Deactivate instead.`
+                                          : "Delete rack"
+                                      }
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Single Row Compact View (Tap to Open Bottom Sheet) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {paginatedRacks.map((r) => {
+                        const rackShelves = shelves.filter((s) => s.rack === r.id);
+                        const rackBooks = books.filter((b) => b.rack === r.id || b.rack_code === r.rack_code);
+                        const isRackActive = r.is_active !== false;
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() =>
+                              setSelectedMobileMaster({
+                                type: "rack",
+                                data: r,
+                                shelves: rackShelves,
+                                booksCount: rackBooks.length,
+                              })
+                            }
+                            className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                                <MapPin className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-sm truncate">{r.rack_name}</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                  Rack {r.rack_code} • {rackShelves.length} Shelves • {rackBooks.length} Books
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                  isRackActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
+                              >
+                                {isRackActive ? "Active" : "Inactive"}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-slate-300" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Superadmin Style Bottom Pagination */}
+                    <TablePagination
+                      currentPage={mastersPage}
+                      totalItems={filteredRacks.length}
+                      pageSize={mastersPageSize}
+                      onPageChange={setMastersPage}
+                      onPageSizeChange={setMastersPageSize}
+                      itemLabel="racks"
+                    />
+                  </>
+                )}
+              </>
+            )}
             </div>
           </div>
         )}
@@ -4551,113 +5515,115 @@ export default function LibrarianDashboard() {
           </div>
         )}
 
-        {/* TAB 6: HISTORY */}
+        {/* TAB 6: HISTORY (SUPERADMIN UNIFIED TABLE CARD) */}
         {activeTab === "history" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-white space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base">Completed Circulation History</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Historical records of returned, damaged, or lost books</p>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+            {/* Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+                    <Clock className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">Completed Circulation History</h3>
+                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                    {filteredHistoryLoans.length} {filteredHistoryLoans.length === 1 ? "Record" : "Records"}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-slate-400">
-                  Showing {filteredHistoryLoans.length} of {historyLoans.length} records
-                </span>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Historical archive of returned, damaged, or lost books with settled fines and receipts
+                </p>
               </div>
 
-              {/* History Search & Filters Toolbar */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 pt-1">
-                <div className="md:col-span-5 relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Search borrower, book, accession, remarks..."
-                    className="pl-9 h-9 text-xs rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                  />
-                  {historySearch && (
-                    <button
-                      type="button"
-                      onClick={() => setHistorySearch("")}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={loadAllData}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                title="Reload history"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
 
-                {/* Filter by Particular Book */}
-                <div className="md:col-span-4">
-                  <select
-                    value={historyBookFilter}
-                    onChange={(e) => setHistoryBookFilter(e.target.value)}
-                    className={`w-full h-9 rounded-xl border px-3 text-xs font-semibold transition-colors ${
-                      historyBookFilter !== "ALL"
-                        ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500/20"
-                        : "bg-slate-50 border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <option value="ALL">Filter by Book (All {uniqueHistoryLoanBooks.length} titles)</option>
-                    {uniqueHistoryLoanBooks.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title} ({b.count} record{b.count > 1 ? "s" : ""})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Filter by Category */}
-                <div className="md:col-span-3">
-                  <select
-                    value={historyCategoryFilter}
-                    onChange={(e) => setHistoryCategoryFilter(e.target.value)}
-                    className={`w-full h-9 rounded-xl border px-3 text-xs font-semibold transition-colors ${
-                      historyCategoryFilter !== "ALL"
-                        ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500/20"
-                        : "bg-slate-50 border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <option value="ALL">Filter by Category (All)</option>
-                    {categoryNames.filter((c) => c !== "ALL").map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Filter and Search Bar Directly on Top of Table Data */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+              {/* Search */}
+              <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={historySearch}
+                  onChange={(e) => {
+                    setHistorySearch(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  placeholder="Search borrower, book title, accession no, receipt…"
+                  className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                />
               </div>
 
-              {/* Status Chips & Reset */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-                {["ALL", "RETURNED", "LOST", "DAMAGED"].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setHistoryStatusFilter(st)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                      historyStatusFilter === st
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {st === "ALL" ? "All History" : st.charAt(0) + st.slice(1).toLowerCase()}
-                  </button>
-                ))}
+              {/* Dropdown Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={historyStatusFilter}
+                  onChange={(e) => {
+                    setHistoryStatusFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="RETURNED">Returned</option>
+                  <option value="DAMAGED">Damaged</option>
+                  <option value="LOST">Lost</option>
+                </select>
 
-                {(historySearch || historyBookFilter !== "ALL" || historyCategoryFilter !== "ALL" || historyStatusFilter !== "ALL") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHistorySearch("");
-                      setHistoryBookFilter("ALL");
-                      setHistoryCategoryFilter("ALL");
-                      setHistoryStatusFilter("ALL");
-                    }}
-                    className="text-rose-600 font-bold hover:underline ml-2"
-                  >
-                    Reset Filters
-                  </button>
-                )}
+                <select
+                  value={historyPaymentTypeFilter}
+                  onChange={(e) => {
+                    setHistoryPaymentTypeFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value="ALL">All Payments</option>
+                  <option value="CASH">Cash Counter</option>
+                  <option value="ONLINE">Online / UPI</option>
+                  <option value="UNPAID">Unpaid Dues</option>
+                  <option value="NO_FINE">No Fine</option>
+                </select>
+
+                <select
+                  value={historyCategoryFilter}
+                  onChange={(e) => {
+                    setHistoryCategoryFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
+                >
+                  <option value="ALL">All Categories</option>
+                  {categoryNames.filter((c) => c !== "ALL").map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={historyPageSize}
+                  onChange={(e) => {
+                    setHistoryPageSize(Number(e.target.value));
+                    setHistoryPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                >
+                  <option value={5}>5 per page</option>
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
               </div>
             </div>
 
@@ -4679,6 +5645,7 @@ export default function LibrarianDashboard() {
                     setHistoryBookFilter("ALL");
                     setHistoryCategoryFilter("ALL");
                     setHistoryStatusFilter("ALL");
+                    setHistoryPaymentTypeFilter("ALL");
                   }}
                   className="mt-3 text-xs"
                 >
@@ -4686,178 +5653,301 @@ export default function LibrarianDashboard() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50/90 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Book Title</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Accession No</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Borrower</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Issue Date</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Return Date</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Condition / Status</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Fine Amount &amp; Status</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap">Remarks</th>
-                      <th className="px-4 py-3.5 whitespace-nowrap text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredHistoryLoans.map((item) => {
-                      const totalFine = Number(item.total_fine || item.late_fees || 0);
-                      const paidFine = Number(item.fine_paid_amount || 0);
-                      const dueFine = Math.max(0, totalFine - paidFine);
+              <div className="overflow-hidden">
+                {/* Desktop History Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50/90 text-slate-600 text-[11px] font-black uppercase tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="py-3.5 px-3 text-center w-12">#</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Book Title</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Category</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Accession No</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Borrower Name</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Borrower ID / GR</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Issue Date</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Return Date</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Condition / Status</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Damage &amp; Late Fee</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Payment Mode</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap">Remarks</th>
+                        <th className="px-4 py-3.5 whitespace-nowrap text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {paginatedHistoryLoans.map((item, idx) => {
+                        const totalFine = Number(item.total_fine || item.late_fees || 0);
+                        const paidFine = Number(item.fine_paid_amount || 0);
+                        const dueFine = Math.max(0, totalFine - paidFine);
 
-                      return (
-                        <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                                <BookOpen className="h-3.5 w-3.5" />
+                        return (
+                          <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                              {(historyPage - 1) * historyPageSize + idx + 1}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-bold text-slate-900 text-sm">{toTitleCase(item.book_title)}</span>
                               </div>
-                              <span className="font-bold text-slate-900 text-sm">{toTitleCase(item.book_title)}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            {item.accession_no ? (
-                              <span className="font-mono text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
-                                {item.accession_no}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                                {toTitleCase(item.book_category) || "General"}
                               </span>
-                            ) : (
-                              <span className="text-slate-400 font-mono text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-800">{toTitleCase(item.staff_name || item.student_name || "Unknown")}</span>
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {item.accession_no ? (
+                                <span className="font-mono text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
+                                  {item.accession_no}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap font-semibold text-slate-800">
+                              {toTitleCase(item.staff_name || item.student_name || "Unknown")}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
                               <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
                                 {item.staff ? `Staff #${item.staff}` : `GR: ${item.student_gr_no || "N/A"}`}
                               </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-700 text-xs">
-                            {item.book_issued_date ? new Date(item.book_issued_date).toLocaleDateString("en-GB") : "—"}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-700 text-xs">
-                            {item.actual_return_date ? (
-                              new Date(item.actual_return_date).toLocaleDateString("en-GB")
-                            ) : (
-                              <span className="text-slate-400 italic">Not Returned</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <span
-                              className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-flex items-center gap-1.5 ${
-                                item.status === "RETURNED"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : item.status === "LOST"
-                                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}
-                            >
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-700 text-xs">
+                              {item.book_issued_date ? new Date(item.book_issued_date).toLocaleDateString("en-GB") : "—"}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-700 text-xs">
+                              {item.actual_return_date ? (
+                                new Date(item.actual_return_date).toLocaleDateString("en-GB")
+                              ) : (
+                                <span className="text-slate-400 italic">Not Returned</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${
+                                className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-flex items-center gap-1.5 ${
                                   item.status === "RETURNED"
-                                    ? "bg-emerald-500"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : item.status === "LOST"
-                                    ? "bg-rose-500"
-                                    : "bg-amber-500"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}
-                              />
-                              {item.condition_on_return || item.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            {totalFine > 0 ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 text-xs">Total: ₹{totalFine}</span>
-                                {item.is_fine_paid || dueFine <= 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Fully Paid
+                              >
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    item.status === "RETURNED"
+                                      ? "bg-emerald-500"
+                                      : item.status === "LOST"
+                                      ? "bg-rose-500"
+                                      : "bg-amber-500"
+                                  }`}
+                                />
+                                {item.condition_on_return || item.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {totalFine > 0 ? (
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-900 text-xs">Total: ₹{totalFine}</span>
+                                    {item.is_fine_paid || dueFine <= 0 ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                                        <CheckCircle2 className="h-2.5 w-2.5" /> Paid
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.5 rounded-full">
+                                        Due: ₹{dueFine}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {Number(item.damage_fees || 0) > 0 && (
+                                    <span className="text-[10px] text-amber-700 font-bold block">
+                                      Damage: ₹{item.damage_fees}
+                                    </span>
+                                  )}
+                                  {Number(item.late_fees || 0) > 0 && (
+                                    <span className="text-[10px] text-slate-500 font-medium block">
+                                      Late: ₹{item.late_fees}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                  ₹0 (No Fine)
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {totalFine > 0 ? (
+                                (item.payment_method || "").toLowerCase() === "cash" ? (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Cash
+                                  </span>
+                                ) : ["online", "upi", "card"].includes((item.payment_method || "").toLowerCase()) ? (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                                    <CreditCard className="h-3.5 w-3.5 text-indigo-600" /> Online
+                                  </span>
+                                ) : dueFine > 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                    <Clock className="h-3.5 w-3.5 text-rose-500" /> Pending (Due)
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full">
-                                    Due: ₹{dueFine}
+                                  <span className="text-slate-500 text-xs font-semibold">
+                                    {item.payment_method || "Settled"}
                                   </span>
+                                )
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500">{item.remarks || "—"}</td>
+                            <td className="px-4 py-3.5 whitespace-nowrap text-right">
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                {dueFine > 0 && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenPayFine(item)}
+                                    className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 shadow-2xs rounded-lg"
+                                  >
+                                    <CreditCard className="h-3 w-3" /> Collect Fine
+                                  </Button>
+                                )}
+                                {item.is_fine_paid && item.payment_receipt_no && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setReceiptModal({
+                                        detail: "Paid",
+                                        receipt_no: item.payment_receipt_no || "",
+                                        amount_paid: String(item.fine_paid_amount || item.total_fine),
+                                        remaining_due: "0.00",
+                                        is_fine_paid: true,
+                                        record: item,
+                                      });
+                                    }}
+                                    className="h-7 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 font-bold gap-1 rounded-lg"
+                                  >
+                                    <Receipt className="h-3 w-3" /> Receipt
+                                  </Button>
                                 )}
                               </div>
-                            ) : (
-                              <span className="text-slate-400 font-mono text-xs bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
-                                ₹0 (No Fine)
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500">{item.remarks || "—"}</td>
-                          <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                            <div className="inline-flex items-center gap-1.5 justify-end">
-                              {dueFine > 0 && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleOpenPayFine(item)}
-                                  className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 shadow-2xs rounded-lg"
-                                >
-                                  <CreditCard className="h-3 w-3" /> Collect Fine
-                                </Button>
-                              )}
-                              {item.is_fine_paid && item.payment_receipt_no && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setReceiptModal({
-                                      detail: "Paid",
-                                      receipt_no: item.payment_receipt_no || "",
-                                      amount_paid: String(item.fine_paid_amount || item.total_fine),
-                                      remaining_due: "0.00",
-                                      is_fine_paid: true,
-                                      record: item,
-                                    });
-                                  }}
-                                  className="h-7 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 font-bold gap-1 rounded-lg"
-                                >
-                                  <Receipt className="h-3 w-3" /> Receipt
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Single Row View */}
+                <div className="divide-y divide-slate-100 block md:hidden">
+                  {paginatedHistoryLoans.map((item) => {
+                    const totalFine = Number(item.total_fine || item.late_fees || 0);
+                    const paidFine = Number(item.fine_paid_amount || 0);
+                    const dueFine = Math.max(0, totalFine - paidFine);
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedMobileHistory(item)}
+                        className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-slate-900 text-sm truncate block">
+                            {toTitleCase(item.book_title)}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                            <span>{toTitleCase(item.staff_name || item.student_name || "Unknown")}</span>
+                            <span>•</span>
+                            <span className="font-mono text-[11px]">{item.accession_no || "—"}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              item.status === "RETURNED"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : item.status === "LOST"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                          {dueFine > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                              ₹{dueFine}
+                            </span>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Superadmin Style Bottom Pagination */}
+                <TablePagination
+                  currentPage={historyPage}
+                  totalItems={filteredHistoryLoans.length}
+                  pageSize={historyPageSize}
+                  onPageChange={setHistoryPage}
+                  onPageSizeChange={setHistoryPageSize}
+                  itemLabel="circulation records"
+                />
               </div>
             )}
           </div>
         )}
-          </main>
         </div>
       </div>
 
       {/* MODAL: ADD / EDIT BOOK */}
       {showAddBookModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-lg font-bold text-slate-900">{editingBook ? "Edit Book Item" : "Add New Book Master"}</h2>
-              <button onClick={() => setShowAddBookModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-3xl lg:max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Fixed Header */}
+            <div className="flex items-start justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-gradient-to-r from-slate-50 via-white to-indigo-50/20">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                    <BookOpen className="h-4 w-4" />
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                    {editingBook ? "Edit Book Master" : "Add New Book Master"}
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 pl-10">
+                  Configure book catalogue details, storage rack locations, and generate unique physical copy barcodes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddBookModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form noValidate onSubmit={handleSaveBook} className="space-y-4">
-              {Object.keys(bookFormErrors).length > 0 && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                  <span className="font-semibold">Please correct the highlighted mandatory fields marked in red below.</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1 md:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-slate-800">
-                      Book Title <span className="text-rose-500">*</span>
-                    </Label>
+            {/* Form with Scrollable Content Body */}
+            <form noValidate onSubmit={handleSaveBook} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                {Object.keys(bookFormErrors).length > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span className="font-semibold">Please correct the highlighted mandatory fields marked in red below.</span>
                   </div>
+                )}
+
+                {/* 1. Full-width Book Title */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-800">
+                    Book Title <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     value={bookForm.title}
                     onChange={(e) => {
@@ -4872,8 +5962,10 @@ export default function LibrarianDashboard() {
                       }
                     }}
                     placeholder="e.g. Mathematics Class 10"
-                    className={`transition-colors ${
-                      bookFormErrors.title ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
+                    className={`h-10 text-sm rounded-xl transition-colors ${
+                      bookFormErrors.title
+                        ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                        : "border-slate-200"
                     }`}
                   />
                   {bookFormErrors.title && (
@@ -4883,302 +5975,361 @@ export default function LibrarianDashboard() {
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 2. Two-column layout: Author & Category / Subject */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Author <span className="text-rose-500">*</span>
                     </Label>
+                    <Input
+                      value={bookForm.author}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, author: e.target.value });
+                        if (bookFormErrors.author) {
+                          setBookFormErrors((prev) => ({ ...prev, author: "" }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          setBookForm((prev) => ({ ...prev, author: toTitleCase(prev.author) }));
+                        }
+                      }}
+                      placeholder="e.g. R.D. Sharma"
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.author
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.author && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.author}
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    value={bookForm.author}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, author: e.target.value });
-                      if (bookFormErrors.author) {
-                        setBookFormErrors((prev) => ({ ...prev, author: "" }));
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, author: toTitleCase(prev.author) }));
-                      }
-                    }}
-                    placeholder="e.g. R.D. Sharma"
-                    className={`transition-colors ${
-                      bookFormErrors.author ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.author && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.author}
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Category / Subject <span className="text-rose-500">*</span>
                     </Label>
-                    <span className="text-[10px] text-slate-400">Select existing or type new</span>
+                    <CategoryCombobox
+                      value={bookForm.category}
+                      onChange={(catName, catRefId) => {
+                        setBookForm((prev) => ({
+                          ...prev,
+                          category: catName,
+                          category_ref: catRefId ? String(catRefId) : "",
+                        }));
+                        if (bookFormErrors.category) {
+                          setBookFormErrors((prev) => ({ ...prev, category: "" }));
+                        }
+                      }}
+                      categories={categories}
+                      allBookCategoryNames={categoryNames}
+                      error={bookFormErrors.category}
+                    />
+                    {bookFormErrors.category && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.category}
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    list="existing-book-categories"
-                    value={bookForm.category}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, category: e.target.value });
-                      if (bookFormErrors.category) {
-                        setBookFormErrors((prev) => ({ ...prev, category: "" }));
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, category: toTitleCase(prev.category) }));
-                      }
-                    }}
-                    placeholder="e.g. Science, Mathematics, Literature..."
-                    className={`transition-colors ${
-                      bookFormErrors.category ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  <datalist id="existing-book-categories">
-                    {categoryNames.filter((c) => c !== "ALL").map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                  {categoryNames.filter((c) => c !== "ALL").length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 pt-1">
-                      <span className="text-[10px] font-medium text-slate-400">Quick pick:</span>
-                      {categoryNames.filter((c) => c !== "ALL").slice(0, 6).map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => {
-                            setBookForm({ ...bookForm, category: c });
-                            if (bookFormErrors.category) setBookFormErrors((prev) => ({ ...prev, category: "" }));
-                          }}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                            bookForm.category === c
-                              ? "bg-indigo-600 text-white border-indigo-600 font-bold"
-                              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
+                </div>
+
+                {/* 3. Two-column layout: ISBN & Book Price */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-slate-800">
+                        ISBN (International Standard Book No)
+                      </Label>
+                      {bookForm.isbn?.trim() && !bookFormErrors.isbn && (
+                        <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Unique &amp; Available
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {bookFormErrors.category && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.category}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-800">ISBN (Optional)</Label>
-                  <Input
-                    value={bookForm.isbn}
-                    onChange={(e) => setBookForm({ ...bookForm, isbn: e.target.value })}
-                    placeholder="e.g. 978-3-16-148410-0"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-slate-800">Book Price (₹)</Label>
+                    <div className="relative">
+                      <Input
+                        value={bookForm.isbn}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBookForm((prev) => ({ ...prev, isbn: val }));
+                          const errorMsg = checkIsbnDuplicate(val, editingBook?.id);
+                          setBookFormErrors((prev) => {
+                            const next = { ...prev };
+                            if (errorMsg) {
+                              next.isbn = errorMsg;
+                            } else {
+                              delete next.isbn;
+                            }
+                            return next;
+                          });
+                        }}
+                        onBlur={() => {
+                          if (bookForm.isbn) {
+                            const errorMsg = checkIsbnDuplicate(bookForm.isbn, editingBook?.id);
+                            if (errorMsg) {
+                              setBookFormErrors((prev) => ({ ...prev, isbn: errorMsg }));
+                            }
+                          }
+                        }}
+                        placeholder="e.g. 978-3-16-148410-0"
+                        className={`h-10 text-sm rounded-xl transition-all ${
+                          bookFormErrors.isbn
+                            ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20 pr-9"
+                            : "border-slate-200 focus:border-indigo-500"
+                        }`}
+                      />
+                      {bookFormErrors.isbn && (
+                        <AlertCircle className="absolute right-3 top-3 h-4 w-4 text-rose-500 pointer-events-none" />
+                      )}
+                    </div>
+                    {bookFormErrors.isbn && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-start gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-rose-600" />
+                        <span>{bookFormErrors.isbn}</span>
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={bookForm.price}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, price: Number(e.target.value) });
-                      if (bookFormErrors.price) {
-                        setBookFormErrors((prev) => ({ ...prev, price: "" }));
-                      }
-                    }}
-                    placeholder="150"
-                    className={`transition-colors ${
-                      bookFormErrors.price ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.price && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.price}
-                    </p>
-                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-800">Book Price (₹)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={bookForm.price}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, price: Number(e.target.value) });
+                        if (bookFormErrors.price) {
+                          setBookFormErrors((prev) => ({ ...prev, price: "" }));
+                        }
+                      }}
+                      placeholder="150"
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.price
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.price && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.price}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 4. Two-column layout: Rack Location & Shelf Location with side-by-side Add buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Rack Location with Side-by-side Add Button */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Rack Location <span className="text-rose-500">*</span>
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => openAddMasterModal("rack")}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 hover:underline"
-                    >
-                      <Plus className="h-3 w-3" /> Add Rack
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={bookForm.rack}
+                        onChange={(e) => {
+                          const newRack = e.target.value;
+                          if (bookFormErrors.rack) {
+                            setBookFormErrors((prev) => ({ ...prev, rack: "" }));
+                          }
+                          setBookForm((prev) => {
+                            const isCurrentShelfInNewRack =
+                              newRack && prev.shelf
+                                ? shelves.some(
+                                    (s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf)
+                                  )
+                                : false;
+                            return {
+                              ...prev,
+                              rack: newRack,
+                              shelf: isCurrentShelfInNewRack ? prev.shelf : "",
+                            };
+                          });
+                        }}
+                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs ${
+                          bookFormErrors.rack
+                            ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        }`}
+                      >
+                        <option value="">{racks.length === 0 ? "-- No Racks Configured --" : "-- Select Rack --"}</option>
+                        {racks
+                          .filter((r) => r.is_active !== false || String(r.id) === String(bookForm.rack))
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.rack_code} - {r.rack_name} {r.is_active === false ? " (Deactivated)" : ""}
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        type="button"
+                        onClick={() => openAddMasterModal("rack")}
+                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all"
+                        title="Add a new rack"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Add Rack</span>
+                      </Button>
+                    </div>
+                    {bookFormErrors.rack && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.rack}
+                      </p>
+                    )}
+                    {racks.length === 0 && !bookFormErrors.rack && (
+                      <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> No library racks configured. Click &ldquo;+ Add Rack&rdquo; to set up your first rack.
+                      </p>
+                    )}
                   </div>
-                  <select
-                    value={bookForm.rack}
-                    onChange={(e) => {
-                      const newRack = e.target.value;
-                      if (bookFormErrors.rack) {
-                        setBookFormErrors((prev) => ({ ...prev, rack: "" }));
-                      }
-                      setBookForm((prev) => {
-                        const isCurrentShelfInNewRack =
-                          newRack && prev.shelf
-                            ? shelves.some((s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf))
-                            : false;
-                        return {
-                          ...prev,
-                          rack: newRack,
-                          shelf: isCurrentShelfInNewRack ? prev.shelf : "",
-                        };
-                      });
-                    }}
-                    className={`w-full h-9 rounded-md border px-3 text-sm transition-colors ${
-                      bookFormErrors.rack ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  >
-                    <option value="">{racks.length === 0 ? "-- No Racks Available (Click + Add Rack) --" : "-- Select Rack --"}</option>
-                    {racks.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.rack_code} - {r.rack_name}
-                      </option>
-                    ))}
-                  </select>
-                  {bookFormErrors.rack && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.rack}
-                    </p>
-                  )}
-                  {racks.length === 0 && !bookFormErrors.rack && (
-                    <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" /> No racks created yet. Click{" "}
-                      <button type="button" onClick={() => openAddMasterModal("rack")} className="font-bold underline text-indigo-600 hover:text-indigo-800 ml-0.5">
-                        + Add Rack
-                      </button>{" "}
-                      to set up one.
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                  {/* Shelf Location with Side-by-side Add Button */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Shelf Location <span className="text-rose-500">*</span>
                     </Label>
-                    {bookForm.rack && (
-                      <button
-                        type="button"
-                        onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 hover:underline"
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={bookForm.shelf}
+                        onChange={(e) => {
+                          setBookForm({ ...bookForm, shelf: e.target.value });
+                          if (bookFormErrors.shelf) {
+                            setBookFormErrors((prev) => ({ ...prev, shelf: "" }));
+                          }
+                        }}
+                        disabled={!bookForm.rack}
+                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
+                          bookFormErrors.shelf
+                            ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        }`}
                       >
-                        <Plus className="h-3 w-3" /> Add Shelf
-                      </button>
-                    )}
-                  </div>
-                  <select
-                    value={bookForm.shelf}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, shelf: e.target.value });
-                      if (bookFormErrors.shelf) {
-                        setBookFormErrors((prev) => ({ ...prev, shelf: "" }));
-                      }
-                    }}
-                    disabled={!bookForm.rack}
-                    className={`w-full h-9 rounded-md border px-3 text-sm transition-colors disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
-                      bookFormErrors.shelf ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  >
-                    {!bookForm.rack ? (
-                      <option value="">-- Select Rack First --</option>
-                    ) : (
-                      <>
-                        <option value="">
-                          {shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0
-                            ? "-- No Shelves in this Rack (Click + Add Shelf) --"
-                            : "-- Select Shelf --"}
-                        </option>
-                        {shelves
-                          .filter((s) => String(s.rack) === String(bookForm.rack))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.shelf_code} ({s.shelf_name})
+                        {!bookForm.rack ? (
+                          <option value="">-- Select Rack First --</option>
+                        ) : (
+                          <>
+                            <option value="">
+                              {shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0
+                                ? "-- No Shelves in this Rack --"
+                                : "-- Select Shelf --"}
                             </option>
-                          ))}
-                      </>
+                            {shelves
+                              .filter(
+                                (s) =>
+                                  String(s.rack) === String(bookForm.rack) &&
+                                  (s.is_active !== false || String(s.id) === String(bookForm.shelf))
+                              )
+                              .map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.shelf_code} ({s.shelf_name}) {s.is_active === false ? " (Deactivated)" : ""}
+                                </option>
+                              ))}
+                          </>
+                        )}
+                      </select>
+                      <Button
+                        type="button"
+                        disabled={!bookForm.rack}
+                        onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))}
+                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!bookForm.rack ? "Select a rack first" : "Add a new shelf to the selected rack"}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Add Shelf</span>
+                      </Button>
+                    </div>
+                    {bookFormErrors.shelf && (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.shelf}
+                      </p>
                     )}
-                  </select>
-                  {bookFormErrors.shelf && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.shelf}
-                    </p>
-                  )}
-                  {bookForm.rack && shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0 && !bookFormErrors.shelf && (
-                    <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" /> No shelves in this rack. Click{" "}
-                      <button type="button" onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))} className="font-bold underline text-indigo-600 hover:text-indigo-800 ml-0.5">
-                        + Add Shelf
-                      </button>{" "}
-                      to create one.
-                    </p>
-                  )}
+                    {bookForm.rack &&
+                      shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0 &&
+                      !bookFormErrors.shelf && (
+                        <p className="text-[11px] font-medium text-amber-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Selected rack has no shelves yet. Click &ldquo;+ Add Shelf&rdquo; to add one.
+                        </p>
+                      )}
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* 5. Two-column layout: Total Physical Copies & Edition/Year */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-800">
                       Total Physical Copies <span className="text-rose-500">*</span>
                     </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={bookForm.total_copies}
+                      onChange={(e) => {
+                        setBookForm({ ...bookForm, total_copies: Number(e.target.value) });
+                        if (bookFormErrors.total_copies) {
+                          setBookFormErrors((prev) => ({ ...prev, total_copies: "" }));
+                        }
+                      }}
+                      className={`h-10 text-sm rounded-xl transition-colors ${
+                        bookFormErrors.total_copies
+                          ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
+                          : "border-slate-200"
+                      }`}
+                    />
+                    {bookFormErrors.total_copies ? (
+                      <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.total_copies}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        Generates unique sequential SBIN barcodes for each physical copy automatically.
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={bookForm.total_copies}
-                    onChange={(e) => {
-                      setBookForm({ ...bookForm, total_copies: Number(e.target.value) });
-                      if (bookFormErrors.total_copies) {
-                        setBookFormErrors((prev) => ({ ...prev, total_copies: "" }));
-                      }
-                    }}
-                    className={`transition-colors ${
-                      bookFormErrors.total_copies ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200"
-                    }`}
-                  />
-                  {bookFormErrors.total_copies && (
-                    <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {bookFormErrors.total_copies}
-                    </p>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Edition / Year</Label>
-                  <Input
-                    value={bookForm.edition}
-                    onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        setBookForm((prev) => ({ ...prev, edition: toTitleCase(prev.edition) }));
-                      }
-                    }}
-                    placeholder="e.g. 1st Edition E.S.T 800"
-                  />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-800">Edition / Year (Optional)</Label>
+                    <Input
+                      value={bookForm.edition}
+                      onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          setBookForm((prev) => ({ ...prev, edition: toTitleCase(prev.edition) }));
+                        }
+                      }}
+                      placeholder="e.g. 2nd Revised Edition 2024"
+                      className="h-10 text-sm rounded-xl border-slate-200"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => setShowAddBookModal(false)}>
+              {/* Fixed Distinct Footer Area */}
+              <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/90 flex items-center justify-end gap-2.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddBookModal(false)}
+                  className="h-10 px-4 rounded-xl border-slate-200 text-slate-700 font-semibold hover:bg-white"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  {editingBook ? "Update Book" : "Create Book & Generate Barcodes"}
+                <Button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="h-10 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs transition-all gap-1.5"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingBook ? "Update Book" : "Create Book & Generate Barcodes"}</span>
+                  )}
                 </Button>
               </div>
             </form>
@@ -5211,6 +6362,17 @@ export default function LibrarianDashboard() {
                 <X className="h-5 w-5" />
               </button>
             </div>
+
+            {/* Direct Inline Error Alert */}
+            {(issueErrors.general || issueErrors.non_field_errors || issueErrors.student || issueErrors.book || issueErrors.due_date) && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-bold">Issue Request Notice:</span>
+                  <p>{issueErrors.general || issueErrors.non_field_errors || issueErrors.student || issueErrors.book || issueErrors.due_date}</p>
+                </div>
+              </div>
+            )}
 
             <form noValidate onSubmit={handleIssueBook} className="space-y-4">
               {/* STEP 1: BOOK SELECTION & STOCK INFO */}
@@ -6051,270 +7213,375 @@ export default function LibrarianDashboard() {
         </div>
       )}
 
-      {/* MODAL: RETURN BOOK WITH CONDITION */}
-      {showReturnModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Return & Inspect Book</h2>
-                <p className="text-xs text-slate-500">
-                  {showReturnModal.book_title} — {showReturnModal.staff_name || showReturnModal.student_name}
-                </p>
-              </div>
-              <button onClick={() => setShowReturnModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {/* MODAL: RETURN BOOK WITH COMPREHENSIVE FINANCIAL CALCULATION */}
+      {showReturnModal && (() => {
+        const dueDateObj = showReturnModal.due_date ? new Date(showReturnModal.due_date) : new Date();
+        const todayObj = new Date();
+        const dDue = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
+        const dToday = new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate());
+        const graceDays = librarySettings?.grace_period_days ?? 0;
+        const perDayRate = Number(librarySettings?.fine_per_day ?? 2);
+        const msDiff = dToday.getTime() - dDue.getTime();
+        const rawDaysDiff = Math.round(msDiff / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.max(0, rawDaysDiff - graceDays);
+        const calculatedLateFee = daysOverdue > 0 ? daysOverdue * perDayRate : 0;
+        const assessedDamage = (returnForm.condition === "MINOR_DAMAGE" || returnForm.condition === "MAJOR_DAMAGE")
+          ? Number(returnForm.damage_fee || 0)
+          : 0;
+        const assessedLost = returnForm.condition === "LOST"
+          ? Number(returnForm.lost_fee || 0)
+          : 0;
+        const totalReturnFine = calculatedLateFee + assessedDamage + assessedLost;
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Book Physical Condition</Label>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full space-y-4 border border-slate-200 shadow-2xl my-auto animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">Return &amp; Physical Book Inspection</h2>
+                    <p className="text-xs text-slate-500">Counter verification, overdue analysis &amp; penalty settlement</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReturnModal(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Direct Inline Error Alert */}
+              {returnError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-in fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold">Return Processing Notice:</span>
+                    <p>{returnError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Borrower & Book Information Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-900 text-sm">{showReturnModal.book_title}</span>
+                  <span className="font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                    {showReturnModal.accession_no || `BC-${showReturnModal.book}`}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 pt-1 border-t border-slate-200/60">
+                  <div className="font-semibold text-slate-800">
+                    Borrower: <span className="text-indigo-600 font-bold">{toTitleCase(showReturnModal.staff_name || showReturnModal.student_name)}</span>
+                  </div>
+                  {(showReturnModal.student_gr_no || showReturnModal.staff) && (
+                    <span className="font-mono text-slate-500 text-[11px]">
+                      {showReturnModal.staff ? `Staff #${showReturnModal.staff}` : `GR: ${showReturnModal.student_gr_no}`}
+                    </span>
+                  )}
+                  {showReturnModal.student_class && (
+                    <span className="text-slate-500 text-[11px]">
+                      • Class {showReturnModal.student_class} {showReturnModal.student_division ? `(${showReturnModal.student_division})` : ""}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Dates & Overdue Timing Assessment Banner */}
+              <div className="p-3.5 rounded-2xl border transition-all space-y-2.5 bg-white shadow-2xs">
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Issued On</div>
+                    <div className="font-mono font-semibold text-slate-700 mt-0.5">
+                      {showReturnModal.book_issued_date ? new Date(showReturnModal.book_issued_date).toLocaleDateString() : "—"}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Due Date</div>
+                    <div className="font-mono font-bold text-indigo-700 mt-0.5">
+                      {new Date(showReturnModal.due_date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Returned</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      Today ({todayObj.toLocaleDateString()})
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overdue Timing Notice */}
+                {daysOverdue > 0 ? (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Clock className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>+{daysOverdue} Days Overdue</span>
+                    </div>
+                    <div className="font-mono font-black text-rose-700 text-sm">
+                      Late Fine: ₹{calculatedLateFee.toFixed(2)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-semibold">Returned On Time / Within Grace Period • Zero Late Fee</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Physical Condition Selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800">Book Physical Condition on Return *</Label>
                 <select
                   value={returnForm.condition}
-                  onChange={(e) => setReturnForm({ ...returnForm, condition: e.target.value })}
-                  className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm font-semibold"
+                  onChange={(e) => {
+                    const cond = e.target.value;
+                    setReturnForm((prev) => ({
+                      ...prev,
+                      condition: cond,
+                      damage_fee: cond === "MINOR_DAMAGE" || cond === "MAJOR_DAMAGE"
+                        ? (Number(prev.damage_fee) > 0 ? prev.damage_fee : Number(librarySettings?.damage_penalty || 50))
+                        : 0,
+                      lost_fee: cond === "LOST"
+                        ? (Number(prev.lost_fee) > 0 ? prev.lost_fee : Number(librarySettings?.lost_penalty || 100))
+                        : 0,
+                    }));
+                  }}
+                  className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 shadow-2xs"
                 >
-                  <option value="GOOD">Good Condition (No Damage)</option>
-                  <option value="MINOR_DAMAGE">Minor Damage (Torn pages / cover)</option>
-                  <option value="MAJOR_DAMAGE">Major Damage (Water / Unusable)</option>
-                  <option value="LOST">Lost Book</option>
+                  <option value="GOOD">Good Condition (No Physical Damage)</option>
+                  <option value="MINOR_DAMAGE">Minor Damage (Torn pages / marked / cover bent)</option>
+                  <option value="MAJOR_DAMAGE">Major Damage (Water damaged / spine broken / unusable)</option>
+                  <option value="LOST">Lost Book (Unreturned copy declared lost)</option>
                 </select>
               </div>
 
-              {returnForm.condition !== "GOOD" && returnForm.condition !== "LOST" && (
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Damage Penalty Fee (₹)</Label>
+              {/* Condition Specific Damage / Lost Fee Inputs */}
+              {(returnForm.condition === "MINOR_DAMAGE" || returnForm.condition === "MAJOR_DAMAGE") && (
+                <div className="space-y-2 p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-amber-950">Assessed Physical Damage Cost (₹)</Label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                      Standard: ₹{librarySettings?.damage_penalty || 50}
+                    </span>
+                  </div>
                   <Input
                     type="number"
+                    min="0"
                     value={returnForm.damage_fee}
                     onChange={(e) => setReturnForm({ ...returnForm, damage_fee: Number(e.target.value) })}
+                    className="bg-white border-amber-300 font-bold text-slate-900"
+                    placeholder="Enter assessed damage amount in ₹"
                   />
                 </div>
               )}
 
               {returnForm.condition === "LOST" && (
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Lost Penalty Fee (₹)</Label>
+                <div className="space-y-2 p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-rose-950">Lost Book Replacement Penalty (₹)</Label>
+                    <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
+                      Standard: ₹{librarySettings?.lost_penalty || 100}
+                    </span>
+                  </div>
                   <Input
                     type="number"
+                    min="0"
                     value={returnForm.lost_fee}
                     onChange={(e) => setReturnForm({ ...returnForm, lost_fee: Number(e.target.value) })}
+                    className="bg-white border-rose-300 font-bold text-slate-900"
+                    placeholder="Enter replacement fee in ₹"
                   />
                 </div>
               )}
 
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Inspector Remarks (Optional)</Label>
-                <Input
-                  value={returnForm.remarks}
-                  onChange={(e) => setReturnForm({ ...returnForm, remarks: e.target.value })}
-                  placeholder="e.g. Returned on time, pages verified"
-                />
-              </div>
-
-              {/* Instant Fine Payment on Return */}
-              <div className="pt-2 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="return_pay_now"
-                    checked={returnForm.pay_now}
-                    onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <label htmlFor="return_pay_now" className="text-xs font-semibold text-slate-800">
-                    Collect Fine Now (Instant Payment Settlement)
-                  </label>
+              {/* Itemized Financial Assessment Ledger */}
+              <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-200/80 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                  <span>Return Financial Ledger</span>
+                  <span className="text-[10px] font-mono lowercase text-indigo-600">rate: ₹{perDayRate}/day</span>
                 </div>
-                {returnForm.pay_now && (
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Payment Method</Label>
-                    <select
-                      value={returnForm.payment_method}
-                      onChange={(e) => setReturnForm({ ...returnForm, payment_method: e.target.value })}
-                      className="w-full h-9 rounded-md border border-slate-200 px-3 text-xs bg-white"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Online">Online</option>
-                      <option value="Card">Card</option>
-                    </select>
+
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Overdue Delay Penalty ({daysOverdue} days):</span>
+                    <span className="font-mono font-bold text-slate-900">₹{calculatedLateFee.toFixed(2)}</span>
+                  </div>
+                  {assessedDamage > 0 && (
+                    <div className="flex items-center justify-between text-amber-800">
+                      <span>Condition Damage Cost:</span>
+                      <span className="font-mono font-bold">₹{assessedDamage.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {assessedLost > 0 && (
+                    <div className="flex items-center justify-between text-rose-800">
+                      <span>Lost Book Replacement Fee:</span>
+                      <span className="font-mono font-bold">₹{assessedLost.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-indigo-200/80 flex items-center justify-between text-sm">
+                    <span className="font-bold text-slate-900">Total Assessed Return Penalty:</span>
+                    <span className="font-mono font-black text-indigo-700 text-base">₹{totalReturnFine.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Instant Fine Collection or Mark as Pending Due */}
+                {totalReturnFine > 0 ? (
+                  <div className="pt-3 border-t border-indigo-200/60 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={returnForm.pay_now}
+                          onChange={(e) => setReturnForm({ ...returnForm, pay_now: e.target.checked })}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Collect Fine Now at Counter (Instant Settlement)</span>
+                      </label>
+                      {!returnForm.pay_now && (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
+                          Due (Unpaid)
+                        </span>
+                      )}
+                    </div>
+
+                    {returnForm.pay_now ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReturnForm({ ...returnForm, payment_method: "Cash" })}
+                            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
+                              returnForm.payment_method === "Cash"
+                                ? "bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/20"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
+                            }`}
+                          >
+                            <DollarSign className="h-4 w-4" /> Cash Counter
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReturnForm({ ...returnForm, payment_method: "Online" })}
+                            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
+                              returnForm.payment_method === "Online"
+                                ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/20"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40"
+                            }`}
+                          >
+                            <CreditCard className="h-4 w-4" /> Online / UPI
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 font-medium">
+                          Collect ₹{totalReturnFine.toFixed(2)} via {returnForm.payment_method}. Official receipt will be generated automatically.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-rose-700 font-medium">
+                        ₹{totalReturnFine.toFixed(2)} will be recorded as Outstanding Due under borrower's account.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-indigo-200/60 text-[11px] text-emerald-700 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Book returned in good standing with zero financial liability.
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => setShowReturnModal(null)}>
+              {/* Remarks */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-slate-700">Inspector Remarks (Optional)</Label>
+                <Input
+                  value={returnForm.remarks}
+                  onChange={(e) => setReturnForm({ ...returnForm, remarks: e.target.value })}
+                  placeholder="e.g. Returned on time, pages verified"
+                  className="bg-white text-xs"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowReturnModal(null)}
+                  disabled={actionLoading}
+                  className="text-xs rounded-xl"
+                >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleFinalizeReturn}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl px-4 shadow-sm"
                 >
-                  Complete Return
+                  {actionLoading ? "Processing Return..." : (totalReturnFine > 0 && returnForm.pay_now ? `Collect ₹${totalReturnFine.toFixed(2)} & Complete Return` : "Complete Return")}
                 </Button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: BOOK COPIES & BARCODES */}
-      {showCopiesModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Physical Copies & Barcodes</h2>
-                <p className="text-xs text-slate-500">{showCopiesModal.title}</p>
-              </div>
-              <button onClick={() => setShowCopiesModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Copies list with transfer & status change */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase text-slate-500">Registered Accession Copies ({bookCopiesList.length})</h4>
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {bookCopiesList.map((copy) => (
-                  <div key={copy.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="font-mono text-xs font-bold text-slate-900">{copy.accession_no}</div>
-                      <div className="text-[11px] text-slate-500">
-                        Barcode: {copy.barcode || "N/A"} • Rack: {copy.rack_code || "—"} • Shelf: {copy.shelf_code || "—"}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Condition: {copy.condition}</div>
-                    </div>
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                      <select
-                        value={copy.status}
-                        onChange={(e) => handleChangeCopyStatus(copy.id, e.target.value)}
-                        disabled={copy.status === "ISSUED" || copy.status === "RESERVED"}
-                        className="h-7 text-[11px] rounded border border-slate-200 bg-white px-2 font-medium disabled:bg-slate-100 disabled:text-slate-500"
-                        title={copy.status === "ISSUED" ? "Cannot change status while book is issued on loan" : ""}
-                      >
-                        <option value="AVAILABLE">Available</option>
-                        <option value="ISSUED">Issued (On Loan)</option>
-                        <option value="RESERVED">Reserved</option>
-                        <option value="UNDER_REPAIR">Under Repair</option>
-                        <option value="DAMAGED">Damaged</option>
-                        <option value="LOST">Lost</option>
-                        <option value="DISPOSED">Disposed</option>
-                      </select>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setTransferCopyModal(copy);
-                          setTransferForm({
-                            rack_id: copy.rack ? String(copy.rack) : "",
-                            shelf_id: copy.shelf ? String(copy.shelf) : "",
-                          });
-                        }}
-                        className="h-7 text-[11px] px-2 border-slate-200 bg-white hover:bg-slate-50 text-indigo-600"
-                      >
-                        <ArrowRightLeft className="h-3 w-3 mr-1" /> Transfer
-                      </Button>
-                      {copy.status !== "DISPOSED" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDisposeCopy(copy.id)}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
-                          title="Dispose physical copy"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Add extra copies form */}
-            <form noValidate onSubmit={handleGenerateCopies} className="pt-3 border-t space-y-3">
-              <h4 className="text-xs font-bold uppercase text-slate-500">Generate Additional Copies</h4>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">Count</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={generateCopiesForm.count}
-                    onChange={(e) => setGenerateCopiesForm({ ...generateCopiesForm, count: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Rack</Label>
-                  <select
-                    value={generateCopiesForm.rack_id}
-                    onChange={(e) => {
-                      const newRack = e.target.value;
-                      setGenerateCopiesForm((prev) => {
-                        const isShelfInNewRack =
-                          newRack && prev.shelf_id
-                            ? shelves.some((s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf_id))
-                            : false;
-                        return {
-                          ...prev,
-                          rack_id: newRack,
-                          shelf_id: isShelfInNewRack ? prev.shelf_id : "",
-                        };
-                      });
-                    }}
-                    className="w-full h-9 rounded-md border border-slate-200 text-xs px-2"
-                  >
-                    <option value="">-- Rack --</option>
-                    {racks.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.rack_code}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label className="text-xs">Shelf</Label>
-                  <select
-                    value={generateCopiesForm.shelf_id}
-                    onChange={(e) => setGenerateCopiesForm({ ...generateCopiesForm, shelf_id: e.target.value })}
-                    disabled={!generateCopiesForm.rack_id}
-                    className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    {!generateCopiesForm.rack_id ? (
-                      <option value="">-- Select Rack First --</option>
-                    ) : (
-                      <>
-                        <option value="">-- Shelf --</option>
-                        {shelves
-                          .filter((s) => String(s.rack) === String(generateCopiesForm.rack_id))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.shelf_code} ({s.shelf_name})
-                            </option>
-                          ))}
-                      </>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowCopiesModal(null)}>
-                  Close
-                </Button>
-                <Button type="submit" size="sm" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Generate Barcodes
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ManageCopiesModal
+        isOpen={!!showCopiesModal}
+        onClose={() => setShowCopiesModal(null)}
+        book={showCopiesModal}
+        copies={bookCopiesList}
+        racks={racks}
+        shelves={shelves}
+        actionLoading={actionLoading}
+        onGenerateCopies={async (count, rackId, shelfId) => {
+          if (!showCopiesModal) return;
+          setActionLoading(true);
+          try {
+            await generateBookCopies({
+              book_id: showCopiesModal.id,
+              count: Number(count),
+              rack_id: rackId ? Number(rackId) : null,
+              shelf_id: shelfId ? Number(shelfId) : null,
+            });
+            showToast("success", `${count} physical copy barcode(s) generated!`);
+            const updatedCopies = await getBookCopies(showCopiesModal.id);
+            setBookCopiesList(updatedCopies);
+            await loadAllData();
+          } catch (err: any) {
+            showToast("error", err.message || "Failed to generate copies.");
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+        onChangeStatus={handleChangeCopyStatus}
+        onTransferClick={(copy) => {
+          setTransferCopyModal(copy);
+          setTransferForm({
+            rack_id: copy.rack ? String(copy.rack) : "",
+            shelf_id: copy.shelf ? String(copy.shelf) : "",
+          });
+        }}
+        onDisposeClick={handleDisposeCopy}
+        onPrintSticker={(copy) => {
+          setPrintStickerModal({
+            isOpen: true,
+            copy,
+            book: showCopiesModal,
+          });
+        }}
+        onPrintAllBarcodes={(b, cps) => {
+          setPrintStickerModal({
+            isOpen: true,
+            book: b,
+            allCopies: cps,
+          });
+        }}
+      />
 
       {/* MODAL: ADD MASTER */}
       {showMasterModal && (
@@ -6370,8 +7637,6 @@ export default function LibrarianDashboard() {
                     ? editingMaster ? "Shelf Name / Number *" : "Shelf Name(s) / Number(s) * (comma-separated for multiple)"
                     : showMasterModal === "author"
                     ? "Author Full Name *"
-                    : showMasterModal === "publisher"
-                    ? "Publisher Name *"
                     : "Category / Subject Name *"}
                 </Label>
                 <Input
@@ -6387,8 +7652,6 @@ export default function LibrarianDashboard() {
                       ? "e.g. Shelf 1, Shelf 2, Shelf 3, Shelf 4"
                       : showMasterModal === "author"
                       ? "e.g. H.C. Verma"
-                      : showMasterModal === "publisher"
-                      ? "e.g. Oxford University Press"
                       : "e.g. Physics / Mathematics"
                   }
                   className={
@@ -6445,27 +7708,6 @@ export default function LibrarianDashboard() {
                 )}
               </div>
 
-              {showMasterModal === "publisher" && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Contact Phone (Optional)</Label>
-                    <Input
-                      value={masterForm.extra}
-                      onChange={(e) => setMasterForm({ ...masterForm, extra: e.target.value })}
-                      placeholder="+91 9876543210"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Contact Email (Optional)</Label>
-                    <Input
-                      value={masterForm.extra2}
-                      onChange={(e) => setMasterForm({ ...masterForm, extra2: e.target.value })}
-                      placeholder="contact@publisher.com"
-                    />
-                  </div>
-                </>
-              )}
-
               {showMasterModal === "category" && (
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Description (Optional)</Label>
@@ -6501,171 +7743,225 @@ export default function LibrarianDashboard() {
       )}
 
       {/* MODAL: COLLECT FINE PAYMENT */}
-      {finePaymentModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-indigo-600" /> Collect Library Fine
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {finePaymentModal.book_title} — {finePaymentModal.staff_name || finePaymentModal.student_name}
-                </p>
-              </div>
-              <button onClick={() => setFinePaymentModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {finePaymentModal && (() => {
+        const modalLate = Number(finePaymentModal.late_fees || 0);
+        const modalDamage = Number(finePaymentModal.damage_fees || 0);
+        const modalLost = Number(finePaymentModal.lost_fees || 0);
+        const modalExplicitTotal = Number(finePaymentModal.total_fine || 0);
+        const modalTotal = modalExplicitTotal > 0 ? modalExplicitTotal : (modalLate + modalDamage + modalLost);
+        const modalPaid = Number(finePaymentModal.fine_paid_amount || 0);
+        const modalRemaining = finePaymentModal.fine_remaining !== undefined && finePaymentModal.fine_remaining !== null && Number(finePaymentModal.fine_remaining) > 0
+          ? Number(finePaymentModal.fine_remaining)
+          : Math.max(0, modalTotal - modalPaid);
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
-              <div className="flex justify-between text-slate-600">
-                <span>Total Assessment Fine:</span>
-                <span className="font-mono font-bold text-slate-800">₹{finePaymentModal.total_fine}</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Previously Settled / Paid:</span>
-                <span className="font-mono text-emerald-600">₹{finePaymentModal.fine_paid_amount || "0.00"}</span>
-              </div>
-              <div className="flex justify-between text-rose-700 font-bold border-t pt-1">
-                <span>Remaining Balance Due:</span>
-                <span className="font-mono text-base">
-                  ₹{Math.max(0, Number(finePaymentModal.total_fine) - Number(finePaymentModal.fine_paid_amount || 0)).toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <form noValidate onSubmit={handleSubmitPayFine} className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Payment Amount (₹) *</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={finePaymentForm.amount}
-                  onChange={(e) => {
-                    setFinePaymentForm({ ...finePaymentForm, amount: e.target.value });
-                    if (finePaymentError) setFinePaymentError("");
-                  }}
-                  className={
-                    finePaymentError
-                      ? "border-rose-500 bg-rose-50/40 text-slate-900 focus-visible:ring-rose-200"
-                      : ""
-                  }
-                />
-                {finePaymentError ? (
-                  <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{finePaymentError}</span>
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-slate-400">Supports partial or full fine collection.</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Payment Method *</Label>
-                <select
-                  value={finePaymentForm.payment_method}
-                  onChange={(e) => setFinePaymentForm({ ...finePaymentForm, payment_method: e.target.value })}
-                  className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm bg-white"
-                >
-                  <option value="Cash">Cash Counter</option>
-                  <option value="UPI">UPI / QR Code</option>
-                  <option value="Online">Online NetBanking</option>
-                  <option value="Card">Debit / Credit Card</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t">
-                <Button type="button" variant="outline" size="sm" onClick={() => setFinePaymentModal(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-medium">
-                  {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Receipt className="h-3.5 w-3.5" />}
-                  Record Payment & Generate Receipt
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: PRINTABLE RECEIPT */}
-      {receiptModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl printable-area">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-lg font-bold text-slate-900">Library Fine Receipt</h2>
-              </div>
-              <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 space-y-3 font-mono text-xs">
-              <div className="text-center border-b pb-2">
-                <div className="font-bold text-sm text-slate-900">OFFICIAL LIBRARY RECEIPT</div>
-                <div className="text-[11px] text-slate-500">School Library Management System</div>
-                <div className="text-[11px] text-indigo-700 font-bold mt-1">Receipt No: {receiptModal.receipt_no}</div>
-              </div>
-
-              <div className="space-y-1.5 pt-1 text-slate-700">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Date & Time:</span>
-                  <span>{new Date().toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Borrower:</span>
-                  <span className="font-bold">{receiptModal.record?.staff_name || receiptModal.record?.student_name}</span>
-                </div>
-                {receiptModal.record?.student_gr_no && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">GR Number:</span>
-                    <span>{receiptModal.record.student_gr_no}</span>
+        return (
+          <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-5 border border-slate-200 shadow-2xl relative my-auto">
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-slate-200/80 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs shrink-0">
+                    <Receipt className="h-5 w-5" />
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Book Title:</span>
-                  <span className="text-right max-w-[200px] truncate">{receiptModal.record?.book_title}</span>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Collect Library Fine</h2>
+                    <p className="text-xs text-slate-500">Record counter payment, clear student dues & issue digital receipt</p>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Payment Mode:</span>
-                  <span>{receiptModal.record?.payment_method || "Cash"}</span>
+                <button
+                  type="button"
+                  onClick={() => setFinePaymentModal(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* INLINE ERROR BANNER IF ANY */}
+              {finePaymentError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-in fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold">Payment Error:</span>
+                    <p>{finePaymentError}</p>
+                  </div>
                 </div>
-                <div className="border-t pt-1 flex justify-between font-bold text-slate-900 text-sm">
-                  <span>Amount Paid:</span>
-                  <span className="text-emerald-700">₹{receiptModal.amount_paid}</span>
-                </div>
-                <div className="flex justify-between text-slate-500 text-[11px]">
-                  <span>Remaining Due:</span>
-                  <span className={Number(receiptModal.remaining_due) > 0 ? "text-rose-600 font-bold" : "text-slate-500"}>
-                    ₹{receiptModal.remaining_due}
+              )}
+
+              {/* Borrower & Loan Details Card */}
+              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
+                      {(finePaymentModal.student_name || finePaymentModal.staff_name || "B").charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {toTitleCase(finePaymentModal.student_name || finePaymentModal.staff_name || "Borrower")}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-mono">
+                        {finePaymentModal.student_gr_no ? `GR No: ${finePaymentModal.student_gr_no}` : finePaymentModal.staff ? `Staff ID: ${finePaymentModal.staff}` : "Library Member"}
+                        {finePaymentModal.student_class ? ` • ${finePaymentModal.student_class} ${finePaymentModal.student_division || ""}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                    finePaymentModal.condition_on_return === "LOST"
+                      ? "bg-rose-100 text-rose-800 border border-rose-200"
+                      : finePaymentModal.condition_on_return === "MAJOR_DAMAGE"
+                      ? "bg-amber-100 text-amber-800 border border-amber-200"
+                      : "bg-blue-100 text-blue-800 border border-blue-200"
+                  }`}>
+                    {finePaymentModal.condition_on_return || finePaymentModal.status}
                   </span>
                 </div>
+
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <BookOpen className="h-3.5 w-3.5 text-indigo-500" />
+                    <span className="font-semibold text-slate-800">{finePaymentModal.book_title}</span>
+                  </div>
+                  {finePaymentModal.accession_no && (
+                    <span className="font-mono text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Acc: {finePaymentModal.accession_no}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="text-center border-t pt-2 text-[10px] text-slate-400 italic">
-                {receiptModal.is_fine_paid ? "All library dues for this loan transaction are fully settled." : "Partial settlement recorded."}
+              {/* Itemized Assessment Breakdown Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+                <div className="font-bold text-slate-700 text-[11px] uppercase tracking-wider">Fine Assessment Breakdown</div>
+                
+                {modalLate > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Late Return Fee:</span>
+                    <span className="font-mono font-bold text-slate-800">₹{modalLate.toFixed(2)}</span>
+                  </div>
+                )}
+                {modalDamage > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Physical Damage Penalty:</span>
+                    <span className="font-mono font-bold text-amber-800">₹{modalDamage.toFixed(2)}</span>
+                  </div>
+                )}
+                {modalLost > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Lost Book Replacement Fee:</span>
+                    <span className="font-mono font-bold text-rose-800">₹{modalLost.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-2 font-medium">
+                  <span>Total Assessed Penalty:</span>
+                  <span className="font-mono font-bold text-slate-900">₹{modalTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-emerald-700 font-medium">
+                  <span>Previously Settled / Paid:</span>
+                  <span className="font-mono font-bold">₹{modalPaid.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center bg-rose-50 p-2.5 rounded-xl border border-rose-200 text-rose-800 font-bold mt-1">
+                  <span className="text-xs">Outstanding Balance Due:</span>
+                  <span className="font-mono text-base font-black">₹{modalRemaining.toFixed(2)}</span>
+                </div>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setReceiptModal(null)}>
-                Close
-              </Button>
-              <Button
-                onClick={() => window.print()}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-medium"
-              >
-                <Printer className="h-3.5 w-3.5" /> Print Receipt
-              </Button>
+              <form noValidate onSubmit={handleSubmitPayFine} className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-800">Payment Collection Amount (₹) *</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFinePaymentForm({ ...finePaymentForm, amount: modalRemaining.toFixed(2) });
+                        if (finePaymentError) setFinePaymentError("");
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      Fill Full Balance (₹{modalRemaining.toFixed(2)})
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      max={modalRemaining}
+                      value={finePaymentForm.amount}
+                      onChange={(e) => {
+                        setFinePaymentForm({ ...finePaymentForm, amount: e.target.value });
+                        if (finePaymentError) setFinePaymentError("");
+                      }}
+                      className={`pl-8 h-11 text-base font-bold rounded-xl ${
+                        finePaymentError
+                          ? "border-rose-500 bg-rose-50/40 text-slate-900 focus-visible:ring-rose-200"
+                          : "border-slate-200 bg-white"
+                      }`}
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400">Supports partial settlement or full fee clearance.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-800">Payment Collection Mode *</Label>
+                  <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFinePaymentForm({ ...finePaymentForm, payment_method: "Cash" })}
+                      className={`flex items-center justify-center gap-2 py-3 px-3.5 rounded-2xl border text-xs font-bold transition-all ${
+                        finePaymentForm.payment_method === "Cash"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                      }`}
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      <span>Cash Counter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFinePaymentForm({ ...finePaymentForm, payment_method: "Online" })}
+                      className={`flex items-center justify-center gap-2 py-3 px-3.5 rounded-2xl border text-xs font-bold transition-all ${
+                        finePaymentForm.payment_method === "Online"
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/20"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50"
+                      }`}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span>Online / UPI</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200/80">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFinePaymentModal(null)}
+                    className="rounded-xl px-4 text-xs font-bold h-10 text-slate-600 border-slate-200 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={actionLoading || Number(finePaymentForm.amount) <= 0}
+                    className="rounded-xl px-5 text-xs font-bold h-10 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-xs"
+                  >
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                    <span>Collect ₹{Number(finePaymentForm.amount || 0).toFixed(2)} & Print Receipt</span>
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* MODAL: PRINTABLE RECEIPT */}
+      <LibraryFineReceiptModal
+        isOpen={!!receiptModal}
+        onClose={() => setReceiptModal(null)}
+        receiptData={receiptModal}
+      />
 
       {/* MODAL: TRANSFER PHYSICAL COPY */}
       {transferCopyModal && (
@@ -6690,11 +7986,13 @@ export default function LibrarianDashboard() {
                   className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white"
                 >
                   <option value="">-- No Rack --</option>
-                  {racks.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.rack_code} — {r.rack_name}
-                    </option>
-                  ))}
+                  {racks
+                    .filter((r) => r.is_active !== false || String(r.id) === String(transferForm.rack_id))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.rack_code} — {r.rack_name} {r.is_active === false ? " (Deactivated)" : ""}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -6712,10 +8010,14 @@ export default function LibrarianDashboard() {
                     <>
                       <option value="">-- No Shelf --</option>
                       {shelves
-                        .filter((s) => String(s.rack) === String(transferForm.rack_id))
+                        .filter(
+                          (s) =>
+                            String(s.rack) === String(transferForm.rack_id) &&
+                            (s.is_active !== false || String(s.id) === String(transferForm.shelf_id))
+                        )
                         .map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.shelf_code} ({s.shelf_name})
+                            {s.shelf_code} ({s.shelf_name}) {s.is_active === false ? " (Deactivated)" : ""}
                           </option>
                         ))}
                     </>
@@ -6735,6 +8037,721 @@ export default function LibrarianDashboard() {
           </div>
         </div>
       )}
+
+      {/* REUSABLE CUSTOM DELETE CONFIRMATION MODAL */}
+      <ConfirmDeleteModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        itemName={confirmModal.itemName}
+        itemType={confirmModal.itemType}
+        description={confirmModal.description}
+        consequences={confirmModal.consequences}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDestructive={confirmModal.isDestructive}
+      />
+
+      {/* BARCODE STICKERS & LABELS PRINT MODAL */}
+      <PrintBarcodeStickerModal
+        isOpen={printStickerModal.isOpen}
+        onClose={() => setPrintStickerModal((prev) => ({ ...prev, isOpen: false }))}
+        copy={printStickerModal.copy}
+        book={printStickerModal.book}
+        allCopies={printStickerModal.allCopies}
+      />
+
+      {/* ================= MOBILE BOTTOM DRAWERS ================= */}
+      {/* 1. Mobile Book Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileBook}
+        onClose={() => setSelectedMobileBook(null)}
+        title={selectedMobileBook ? toTitleCase(selectedMobileBook.title) : ""}
+        subtitle={selectedMobileBook?.subtitle ? toTitleCase(selectedMobileBook.subtitle) : undefined}
+        badge={
+          selectedMobileBook ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                selectedMobileBook.available_copies > 0
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-rose-50 text-rose-700 border border-rose-200"
+              }`}
+            >
+              {selectedMobileBook.available_copies > 0
+                ? `${selectedMobileBook.available_copies} / ${selectedMobileBook.total_copies} Available`
+                : "Out of Stock"}
+            </span>
+          ) : undefined
+        }
+        actions={
+          selectedMobileBook && (
+            <div className="flex flex-col gap-2 w-full">
+              {selectedMobileBook.available_copies > 0 && (
+                <Button
+                  onClick={() => {
+                    const b = selectedMobileBook;
+                    setSelectedMobileBook(null);
+                    setIssueForm({
+                      book: String(b.id),
+                      book_copy: "",
+                      student: "",
+                      due_date: new Date(Date.now() + (settingsForm.issue_duration_days || 14) * 86400000)
+                        .toISOString()
+                        .split("T")[0],
+                    });
+                    setShowIssueModal(true);
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <ArrowRightLeft className="h-4 w-4" /> Issue This Book
+                </Button>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const b = selectedMobileBook;
+                    setSelectedMobileBook(null);
+                    setShowCopiesModal(b);
+                    try {
+                      const copies = await getBookCopies(b.id);
+                      setBookCopiesList(copies);
+                    } catch {
+                      setBookCopiesList([]);
+                    }
+                  }}
+                  className="text-xs h-9 font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-xl gap-1"
+                >
+                  <QrCode className="h-3.5 w-3.5" /> Copies ({selectedMobileBook.total_copies})
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const b = selectedMobileBook;
+                    setSelectedMobileBook(null);
+                    try {
+                      const copies = await getBookCopies(b.id);
+                      setPrintStickerModal({
+                        isOpen: true,
+                        book: b,
+                        allCopies: copies,
+                      });
+                    } catch {
+                      setPrintStickerModal({
+                        isOpen: true,
+                        book: b,
+                        allCopies: [],
+                      });
+                    }
+                  }}
+                  className="text-xs h-9 font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Stickers
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const b = selectedMobileBook;
+                    setSelectedMobileBook(null);
+                    setEditingBook(b);
+                    setBookFormErrors({});
+                    setBookForm({
+                      title: toTitleCase(b.title),
+                      subtitle: toTitleCase(b.subtitle || ""),
+                      isbn: b.isbn || "",
+                      author: toTitleCase(b.author),
+                      category: toTitleCase(b.category),
+                      category_ref: b.category_ref ? String(b.category_ref) : "",
+                      author_ref: b.author_ref ? String(b.author_ref) : "",
+                      rack: b.rack ? String(b.rack) : "",
+                      shelf: b.shelf ? String(b.shelf) : "",
+                      edition: toTitleCase(b.edition || ""),
+                      publication_year: b.publication_year || new Date().getFullYear(),
+                      language: b.language || "English",
+                      pages: Number(b.pages) || 200,
+                      price: Number(b.price) || 150,
+                      total_copies: Number(b.total_copies) || 1,
+                      description: b.description || "",
+                    });
+                    setShowAddBookModal(true);
+                  }}
+                  className="text-xs h-9 font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1"
+                >
+                  <Edit className="h-3.5 w-3.5" /> Edit Details
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const b = selectedMobileBook;
+                    setSelectedMobileBook(null);
+                    handleDeleteBook(b);
+                  }}
+                  className="text-xs h-9 font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl gap-1"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </Button>
+              </div>
+            </div>
+          )
+        }
+      >
+        {selectedMobileBook && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Author</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">{toTitleCase(selectedMobileBook.author)}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Category</p>
+                <p className="text-xs font-bold text-indigo-700 mt-0.5">{toTitleCase(selectedMobileBook.category) || "General"}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">ISBN / Barcode</p>
+                <p className="text-xs font-mono font-bold text-slate-800 mt-0.5">{selectedMobileBook.isbn || "—"}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Price</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">₹{selectedMobileBook.price}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Physical Rack</p>
+                <p className="text-xs font-bold text-amber-800 mt-0.5">
+                  {selectedMobileBook.rack_code ? `Rack ${selectedMobileBook.rack_code}` : "Unassigned"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Shelf Location</p>
+                <p className="text-xs font-bold text-slate-700 mt-0.5">
+                  {selectedMobileBook.shelf_code ? `Shelf ${selectedMobileBook.shelf_code}` : "Unassigned"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Edition / Year</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileBook.edition || "1st"} • {selectedMobileBook.publication_year || "—"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Language / Pages</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileBook.language || "English"} • {selectedMobileBook.pages || 0} pgs
+                </p>
+              </div>
+            </div>
+            {selectedMobileBook.description && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Book Overview / Synopsis</p>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">{selectedMobileBook.description}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </MobileBottomDrawer>
+
+      {/* 2. Mobile Loan Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileLoan}
+        onClose={() => setSelectedMobileLoan(null)}
+        title={selectedMobileLoan ? toTitleCase(selectedMobileLoan.book_title) : ""}
+        subtitle={selectedMobileLoan ? `Accession: ${selectedMobileLoan.accession_no || `BC-${selectedMobileLoan.book}`}` : undefined}
+        badge={
+          selectedMobileLoan ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                new Date(selectedMobileLoan.due_date) < new Date()
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+              }`}
+            >
+              {new Date(selectedMobileLoan.due_date) < new Date() ? "Overdue" : "Active Loan"}
+            </span>
+          ) : undefined
+        }
+        actions={
+          selectedMobileLoan && (
+            <div className="flex flex-col gap-2 w-full">
+              <Button
+                onClick={() => {
+                  const loan = selectedMobileLoan;
+                  setSelectedMobileLoan(null);
+                  setShowReturnModal(loan);
+                  setReturnForm({
+                    condition: "GOOD",
+                    remarks: "",
+                    damage_fee: Number(librarySettings?.damage_penalty || 50),
+                    lost_fee: Number(librarySettings?.lost_penalty || 100),
+                    pay_now: true,
+                    payment_method: "Cash",
+                  });
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Return / Check-In Book
+              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const loan = selectedMobileLoan;
+                    setSelectedMobileLoan(null);
+                    handleRenewBook(loan.id);
+                  }}
+                  className="text-xs h-9 font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-xl gap-1"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Renew ({Math.max(0, (librarySettings?.max_renewal_count || 2) - (selectedMobileLoan.renewal_count || 0))} left)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const loan = selectedMobileLoan;
+                    setSelectedMobileLoan(null);
+                    handleMarkLost(loan.id, loan.book_title);
+                  }}
+                  className="text-xs h-9 font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl gap-1"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Report Lost
+                </Button>
+              </div>
+            </div>
+          )
+        }
+      >
+        {selectedMobileLoan && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Borrower</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">
+                  {toTitleCase(selectedMobileLoan.staff_name || selectedMobileLoan.student_name || "Unknown")}
+                </p>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {selectedMobileLoan.staff ? `Staff #${selectedMobileLoan.staff}` : `GR: ${selectedMobileLoan.student_gr_no || "N/A"}`}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Accession No</p>
+                <p className="text-xs font-mono font-bold text-indigo-700 mt-0.5">
+                  {selectedMobileLoan.accession_no || `BC-${selectedMobileLoan.book}`}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Issued On</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {new Date(selectedMobileLoan.book_issued_date).toLocaleDateString("en-GB")}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Due Date</p>
+                <p className={`text-xs font-bold mt-0.5 ${new Date(selectedMobileLoan.due_date) < new Date() ? "text-rose-600" : "text-slate-800"}`}>
+                  {new Date(selectedMobileLoan.due_date).toLocaleDateString("en-GB")}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Total / Late Fine</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  ₹{selectedMobileLoan.total_fine || selectedMobileLoan.late_fees || 0}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Renewal Times</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileLoan.renewal_count || 0} / {librarySettings?.max_renewal_count || 2}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </MobileBottomDrawer>
+
+      {/* 3. Mobile History Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileHistory}
+        onClose={() => setSelectedMobileHistory(null)}
+        title={selectedMobileHistory ? toTitleCase(selectedMobileHistory.book_title) : ""}
+        subtitle={selectedMobileHistory ? `Accession: ${selectedMobileHistory.accession_no || `BC-${selectedMobileHistory.book}`}` : undefined}
+        badge={
+          selectedMobileHistory ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                selectedMobileHistory.status === "RETURNED"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : selectedMobileHistory.status === "LOST"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}
+            >
+              {selectedMobileHistory.condition_on_return || selectedMobileHistory.status}
+            </span>
+          ) : undefined
+        }
+        actions={
+          selectedMobileHistory && (
+            <div className="flex flex-col gap-2 w-full">
+              {Math.max(0, Number(selectedMobileHistory.total_fine || selectedMobileHistory.late_fees || 0) - Number(selectedMobileHistory.fine_paid_amount || 0)) > 0 ? (
+                <Button
+                  onClick={() => {
+                    const h = selectedMobileHistory;
+                    setSelectedMobileHistory(null);
+                    handleOpenPayFine(h);
+                  }}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <DollarSign className="h-4 w-4" /> Collect Fine (₹{Math.max(0, Number(selectedMobileHistory.total_fine || selectedMobileHistory.late_fees || 0) - Number(selectedMobileHistory.fine_paid_amount || 0))})
+                </Button>
+              ) : selectedMobileHistory.is_fine_paid && selectedMobileHistory.payment_receipt_no ? (
+                <Button
+                  onClick={() => {
+                    const h = selectedMobileHistory;
+                    setSelectedMobileHistory(null);
+                    setReceiptModal({
+                      detail: "Paid",
+                      receipt_no: h.payment_receipt_no || "",
+                      amount_paid: String(h.fine_paid_amount || h.total_fine || 0),
+                      remaining_due: "0.00",
+                      is_fine_paid: true,
+                      record: h,
+                    });
+                  }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <Receipt className="h-4 w-4" /> View Payment Receipt
+                </Button>
+              ) : null}
+            </div>
+          )
+        }
+      >
+        {selectedMobileHistory && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Borrower</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">
+                  {toTitleCase(selectedMobileHistory.staff_name || selectedMobileHistory.student_name || "Unknown")}
+                </p>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {selectedMobileHistory.staff ? `Staff #${selectedMobileHistory.staff}` : `GR: ${selectedMobileHistory.student_gr_no || "N/A"}`}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Condition on Return</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileHistory.condition_on_return || selectedMobileHistory.status}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Issued On</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileHistory.book_issued_date ? new Date(selectedMobileHistory.book_issued_date).toLocaleDateString("en-GB") : "—"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Returned On</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileHistory.actual_return_date ? new Date(selectedMobileHistory.actual_return_date).toLocaleDateString("en-GB") : "Not Returned"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Total Fine</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  ₹{Number(selectedMobileHistory.total_fine || selectedMobileHistory.late_fees || 0)}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Payment Status</p>
+                <p className={`text-xs font-bold mt-0.5 ${selectedMobileHistory.is_fine_paid ? "text-emerald-600" : "text-amber-600"}`}>
+                  {selectedMobileHistory.is_fine_paid ? `Paid (₹${selectedMobileHistory.fine_paid_amount || 0})` : "Unpaid / Exempt"}
+                </p>
+              </div>
+            </div>
+            {selectedMobileHistory.remarks && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Staff Return Remarks</p>
+                <p className="text-xs text-slate-600 mt-0.5">{selectedMobileHistory.remarks}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </MobileBottomDrawer>
+
+      {/* 4. Mobile Reservation Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileReservation}
+        onClose={() => setSelectedMobileReservation(null)}
+        title={selectedMobileReservation ? toTitleCase(selectedMobileReservation.book_title) : ""}
+        subtitle={selectedMobileReservation ? `Student: ${selectedMobileReservation.student_name}` : undefined}
+        badge={
+          selectedMobileReservation ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                selectedMobileReservation.status === "AVAILABLE"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : selectedMobileReservation.status === "WAITING"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                  : "bg-slate-100 text-slate-600 border border-slate-200"
+              }`}
+            >
+              {selectedMobileReservation.status}
+            </span>
+          ) : undefined
+        }
+        actions={
+          selectedMobileReservation && (
+            <div className="flex flex-col gap-2 w-full">
+              {selectedMobileReservation.status === "WAITING" && (
+                <Button
+                  onClick={() => {
+                    const res = selectedMobileReservation;
+                    setSelectedMobileReservation(null);
+                    handleCancelReservation(res.id, res.book_title);
+                  }}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <X className="h-4 w-4" /> Cancel Waitlist Reservation
+                </Button>
+              )}
+            </div>
+          )
+        }
+      >
+        {selectedMobileReservation && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Student GR / Adm No</p>
+                <p className="text-xs font-mono font-bold text-slate-900 mt-0.5">{selectedMobileReservation.student_gr_no || "—"}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Queue Status</p>
+                <p className="text-xs font-bold text-indigo-700 mt-0.5">{selectedMobileReservation.status}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Reserved Date</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {new Date(selectedMobileReservation.reservation_date).toLocaleDateString("en-GB")}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Expiration Date</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">
+                  {selectedMobileReservation.expiry_date ? new Date(selectedMobileReservation.expiry_date).toLocaleDateString("en-GB") : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </MobileBottomDrawer>
+
+      {/* 5. Mobile Clearance Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileClearance}
+        onClose={() => setSelectedMobileClearance(null)}
+        title={selectedMobileClearance?.student_name || ""}
+        subtitle={selectedMobileClearance ? `GR: ${selectedMobileClearance.gr_no || "—"}` : undefined}
+        badge={
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+            Pending Clearance
+          </span>
+        }
+        actions={
+          selectedMobileClearance && (
+            <div className="flex flex-col gap-2 w-full">
+              <Button
+                onClick={() => {
+                  const st = selectedMobileClearance;
+                  setSelectedMobileClearance(null);
+                  handleSearchStudentClearance(st.student_id);
+                }}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+              >
+                <ShieldCheck className="h-4 w-4" /> Open Student Clearance Dossier
+              </Button>
+            </div>
+          )
+        }
+      >
+        {selectedMobileClearance && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Class & Division</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">{selectedMobileClearance.class_name || "—"}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Overdue Books</p>
+                <p className="text-xs font-bold text-rose-600 mt-0.5">{selectedMobileClearance.active_books_count || 0} book(s)</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 col-span-2">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Outstanding Fine Balance</p>
+                <p className="text-sm font-black text-rose-600 mt-0.5">₹{selectedMobileClearance.pending_fine_total || 0}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </MobileBottomDrawer>
+
+      {/* 6. Mobile Master Drawer */}
+      <MobileBottomDrawer
+        isOpen={!!selectedMobileMaster}
+        onClose={() => setSelectedMobileMaster(null)}
+        title={
+          selectedMobileMaster
+            ? selectedMobileMaster.type === "rack"
+              ? selectedMobileMaster.data.rack_name
+              : toTitleCase(selectedMobileMaster.data.name)
+            : ""
+        }
+        subtitle={
+          selectedMobileMaster
+            ? selectedMobileMaster.type === "rack"
+              ? `Rack Code: ${selectedMobileMaster.data.rack_code}`
+              : selectedMobileMaster.data.code
+              ? `Code / Ref: ${selectedMobileMaster.data.code}`
+              : undefined
+            : undefined
+        }
+        badge={
+          selectedMobileMaster ? (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+                selectedMobileMaster.data.is_active !== false
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}
+            >
+              {selectedMobileMaster.data.is_active !== false ? "Active" : "Deactivated"}
+            </span>
+          ) : undefined
+        }
+        actions={
+          selectedMobileMaster && (
+            <div className="flex flex-col gap-2 w-full">
+              {selectedMobileMaster.type === "rack" && (
+                <Button
+                  onClick={() => {
+                    const m = selectedMobileMaster;
+                    setSelectedMobileMaster(null);
+                    openAddMasterModal("shelf", m.data.id);
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <Plus className="h-4 w-4" /> Add Shelf to This Rack
+                </Button>
+              )}
+              {selectedMobileMaster.type !== "rack" && (
+                <Button
+                  onClick={() => {
+                    const m = selectedMobileMaster;
+                    setSelectedMobileMaster(null);
+                    if (m.type === "category") setCategoryFilter(toTitleCase(m.data.name));
+                    else if (m.type === "author") setAuthorFilter(toTitleCase(m.data.name));
+                    setActiveTab("catalog");
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <BookOpen className="h-4 w-4" /> View Associated Books ({selectedMobileMaster.count || 0})
+                </Button>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const m = selectedMobileMaster;
+                    setSelectedMobileMaster(null);
+                    if (m.type === "category") openEditMasterModal("category", m.data);
+                    else if (m.type === "author") openEditMasterModal("author", m.data);
+                    else if (m.type === "rack") openEditMasterModal("rack", m.data);
+                  }}
+                  className="text-xs h-9 font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1"
+                >
+                  <Edit className="h-3.5 w-3.5" /> Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const m = selectedMobileMaster;
+                    setSelectedMobileMaster(null);
+                    const isActive = m.data.is_active !== false;
+                    if (m.type === "category") handleToggleActiveMaster("category", m.data.id, m.data.name, isActive);
+                    else if (m.type === "author") handleToggleActiveMaster("author", m.data.id, m.data.name, isActive);
+                    else if (m.type === "rack") handleToggleActiveMaster("rack", m.data.id, m.data.rack_name, isActive);
+                  }}
+                  className="text-xs h-9 font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1"
+                >
+                  <Power className="h-3.5 w-3.5" /> {selectedMobileMaster.data.is_active !== false ? "Deactivate" : "Activate"}
+                </Button>
+              </div>
+            </div>
+          )
+        }
+      >
+        {selectedMobileMaster && (
+          <div className="space-y-3">
+            {selectedMobileMaster.type === "category" && (
+              <div className="space-y-2">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Total Books in Category</p>
+                  <p className="text-sm font-bold text-indigo-700 mt-0.5">{selectedMobileMaster.count || 0} books</p>
+                </div>
+                {selectedMobileMaster.data.description && (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Description</p>
+                    <p className="text-xs text-slate-600 mt-0.5">{selectedMobileMaster.data.description}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedMobileMaster.type === "author" && (
+              <div className="space-y-2">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Catalogued Books</p>
+                  <p className="text-sm font-bold text-purple-700 mt-0.5">{selectedMobileMaster.count || 0} books</p>
+                </div>
+                {selectedMobileMaster.data.biography && (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Biography / Notes</p>
+                    <p className="text-xs text-slate-600 mt-0.5">{selectedMobileMaster.data.biography}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedMobileMaster.type === "rack" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Shelves Count</p>
+                    <p className="text-xs font-bold text-slate-900 mt-0.5">{selectedMobileMaster.shelves?.length || 0} shelves</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Books Stored</p>
+                    <p className="text-xs font-bold text-slate-900 mt-0.5">{selectedMobileMaster.booksCount || 0} books</p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Configured Shelves</p>
+                  {(!selectedMobileMaster.shelves || selectedMobileMaster.shelves.length === 0) ? (
+                    <p className="text-xs text-slate-400 italic">No shelves added yet.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMobileMaster.shelves.map((s: any) => (
+                        <span key={s.id} className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-800">
+                          {s.shelf_code} <span className="font-sans font-normal text-slate-400">({s.shelf_name})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </MobileBottomDrawer>
     </div>
   );
 }

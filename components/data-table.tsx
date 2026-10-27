@@ -120,7 +120,7 @@ const ALIGN_CLASS: Record<DataTableAlign, string> = {
 };
 
 function filterSelectClass() {
-  return "h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-medium text-slate-700 shadow-2xs outline-none focus:border-[#5826df] focus:ring-2 focus:ring-[#5826df]/20 transition-all";
+  return "h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-medium text-slate-700 shadow-2xs outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all";
 }
 
 /** Default cell content when a column has no explicit `render`. */
@@ -292,7 +292,7 @@ export function DataTable<T>({
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             {search && (
               <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#5436F5]" />
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#2563EB]" />
                 <Input
                   aria-label={searchAriaLabel}
                   value={query}
@@ -301,7 +301,7 @@ export function DataTable<T>({
                     setPage(1);
                   }}
                   placeholder={searchPlaceholder}
-                  className="h-9 sm:h-10 rounded-xl border-[#E5EAF4] bg-white pl-10 text-xs sm:text-sm text-[#142044] placeholder:text-[#7183A6] shadow-2xs focus-visible:border-[#5436F5] focus-visible:ring-3 focus-visible:ring-[#5436F5]/20"
+                  className="h-9 sm:h-10 rounded-xl border-[#E5EAF4] bg-white pl-10 text-xs sm:text-sm text-[#142044] placeholder:text-[#7183A6] shadow-2xs focus-visible:border-[#2563EB] focus-visible:ring-3 focus-visible:ring-[#2563EB]/20"
                 />
               </div>
             )}
@@ -442,7 +442,7 @@ export function DataTable<T>({
                 <tr
                   key={getRowId(row, index)}
                   onClick={() => onRowClick?.(row, index)}
-                  className={cn("align-middle transition-colors hover:bg-indigo-50/40", rowClassName?.(row, index))}
+                  className={cn("align-middle transition-colors hover:bg-blue-50/50", rowClassName?.(row, index))}
                 >
                   {allColumns.map(column => {
                     const content = column.render
@@ -508,19 +508,19 @@ export function DataTable<T>({
               aria-label="Previous page"
               disabled={safeCurrentPage <= 1}
               onClick={() => setPage(safeCurrentPage - 1)}
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#E5EAF4] text-[#7183A6] transition-all hover:bg-[#5436F5]/10 hover:text-[#5436F5] hover:border-[#5436F5]/30 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#E5EAF4] text-[#7183A6] transition-all hover:bg-[#2563EB]/10 hover:text-[#2563EB] hover:border-[#2563EB]/30 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="whitespace-nowrap font-medium text-[#142044]">
-              Page <strong className="text-[#5436F5]">{safeCurrentPage}</strong> of {totalPages}
+              Page <strong className="text-[#2563EB]">{safeCurrentPage}</strong> of {totalPages}
             </span>
             <button
               type="button"
               aria-label="Next page"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setPage(safeCurrentPage + 1)}
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#E5EAF4] text-[#7183A6] transition-all hover:bg-[#5436F5]/10 hover:text-[#5436F5] hover:border-[#5436F5]/30 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#E5EAF4] text-[#7183A6] transition-all hover:bg-[#2563EB]/10 hover:text-[#2563EB] hover:border-[#2563EB]/30 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

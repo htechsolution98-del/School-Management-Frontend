@@ -19,6 +19,7 @@ import {
   Settings,
   Banknote,
   Clock,
+  Bell,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getDashboardRoute } from "@/lib/auth";
@@ -26,6 +27,7 @@ import { getCurrentUserProfile } from "@/lib/current-user";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/teacher", icon: LayoutDashboard },
+  { title: "Notifications", href: "/teacher/notifications", icon: Bell },
   { title: "My Attendance", href: "/teacher/my-attendance", icon: Clock },
   { title: "Student Attendance", href: "/teacher/student-attendance", icon: Users },
   { title: "Study Materials", href: "/teacher/study-materials", icon: FileText },

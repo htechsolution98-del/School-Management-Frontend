@@ -229,7 +229,7 @@ export default function StudentDashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-28 lg:pb-8">
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-3 lg:pb-8">
       {/* Greeting Header */}
       <motion.div
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-xs"

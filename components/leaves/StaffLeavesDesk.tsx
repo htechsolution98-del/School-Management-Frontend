@@ -358,12 +358,12 @@ export function StaffLeavesDesk({
   }, [history]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8" style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 flex items-center justify-center font-bold">
+            <div className="w-11 h-11 rounded-2xl bg-blue-600/10 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 flex items-center justify-center font-bold">
               <CalendarCheck className="w-6 h-6" />
             </div>
             <div>
@@ -390,7 +390,7 @@ export function StaffLeavesDesk({
           </Button>
           <Button
             onClick={handleOpenCreateDialog}
-            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-4 text-xs shadow-md shadow-indigo-500/20"
+            className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-4 text-xs shadow-md shadow-blue-500/20"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Apply for Leave
@@ -411,7 +411,7 @@ export function StaffLeavesDesk({
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-indigo-500" />
+            <Calendar className="w-4 h-4 text-blue-500" />
             Allocated Leave Balances
           </h2>
           <span className="text-xs text-slate-400">
@@ -449,9 +449,9 @@ export function StaffLeavesDesk({
                   key={b.leave_type_id || b.leave_type}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between group hover:border-indigo-300 dark:hover:border-indigo-700 transition"
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between group hover:border-blue-300 dark:hover:border-blue-700 transition"
                 >
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500" />
                   
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -472,7 +472,7 @@ export function StaffLeavesDesk({
                     </div>
 
                     <div className="flex items-baseline gap-2 mt-3">
-                      <span className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">
+                      <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
                         {remaining}
                       </span>
                       <span className="text-xs font-semibold text-slate-400">
@@ -540,7 +540,7 @@ export function StaffLeavesDesk({
         {/* Requests List */}
         {isLoading ? (
           <div className="py-20 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
             <p className="text-xs text-slate-500 font-medium">Loading personal leave records...</p>
           </div>
         ) : filteredHistory.length === 0 ? (
@@ -640,7 +640,7 @@ export function StaffLeavesDesk({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleOpenEditDialog(req)}
-                                className="h-8 px-2 text-xs text-slate-600 hover:text-indigo-600"
+                                className="h-8 px-2 text-xs text-slate-600 hover:text-blue-600"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </Button>
@@ -758,7 +758,7 @@ export function StaffLeavesDesk({
                   type="checkbox"
                   checked={isHalfDay}
                   onChange={(e) => setIsHalfDay(e.target.checked)}
-                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
               </div>
 
@@ -787,7 +787,7 @@ export function StaffLeavesDesk({
             </div>
 
             {/* Total Duration Display */}
-            <div className="flex items-center justify-between px-3 py-2 bg-indigo-50/60 dark:bg-indigo-950/20 rounded-xl text-xs font-semibold text-indigo-800 dark:text-indigo-300">
+            <div className="flex items-center justify-between px-3 py-2 bg-blue-50/60 dark:bg-blue-950/20 rounded-xl text-xs font-semibold text-blue-800 dark:text-blue-300">
               <span>Requested Duration:</span>
               <span className="font-extrabold text-sm">{totalDays} {totalDays === 1 ? "Day" : "Days"}</span>
             </div>
@@ -795,7 +795,7 @@ export function StaffLeavesDesk({
             {/* Live Calculation Preview Breakdown */}
             {isPreviewLoading ? (
               <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-500">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
                 <span>Checking school calendar holidays & working days...</span>
               </div>
             ) : previewData ? (
@@ -803,7 +803,7 @@ export function StaffLeavesDesk({
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/70 dark:border-slate-700/60 text-xs space-y-1.5">
                   <div className="flex items-center justify-between font-semibold">
                     <span className="text-slate-700 dark:text-slate-300">Effective Working Days:</span>
-                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-sm">
+                    <span className="text-blue-600 dark:text-blue-400 font-extrabold text-sm">
                       {previewData.total_effective_days} {previewData.total_effective_days === 1 ? "Day" : "Days"}
                     </span>
                   </div>
@@ -813,7 +813,7 @@ export function StaffLeavesDesk({
                       <button
                         type="button"
                         onClick={() => setShowBreakdown(!showBreakdown)}
-                        className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 underline font-medium ml-2 shrink-0 cursor-pointer"
+                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 underline font-medium ml-2 shrink-0 cursor-pointer"
                       >
                         {showBreakdown ? "Hide dates" : "View dates"}
                       </button>
@@ -832,7 +832,7 @@ export function StaffLeavesDesk({
                               ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
                               : item.category === "WEEKEND"
                               ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                              : "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300"
+                              : "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
                           )}
                         >
                           <span className="font-medium">
@@ -892,7 +892,7 @@ export function StaffLeavesDesk({
               <Button
                 type="submit"
                 disabled={isSubmitting || totalDays <= 0}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 flex-1"
+                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 flex-1"
               >
                 {isSubmitting ? (
                   <>

@@ -41,7 +41,7 @@ export interface CurrentUserProfile {
   is_active: boolean;
   date_joined: string | null;
   last_login: string | null;
-  school: { id: number; name: string; slug: string | null } | null;
+  school: { id: number; name: string; slug: string | null; logo?: string | null } | null;
   modules: string[];
   staff_profile: {
     id: number;

@@ -40,16 +40,20 @@ import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
 
-// Premium background and visual configurations
-const FONT_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap";
+function getStudentInitials(name?: string): string {
+  if (!name) return "ST";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 const SUBJECT_COLORS = [
-  { bg: "bg-indigo-50", text: "text-indigo-600", border: "border-indigo-100/80", iconBg: "bg-indigo-100/50" },
+  { bg: "bg-sky-50", text: "text-sky-600", border: "border-sky-100/80", iconBg: "bg-sky-100/50" },
   { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100/80", iconBg: "bg-emerald-100/50" },
   { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100/80", iconBg: "bg-blue-100/50" },
   { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100/80", iconBg: "bg-amber-100/50" },
   { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100/80", iconBg: "bg-rose-100/50" },
-  { bg: "bg-purple-50", text: "text-purple-600", border: "border-purple-100/80", iconBg: "bg-purple-100/50" },
+  { bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-100/80", iconBg: "bg-teal-100/50" },
 ];
 
 type ViewState = "list" | "marks";
@@ -651,43 +655,33 @@ export default function TeacherExamsPage() {
   }, [roster]);
 
   return (
-    <div
-      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-8 flex flex-col gap-6 overflow-x-hidden relative animate-fade-in"
-      style={{ fontFamily: "'Outfit', sans-serif" }}
-    >
-      <style>{`
-        @import url('${FONT_URL}');
-        *, *::before, *::after { box-sizing: border-box; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-
-      {/* Background Decorative Blur Blobs */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-6 lg:pb-8 flex flex-col gap-5 text-slate-800 dark:text-slate-100">
       {view === "list" ? (
         <>
           {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 z-10">
-            <div>
-              <p className="text-[11px] font-bold text-[#5c28e8] uppercase tracking-widest">Timetable Manager</p>
-              <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-                <CalendarRange className="text-[#5c28e8] h-8 w-8" />
-                Exam Timetable
-              </h1>
-              <p className="text-slate-400 text-sm mt-1">
-                Schedule new examination timetables and view scheduled academic evaluations.
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-xs">
+                <CalendarRange className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate">
+                  Exam Timetable
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                  Schedule academic evaluations, monitor timings & record student marks
+                </p>
+              </div>
             </div>
-            
-            <div className="flex items-center gap-3 self-start sm:self-auto">
-              <Link href="/teacher/exams/class-teacher">
+
+            <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto w-full sm:w-auto">
+              <Link href="/teacher/exams/class-teacher" className="flex-1 sm:flex-initial">
                 <Button
                   variant="outline"
-                  className="flex items-center gap-2 border-purple-200 bg-purple-50 hover:bg-purple-100 text-[#5c28e8] rounded-xl shadow-sm px-4 h-11 font-bold transition-all duration-300"
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-blue-700 dark:text-blue-300 rounded-xl shadow-2xs h-10 text-xs font-bold transition-all"
                 >
-                  <Users size={16} />
-                  Class Teacher View
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Class Teacher View</span>
                 </Button>
               </Link>
 
@@ -695,28 +689,29 @@ export default function TeacherExamsPage() {
                 variant="outline"
                 onClick={loadPageData}
                 disabled={isLoading}
-                className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 rounded-xl shadow-sm px-4 h-11 transition-all duration-300 font-semibold text-slate-600"
+                className="flex items-center gap-1.5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 rounded-xl shadow-2xs h-10 px-3 text-xs font-bold transition-all"
+                title="Refresh"
               >
                 {isLoading ? (
-                  <Loader2 size={16} className="animate-spin text-[#5c28e8]" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
                 ) : (
-                  <RefreshCw size={16} className="text-slate-500" />
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
                 )}
-                Refresh
+                <span className="hidden xs:inline">Refresh</span>
               </Button>
 
               <Button
                 onClick={() => setShowScheduleModal(true)}
-                className="flex items-center gap-2 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl shadow-md shadow-purple-500/20 px-5 h-11 font-bold transition-all duration-300"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs shadow-blue-500/20 h-10 px-4 text-xs font-bold transition-all"
               >
-                <Plus size={16} />
-                Schedule Exam
+                <Plus className="w-4 h-4" />
+                <span>Schedule Exam</span>
               </Button>
             </div>
           </div>
 
-          {/* Summary Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 z-10">
+          {/* Summary Metrics Filter Cards */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             {isLoading || isStatusLoading ? (
               <>
                 <MetricCardSkeleton />
@@ -726,122 +721,125 @@ export default function TeacherExamsPage() {
             ) : (
               <>
                 {/* Card 1: All Exams */}
-                <div
-                  role="button"
-                  tabIndex={0}
+                <button
+                  type="button"
                   onClick={() => setMarksFilter("all")}
-                  onKeyDown={(e) => e.key === "Enter" && setMarksFilter("all")}
-                  style={{
-                    outline: marksFilter === "all" ? "2.5px solid #6366f1" : "2.5px solid transparent",
-                    boxShadow: marksFilter === "all" ? "0 0 0 4px rgba(99,102,241,0.12)" : undefined,
-                    transition: "all 0.2s ease",
-                    borderRadius: "1rem",
-                    cursor: "pointer",
-                  }}
+                  className={`p-3 sm:p-4 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
+                    marksFilter === "all"
+                      ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 ring-2 ring-blue-500/20 shadow-xs"
+                      : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                  }`}
                 >
-                  <Card className="border-indigo-100/60 bg-gradient-to-br from-indigo-50/40 via-white to-white rounded-2xl overflow-hidden">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <div className="p-3.5 rounded-xl bg-indigo-100/50 text-indigo-600 shrink-0">
-                        <CalendarRange size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">All Exams</p>
-                        <h2 className="text-2xl font-black text-slate-800 mt-0.5 leading-none">{stats.total}</h2>
-                      </div>
-                      {marksFilter === "all" && (
-                        <span style={{ background: "#6366f1", color: "white", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 8px", letterSpacing: "0.05em" }}>ACTIVE</span>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                      All Exams
+                    </span>
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <CalendarRange className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-slate-100 leading-none">
+                      {stats.total}
+                    </span>
+                    {marksFilter === "all" && (
+                      <span className="hidden xs:inline text-[9px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/60 px-1.5 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </button>
 
                 {/* Card 2: Marks Added */}
-                <div
-                  role="button"
-                  tabIndex={0}
+                <button
+                  type="button"
                   onClick={() => setMarksFilter("marks-added")}
-                  onKeyDown={(e) => e.key === "Enter" && setMarksFilter("marks-added")}
-                  style={{
-                    outline: marksFilter === "marks-added" ? "2.5px solid #10b981" : "2.5px solid transparent",
-                    boxShadow: marksFilter === "marks-added" ? "0 0 0 4px rgba(16,185,129,0.12)" : undefined,
-                    transition: "all 0.2s ease",
-                    borderRadius: "1rem",
-                    cursor: "pointer",
-                  }}
+                  className={`p-3 sm:p-4 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
+                    marksFilter === "marks-added"
+                      ? "bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20 shadow-xs"
+                      : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                  }`}
                 >
-                  <Card className="border-emerald-100/60 bg-gradient-to-br from-emerald-50/40 via-white to-white rounded-2xl overflow-hidden">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <div className="p-3.5 rounded-xl bg-emerald-100/50 text-emerald-600 shrink-0">
-                        <Award size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Marks Added</p>
-                        <h2 className="text-2xl font-black text-slate-800 mt-0.5 leading-none">{stats.marksAdded}</h2>
-                      </div>
-                      {marksFilter === "marks-added" && (
-                        <span style={{ background: "#10b981", color: "white", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 8px", letterSpacing: "0.05em" }}>ACTIVE</span>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                      Marks Added
+                    </span>
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-slate-100 leading-none">
+                      {stats.marksAdded}
+                    </span>
+                    {marksFilter === "marks-added" && (
+                      <span className="hidden xs:inline text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </button>
 
                 {/* Card 3: Marks Not Added */}
-                <div
-                  role="button"
-                  tabIndex={0}
+                <button
+                  type="button"
                   onClick={() => setMarksFilter("marks-not-added")}
-                  onKeyDown={(e) => e.key === "Enter" && setMarksFilter("marks-not-added")}
-                  style={{
-                    outline: marksFilter === "marks-not-added" ? "2.5px solid #f43f5e" : "2.5px solid transparent",
-                    boxShadow: marksFilter === "marks-not-added" ? "0 0 0 4px rgba(244,63,94,0.12)" : undefined,
-                    transition: "all 0.2s ease",
-                    borderRadius: "1rem",
-                    cursor: "pointer",
-                  }}
+                  className={`p-3 sm:p-4 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
+                    marksFilter === "marks-not-added"
+                      ? "bg-rose-50/80 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 ring-2 ring-rose-500/20 shadow-xs"
+                      : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                  }`}
                 >
-                  <Card className="border-rose-100/60 bg-gradient-to-br from-rose-50/40 via-white to-white rounded-2xl overflow-hidden">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <div className="p-3.5 rounded-xl bg-rose-100/50 text-rose-600 shrink-0">
-                        <AlertCircle size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Marks Not Added</p>
-                        <h2 className="text-2xl font-black text-slate-800 mt-0.5 leading-none">{stats.marksNotAdded}</h2>
-                      </div>
-                      {marksFilter === "marks-not-added" && (
-                        <span style={{ background: "#f43f5e", color: "white", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 8px", letterSpacing: "0.05em" }}>ACTIVE</span>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                      Pending
+                    </span>
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-slate-100 leading-none">
+                      {stats.marksNotAdded}
+                    </span>
+                    {marksFilter === "marks-not-added" && (
+                      <span className="hidden xs:inline text-[9px] font-bold text-rose-700 dark:text-rose-300 bg-rose-100/80 dark:bg-rose-900/60 px-1.5 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </button>
               </>
             )}
           </div>
 
           {/* Toolbar Filter Section */}
-          {isLoading && exams.length === 0 ? (
-            <div className="h-14 w-full bg-white border border-slate-100/80 rounded-2xl animate-pulse flex items-center justify-between px-5 shadow-sm">
-              <div className="h-4.5 w-1/3 bg-slate-100 rounded-md" />
-              <div className="h-5 w-40 bg-slate-100 rounded-md" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by exam title, subject, instructions, class..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm z-10">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-slate-400" />
-                <Input
-                  placeholder="Search exams by title, details, or class name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-11 h-12 bg-slate-50/50 border-slate-200/80 rounded-xl focus-visible:ring-indigo-500/50 text-sm w-full transition-all"
-                />
-              </div>
-              
-              <div className="flex items-center gap-2 shrink-0">
-                <Filter size={16} className="text-slate-400" />
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:flex-initial min-w-[160px]">
                 <select
                   value={selectedClassFilter}
                   onChange={(e) => setSelectedClassFilter(e.target.value)}
-                  className="h-12 px-4 rounded-xl border border-slate-200/80 bg-slate-50/50 text-slate-600 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer min-w-[160px]"
+                  className="w-full h-9 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="all">All Class Groups</option>
                   {classes.map((cls) => (
@@ -851,18 +849,33 @@ export default function TeacherExamsPage() {
                   ))}
                 </select>
               </div>
+
+              {(searchQuery || selectedClassFilter !== "all" || marksFilter !== "all") && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedClassFilter("all");
+                    setMarksFilter("all");
+                  }}
+                  className="h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                  title="Reset filters"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span className="hidden sm:inline">Reset</span>
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Main Grid View */}
           {isLoading || isStatusLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <ExamCardSkeleton key={n} />
               ))}
             </div>
           ) : error ? (
-            <Card className="border-rose-100 bg-rose-50/20 shadow-sm rounded-2xl z-10 p-6 text-center max-w-md mx-auto">
+            <Card className="border-rose-100 bg-rose-50/20 shadow-sm rounded-2xl p-6 text-center max-w-md mx-auto">
               <AlertCircle className="text-rose-500 h-10 w-10 mx-auto mb-3 shrink-0" />
               <h2 className="text-rose-900 text-lg font-bold">Failed to sync exams</h2>
               <p className="text-rose-600 text-sm mt-1">{error}</p>
@@ -871,9 +884,9 @@ export default function TeacherExamsPage() {
               </Button>
             </Card>
           ) : filteredExams.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm z-10">
-              <CalendarRange className="h-14 w-14 text-slate-200 mb-3" />
-              <p className="text-base font-semibold">
+            <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+              <CalendarRange className="h-14 w-14 text-slate-200 dark:text-slate-700 mb-3" />
+              <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
                 {marksFilter === "marks-added"
                   ? "No exams with marks added yet"
                   : marksFilter === "marks-not-added"
@@ -887,21 +900,21 @@ export default function TeacherExamsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <AnimatePresence>
                 {filteredExams.map((ex, index) => {
-                   const colorConfig = SUBJECT_COLORS[index % SUBJECT_COLORS.length];
+                  const colorConfig = SUBJECT_COLORS[index % SUBJECT_COLORS.length];
                   const readableSubject = resolveSubjectName(ex.subject);
                   const status = examStatuses[ex.id] || { isPublished: false, isDraft: false, hasMarks: false };
                   const timeStatus = getExamTimeStatus(ex);
 
-                  let badgeBg = "bg-slate-50 border-slate-150 text-slate-500";
+                  let badgeBg = "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300";
                   let badgeText = "Result Not Updated";
                   if (status.isPublished) {
-                    badgeBg = "bg-emerald-50 border-emerald-100 text-emerald-600";
+                    badgeBg = "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300";
                     badgeText = "Result Updated";
                   } else if (status.isDraft) {
-                    badgeBg = "bg-amber-50 border-amber-100 text-amber-600";
+                    badgeBg = "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300";
                     badgeText = "Result Draft Saved";
                   }
 
@@ -914,24 +927,24 @@ export default function TeacherExamsPage() {
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.25 }}
                     >
-                      <Card className="border-slate-100 hover:border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 bg-white rounded-3xl h-full flex flex-col justify-between overflow-hidden group">
+                      <Card className="border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 shadow-2xs hover:shadow-sm transition-all duration-300 bg-white dark:bg-slate-900 rounded-3xl h-full flex flex-col justify-between overflow-hidden group">
                         <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-3 rounded-2xl ${colorConfig.bg} ${colorConfig.text} shrink-0`}>
+                          <div className="flex items-start justify-between gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className={`p-2.5 rounded-2xl ${colorConfig.bg} ${colorConfig.text} shrink-0 shadow-2xs`}>
                                 <BookOpen size={20} className="group-hover:scale-110 transition-transform duration-300" />
                               </div>
-                              <div>
-                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                                   {ex.class_group_name || "Class Group"}
                                 </span>
-                                <CardTitle className="text-lg text-slate-800 font-extrabold tracking-tight mt-0.5 leading-tight truncate max-w-[130px]" title={ex.title}>
+                                <h3 className="text-sm sm:text-base text-slate-900 dark:text-slate-100 font-extrabold tracking-tight mt-0.5 leading-snug line-clamp-1" title={ex.title}>
                                   {ex.title}
-                                </CardTitle>
+                                </h3>
                               </div>
                             </div>
 
-                            <span className={`px-2 py-0.5 rounded-full border font-bold text-[8px] tracking-wide uppercase shrink-0 ${badgeBg}`}>
+                            <span className={`px-2.5 py-1 rounded-full border font-bold text-[10px] tracking-wide shrink-0 ${badgeBg}`}>
                               {badgeText}
                             </span>
                           </div>
@@ -939,40 +952,40 @@ export default function TeacherExamsPage() {
                         
                         <CardContent className="pt-0 flex flex-col gap-4 flex-1 justify-between">
                           <div>
-                            <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mt-1" title={ex.description}>
+                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-1" title={ex.description}>
                               {ex.description || "No description provided."}
                             </p>
 
-                            <div className="space-y-1.5 pt-2 border-t border-slate-100/80 mt-3">
+                            <div className="space-y-2 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 mt-3 text-xs">
                               {/* Subject Tag */}
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between">
                                 <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                                  <FileText size={13} />
+                                  <FileText className="w-3.5 h-3.5" />
                                   Evaluation
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${colorConfig.bg} ${colorConfig.text}`}>
+                                <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${colorConfig.bg} ${colorConfig.text}`}>
                                   {readableSubject}
                                 </span>
                               </div>
 
                               {/* Date Tag */}
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between">
                                 <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                                  <Calendar size={13} />
+                                  <Calendar className="w-3.5 h-3.5" />
                                   Exam Date
                                 </span>
-                                <span className="text-slate-700 font-bold">
+                                <span className="text-slate-700 dark:text-slate-200 font-bold text-[11px]">
                                   {formatExamDate(ex.exam_date)}
                                 </span>
                               </div>
 
                               {/* Time Tag */}
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between">
                                 <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                                  <Clock size={13} />
+                                  <Clock className="w-3.5 h-3.5" />
                                   Duration
                                 </span>
-                                <span className="text-slate-700 font-bold flex items-center gap-1">
+                                <span className="text-slate-700 dark:text-slate-200 font-bold text-[11px] flex items-center gap-1">
                                   {formatExamTime(ex.start_time)} – {formatExamTime(ex.end_time)}
                                 </span>
                               </div>
@@ -988,9 +1001,17 @@ export default function TeacherExamsPage() {
                               loadExamRoster(ex);
                             }}
                             disabled={!status.isPublished && !timeStatus.isFinished}
-                            className="w-full mt-3 h-10 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 group-hover:border-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className={`w-full mt-3 h-10 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                              status.isPublished
+                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800"
+                                : status.isDraft
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800"
+                                : !timeStatus.isFinished
+                                ? "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                                : "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                            }`}
                           >
-                            <Award size={14} className="text-indigo-500" />
+                            <Award className="w-3.5 h-3.5" />
                             {status.isPublished 
                               ? "View Results" 
                               : !timeStatus.isFinished 
@@ -1010,40 +1031,40 @@ export default function TeacherExamsPage() {
         </>
       ) : (
         /* ─── MARKS ENTRY VIEW ─── */
-        <div className="flex flex-col gap-6 z-10">
+        <div className="flex flex-col gap-5">
           {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 onClick={() => setView("list")}
-                className="p-3 border border-slate-200 hover:bg-slate-50 rounded-xl h-11 w-11 flex items-center justify-center"
+                className="p-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl h-10 w-10 flex items-center justify-center shrink-0 cursor-pointer shadow-2xs"
               >
-                <ArrowLeft size={16} className="text-slate-600" />
+                <ArrowLeft className="w-4 h-4 text-slate-600 dark:text-slate-300" />
               </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
                     Class Group: {selectedExam?.class_group_name}
                   </span>
                   {rosterMeta.is_class_teacher && (
-                    <span className="bg-purple-100 text-[#5c28e8] text-[10px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">
                       Class Teacher
                     </span>
                   )}
                   {rosterMeta.status === "SUBMITTED" && (
-                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">
                       Submitted to Class Teacher
                     </span>
                   )}
                   {rosterMeta.status === "VERIFIED" && (
-                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
                       Verified & Locked
                     </span>
                   )}
                 </div>
-                <h1 className="text-2xl font-black text-slate-800 leading-tight">
-                  {selectedExam?.title} Results
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 leading-tight mt-0.5 truncate">
+                  {selectedExam?.title} — Marks Entry
                 </h1>
                 <p className="text-slate-400 text-xs mt-0.5">
                   {rosterMeta.is_class_teacher
@@ -1053,17 +1074,17 @@ export default function TeacherExamsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               {rosterMeta.is_class_teacher && (
                 <Button
                   onClick={handlePublishResults}
                   disabled={publishing || isRosterPublished || roster.length === 0}
-                  className="h-11 px-5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md hover:shadow-lg disabled:opacity-50"
+                  className="h-10 px-4 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {publishing ? (
-                    <Loader2 size={15} className="animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <Check size={15} />
+                    <Check className="w-3.5 h-3.5" />
                   )}
                   {isRosterPublished ? "Published" : "Publish Results"}
                 </Button>
@@ -1073,13 +1094,13 @@ export default function TeacherExamsPage() {
 
           {/* Locked Status Notice for Subject Teachers */}
           {(!rosterMeta.can_edit || (rosterMeta.status === "SUBMITTED" || rosterMeta.status === "VERIFIED")) && !rosterMeta.is_class_teacher && (
-            <div className="flex items-start gap-3 p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-900 text-xs">
-              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-4 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl text-amber-900 dark:text-amber-200 text-xs">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-amber-950">
+                <p className="font-bold text-amber-950 dark:text-amber-100">
                   Marks Submitted to Class Teacher (Read Only)
                 </p>
-                <p className="text-amber-800 mt-0.5">
+                <p className="text-amber-800 dark:text-amber-300/80 mt-0.5 leading-relaxed">
                   You have submitted these subject marks to the Class Teacher. Subject teachers can only edit marks until submission. All update and verification authority is now with the Class Teacher.
                 </p>
               </div>
@@ -1087,31 +1108,35 @@ export default function TeacherExamsPage() {
           )}
 
           {/* Config & Controls Box */}
-          <Card className="border-slate-100 shadow-sm rounded-2xl bg-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Card className="border-slate-200/80 dark:border-slate-800 shadow-2xs rounded-2xl bg-white dark:bg-slate-900 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-slate-600">Maximum Evaluated Marks:</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
+                Maximum Evaluated Marks:
+              </span>
               <Input
                 type="number"
                 value={maxMarks}
                 disabled={isRosterPublished || !rosterMeta.can_edit}
                 onChange={(e) => setMaxMarks(Math.max(1, Number(e.target.value)))}
-                className="w-24 h-11 text-center font-extrabold focus-visible:ring-indigo-500/50 border-slate-200 text-slate-800 rounded-xl"
+                className="w-20 sm:w-24 h-9 sm:h-10 text-center font-black focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs sm:text-sm"
               />
             </div>
             
             {isRosterPublished && (
-              <div className="flex items-center gap-2.5 px-4.5 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-xs font-bold">
-                <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
+              <div className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Results for this exam have been published and are locked for editing.</span>
               </div>
             )}
           </Card>
 
           {/* Table Container Card */}
-          <Card className="border-slate-100 shadow-sm bg-white rounded-3xl overflow-hidden">
-            <CardHeader className="pb-2 border-b border-slate-100 bg-slate-50/50">
+          <Card className="border-slate-200/80 dark:border-slate-800 shadow-2xs bg-white dark:bg-slate-900 rounded-2xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base text-slate-800 font-bold">Student Roster</CardTitle>
+                <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Student Roster
+                </CardTitle>
                 <CardDescription className="text-xs font-medium text-slate-400">
                   {roster.length} students enrolled in {selectedExam?.class_group_name}
                 </CardDescription>
@@ -1119,79 +1144,147 @@ export default function TeacherExamsPage() {
             </CardHeader>
 
             {rosterLoading ? (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/40 text-left border-b border-slate-100 text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                      <th className="px-6 py-4.5">GR No.</th>
-                      <th className="px-6 py-4.5">Student Name</th>
-                      <th className="px-6 py-4.5 text-center">Is Absent</th>
-                      <th className="px-6 py-4.5 text-center" style={{ width: "160px" }}>Marks Obtained</th>
-                      <th className="px-6 py-4.5">Remarks / Comments</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <RosterRowSkeleton key={n} />
-                    ))}
-                  </tbody>
-                </table>
+              <div className="py-16 text-center">
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-400">Loading student roster…</p>
               </div>
             ) : rosterError ? (
-              <div className="py-16 text-center max-w-sm mx-auto">
-                <AlertCircle className="h-9 w-9 text-rose-500 mx-auto mb-2.5" />
-                <p className="text-slate-800 text-sm font-bold">Failed to load roster</p>
+              <div className="py-16 text-center max-w-sm mx-auto px-4">
+                <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+                <p className="text-slate-900 dark:text-slate-100 text-sm font-bold">Failed to load roster</p>
                 <p className="text-slate-400 text-xs mt-1 leading-relaxed">{rosterError}</p>
-                <Button onClick={() => loadExamRoster(selectedExam!)} className="mt-4 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl px-4">
+                <Button onClick={() => loadExamRoster(selectedExam!)} className="mt-4 h-9 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold rounded-xl px-4 text-xs">
                   Retry
                 </Button>
               </div>
             ) : roster.length === 0 ? (
               <div className="py-20 text-center text-slate-400">
-                <Users className="h-10 w-10 text-slate-200 mx-auto mb-2.5" />
-                <p className="text-xs font-bold">No students registered in this class.</p>
+                <Users className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No students registered in this class.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto w-full">
-                <table className="w-full min-w-[650px] border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/40 text-left border-b border-slate-100 text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                      <th className="px-6 py-4.5">GR No.</th>
-                      <th className="px-6 py-4.5">Student Name</th>
-                      <th className="px-6 py-4.5 text-center">Is Absent</th>
-                      <th className="px-6 py-4.5 text-center" style={{ width: "160px" }}>Marks Obtained</th>
-                      <th className="px-6 py-4.5">Remarks / Comments</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {roster.map((row) => {
-                      const isInputDisabled = isRosterPublished || !rosterMeta.can_edit;
-                      return (
-                        <tr key={row.student} className="hover:bg-slate-50/40 transition-colors">
-                          {/* GR Number */}
-                          <td className="px-6 py-4 font-bold text-slate-400 tracking-wider">
-                            {row.gr_no || "—"}
-                          </td>
-                          
-                          {/* Student Name */}
-                          <td className="px-6 py-4 font-bold text-slate-800 capitalize">
-                            {row.student_name}
-                          </td>
-                          
-                          {/* Absent Toggle Checkbox */}
-                          <td className="px-6 py-4 text-center">
+              <>
+                {/* Desktop Roster Table (Hidden on Mobile) */}
+                <div className="hidden md:block overflow-x-auto w-full">
+                  <table className="w-full min-w-[650px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/60 dark:bg-slate-800/40 text-left border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="px-5 py-3">GR No.</th>
+                        <th className="px-5 py-3">Student Name</th>
+                        <th className="px-5 py-3 text-center">Is Absent</th>
+                        <th className="px-5 py-3 text-center" style={{ width: "160px" }}>Marks Obtained</th>
+                        <th className="px-5 py-3">Remarks / Comments</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                      {roster.map((row) => {
+                        const isInputDisabled = isRosterPublished || !rosterMeta.can_edit;
+                        return (
+                          <tr key={row.student} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors">
+                            {/* GR Number */}
+                            <td className="px-5 py-3 font-mono font-bold text-slate-500">
+                              {row.gr_no || "—"}
+                            </td>
+                            
+                            {/* Student Name */}
+                            <td className="px-5 py-3 font-bold text-slate-800 dark:text-slate-200 capitalize">
+                              {row.student_name}
+                            </td>
+                            
+                            {/* Absent Toggle Checkbox */}
+                            <td className="px-5 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={row.is_absent}
+                                disabled={isInputDisabled}
+                                onChange={(e) => updateRosterRow(row.student, { is_absent: e.target.checked })}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            
+                            {/* Marks Obtained Input */}
+                            <td className="px-5 py-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={maxMarks}
+                                  value={row.marks_obtained !== null ? row.marks_obtained : ""}
+                                  disabled={row.is_absent || isInputDisabled}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? 0 : Number(e.target.value);
+                                    updateRosterRow(row.student, { marks_obtained: val });
+                                  }}
+                                  className={`w-20 text-center font-extrabold h-9 rounded-xl focus-visible:ring-blue-500/50 ${
+                                    row.marks_obtained !== null && row.marks_obtained > maxMarks
+                                      ? "border-rose-300 bg-rose-50/30 text-rose-600"
+                                      : "border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                                  }`}
+                                />
+                                <span className="text-slate-400 font-bold">/ {maxMarks}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Remarks Input */}
+                            <td className="px-5 py-3">
+                              <Input
+                                placeholder="e.g. Good progress, outstanding work"
+                                value={row.remarks || ""}
+                                disabled={isInputDisabled}
+                                onChange={(e) => updateRosterRow(row.student, { remarks: e.target.value })}
+                                className="h-9 focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Roster Cards (Visible on Mobile: md:hidden) */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {roster.map((row) => {
+                    const isInputDisabled = isRosterPublished || !rosterMeta.can_edit;
+                    const initials = getStudentInitials(row.student_name);
+                    return (
+                      <div key={row.student} className="p-3.5 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200/50 dark:border-blue-800/50 shadow-2xs">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 leading-tight truncate">
+                                {row.student_name}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                GR: {row.gr_no || "—"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Absent Toggle Button/Checkbox */}
+                          <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-bold cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={row.is_absent}
                               disabled={isInputDisabled}
                               onChange={(e) => updateRosterRow(row.student, { is_absent: e.target.checked })}
-                              className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/50 cursor-pointer disabled:cursor-not-allowed"
+                              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                             />
-                          </td>
-                          
-                          {/* Marks Obtained Input */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
+                            <span className={row.is_absent ? "text-rose-600 font-extrabold" : "text-slate-600 dark:text-slate-400"}>
+                              Absent
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              Marks (Max {maxMarks})
+                            </span>
+                            <div className="flex items-center gap-1.5">
                               <Input
                                 type="number"
                                 min={0}
@@ -1202,77 +1295,77 @@ export default function TeacherExamsPage() {
                                   const val = e.target.value === "" ? 0 : Number(e.target.value);
                                   updateRosterRow(row.student, { marks_obtained: val });
                                 }}
-                                className={`w-20 text-center font-extrabold h-9 rounded-xl focus-visible:ring-indigo-500/50 ${
+                                className={`w-full text-center font-extrabold h-9 rounded-xl ${
                                   row.marks_obtained !== null && row.marks_obtained > maxMarks
-                                    ? "border-rose-300 bg-rose-50/30 text-rose-600"
-                                    : "border-slate-200 text-slate-800"
+                                    ? "border-rose-300 bg-rose-50/50 text-rose-600"
+                                    : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
                                 }`}
                               />
-                              <span className="text-slate-400 font-bold">/ {maxMarks}</span>
                             </div>
-                          </td>
-                          
-                          {/* Remarks Input */}
-                          <td className="px-6 py-4">
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              Remarks
+                            </span>
                             <Input
-                              placeholder="e.g. Good progress, outstanding work"
+                              placeholder="e.g. Good, Average"
                               value={row.remarks || ""}
                               disabled={isInputDisabled}
                               onChange={(e) => updateRosterRow(row.student, { remarks: e.target.value })}
-                              className="h-9 focus-visible:ring-indigo-500/50 border-slate-200 rounded-xl"
+                              className="h-9 text-xs rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
                             />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </Card>
 
-          {/* Action Row */}
+          {/* Sticky Bottom Action Bar */}
           {!isRosterPublished && roster.length > 0 && (
-            <div className="flex items-center gap-3 justify-end pt-2">
+            <div className="sticky bottom-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-lg flex items-center justify-between gap-2 flex-wrap z-20">
               <Button
                 variant="outline"
                 onClick={() => setView("list")}
-                className="h-11 rounded-xl px-6 font-semibold text-slate-600 border-slate-200 bg-white hover:bg-slate-50"
+                className="h-10 rounded-xl px-4 text-xs font-bold text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50"
               >
+                <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                 Back to List
               </Button>
               
               {rosterMeta.can_edit && (
-                <>
-                  {/* Save Draft Marks button */}
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={() => handleSaveMarks("DRAFT")}
                     disabled={savingMarks || rosterLoading}
                     variant="outline"
-                    className="h-11 px-5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-200 shadow-sm disabled:opacity-50"
+                    className="h-10 px-4 text-xs font-bold rounded-xl text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 border-blue-200 dark:border-blue-800 shadow-2xs"
                   >
                     {savingMarks ? (
-                      <Loader2 size={15} className="animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
                     ) : (
-                      <Save size={15} />
+                      <Save className="w-3.5 h-3.5 mr-1" />
                     )}
-                    Save Draft Marks
+                    Save Draft
                   </Button>
 
-                  {/* Submit Marks Button */}
                   <Button
                     onClick={() => handleSaveMarks("SUBMITTED")}
                     disabled={savingMarks || rosterLoading}
-                    className="h-11 px-6 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all text-white bg-[#5c28e8] hover:bg-[#4d20cb] shadow-md shadow-purple-500/20 disabled:opacity-50"
+                    className="h-10 px-4 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-xs"
                   >
                     {savingMarks ? (
-                      <Loader2 size={15} className="animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
                     ) : (
-                      <CheckCircle2 size={15} />
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                     )}
-                    {rosterMeta.is_class_teacher ? "Submit Marks" : "Submit Marks to Class Teacher"}
+                    {rosterMeta.is_class_teacher ? "Submit Marks" : "Submit to Class Teacher"}
                   </Button>
-                </>
+                </div>
               )}
             </div>
           )}
@@ -1281,16 +1374,16 @@ export default function TeacherExamsPage() {
 
       {/* Schedule Exam Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white rounded-3xl max-w-lg w-full shadow-xl border border-slate-100 overflow-hidden flex flex-col relative"
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col relative"
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Schedule Examination</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Schedule Examination</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Define exam timetable for student divisions.</p>
               </div>
               <button
@@ -1308,53 +1401,52 @@ export default function TeacherExamsPage() {
                   });
                   setFormSubjects([]);
                 }}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <X size={18} />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {modalError && (
-              <div className="px-6 pt-4 pb-0">
-                <div className="flex items-center gap-2.5 px-4 py-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-bold animate-shake">
-                  <AlertCircle size={15} className="shrink-0 text-rose-500" />
+              <div className="px-5 pt-3 pb-0">
+                <div className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 rounded-xl text-xs text-rose-600 dark:text-rose-400 font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
                   <span>{modalError}</span>
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleScheduleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
-
+            <form onSubmit={handleScheduleSubmit} className="p-5 space-y-3.5 overflow-y-auto max-h-[75vh]">
               {/* Title input */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Exam Title</label>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Exam Title</label>
                 <Input
                   placeholder="e.g. Mid-Term Chemistry Evaluation"
                   value={formData.title}
                   onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200"
+                  className="rounded-xl h-10 focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-800 text-xs"
                 />
               </div>
 
               {/* Description textarea */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Description / Instructions</label>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Description / Instructions</label>
                 <Textarea
                   placeholder="e.g. 50 Marks MCQ test covering chapters 1 to 4. Standard calculator allowed."
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  className="rounded-xl min-h-[80px] resize-none focus-visible:ring-purple-500/50 border-slate-200 text-xs"
+                  className="rounded-xl min-h-[75px] resize-none focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-800 text-xs"
                 />
               </div>
 
               {/* Grid Class Group & Subject select */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Class Group</label>
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Class Group</label>
                   <select
                     value={formData.class_group}
                     onChange={(e) => handleClassChange(e.target.value)}
-                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
                   >
                     <option value="">Select Class</option>
                     {classes.map((cls) => (
@@ -1366,12 +1458,12 @@ export default function TeacherExamsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Subject</label>
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</label>
                   <select
                     value={formData.subject}
                     onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
                     disabled={!formData.class_group || formSubjectsLoading}
-                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer disabled:opacity-50"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer disabled:opacity-50"
                   >
                     <option value="">
                       {formSubjectsLoading
@@ -1391,22 +1483,20 @@ export default function TeacherExamsPage() {
 
               {/* Date Input */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Exam Date</label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    min={getTomorrowDateString()}
-                    value={toHTMLDate(formData.exam_date)}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, exam_date: toApiDate(e.target.value) }))}
-                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
-                  />
-                </div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Exam Date</label>
+                <Input
+                  type="date"
+                  min={getTomorrowDateString()}
+                  value={toHTMLDate(formData.exam_date)}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, exam_date: toApiDate(e.target.value) }))}
+                  className="rounded-xl h-10 focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold"
+                />
               </div>
 
               {/* Time Slots grid */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Start Time</label>
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Start Time</label>
                   <Input
                     type="time"
                     value={formData.start_time}
@@ -1420,18 +1510,18 @@ export default function TeacherExamsPage() {
                         return next;
                       });
                     }}
-                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
+                    className="rounded-xl h-10 focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">End Time</label>
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">End Time</label>
                   <Input
                     type="time"
                     min={formData.start_time}
                     value={formData.end_time}
                     onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
-                    className="rounded-xl h-11 focus-visible:ring-purple-500/50 border-slate-200 text-slate-600 text-xs font-semibold"
+                    className="rounded-xl h-10 focus-visible:ring-blue-500/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold"
                   />
                 </div>
               </div>
@@ -1443,19 +1533,19 @@ export default function TeacherExamsPage() {
                 const isOverLimit = (endH * 60 + endM) - (startH * 60 + startM) > 240;
                 
                 return (
-                  <div className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold w-fit animate-fade-in ${
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-bold w-fit ${
                     isOverLimit 
-                      ? "bg-rose-50 border-rose-100 text-rose-600" 
-                      : "bg-purple-50/60 border border-purple-100 text-[#5c28e8]"
+                      ? "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400" 
+                      : "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/40 text-blue-700 dark:text-blue-300"
                   }`}>
                     {isOverLimit ? (
                       <>
-                        <AlertCircle size={13} className="text-rose-500 shrink-0" />
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                         <span>Duration exceeds 4 hours limit: {calculateDuration(formData.start_time, formData.end_time)}</span>
                       </>
                     ) : (
                       <>
-                        <Clock size={13} className="text-[#5c28e8] shrink-0" />
+                        <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                         <span>Total Duration: {calculateDuration(formData.start_time, formData.end_time)}</span>
                       </>
                     )}
@@ -1464,7 +1554,7 @@ export default function TeacherExamsPage() {
               })()}
 
               {/* Action Buttons Row */}
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white">
+              <div className="flex items-center gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Button
                   type="button"
                   variant="outline"
@@ -1482,7 +1572,7 @@ export default function TeacherExamsPage() {
                     });
                     setFormSubjects([]);
                   }}
-                  className="flex-1 rounded-xl h-11 font-semibold text-slate-600 border-slate-200 hover:bg-slate-50"
+                  className="flex-1 rounded-xl h-10 font-bold text-xs text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-50"
                 >
                   Cancel
                 </Button>
@@ -1490,12 +1580,12 @@ export default function TeacherExamsPage() {
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl h-11 font-bold shadow-md shadow-purple-500/20 transition-all"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 font-bold text-xs shadow-xs shadow-blue-500/20 transition-all"
                 >
                   {submitting ? (
                     <>
-                      <Loader2 size={16} className="animate-spin text-white" />
-                      Scheduling...
+                      <Loader2 className="w-4 h-4 animate-spin text-white mr-1" />
+                      Scheduling…
                     </>
                   ) : (
                     "Schedule"

@@ -23,7 +23,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className="toaster group !z-[999999]"
       icons={{
         success: (
           <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4.5" />
@@ -48,6 +48,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       offset={16}
       style={
         {
+          zIndex: 999999,
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",

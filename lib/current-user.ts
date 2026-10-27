@@ -38,11 +38,18 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     if (profile.school?.name) {
       localStorage.setItem("school_name", profile.school.name);
     }
+    if (profile.id) {
+      localStorage.setItem("user_id", String(profile.id));
+    }
     if (profile.school?.id) {
       localStorage.setItem("school_id", String(profile.school.id));
     }
     if (profile.school?.slug) {
       localStorage.setItem("school_slug", profile.school.slug);
+    }
+    const logoUrl = profile.school?.logo || profile.avatar;
+    if (logoUrl) {
+      localStorage.setItem("school_logo", logoUrl);
     }
   }
 

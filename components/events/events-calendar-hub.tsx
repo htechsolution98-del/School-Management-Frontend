@@ -118,6 +118,7 @@ const MONTH_NAMES = [
 ];
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS_OF_WEEK_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
 function capitalizeFirstLetter(str?: string) {
   if (!str) return "";
@@ -175,7 +176,7 @@ function toISODateString(rawDate?: string | null): string {
   return trimmed;
 }
 
-function formatDateDisplay(dateStr?: string) {
+function formatDateDisplay(dateStr?: string | null) {
   if (!dateStr) return "N/A";
   const iso = toISODateString(dateStr);
   try {
@@ -294,20 +295,46 @@ export function EventsCalendarHub({
     });
   }, [events, selectedTypeFilter]);
 
-  // Month Statistics
+  // Month Events (filtered by selectedTypeFilter and overlapping currentMonth)
   const monthEvents = useMemo(() => {
+    const padM = String(currentMonth + 1).padStart(2, "0");
+    const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthStart = `${currentYear}-${padM}-01`;
+    const monthEnd = `${currentYear}-${padM}-${String(lastDay).padStart(2, "0")}`;
+
+    return filteredEvents
+      .filter((ev) => {
+        const startIso = toISODateString(ev.start_date);
+        const endIso = toISODateString(ev.end_date) || startIso;
+        if (!startIso) return false;
+        return startIso <= monthEnd && endIso >= monthStart;
+      })
+      .sort((a, b) => {
+        const aDate = toISODateString(a.start_date) || "";
+        const bDate = toISODateString(b.start_date) || "";
+        return aDate.localeCompare(bDate);
+      });
+  }, [filteredEvents, currentYear, currentMonth]);
+
+  // All events in month (unfiltered for accurate stat counters)
+  const allMonthEvents = useMemo(() => {
+    const padM = String(currentMonth + 1).padStart(2, "0");
+    const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthStart = `${currentYear}-${padM}-01`;
+    const monthEnd = `${currentYear}-${padM}-${String(lastDay).padStart(2, "0")}`;
+
     return events.filter((ev) => {
       const startIso = toISODateString(ev.start_date);
+      const endIso = toISODateString(ev.end_date) || startIso;
       if (!startIso) return false;
-      const [y, m] = startIso.split("-").map(Number);
-      return y === currentYear && m === currentMonth + 1;
+      return startIso <= monthEnd && endIso >= monthStart;
     });
   }, [events, currentYear, currentMonth]);
 
-  const holidaysCount = monthEvents.filter((e) => e.is_holiday || e.event_type === "HOLIDAY").length;
-  const schoolEventsCount = monthEvents.filter((e) => e.event_type === "EVENT" || e.event_type === "CELEBRATION").length;
-  const examsCount = monthEvents.filter((e) => e.event_type === "EXAM").length;
-  const meetingsCount = monthEvents.filter((e) => e.event_type === "MEETING").length;
+  const holidaysCount = allMonthEvents.filter((e) => e.is_holiday || e.event_type === "HOLIDAY").length;
+  const schoolEventsCount = allMonthEvents.filter((e) => e.event_type === "EVENT" || e.event_type === "CELEBRATION").length;
+  const examsCount = allMonthEvents.filter((e) => e.event_type === "EXAM").length;
+  const meetingsCount = allMonthEvents.filter((e) => e.event_type === "MEETING").length;
 
   // Calendar Grid Cells Computation
   const calendarDays = useMemo(() => {
@@ -386,20 +413,34 @@ export function EventsCalendarHub({
     return days;
   }, [currentYear, currentMonth, filteredEvents, today]);
 
-  // Events for selected date drawer
+  // Events for selected date
   const selectedDateEvents = useMemo(() => {
     if (!selectedDateStr) return [];
-    return events.filter((ev) => {
-      const startIso = toISODateString(ev.start_date);
-      const endIso = toISODateString(ev.end_date) || startIso;
-      if (!startIso) return false;
-      if (startIso === selectedDateStr) return true;
-      if (endIso && endIso >= startIso) {
-        return selectedDateStr >= startIso && selectedDateStr <= endIso;
-      }
-      return false;
-    });
-  }, [events, selectedDateStr]);
+    return filteredEvents
+      .filter((ev) => {
+        const startIso = toISODateString(ev.start_date);
+        const endIso = toISODateString(ev.end_date) || startIso;
+        if (!startIso) return false;
+        if (startIso === selectedDateStr) return true;
+        if (endIso && endIso >= startIso) {
+          return selectedDateStr >= startIso && selectedDateStr <= endIso;
+        }
+        return false;
+      })
+      .sort((a, b) => {
+        const aDate = toISODateString(a.start_date) || "";
+        const bDate = toISODateString(b.start_date) || "";
+        return aDate.localeCompare(bDate);
+      });
+  }, [filteredEvents, selectedDateStr]);
+
+  // Events displayed below the calendar (filtered by date if clicked, or showing month's holidays & events)
+  const displayedEventsList = useMemo(() => {
+    if (selectedDateStr) {
+      return selectedDateEvents;
+    }
+    return monthEvents;
+  }, [selectedDateStr, selectedDateEvents, monthEvents]);
 
   // Delete Handler
   const handleDeleteConfirm = async () => {
@@ -423,34 +464,34 @@ export function EventsCalendarHub({
     : "Stay updated with official school academic calendars, public holidays, exams, and celebrations.";
 
   return (
-    <div className="space-y-6 pb-16 min-w-0 max-w-7xl mx-auto w-full overflow-x-hidden">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs">
-              <CalendarIcon className="h-6 w-6 stroke-[2.2]" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
+        <div className="space-y-1 w-full min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+              <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100 truncate">
                 {pageTitle || defaultTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-2">
                 {pageSubtitle || defaultSubtitle}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => fetchEventsList(true)}
             disabled={refreshing}
-            className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs"
+            className="flex-1 sm:flex-initial h-8 sm:h-10 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-1.5 sm:gap-2 transition-all shadow-2xs justify-center"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
             Refresh
           </Button>
 
@@ -462,10 +503,10 @@ export function EventsCalendarHub({
                 onClick={handleSeedDefaults}
                 disabled={isSeeding || refreshing}
                 title="Automatically load and synchronize standard public and school holidays"
-                className="h-10 rounded-2xl px-4 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-2 transition-all shadow-2xs"
+                className="flex-1 sm:flex-initial h-8 sm:h-10 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1.5 sm:gap-2 transition-all shadow-2xs justify-center"
               >
-                <Sparkles className={`h-4 w-4 ${isSeeding ? "animate-spin text-amber-500" : "text-amber-500"}`} />
-                {isSeeding ? "Syncing..." : "Sync Public Holidays"}
+                <Sparkles className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isSeeding ? "animate-spin text-amber-500" : "text-amber-500"}`} />
+                {isSeeding ? "Syncing..." : "Sync Holidays"}
               </Button>
 
               <Button
@@ -474,9 +515,9 @@ export function EventsCalendarHub({
                   setInitialDateForForm("");
                   setFormModalOpen(true);
                 }}
-                className="h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98]"
+                className="flex-1 sm:flex-initial h-8 sm:h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-xl sm:rounded-2xl px-4 sm:px-5 gap-1.5 sm:gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] justify-center"
               >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
                 Add Event / Holiday
               </Button>
             </>
@@ -485,127 +526,129 @@ export function EventsCalendarHub({
       </div>
 
       {/* ─── STAT CARDS ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 shrink-0 shadow-2xs">
-              <Palmtree className="w-5 h-5 stroke-[2.2]" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5">
+        <Card className="rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardContent className="p-2.5 sm:p-5 flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 shrink-0 shadow-2xs">
+              <Palmtree className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Holidays ({MONTH_NAMES[currentMonth].slice(0, 3)})</p>
-              <p className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">{holidaysCount}</p>
+              <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Holidays ({MONTH_NAMES[currentMonth].slice(0, 3)})</p>
+              <p className="text-lg sm:text-2xl font-black text-amber-600 dark:text-amber-400">{holidaysCount}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
-              <Trophy className="w-5 h-5 stroke-[2.2]" />
+        <Card className="rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardContent className="p-2.5 sm:p-5 flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Events & Fests</p>
-              <p className="text-xl sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{schoolEventsCount}</p>
+              <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Events & Fests</p>
+              <p className="text-lg sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{schoolEventsCount}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 shrink-0 shadow-2xs">
-              <BookOpen className="w-5 h-5 stroke-[2.2]" />
+        <Card className="rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardContent className="p-2.5 sm:p-5 flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Exams & Tests</p>
-              <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">{examsCount}</p>
+              <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Exams & Tests</p>
+              <p className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400">{examsCount}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900/60 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
-              <Users2 className="w-5 h-5 stroke-[2.2]" />
+        <Card className="rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardContent className="p-2.5 sm:p-5 flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900/60 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
+              <Users2 className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Meetings & PTM</p>
-              <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{meetingsCount}</p>
+              <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Meetings & PTM</p>
+              <p className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{meetingsCount}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* ─── CALENDAR CONTROLS & FILTER PILLS ────────────────────────────── */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-3 sm:p-5 space-y-2.5 sm:space-y-3.5 shadow-2xs w-full min-w-0 overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
           {/* Month / Year Navigator */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevMonth}
-              className="p-2 rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-300 transition-colors"
-              title="Previous Month"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-start">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-300 transition-colors"
+                title="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
 
-            <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200 dark:border-zinc-700">
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-zinc-100 tracking-tight">
-                {MONTH_NAMES[currentMonth]} {currentYear}
-              </h2>
+              <div className="flex items-center gap-1.5 px-3 py-1 sm:px-3.5 sm:py-1.5 bg-slate-50 dark:bg-zinc-800/60 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-zinc-700">
+                <h2 className="text-xs sm:text-base font-black text-slate-900 dark:text-zinc-100 tracking-tight">
+                  {MONTH_NAMES[currentMonth]} {currentYear}
+                </h2>
+              </div>
+
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-300 transition-colors"
+                title="Next Month"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
             </div>
 
             <button
-              onClick={handleNextMonth}
-              className="p-2 rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-300 transition-colors"
-              title="Next Month"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-
-            <button
               onClick={handleGoToday}
-              className="px-3 py-2 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-[#5826df] hover:bg-indigo-100 border border-[#5826df]/20 transition-all ml-1"
+              className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-[#5826df] hover:bg-indigo-100 border border-[#5826df]/20 transition-all shadow-2xs"
             >
               Today
             </button>
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-zinc-800 rounded-2xl self-start md:self-auto">
+          <div className="flex items-center gap-1 p-0.5 sm:p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl sm:rounded-2xl self-end sm:self-auto">
             <button
               onClick={() => setViewMode("CALENDAR")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 sm:gap-1.5 ${
                 viewMode === "CALENDAR"
                   ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-xs"
                   : "text-slate-600 dark:text-zinc-400 hover:text-slate-900"
               }`}
             >
-              <CalendarDays className="w-3.5 h-3.5" />
+              <CalendarDays className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               Month Grid
             </button>
             <button
               onClick={() => setViewMode("AGENDA")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 sm:gap-1.5 ${
                 viewMode === "AGENDA"
                   ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-xs"
                   : "text-slate-600 dark:text-zinc-400 hover:text-slate-900"
               }`}
             >
-              <ListTodo className="w-3.5 h-3.5" />
+              <ListTodo className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               Agenda List
             </button>
           </div>
         </div>
 
         {/* Filter Pills Bar */}
-        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Filter:
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+            <Filter className="w-3 h-3 text-[#5826df]" /> Filter:
           </span>
 
           <button
             onClick={() => setSelectedTypeFilter("ALL")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 ${
               selectedTypeFilter === "ALL"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -616,7 +659,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("HOLIDAY")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedTypeFilter === "HOLIDAY"
                 ? "bg-amber-500 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -628,7 +671,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("EVENT")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedTypeFilter === "EVENT"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -640,7 +683,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("EXAM")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedTypeFilter === "EXAM"
                 ? "bg-rose-500 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -652,7 +695,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("MEETING")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedTypeFilter === "MEETING"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -664,7 +707,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("CELEBRATION")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedTypeFilter === "CELEBRATION"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -683,46 +726,51 @@ export function EventsCalendarHub({
           <p className="text-xs font-bold text-slate-500">Loading academic calendar...</p>
         </div>
       ) : viewMode === "CALENDAR" ? (
-        /* ─── MONTH GRID VIEW ────────────────────────────────────────────── */
-        <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden shadow-2xs w-full">
-          <div className="overflow-x-auto w-full">
-            <div className="min-w-[620px]">
-              {/* Days Header */}
-              <div className="grid grid-cols-7 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-800/50 text-center text-xs font-black text-slate-600 dark:text-zinc-400 py-3">
-            {DAYS_OF_WEEK.map((d, i) => (
-              <div key={d} className={i === 0 ? "text-rose-500" : ""}>
-                {d}
-              </div>
-            ))}
-          </div>
+        <div className="space-y-3 sm:space-y-4">
+          {/* ─── MONTH GRID VIEW (RESPONSIVE NO HORIZONTAL CUTOFF) ───────────── */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden shadow-2xs w-full">
+            {/* Days Header */}
+            <div className="grid grid-cols-7 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-800/50 text-center text-[10px] sm:text-xs font-black text-slate-600 dark:text-zinc-400 py-1.5 sm:py-3">
+              {DAYS_OF_WEEK.map((d, i) => (
+                <div key={d} className={i === 0 ? "text-rose-500 font-extrabold" : ""}>
+                  <span className="hidden sm:inline">{d}</span>
+                  <span className="inline sm:hidden">{DAYS_OF_WEEK_SHORT[i]}</span>
+                </div>
+              ))}
+            </div>
 
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 dark:divide-zinc-800/80">
-            {calendarDays.map((day, idx) => {
-              const isSunday = idx % 7 === 0;
-              const hasEvents = day.events.length > 0;
-              return (
-                <div
-                  key={`${day.dateStr}-${idx}`}
-                  onClick={() => {
-                    if (day.isCurrentMonth) {
-                      setSelectedDateStr(day.dateStr);
-                    }
-                  }}
-                  className={`min-h-[105px] sm:min-h-[120px] p-2 flex flex-col justify-between transition-colors cursor-pointer group ${
-                    !day.isCurrentMonth
-                      ? "bg-slate-50/40 dark:bg-zinc-950/40 text-slate-300 dark:text-zinc-600 cursor-default"
-                      : isSunday
-                      ? "bg-rose-50/20 dark:bg-rose-950/10 hover:bg-slate-50 dark:hover:bg-zinc-800/50"
-                      : "hover:bg-slate-50 dark:hover:bg-zinc-800/50"
-                  }`}
-                >
+            {/* Days Grid */}
+            <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 dark:divide-zinc-800/80">
+              {calendarDays.map((day, idx) => {
+                const isSunday = idx % 7 === 0;
+                const hasEvents = day.events.length > 0;
+                const isSelected = selectedDateStr === day.dateStr;
+                return (
+                  <div
+                    key={`${day.dateStr}-${idx}`}
+                    onClick={() => {
+                      if (day.isCurrentMonth) {
+                        setSelectedDateStr((prev) => (prev === day.dateStr ? null : day.dateStr));
+                      }
+                    }}
+                    className={`min-h-[46px] sm:min-h-[110px] p-1 sm:p-2 flex flex-col justify-between transition-all cursor-pointer group ${
+                      !day.isCurrentMonth
+                        ? "bg-slate-50/40 dark:bg-zinc-950/40 text-slate-300 dark:text-zinc-600 cursor-default"
+                        : isSelected
+                        ? "ring-2 ring-inset ring-[#5826df] bg-indigo-50/70 dark:bg-indigo-950/40"
+                        : isSunday
+                        ? "bg-rose-50/20 dark:bg-rose-950/10 hover:bg-slate-50 dark:hover:bg-zinc-800/50"
+                        : "hover:bg-slate-50 dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
                   {/* Day Header */}
                   <div className="flex items-center justify-between">
                     <span
-                      className={`text-xs font-black w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                      className={`text-[11px] sm:text-xs font-black w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-all ${
                         day.isToday
                           ? "bg-[#5826df] text-white shadow-xs"
+                          : isSelected
+                          ? "bg-[#5826df]/20 text-[#5826df] font-black"
                           : day.isCurrentMonth
                           ? isSunday
                             ? "text-rose-500 font-bold"
@@ -734,45 +782,70 @@ export function EventsCalendarHub({
                     </span>
 
                     {hasEvents && day.isCurrentMonth && (
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                      <span className="text-[8px] sm:text-[10px] font-extrabold px-1 sm:px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
                         {day.events.length}
                       </span>
                     )}
                   </div>
 
                   {/* Event Badges List in Cell */}
-                  <div className="space-y-1 my-1 overflow-hidden">
-                    {day.events.slice(0, 2).map((ev) => {
-                      const cfg = getEventTypeConfig(ev.event_type);
-                      return (
-                        <div
-                          key={ev.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewingDetailEvent(ev);
-                          }}
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg truncate border flex items-center gap-1 transition-transform hover:scale-[1.02] ${cfg.bgClass}`}
-                          title={`${ev.title} (${cfg.label})`}
-                        >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: cfg.color }}
-                          />
-                          <span className="truncate">{capitalizeFirstLetter(ev.title || ev.name)}</span>
-                        </div>
-                      );
-                    })}
+                  {hasEvents && day.isCurrentMonth && (
+                    <div className="space-y-0.5 sm:space-y-1 my-0.5 sm:my-1 overflow-hidden">
+                      {/* Mobile Compact Dots */}
+                      <div className="flex sm:hidden items-center justify-center gap-0.5 flex-wrap">
+                        {day.events.slice(0, 3).map((ev) => {
+                          const cfg = getEventTypeConfig(ev.event_type);
+                          return (
+                            <span
+                              key={ev.id}
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: cfg.color }}
+                              title={`${ev.title || ev.name} (${cfg.label})`}
+                            />
+                          );
+                        })}
+                        {day.events.length > 3 && (
+                          <span className="text-[7px] font-black text-[#5826df] leading-none">
+                            +
+                          </span>
+                        )}
+                      </div>
 
-                    {day.events.length > 2 && (
-                      <p className="text-[9px] font-black text-[#5826df] dark:text-indigo-400 pl-1">
-                        +{day.events.length - 2} more
-                      </p>
-                    )}
-                  </div>
+                      {/* Tablet / Desktop Full Badges */}
+                      <div className="hidden sm:block space-y-1">
+                        {day.events.slice(0, 2).map((ev) => {
+                          const cfg = getEventTypeConfig(ev.event_type);
+                          return (
+                            <div
+                              key={ev.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingDetailEvent(ev);
+                              }}
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg truncate border flex items-center gap-1 transition-transform hover:scale-[1.02] ${cfg.bgClass}`}
+                              title={`${ev.title || ev.name} (${cfg.label})`}
+                            >
+                              <span
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: cfg.color }}
+                              />
+                              <span className="truncate">{capitalizeFirstLetter(ev.title || ev.name)}</span>
+                            </div>
+                          );
+                        })}
+
+                        {day.events.length > 2 && (
+                          <p className="text-[9px] font-black text-[#5826df] dark:text-indigo-400 pl-1">
+                            +{day.events.length - 2} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Cell Bottom Quick Action for Manager */}
                   {canManage && day.isCurrentMonth && (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
+                    <div className="hidden sm:flex opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -791,8 +864,253 @@ export function EventsCalendarHub({
             })}
           </div>
         </div>
+
+        {/* ─── MONTH HOLIDAYS & CELEBRATIONS SECTION (BOTTOM OF CALENDAR) ─── */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-3 sm:p-6 shadow-2xs space-y-3 sm:space-y-4 w-full min-w-0 overflow-hidden">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 pb-2.5 sm:pb-3 border-b border-slate-100 dark:border-zinc-800 w-full min-w-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+              <div
+                className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl shrink-0 ${
+                  selectedDateStr
+                    ? "bg-indigo-50 text-[#5826df] border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900"
+                    : "bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900"
+                }`}
+              >
+                {selectedDateStr ? <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <Palmtree className="w-4 h-4 sm:w-5 sm:h-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-lg font-black text-slate-900 dark:text-zinc-100">
+                    {selectedDateStr
+                      ? `Events & Holidays on ${formatDateDisplay(selectedDateStr)}`
+                      : `${MONTH_NAMES[currentMonth]} ${currentYear} — Holidays, Celebrations & Events`}
+                  </h3>
+                  <span className="text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                    {displayedEventsList.length} {displayedEventsList.length === 1 ? "item" : "items"}
+                  </span>
+                  {holidaysCount > 0 && !selectedDateStr && (
+                    <span className="text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                      <Palmtree className="w-3 h-3" /> {holidaysCount} School Holiday{holidaysCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  {selectedDateStr
+                    ? "Showing events for this date. Tap 'Show All' or tap the date again to view the entire month."
+                    : `Scheduled holidays, celebrations, and events for ${MONTH_NAMES[currentMonth]} ${currentYear}. Tap any calendar day above to inspect that specific date.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+              {selectedDateStr && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedDateStr(null)}
+                  className="rounded-xl text-[11px] sm:text-xs font-bold gap-1.5 h-7 sm:h-8 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                >
+                  <CalendarDays className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#5826df]" /> Show All {MONTH_NAMES[currentMonth]}
+                </Button>
+              )}
+              {canManage && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setInitialDateForForm(selectedDateStr || "");
+                    setEditingEvent(null);
+                    setFormModalOpen(true);
+                  }}
+                  className="bg-[#5826df] hover:bg-[#4c1fc7] text-white text-[11px] sm:text-xs font-bold rounded-xl px-3 sm:px-3.5 h-7 sm:h-8 gap-1.5 shadow-2xs"
+                >
+                  <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Add {selectedDateStr ? "for This Date" : "Event / Holiday"}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          {displayedEventsList.length === 0 ? (
+            <div className="py-10 text-center flex flex-col items-center justify-center gap-2.5 bg-slate-50/50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 p-6">
+              <div className="p-3 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-400">
+                <Palmtree className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-bold text-slate-700 dark:text-zinc-300">
+                {selectedDateStr
+                  ? "No events or holidays scheduled on this date"
+                  : `No events or holidays found for ${MONTH_NAMES[currentMonth]} ${currentYear}`}
+              </p>
+              <p className="text-xs text-slate-400 max-w-sm">
+                {selectedDateStr
+                  ? "Click 'Show All' to view other dates in this month, or create an event for this date."
+                  : canManage
+                  ? "Use the 'Add Event / Holiday' button above to schedule items for this month."
+                  : "Check back later as school management publishes scheduled activities."}
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                {selectedDateStr && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedDateStr(null)}
+                    className="rounded-xl text-xs font-bold"
+                  >
+                    View All Month Events
+                  </Button>
+                )}
+                {canManage && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setInitialDateForForm(selectedDateStr || "");
+                      setEditingEvent(null);
+                      setFormModalOpen(true);
+                    }}
+                    className="bg-[#5826df] hover:bg-[#4c1fc7] text-white rounded-xl text-xs font-bold"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {displayedEventsList.map((ev) => {
+                const cfg = getEventTypeConfig(ev.event_type);
+                const Icon = cfg.icon;
+                const isoDate = toISODateString(ev.start_date);
+                let monthStr = "EVENT";
+                let dayNumber = "";
+                let dayOfWeek = "";
+                if (isoDate) {
+                  try {
+                    const [y, m, d] = isoDate.split("-").map(Number);
+                    if (y && m && d) {
+                      const dt = new Date(y, m - 1, d);
+                      monthStr = dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+                      dayNumber = String(d);
+                      dayOfWeek = dt.toLocaleDateString("en-US", { weekday: "short" });
+                    }
+                  } catch {}
+                }
+
+                const isHolidayItem = ev.is_holiday || ev.event_type === "HOLIDAY";
+                const hasRange = ev.end_date && ev.end_date !== ev.start_date;
+
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => setViewingDetailEvent(ev)}
+                    className={`group p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between gap-3 ${
+                      isHolidayItem
+                        ? "border-amber-200/90 dark:border-amber-800/60 bg-gradient-to-br from-amber-50/60 via-white to-amber-50/20 dark:from-amber-950/20 dark:via-zinc-900 dark:to-amber-950/10 hover:shadow-md hover:border-amber-400"
+                        : ev.event_type === "CELEBRATION"
+                        ? "border-sky-200/90 dark:border-sky-800/60 bg-gradient-to-br from-sky-50/60 via-white to-sky-50/20 dark:from-sky-950/20 dark:via-zinc-900 dark:to-sky-950/10 hover:shadow-md hover:border-sky-400"
+                        : ev.event_type === "EXAM"
+                        ? "border-rose-200/90 dark:border-rose-800/60 bg-gradient-to-br from-rose-50/60 via-white to-rose-50/20 dark:from-rose-950/20 dark:via-zinc-900 dark:to-rose-950/10 hover:shadow-md hover:border-rose-400"
+                        : "border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:shadow-md hover:border-slate-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    {/* Top Row: Date Pill, Badges, Actions */}
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      <div className="w-11 h-12 sm:w-12 sm:h-14 rounded-xl sm:rounded-2xl bg-white dark:bg-zinc-800 shadow-2xs border border-slate-200/80 dark:border-zinc-700/80 flex flex-col items-center justify-center shrink-0 text-center">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-500 tracking-wider leading-none">
+                          {monthStr}
+                        </span>
+                        <span className="text-base sm:text-lg font-black text-slate-900 dark:text-zinc-100 leading-tight">
+                          {dayNumber}
+                        </span>
+                        <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 leading-none">
+                          {dayOfWeek}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge className={`${cfg.bgClass} text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-full flex items-center gap-1 border`}>
+                            <Icon className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {cfg.label}
+                          </Badge>
+                          {isHolidayItem && (
+                            <span className="text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-full bg-amber-500 text-white shadow-2xs">
+                              School Closed
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100 line-clamp-1 group-hover:text-[#5826df] transition-colors first-letter:uppercase">
+                          {capitalizeFirstLetter(ev.title || ev.name)}
+                        </h4>
+                      </div>
+
+                      {canManage && (
+                        <div className="flex items-center gap-1 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEvent(ev);
+                              setFormModalOpen(true);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                            title="Edit Event"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmEvent(ev)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            title="Delete Event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Description snippet */}
+                    {ev.description && (
+                      <p className="text-xs text-slate-600 dark:text-zinc-400 line-clamp-2 leading-relaxed first-letter:uppercase">
+                        {capitalizeFirstLetter(ev.description)}
+                      </p>
+                    )}
+
+                    {/* Footer metadata */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-3 text-[11px] text-slate-500 dark:text-zinc-400 flex-wrap">
+                      {hasRange ? (
+                        <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-zinc-300">
+                          <CalendarIcon className="w-3 h-3 text-[#5826df]" />
+                          {formatDateDisplay(ev.start_date)} - {formatDateDisplay(ev.end_date)}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="w-3 h-3 text-slate-400" />
+                          {formatDateDisplay(ev.start_date)}
+                        </span>
+                      )}
+
+
+
+                      {ev.location && (
+                        <span className="flex items-center gap-1 max-w-[140px] truncate" title={ev.location}>
+                          <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span className="truncate">{ev.location}</span>
+                        </span>
+                      )}
+
+                      {ev.target_audience && ev.target_audience !== "ALL" && (
+                        <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
+                          {ev.target_audience}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
       ) : (
         /* ─── AGENDA / LIST VIEW ─────────────────────────────────────────── */
         <div className="space-y-3">
@@ -811,29 +1129,61 @@ export function EventsCalendarHub({
               {filteredEvents.map((ev) => {
                 const cfg = getEventTypeConfig(ev.event_type);
                 const Icon = cfg.icon;
+                const isoDate = toISODateString(ev.start_date);
+                let monthStr = "EVENT";
+                let dayNumber = "";
+                let dayOfWeek = "";
+                if (isoDate) {
+                  try {
+                    const [y, m, d] = isoDate.split("-").map(Number);
+                    if (y && m && d) {
+                      const dt = new Date(y, m - 1, d);
+                      monthStr = dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+                      dayNumber = String(d);
+                      dayOfWeek = dt.toLocaleDateString("en-US", { weekday: "short" });
+                    }
+                  } catch {}
+                }
+
                 return (
                   <motion.div
                     key={ev.id}
                     layout
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 shadow-2xs hover:border-[#5826df]/35 transition-all flex flex-col justify-between gap-3"
+                    className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#5826df]/35 transition-all flex items-start gap-3 sm:gap-4 group"
                   >
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge className={`${cfg.bgClass} text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5`}>
-                          <Icon className="w-3 h-3" />
-                          {cfg.label}
-                        </Badge>
+                    {/* Date Block */}
+                    <div className="w-13 sm:w-16 rounded-2xl bg-indigo-50/70 dark:bg-zinc-800/60 border border-indigo-100 dark:border-zinc-700 flex flex-col items-center justify-center py-2 px-1 text-center shrink-0 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase text-[#5826df] tracking-wider">
+                        {monthStr}
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100 leading-none my-0.5 sm:my-1">
+                        {dayNumber || "--"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">
+                        {dayOfWeek}
+                      </span>
+                    </div>
 
-                        {ev.is_holiday && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                            School Closed
-                          </span>
-                        )}
+                    {/* Event Info */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge className={`${cfg.bgClass} text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1`}>
+                            <Icon className="w-3 h-3" />
+                            {cfg.label}
+                          </Badge>
+
+                          {ev.is_holiday && (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                              School Closed
+                            </span>
+                          )}
+                        </div>
 
                         {canManage && (
-                          <div className="flex items-center gap-1 ml-auto">
+                          <div className="flex items-center gap-1 shrink-0">
                             <Button
                               size="sm"
                               variant="ghost"
@@ -859,7 +1209,7 @@ export function EventsCalendarHub({
 
                       <h3
                         onClick={() => setViewingDetailEvent(ev)}
-                        className="text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] cursor-pointer first-letter:uppercase"
+                        className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] cursor-pointer first-letter:uppercase line-clamp-1 leading-snug"
                       >
                         {capitalizeFirstLetter(ev.title || ev.name)}
                       </h3>
@@ -869,23 +1219,23 @@ export function EventsCalendarHub({
                           {capitalizeFirstLetter(ev.description)}
                         </p>
                       )}
-                    </div>
 
-                    <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
-                        <Clock className="w-3.5 h-3.5 text-[#5826df]" />
-                        <span>{formatDateDisplay(ev.start_date)}</span>
-                        {ev.end_date && ev.end_date !== ev.start_date && (
-                          <span> &rarr; {formatDateDisplay(ev.end_date)}</span>
+                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2 text-[11px] text-slate-400 flex-wrap">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
+                          <Clock className="w-3.5 h-3.5 text-[#5826df] shrink-0" />
+                          <span>{formatDateDisplay(ev.start_date)}</span>
+                          {ev.end_date && ev.end_date !== ev.start_date && (
+                            <span> &rarr; {formatDateDisplay(ev.end_date)}</span>
+                          )}
+                        </div>
+
+                        {ev.location && (
+                          <div className="flex items-center gap-1 font-medium text-slate-500 truncate max-w-[140px]">
+                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate">{ev.location}</span>
+                          </div>
                         )}
                       </div>
-
-                      {ev.location && (
-                        <div className="flex items-center gap-1 font-medium text-slate-500 truncate">
-                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{ev.location}</span>
-                        </div>
-                      )}
                     </div>
                   </motion.div>
                 );
@@ -895,154 +1245,18 @@ export function EventsCalendarHub({
         </div>
       )}
 
-      {/* ─── DAY EVENTS DRAWER / DETAILS MODAL ───────────────────────────── */}
-      <AnimatePresence>
-        {selectedDateStr && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setSelectedDateStr(null)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-2xl bg-indigo-50 text-[#5826df] border border-indigo-100">
-                    <CalendarIcon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 dark:text-zinc-100">
-                      {formatDateDisplay(selectedDateStr)}
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      {selectedDateEvents.length} Event{selectedDateEvents.length !== 1 ? "s" : ""} on this date
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedDateStr(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Day Events List */}
-              <div className="space-y-2.5">
-                {selectedDateEvents.length === 0 ? (
-                  <div className="py-10 text-center space-y-2">
-                    <p className="text-xs text-slate-400">No events or holidays scheduled for this date.</p>
-                    {canManage && (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setInitialDateForForm(selectedDateStr);
-                          setEditingEvent(null);
-                          setFormModalOpen(true);
-                        }}
-                        className="bg-[#5826df] hover:bg-[#4c1fc7] text-white text-xs font-bold rounded-xl px-4 gap-1.5"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Add Event on this Date
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  selectedDateEvents.map((ev) => {
-                    const cfg = getEventTypeConfig(ev.event_type);
-                    const Icon = cfg.icon;
-                    return (
-                      <div
-                        key={ev.id}
-                        className="p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <Badge className={`${cfg.bgClass} text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1`}>
-                            <Icon className="w-3 h-3" /> {cfg.label}
-                          </Badge>
-                          {ev.is_holiday && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                              Holiday
-                            </span>
-                          )}
-
-                          {canManage && (
-                            <div className="flex items-center gap-1 ml-auto">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingEvent(ev);
-                                  setFormModalOpen(true);
-                                }}
-                                className="h-6 w-6 p-0 text-amber-600 hover:bg-amber-50 rounded-lg"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeleteConfirmEvent(ev)}
-                                className="h-6 w-6 p-0 text-rose-600 hover:bg-rose-50 rounded-lg"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-
-                        <h4 className="text-sm font-black text-slate-900 dark:text-zinc-100 first-letter:uppercase">
-                          {capitalizeFirstLetter(ev.title || ev.name)}
-                        </h4>
-
-                        {ev.description && (
-                          <p className="text-xs text-slate-600 dark:text-zinc-400 whitespace-pre-wrap leading-relaxed first-letter:uppercase">
-                            {capitalizeFirstLetter(ev.description)}
-                          </p>
-                        )}
-
-                        {ev.location && (
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-[#5826df]" /> {ev.location}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {canManage && selectedDateEvents.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setInitialDateForForm(selectedDateStr);
-                      setEditingEvent(null);
-                      setFormModalOpen(true);
-                    }}
-                    className="bg-[#5826df] hover:bg-[#4c1fc7] text-white text-xs font-bold rounded-xl px-4 gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Another Event
-                  </Button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* (Day events and monthly celebrations/holidays are shown in the bottom section of the calendar) */}
 
       {/* ─── SINGLE EVENT DETAIL VIEW MODAL ─────────────────────────────── */}
       <AnimatePresence>
         {viewingDetailEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setViewingDetailEvent(null)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 max-h-[85vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
             >
               <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
                 <div className="space-y-1.5">
@@ -1139,13 +1353,13 @@ export function EventsCalendarHub({
       {/* ─── DELETE CONFIRM MODAL ──────────────────────────────────────── */}
       <AnimatePresence>
         {deleteConfirmEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setDeleteConfirmEvent(null)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-sm p-5 sm:p-6 z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
             >
               <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto">
                 <Trash2 className="w-6 h-6 stroke-[2.2]" />
@@ -1259,13 +1473,13 @@ function EventFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-xl p-6 sm:p-7 max-h-[92vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
+        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-xl p-4 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowLeft,
+  ArrowRight,
   Banknote,
   Bell,
   BookOpen,
@@ -13,6 +15,9 @@ import {
   Clock,
   FileCheck,
   FileText,
+  Home,
+  Calendar,
+  MoreHorizontal,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -109,24 +114,47 @@ function settleWidth(width: number) {
   return width < COMPACT_MAX ? MIN_WIDTH : Math.max(EXPANDED_MIN, width);
 }
 
-/** Finds the deepest link matching the current path so nested groups resolve. */
-function findActive(links: SidebarLink[], pathname: string): SidebarLink | undefined {
+/** Finds the deepest link matching the current path and query so nested groups resolve. */
+function findActive(links: SidebarLink[], pathname: string, currentQuery = ""): SidebarLink | undefined {
   const leaves = links.flatMap(link => link.subLinks?.length ? link.subLinks : [link]);
-  return leaves.filter(link => pathname === link.href || (!link.exact && link !== links[0] && pathname.startsWith(`${link.href}/`)))
-    .sort((a, b) => b.href.length - a.href.length)[0];
+  const fullPath = currentQuery ? `${pathname}${currentQuery}` : pathname;
+
+  // 1. Exact match with query params if fullPath matches link.href
+  const exactMatch = leaves.find(link => link.href === fullPath);
+  if (exactMatch) return exactMatch;
+
+  // 2. Base pathname match for links without query params
+  return leaves.filter(link => {
+    const [base, query] = link.href.split("?");
+    if (query) {
+      return fullPath === link.href;
+    }
+    return pathname === base || (!link.exact && link !== links[0] && pathname.startsWith(`${base}/`));
+  }).sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-export function 
-AppShell({
-  children,
-  links,
-  roleTitle,
-  userName,
-  onSignOut,
-  headerTitle,
-  noPadding,
-  mainClassName,
-}: AppShellProps) {
+function formatSchoolDisplayName(name?: string | null): string {
+  if (!name) return "VidyaSanchalan";
+  const trimmed = name.trim();
+  if (trimmed.toLowerCase() === "vidyasanchalan") return "VidyaSanchalan";
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function
+  AppShell({
+    children,
+    links,
+    roleTitle,
+    userName,
+    onSignOut,
+    headerTitle,
+    noPadding,
+    mainClassName,
+  }: AppShellProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
   const requiresRoleCheck = !onSignOut && !!roleTitle && !!ROLE_ALLOWED_MAP[roleTitle];
@@ -165,12 +193,45 @@ AppShell({
   const [signingOut, setSigningOut] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
-  const { notifications, readIds, unreadCount, markAsRead } = useAnnouncementSocket();
+  const { notifications, readIds, unreadCount, markAsRead, markAllAsRead } = useAnnouncementSocket();
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<AnnouncementResponse | null>(null);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState<string | null>(null);
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [logoImgError, setLogoImgError] = useState(false);
+
+  const getNotificationsUrl = useCallback(() => {
+    const pathPrefix = (pathname || "").split("/")[1]?.toLowerCase();
+    const knownRoles = [
+      "librarian",
+      "teacher",
+      "clerk",
+      "principal",
+      "trustee",
+      "fees",
+      "inventory",
+      "student",
+      "parent",
+      "superadmin",
+      "admin",
+    ];
+    if (pathPrefix && knownRoles.includes(pathPrefix)) {
+      return `/${pathPrefix}/notifications`;
+    }
+    if (roleTitle) {
+      const roleNormalized = roleTitle.toLowerCase().replace(/[^a-z]/g, "");
+      if (knownRoles.includes(roleNormalized)) {
+        return `/${roleNormalized}/notifications`;
+      }
+    }
+    const userRole = (profile?.role || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (userRole && knownRoles.includes(userRole)) {
+      return `/${userRole}/notifications`;
+    }
+    return "/librarian/notifications";
+  }, [pathname, roleTitle, profile?.role]);
 
   useEffect(() => {
     let mounted = true;
@@ -178,6 +239,12 @@ AppShell({
       .then((data) => {
         if (!mounted) return;
         setProfile(data);
+        if (data.school?.name) setSchoolName(data.school.name);
+        const resolvedLogo = data.school?.logo || data.avatar;
+        if (resolvedLogo) {
+          setSchoolLogo(resolvedLogo);
+          setLogoImgError(false);
+        }
         const serverRoles = (data.roles || (data.role ? [data.role] : [])).map(r => String(r).toLowerCase().trim());
         if (requiresRoleCheck && roleTitle && ROLE_ALLOWED_MAP[roleTitle]) {
           const isAllowed = ROLE_ALLOWED_MAP[roleTitle].some(r => serverRoles.includes(r));
@@ -192,15 +259,36 @@ AppShell({
   }, [requiresRoleCheck, roleTitle, pathname]);
 
   useEffect(() => {
-    try { setSchoolName(localStorage.getItem("school_name")); } catch { /* ignore */ }
+    try {
+      setSchoolName(localStorage.getItem("school_name"));
+      setSchoolLogo(localStorage.getItem("school_logo"));
+    } catch { /* ignore */ }
+  }, []);
+
+  const [currentQuery, setCurrentQuery] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentQuery(window.location.search);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      if (typeof window !== "undefined") {
+        setCurrentQuery(window.location.search);
+      }
+    };
+    window.addEventListener("popstate", handleLocationChange);
+    return () => window.removeEventListener("popstate", handleLocationChange);
   }, []);
 
   // Auto-expand the group that owns the active page.
   useEffect(() => {
-    const active = findActive(links, pathname);
+    const active = findActive(links, pathname, currentQuery);
     const owner = links.find(link => active && link.subLinks?.includes(active));
     if (owner) setOpenGroup(owner.title);
-  }, [pathname, links]);
+  }, [pathname, currentQuery, links]);
 
   const updateWidth = useCallback((width: number) => {
     const next = clampWidth(width);
@@ -236,7 +324,7 @@ AppShell({
     };
     const outside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target?.closest?.("#notification-detail-modal")) return;
+      if (target?.closest?.("#notification-detail-modal") || target?.closest?.("#mobile-notifications-panel")) return;
       if (!notificationRef.current?.contains(target)) setNotificationsOpen(false);
     };
     document.addEventListener("keydown", onKey);
@@ -254,15 +342,15 @@ AppShell({
   };
 
   const subtitle = roleTitle || "Clerk";
-  const activeLink = findActive(links, pathname);
+  const activeLink = findActive(links, pathname, currentQuery);
 
   const getBadgeColor = (title: string, index: number) => {
     const lower = title.toLowerCase().trim();
-    if (lower === "dashboard") return "bg-indigo-500 text-white";
+    if (lower === "dashboard") return "bg-blue-600 text-white";
     if (lower.includes("academic year")) return "bg-[#3b82f6] text-white";
-    if (lower.includes("result dashboard")) return "bg-[#6366f1] text-white";
-    if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#8b5cf6] text-white";
-    
+    if (lower.includes("result dashboard")) return "bg-[#0284c7] text-white";
+    if (lower.includes("result weightage") || lower.includes("weightage")) return "bg-[#2563eb] text-white";
+
     // Exam Management
     if (lower === "exam management") return "bg-[#ec4899] text-white";
     if (lower.includes("exam config") || lower.includes("configuration")) return "bg-[#64748b] text-white";
@@ -279,7 +367,7 @@ AppShell({
     // Result Processing
     if (lower === "result processing") return "bg-[#e11d48] text-white";
     if (lower.includes("result preview")) return "bg-[#3b82f6] text-white";
-    if (lower.includes("result verification")) return "bg-[#a855f7] text-white";
+    if (lower.includes("result verification")) return "bg-[#0284c7] text-white";
     if (lower.includes("result publish") || lower === "result publish") return "bg-[#06b6d4] text-white";
     if (lower.includes("published result") || lower.includes("progress report")) return "bg-[#f59e0b] text-white";
 
@@ -290,21 +378,21 @@ AppShell({
     if (lower.includes("hr") || lower.includes("staff") || lower.includes("department")) return "bg-[#06b6d4] text-white";
     if (lower.includes("admission") || lower.includes("applicant") || lower.includes("student directory") || lower.includes("students")) return "bg-[#f43f5e] text-white";
     if (lower.includes("fee type")) return "bg-[#ec4899] text-white";
-    if (lower.includes("fee structure")) return "bg-[#8b5cf6] text-white";
+    if (lower.includes("fee structure")) return "bg-[#2563eb] text-white";
     if (lower.includes("generate fee") || lower.includes("genrate fee")) return "bg-[#10b981] text-white";
     if (lower.includes("student ledger") || lower.includes("ledger") || lower.includes("receipt")) return "bg-[#f97316] text-white";
-    if (lower.includes("division")) return "bg-[#818cf8] text-white";
+    if (lower.includes("division")) return "bg-[#0284c7] text-white";
     if (lower.includes("categorie")) return "bg-[#fbbf24] text-white";
     if (lower.includes("school") || lower.includes("class") || lower.includes("profile")) return "bg-[#38bdf8] text-white";
     if (lower.includes("attendance")) return "bg-[#22c55e] text-white";
-    if (lower.includes("curriculum") || lower.includes("subject") || lower.includes("syllabus")) return "bg-[#818cf8] text-white";
+    if (lower.includes("curriculum") || lower.includes("subject") || lower.includes("syllabus")) return "bg-[#0284c7] text-white";
     if (lower.includes("teacher") || lower.includes("faculty") || lower.includes("workload")) return "bg-[#f97316] text-white";
     if (lower.includes("timetable") || lower.includes("schedule")) return "bg-[#06b6d4] text-white";
     if (lower.includes("announcement") || lower.includes("notice")) return "bg-[#ec4899] text-white";
     if (lower.includes("leave request")) return "bg-[#84cc16] text-white";
     if (lower.includes("my leave") || lower.includes("leave")) return "bg-[#fb7185] text-white";
     if (lower.includes("fee") || lower.includes("payment")) return "bg-[#10b981] text-white";
-    if (lower.includes("inventory") || lower.includes("stock") || lower.includes("asset")) return "bg-[#a855f7] text-white";
+    if (lower.includes("inventory") || lower.includes("stock") || lower.includes("asset")) return "bg-[#0284c7] text-white";
     if (lower.includes("librar") || lower.includes("book")) return "bg-[#eab308] text-white";
     if (lower.includes("exam") || lower.includes("result") || lower.includes("mark")) return "bg-[#e11d48] text-white";
     if (lower.includes("homework") || lower.includes("assignment")) return "bg-[#06b6d4] text-white";
@@ -315,12 +403,12 @@ AppShell({
       "bg-[#10b981] text-white", // Emerald
       "bg-[#f97316] text-white", // Orange
       "bg-[#f43f5e] text-white", // Rose
-      "bg-[#8b5cf6] text-white", // Purple
+      "bg-[#2563eb] text-white", // Blue
       "bg-[#38bdf8] text-white", // Sky
       "bg-[#fbbf24] text-white", // Amber
       "bg-[#22c55e] text-white", // Green
       "bg-[#ec4899] text-white", // Pink
-      "bg-[#6366f1] text-white", // Indigo
+      "bg-[#0284c7] text-white", // Light Blue
     ];
     return palette[index % palette.length];
   };
@@ -331,22 +419,20 @@ AppShell({
     const Icon = link.icon;
     const badgeColor = getBadgeColor(link.title, index);
 
-    const base = `group flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 ${
-      compact ? "justify-center px-0" : "gap-3 px-3.5"
-    }`;
-    
-    // Active item has white card style with deep indigo text
+    const base = `group flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 ${compact ? "justify-center px-0" : "gap-3 px-3.5"
+      }`;
+
+    // Active item has white card style with deep blue text
     const tone = selected
-      ? "bg-white text-indigo-950 font-bold shadow-md shadow-indigo-950/20"
+      ? "bg-white text-blue-950 font-bold shadow-md shadow-blue-950/20"
       : "text-white/85 hover:bg-white/10 hover:text-white";
 
     if (link.subLinks?.length) {
       const groupOpen = !compact && openGroup === link.title;
       const childClasses = (active: boolean) =>
-        `flex min-h-9 items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium leading-5 transition-all ${
-          active
-            ? "bg-white/20 text-white font-bold shadow-2xs backdrop-blur-xs"
-            : "text-purple-100/80 hover:bg-white/10 hover:text-white"
+        `flex min-h-9 items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium leading-5 transition-all ${active
+          ? "bg-white/20 text-white font-bold shadow-2xs backdrop-blur-xs"
+          : "text-blue-100/80 hover:bg-white/10 hover:text-white"
         }`;
 
       return (
@@ -369,9 +455,8 @@ AppShell({
               <>
                 <span className="flex-1 text-left truncate">{link.title}</span>
                 <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${
-                    groupOpen ? "rotate-180 text-white" : ""
-                  }`}
+                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${groupOpen ? "rotate-180 text-white" : ""
+                    }`}
                 />
               </>
             )}
@@ -395,7 +480,14 @@ AppShell({
                         <Link
                           key={`${sub.href}-${sub.title}`}
                           href={sub.href}
-                          onClick={onNavigate}
+                          onClick={() => {
+                            if (sub.href.includes("?")) {
+                              setCurrentQuery(sub.href.substring(sub.href.indexOf("?")));
+                            } else {
+                              setCurrentQuery("");
+                            }
+                            onNavigate?.();
+                          }}
                           aria-current={subActive ? "page" : undefined}
                           className={childClasses(subActive)}
                         >
@@ -433,6 +525,19 @@ AppShell({
     );
   };
 
+  const isSuperAdminRole =
+    roleTitle === "Super Admin" ||
+    (profile?.roles || []).some((r) => String(r).toLowerCase().includes("super"));
+  const rawSchoolName =
+    headerTitle ||
+    (isSuperAdminRole
+      ? "VidyaSanchalan Platform"
+      : profile?.school?.name || schoolName || "VidyaSanchalan");
+  const currentSchoolDisplayName = isSuperAdminRole
+    ? "VidyaSanchalan Platform"
+    : formatSchoolDisplayName(rawSchoolName);
+  const activeLogo = isSuperAdminRole ? null : (profile?.school?.logo || profile?.avatar || schoolLogo);
+
   const navigation = (compact: boolean, onNavigate?: () => void) => (
     <div className="flex h-full flex-col relative z-10">
       {/* Brand Header */}
@@ -443,21 +548,32 @@ AppShell({
           onClick={() => updateWidth(expanded ? MIN_WIDTH : DEFAULT_WIDTH)}
           className="shrink-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-white transition-transform active:scale-95"
         >
-          <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-md p-1.5 flex items-center justify-center shadow-inner border border-white/20">
-            <School className="h-6 w-6 text-amber-300 drop-shadow-sm" />
+          <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-md p-1.5 flex items-center justify-center shadow-inner border border-white/20 overflow-hidden">
+            {!logoImgError && activeLogo ? (
+              <img
+                src={activeLogo}
+                alt={currentSchoolDisplayName}
+                onError={() => setLogoImgError(true)}
+                className="h-full w-full object-contain rounded-xl"
+              />
+            ) : (
+              <School className="h-6 w-6 text-amber-300 drop-shadow-sm" />
+            )}
           </div>
         </button>
         {!compact && (
           <div className="min-w-0">
-            <p className="truncate text-base font-bold tracking-tight text-white drop-shadow-xs">VidyaSanchalan</p>
-            <p className="truncate text-xs text-purple-200/90 font-medium">{subtitle}</p>
+            <p className="truncate text-base font-bold tracking-tight text-white drop-shadow-xs" title={currentSchoolDisplayName}>
+              {currentSchoolDisplayName}
+            </p>
+            <p className="truncate text-xs text-blue-200/90 font-medium">{subtitle}</p>
           </div>
         )}
       </div>
 
       {/* Section Label */}
       {!compact && (
-        <p className="px-6 pb-2 pt-6 text-[11px] font-bold uppercase tracking-widest text-purple-200/60">
+        <p className="px-6 pb-2 pt-6 text-[11px] font-bold uppercase tracking-widest text-blue-200/60">
           WORKSPACE
         </p>
       )}
@@ -475,9 +591,8 @@ AppShell({
           disabled={signingOut}
           title={compact ? (signingOut ? "Signing out…" : "Sign out") : undefined}
           aria-label="Sign out"
-          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-purple-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${
-            compact ? "justify-center" : "gap-3 px-3.5"
-          }`}
+          className={`flex h-11 w-full items-center rounded-2xl text-xs sm:text-sm font-medium text-blue-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 ${compact ? "justify-center" : "gap-3 px-3.5"
+            }`}
         >
           {signingOut ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
           {!compact && <span>{signingOut ? "Signing out…" : "Sign out"}</span>}
@@ -487,28 +602,20 @@ AppShell({
   );
 
   const sortedNotifications = [...notifications].sort((a, b) => {
-    const aRead = readIds.includes(a.id);
-    const bRead = readIds.includes(b.id);
+    const aRead = readIds.some((rId) => String(rId) === String(a.id));
+    const bRead = readIds.some((rId) => String(rId) === String(b.id));
     if (aRead !== bRead) return aRead ? 1 : -1;
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
 
   if (requiresRoleCheck && authorizedPath !== pathname) {
     return (
-      <div className="flex h-svh items-center justify-center bg-[#f4f6fb] text-indigo-900 font-semibold">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-indigo-600" /> Checking access…
+      <div className="flex h-svh items-center justify-center bg-[#f4f6fb] text-slate-900 font-semibold">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin text-blue-600" /> Checking access…
       </div>
     );
   }
 
-  const isSuperAdminRole =
-    roleTitle === "Super Admin" ||
-    (profile?.roles || []).some((r) => String(r).toLowerCase().includes("super"));
-  const currentSchoolDisplayName =
-    headerTitle ||
-    (isSuperAdminRole
-      ? "VidyaSanchalan Platform"
-      : profile?.school?.name || schoolName || "VidyaSanchalan");
   const currentUserName = profile?.name || userName || "Administrator";
   const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "SA";
 
@@ -518,8 +625,8 @@ AppShell({
 
     if (role.includes("teacher")) {
       return [
-        { title: "Dashboard", href: "/teacher", icon: LayoutDashboard },
-        { title: "Attendance", href: "/teacher/student-attendance", icon: Users },
+        { title: "Dashboard", href: "/teacher", icon: Home },
+        { title: "Attendance", href: "/teacher/my-attendance", icon: Calendar },
         { title: "Homework", href: "/teacher/Homework", icon: BookOpen },
         { title: "Materials", href: "/teacher/study-materials", icon: FileText },
       ];
@@ -577,8 +684,8 @@ AppShell({
       >
         {/* Subtle Ambient Light Highlights */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute bottom-0 -right-24 h-56 w-56 rounded-full bg-indigo-900/40 blur-3xl" />
-        
+        <div className="pointer-events-none absolute bottom-0 -right-24 h-56 w-56 rounded-full bg-blue-900/40 blur-3xl" />
+
         <div className="flex h-full min-w-0 flex-col overflow-hidden relative z-10">
           {navigation(!expanded)}
         </div>
@@ -610,9 +717,8 @@ AppShell({
             event.preventDefault();
             updateWidth(event.key === "ArrowLeft" ? MIN_WIDTH : 248);
           }}
-          className={`absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none transition-colors hover:bg-white/20 focus-visible:bg-white/20 ${
-            resizing ? "bg-white/20" : ""
-          }`}
+          className={`absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none transition-colors hover:bg-white/20 focus-visible:bg-white/20 ${resizing ? "bg-white/20" : ""
+            }`}
         />
       </motion.aside>
 
@@ -621,14 +727,23 @@ AppShell({
         {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
         <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs">
-              <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
+              {!logoImgError && activeLogo ? (
+                <img
+                  src={activeLogo}
+                  alt={currentSchoolDisplayName}
+                  onError={() => setLogoImgError(true)}
+                  className="h-full w-full object-contain p-0.5 rounded-full"
+                />
+              ) : (
+                <svg className="w-5 h-5 text-[#FCD34D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              )}
             </span>
             <div className="min-w-0">
-              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight">
-                VidyaSanchalan
+              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight" title={currentSchoolDisplayName}>
+                {currentSchoolDisplayName}
               </span>
               <span className="block truncate text-xs text-white/80 lg:text-[#7183A6] font-normal leading-tight mt-0.5">
                 {roleTitle || "Teacher"}
@@ -637,33 +752,81 @@ AppShell({
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Page Tutorial Help Button */}
+            <PageTutorialDialog
+              roleTitle={roleTitle}
+              isSuperAdmin={
+                roleTitle === "Super Admin" ||
+                Boolean(profile?.is_superuser) ||
+                (profile?.roles || (profile?.role ? [profile.role] : [])).some((r) =>
+                  ["super_admin", "superadmin", "super-admin"].includes(String(r).toLowerCase().trim())
+                )
+              }
+            />
+
             {/* Notification Bell */}
-            <div ref={notificationRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen((value) => !value)}
+            <div ref={notificationRef} className="relative z-50">
+              {/* Mobile View: Direct redirection to Notification Page */}
+              <Link
+                href={getNotificationsUrl()}
                 aria-label="Notifications"
-                aria-expanded={notificationsOpen}
-                className="relative flex h-9 w-9 items-center justify-center rounded-full text-white lg:text-slate-600 hover:bg-white/10 lg:hover:bg-slate-50 transition-colors cursor-pointer"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10 active:scale-95 transition-all lg:hidden cursor-pointer"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-                  {unreadCount > 0 ? unreadCount : 3}
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+
+              {/* Desktop View: Opens Notification Dropdown */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNotificationsOpen((value) => !value);
+                }}
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                className="relative hidden lg:flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
+
+              {/* Desktop Notification Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl">
-                  <p className="flex items-center gap-2 border-b border-slate-100 p-4 text-sm font-semibold text-slate-900">
-                    <Bell className="h-4 w-4 text-[#5436F5]" />
-                    Notifications
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-[#5436F5]">
-                      {unreadCount > 0 ? unreadCount : 3} new
-                    </span>
-                  </p>
-                  <div className="max-h-80 overflow-y-auto">
+                <div className="hidden lg:block absolute right-0 z-[9999] mt-2 w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-100 p-3.5 sm:p-4 text-sm font-semibold text-slate-900 bg-slate-50/50">
+                    <p className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-[#2563EB]" />
+                      Notifications
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
+                        {unreadCount} new
+                      </span>
+                    </p>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllAsRead();
+                        }}
+                        className="text-[11px] font-medium text-[#2563EB] hover:underline cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
                     {sortedNotifications.length ? (
                       sortedNotifications.map((notification) => {
-                        const isRead = readIds.includes(notification.id);
+                        const isRead = readIds.some((rId) => String(rId) === String(notification.id));
                         return (
                           <button
                             key={notification.id}
@@ -672,13 +835,13 @@ AppShell({
                               setSelectedNotification(notification);
                               markAsRead(notification.id);
                             }}
-                            className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50 cursor-pointer ${
-                              isRead ? "" : "bg-indigo-50/40"
+                            className={`flex w-full gap-3 p-3.5 text-left transition-colors hover:bg-slate-50 cursor-pointer ${
+                              isRead ? "" : "bg-blue-50/40"
                             }`}
                           >
                             <span
                               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                                isRead ? "bg-slate-100 text-slate-500" : "bg-indigo-100 text-[#5436F5]"
+                                isRead ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-[#2563EB]"
                               }`}
                             >
                               <Megaphone className="h-4 w-4" />
@@ -692,7 +855,7 @@ AppShell({
                                 >
                                   {notification.title}
                                 </span>
-                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#5436F5]" />}
+                                {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563EB]" />}
                               </span>
                               <span className="mt-0.5 block line-clamp-2 text-xs text-slate-500">
                                 {notification.description}
@@ -718,6 +881,16 @@ AppShell({
                       </div>
                     )}
                   </div>
+                  <div className="border-t border-slate-100 p-2.5 bg-slate-50/80 text-center">
+                    <Link
+                      href={getNotificationsUrl()}
+                      onClick={() => setNotificationsOpen(false)}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[#2563EB] hover:text-[#1D4ED8] hover:underline"
+                    >
+                      <span>Open Full Notification Hub</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
@@ -730,7 +903,7 @@ AppShell({
               title="View my profile"
               className="flex items-center gap-2 pl-1 text-left transition-opacity hover:opacity-90 focus-visible:outline-none cursor-pointer"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6351F7] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#5436F5]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1D4ED8] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#2563EB]">
                 {userInitials || "TE"}
               </span>
               <div className="text-left flex items-center gap-1">
@@ -755,7 +928,7 @@ AppShell({
           </div>
         )}
 
-        {/* Content Body: Protected with pb-28 on mobile so bottom bar never blocks content */}
+        {/* Content Body: Snug pb-20 on mobile clears the 64px floating glass bar without creating excessive empty space */}
         <main
           className={cn(
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
@@ -766,17 +939,28 @@ AppShell({
           {children}
         </main>
 
-        {/* Persistent Role-Aware Mobile Bottom Navigation Bar */}
+        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Compact) */}
+        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Exact Reference Match) */}
         <nav
           aria-label="Mobile Bottom Navigation"
           className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden print:hidden"
         >
-          <div className="flex items-center justify-around px-2 pt-2 pb-1 max-w-lg mx-auto">
+          <div className="flex items-center justify-around px-2 py-1.5 w-full">
             {mobileNavItems.map((item, idx) => {
-              const isActive =
-                pathname === item.href ||
-                (item.href && item.href !== "/" && item.href !== "/teacher" && item.href !== "/clerk" && item.href !== "/student" && pathname.startsWith(`${item.href}/`)) ||
-                (item.title === "Attendance" && (pathname === "/teacher/my-attendance" || pathname === "/teacher/student-attendance" || pathname.startsWith("/teacher/attendance")));
+              const pathLower = pathname.toLowerCase();
+              const itemHrefLower = (item.href || "").toLowerCase();
+              const isDashboard =
+                item.title.toLowerCase() === "dashboard" ||
+                itemHrefLower === "/" ||
+                itemHrefLower.split("/").filter(Boolean).length <= 1;
+
+              const isActive = isDashboard
+                ? pathLower === itemHrefLower
+                : pathLower === itemHrefLower ||
+                  (itemHrefLower &&
+                    itemHrefLower !== "/" &&
+                    pathLower.startsWith(`${itemHrefLower}/`)) ||
+                  (item.title === "Attendance" && pathLower.includes("attendance"));
               const Icon = item.icon;
 
               return (
@@ -784,22 +968,24 @@ AppShell({
                   key={item.href || idx}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex flex-col items-center justify-center flex-1 py-0.5 px-1 transition-all ${
-                    isActive ? "text-[#5436F5]" : "text-[#7183A6] hover:text-[#142044]"
-                  }`}
+                  className="flex flex-col items-center justify-center flex-1 py-0.5 px-0.5 relative group"
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? "text-[#5436F5] fill-[#5436F5]" : "text-[#7183A6]"}`} />
-                  <span
-                    className={`text-[11px] mt-1 tracking-tight truncate max-w-[68px] text-center ${
-                      isActive ? "font-bold text-[#5436F5]" : "font-medium text-[#7183A6]"
-                    }`}
-                  >
-                    {item.title}
-                  </span>
                   {isActive ? (
-                    <span className="h-[2.5px] w-7 bg-[#5436F5] rounded-full mt-1" />
+                    <div className="flex flex-col items-center">
+                      <div className="px-4 py-1.5 rounded-2xl bg-gradient-to-b from-blue-50 to-blue-100 border border-blue-200/80 shadow-xs flex flex-col items-center">
+                        <Icon className="w-4 h-4 text-[#2563EB]" />
+                        <span className="text-[9.5px] font-bold text-[#2563EB] mt-0.5 leading-none">
+                          {item.title}
+                        </span>
+                      </div>
+                    </div>
                   ) : (
-                    <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
+                    <div className="flex flex-col items-center py-1">
+                      <Icon className="w-4 h-4 text-[#8E95A9]" />
+                      <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
+                        {item.title}
+                      </span>
+                    </div>
                   )}
                 </Link>
               );
@@ -810,17 +996,14 @@ AppShell({
               type="button"
               onClick={() => setMobileOpen(true)}
               aria-label="Open full menu"
-              className="flex flex-col items-center justify-center flex-1 py-0.5 px-1 text-[#7183A6] hover:text-[#142044] transition-all cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[#8E95A9] hover:text-[#1A1D2F] transition-all cursor-pointer"
             >
-              <Menu className="w-5 h-5 text-[#7183A6]" />
-              <span className="text-[11px] mt-1 font-medium text-[#7183A6] tracking-tight">
+              <MoreHorizontal className="w-4 h-4 text-[#8E95A9]" />
+              <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
                 More
               </span>
-              <span className="h-[2.5px] w-7 bg-transparent rounded-full mt-1" />
             </button>
           </div>
-          {/* iOS Home Indicator Bar */}
-          <div className="w-32 h-1 bg-slate-300 rounded-full mx-auto my-1.5" />
         </nav>
       </div>
 
@@ -840,7 +1023,7 @@ AppShell({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="relative flex w-[280px] max-w-[85vw] flex-col bg-gradient-to-b from-[#4f46e5] via-[#4338ca] to-[#312e81] shadow-2xl z-10 overflow-hidden"
+              className="relative flex w-[280px] max-w-[85vw] flex-col bg-gradient-to-b from-[#1E40AF] via-[#1D4ED8] to-[#172554] shadow-2xl z-10 overflow-hidden"
             >
               {navigation(false, () => setMobileOpen(false))}
             </motion.aside>
@@ -862,7 +1045,7 @@ AppShell({
             >
               <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-900">
-                  <Megaphone className="h-5 w-5 text-[#5826df]" />
+                  <Megaphone className="h-5 w-5 text-[#2563EB]" />
                   Announcement Detail
                 </h3>
                 <button onClick={() => setSelectedNotification(null)} className="rounded-xl p-1.5 text-slate-500 transition-colors hover:bg-slate-100" aria-label="Close announcement">
@@ -897,7 +1080,7 @@ AppShell({
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Target Audience</h4>
-                    <span className="mt-1.5 inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-[#5826df]">
+                    <span className="mt-1.5 inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
                       {selectedNotification.announcement_for ?? "ALL"}
                     </span>
                   </div>
@@ -922,8 +1105,8 @@ AppShell({
                     <p className={`mt-1 text-xs font-medium ${selectedNotification.expires_at && new Date(selectedNotification.expires_at).getTime() < Date.now() ? "text-red-600" : "text-slate-600"}`}>
                       {selectedNotification.expires_at
                         ? new Date(selectedNotification.expires_at).toLocaleString("en-IN", {
-                            day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                          })
+                          day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                        })
                         : "Never"}
                       {selectedNotification.expires_at && new Date(selectedNotification.expires_at).getTime() < Date.now() && " (Expired)"}
                     </p>
@@ -934,7 +1117,7 @@ AppShell({
                 <button
                   type="button"
                   onClick={() => setSelectedNotification(null)}
-                  className="rounded-xl bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white shadow-md shadow-[#5826df]/25 px-6 py-2.5 text-xs font-bold transition-all active:scale-[0.98]"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md shadow-blue-500/25 px-6 py-2.5 text-xs font-bold transition-all active:scale-[0.98]"
                 >
                   Close Notice
                 </button>

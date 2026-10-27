@@ -98,13 +98,13 @@ export function SalarySlipModal({
         >
           {/* ── Modal Action Header (Hidden on Print) ── */}
           <div className="print:hidden flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                <FileText className="w-4 h-4" />
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-gradient-to-br from-blue-600/15 to-blue-600/25 text-blue-600 border border-blue-600/20 shadow-2xs">
+                <FileText className="w-4 h-4 stroke-[2.2]" />
               </span>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                  Salary Slip & Compensation Receipt
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">
+                  Salary Slip & Compensation Statement
                 </h3>
                 <p className="text-xs text-slate-400">
                   Period: {formatMonthYear(payslip.salary_month)}
@@ -115,7 +115,7 @@ export function SalarySlipModal({
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white transition shadow-sm shadow-blue-500/25"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print / Save PDF</span>
@@ -135,20 +135,26 @@ export function SalarySlipModal({
             ref={printRef}
             className="p-6 sm:p-8 overflow-y-auto space-y-6 text-slate-800 dark:text-slate-100 print:p-0 print:m-0 print:text-black print:dark:text-black print:bg-white"
           >
-            {/* Institution Letterhead */}
-            <div className="border-b-2 border-indigo-600 pb-5 text-center sm:text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center justify-center sm:justify-start gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xl tracking-tight">
-                  <Building className="w-6 h-6" />
-                  <span>{payslip.school_name || schoolName}</span>
+            {/* Institution Letterhead with Official Logo */}
+            <div className="border-b-2 border-blue-600 pb-5 text-center sm:text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3.5 justify-center sm:justify-start">
+                <img
+                  src="/logo.png"
+                  alt="VidyaSanchalan"
+                  className="h-12 w-auto object-contain shrink-0"
+                />
+                <div>
+                  <div className="flex items-center justify-center sm:justify-start gap-2 text-blue-600 dark:text-blue-400 font-black text-xl tracking-tight">
+                    <span>{payslip.school_name || schoolName || "VidyaSanchalan"}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Official Staff Payroll & Compensation Statement
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Official Staff Payroll & Compensation Statement
-                </p>
               </div>
 
               <div className="text-center sm:text-right">
-                <span className="inline-block px-3 py-1 text-xs font-extrabold uppercase tracking-wider rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                <span className="inline-block px-3 py-1 text-xs font-black uppercase tracking-wider rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   {payslip.receipt_number || `Payslip #${payslip.id}`}
                 </span>
                 <div className="text-xs font-semibold text-slate-500 mt-1">
@@ -167,7 +173,7 @@ export function SalarySlipModal({
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Staff ID / Code</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block font-mono">
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
                   EMP-{payslip.staff}
                 </span>
               </div>
@@ -185,19 +191,19 @@ export function SalarySlipModal({
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Payment Mode</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block uppercase font-mono">
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block uppercase">
                   {payslip.payment_mode || "Direct / Cash"}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Receipt Ref</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block font-mono">
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
                   {payslip.receipt_number || `SAL-${payslip.id}`}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Payment Date</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block font-mono">
+                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
                   {payslip.payment_date ? new Date(payslip.payment_date).toLocaleDateString("en-IN") : (payslip.created_at ? new Date(payslip.created_at).toLocaleDateString("en-IN") : "—")}
                 </span>
               </div>
@@ -240,8 +246,8 @@ export function SalarySlipModal({
                     {payslip.unpaid_leaves}
                   </span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-300">
-                  <span className="text-indigo-600 dark:text-indigo-400 block">Payable Days</span>
+                <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300">
+                  <span className="text-blue-600 dark:text-blue-400 block">Payable Days</span>
                   <span className="text-base font-bold mt-0.5 block">
                     {breakdown.payable_days ?? (Number(payslip.present_days) + Number(payslip.paid_leaves))}
                   </span>
@@ -268,7 +274,7 @@ export function SalarySlipModal({
                           <span className="text-slate-600 dark:text-slate-300 font-medium">
                             {item.name}
                           </span>
-                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100">
                             {formatCurrency(item.amount)}
                           </span>
                         </div>
@@ -276,7 +282,7 @@ export function SalarySlipModal({
                     ) : (
                       <div className="py-2 flex items-center justify-between">
                         <span className="text-slate-600 dark:text-slate-300 font-medium">Gross Regular Pay</span>
-                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
+                        <span className="font-semibold text-slate-800 dark:text-slate-100">
                           {formatCurrency(payslip.gross_earnings)}
                         </span>
                       </div>
@@ -288,7 +294,7 @@ export function SalarySlipModal({
                   <span className="text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Total Gross Earnings
                   </span>
-                  <span className="text-emerald-600 dark:text-emerald-400 text-sm font-mono">
+                  <span className="text-emerald-600 dark:text-emerald-400 text-sm font-bold">
                     {formatCurrency(payslip.gross_earnings)}
                   </span>
                 </div>
@@ -311,7 +317,7 @@ export function SalarySlipModal({
                           <span className="text-slate-600 dark:text-slate-300 font-medium">
                             {item.name}
                           </span>
-                          <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
+                          <span className="font-semibold text-rose-600 dark:text-rose-400">
                             - {formatCurrency(item.amount)}
                           </span>
                         </div>
@@ -319,7 +325,7 @@ export function SalarySlipModal({
                     ) : (
                       <div className="py-2 flex items-center justify-between text-slate-400">
                         <span>No voluntary deductions</span>
-                        <span className="font-mono">{formatCurrency(payslip.total_deductions)}</span>
+                        <span className="font-semibold">{formatCurrency(payslip.total_deductions)}</span>
                       </div>
                     )}
                   </div>
@@ -329,7 +335,7 @@ export function SalarySlipModal({
                   <span className="text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Total Deductions
                   </span>
-                  <span className="text-rose-600 dark:text-rose-400 text-sm font-mono">
+                  <span className="text-rose-600 dark:text-rose-400 text-sm font-bold">
                     {formatCurrency(payslip.total_deductions)}
                   </span>
                 </div>
@@ -337,22 +343,22 @@ export function SalarySlipModal({
             </div>
 
             {/* Net Salary Highlight Banner */}
-            <div className="bg-gradient-to-r from-indigo-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-lg shadow-blue-600/20 border border-blue-400/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300 block">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-200 block">
                   Net Take-Home Salary
                 </span>
-                <div className="text-3xl font-extrabold text-white mt-1 font-mono tracking-tight">
+                <div className="text-3xl sm:text-4xl font-black text-white mt-1 tracking-tight">
                   {formatCurrency(payslip.net_salary)}
                 </div>
-                <p className="text-xs text-indigo-200 mt-1">
+                <p className="text-xs text-blue-200/90 mt-1 font-medium">
                   Gross Earnings ({formatCurrency(payslip.gross_earnings)}) — Total Deductions ({formatCurrency(payslip.total_deductions)})
                 </p>
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-center">
-                <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" />
+                <span className="px-3.5 py-1.5 rounded-full text-xs font-black bg-emerald-400/20 text-emerald-200 border border-emerald-300/40 flex items-center gap-1.5 shadow-xs">
+                  <ShieldCheck className="w-4 h-4 text-emerald-300" />
                   Disbursed & Reconciled
                 </span>
               </div>
@@ -363,7 +369,7 @@ export function SalarySlipModal({
               <p>
                 This is a secure, system-generated electronic payslip verified by the School Accounts & HR Office.
               </p>
-              <span className="font-mono text-[11px]">
+              <span className="text-[11px] font-medium">
                 Generated: {payslip.created_at ? new Date(payslip.created_at).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}
               </span>
             </div>

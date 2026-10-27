@@ -182,7 +182,7 @@ export default function StudentLibraryPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 max-w-7xl mx-auto pb-3 lg:pb-8 w-full min-w-0 overflow-x-hidden">
       {/* Toast Notification */}
       <AnimatePresence>
         {notification && (

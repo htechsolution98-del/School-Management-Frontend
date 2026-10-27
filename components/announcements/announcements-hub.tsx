@@ -31,6 +31,13 @@ import {
   ChevronDown,
   User,
   Filter,
+  BookOpen,
+  BookMarked,
+  DollarSign,
+  CheckSquare,
+  Square,
+  Check,
+  Package,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -39,8 +46,10 @@ import {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  getAnnouncementRecipients,
   type AnnouncementResponse,
   type AnnouncementPayload,
+  type AnnouncementRecipient,
 } from "@/lib/principal";
 import { getSchoolClasses } from "@/lib/clerk/classes";
 import { getDivisions } from "@/lib/clerk/divisions";
@@ -85,23 +94,38 @@ interface DivisionOption {
   class_name?: string;
 }
 
+export const TARGET_ROLE_OPTIONS = [
+  { value: "STUDENT", label: "Student", desc: "Student portal & learners", icon: GraduationCap },
+  { value: "PARENT", label: "Parent", desc: "Parent portal & guardians", icon: HeartHandshake },
+  { value: "TEACHER", label: "Teacher", desc: "Faculty & academic staff", icon: BookOpen },
+  { value: "PRINCIPAL", label: "Principal", desc: "School administration & leadership", icon: ShieldCheck },
+  { value: "TRUSTEE", label: "Trustee", desc: "Trustee & executive management", icon: Building },
+  { value: "CLERK", label: "Clerk", desc: "Office administration & clerks", icon: Users },
+  { value: "FEE-MANAGER", label: "Fee Manager", desc: "Accounts & finance department", icon: DollarSign },
+  { value: "LIBRARIAN", label: "Librarian", desc: "Library & circulation desk", icon: BookMarked },
+  { value: "TRANSPORT", label: "Transport", desc: "Transport fleet & drivers", icon: Bus },
+  { value: "INVENTORY", label: "Inventory", desc: "Inventory & assets department", icon: Package },
+];
+
 const ALL_AUDIENCE_OPTIONS = [
   { value: "ALL", label: "Everyone (All Roles)", desc: "School-wide broadcast to all panels", icon: Users },
-  { value: "STUDENTS_PARENTS", label: "Students & Parents", desc: "Visible to students and parents", icon: HeartHandshake },
-  { value: "STUDENT", label: "Students Only", desc: "Visible exclusively on student portal", icon: GraduationCap },
-  { value: "PARENT", label: "Parents Only", desc: "Visible exclusively on parent portal", icon: HeartHandshake },
-  { value: "TEACHER", label: "Teachers Only", desc: "Academic staff notices & circulars", icon: GraduationCap },
-  { value: "CLERK", label: "Administration & Clerks", desc: "Administrative circulars", icon: Building },
-  { value: "LIBRARIAN", label: "Librarians", desc: "Library notices & updates", icon: Building },
-  { value: "FEE-MANAGER", label: "Accounts & Fees", desc: "Fee department notices", icon: Building },
+  { value: "STUDENT", label: "Students", desc: "Visible exclusively on student portal", icon: GraduationCap },
+  { value: "PARENT", label: "Parents", desc: "Visible exclusively on parent portal", icon: HeartHandshake },
+  { value: "TEACHER", label: "Teachers", desc: "Academic staff notices & circulars", icon: BookOpen },
+  { value: "PRINCIPAL", label: "Principal", desc: "School leadership notices", icon: ShieldCheck },
+  { value: "TRUSTEE", label: "Trustees", desc: "Trustee & executive circulars", icon: Building },
+  { value: "CLERK", label: "Administration & Clerks", desc: "Administrative circulars", icon: Users },
+  { value: "FEE-MANAGER", label: "Accounts & Fees", desc: "Fee department notices", icon: DollarSign },
+  { value: "LIBRARIAN", label: "Librarians", desc: "Library notices & updates", icon: BookMarked },
   { value: "TRANSPORT", label: "Transport Department", desc: "Bus & route announcements", icon: Bus },
+  { value: "INVENTORY", label: "Inventory Department", desc: "Warehouse & asset circulars", icon: Package },
 ];
 
 const TEACHER_AUDIENCE_OPTIONS = [
-  { value: "STUDENTS_PARENTS", label: "Students & Parents", desc: "Target students and their parents", icon: HeartHandshake },
   { value: "STUDENT", label: "Students Only", desc: "Notice for student portal only", icon: GraduationCap },
   { value: "PARENT", label: "Parents Only", desc: "Notice for parent portal only", icon: HeartHandshake },
-  { value: "TEACHER", label: "Other Teachers", desc: "Staff circular for fellow teachers", icon: GraduationCap },
+  { value: "TEACHER", label: "Other Teachers", desc: "Staff circular for fellow teachers", icon: BookOpen },
+  { value: "ALL", label: "Everyone (All Roles)", desc: "School-wide broadcast", icon: Users },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -166,11 +190,26 @@ function getAudienceBadge(announcementFor?: string, isEveryone?: boolean | strin
   if (isAll) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 text-[11px] font-bold shadow-2xs">
-        <Users className="w-3 h-3 text-emerald-600" /> All Roles
+        <Users className="w-3 h-3 text-emerald-600" /> All Roles (Everyone)
       </span>
     );
   }
-  const match = ALL_AUDIENCE_OPTIONS.find((a) => a.value === announcementFor?.toUpperCase());
+
+  const parts = announcementFor.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    const labels = parts.map((val) => {
+      const match = TARGET_ROLE_OPTIONS.find((a) => a.value === val.toUpperCase());
+      return match ? match.label : val;
+    });
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 text-[11px] font-bold shadow-2xs">
+        <Users className="w-3 h-3 text-indigo-600" /> {labels.join(" + ")}
+      </span>
+    );
+  }
+
+  const match = TARGET_ROLE_OPTIONS.find((a) => a.value === announcementFor?.toUpperCase()) ||
+    ALL_AUDIENCE_OPTIONS.find((a) => a.value === announcementFor?.toUpperCase());
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold shadow-2xs">
       <Building className="w-3 h-3 text-slate-500" /> {match?.label ?? announcementFor}
@@ -179,6 +218,14 @@ function getAudienceBadge(announcementFor?: string, isEveryone?: boolean | strin
 }
 
 function getTargetScopeBadge(item: AnnouncementResponse) {
+  if (item.target_user_name || item.target_user) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 text-[11px] font-bold shadow-2xs">
+        <UserCheck className="w-3 h-3 text-blue-600" />
+        Individual: {item.target_user_name || `User #${item.target_user}`}
+      </span>
+    );
+  }
   if (item.target_student_name || item.target_student) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-purple-50 text-[#5826df] dark:bg-purple-950/50 dark:text-purple-300 border border-[#5826df]/25 text-[11px] font-bold shadow-2xs">
@@ -302,8 +349,10 @@ export function AnnouncementsHub({
           item.created_by_name?.toLowerCase().includes(q) ||
           item.created_by_role?.toLowerCase().includes(q);
         const matchStudent = item.target_student_name?.toLowerCase().includes(q);
+        const matchTargetUser = item.target_user_name?.toLowerCase().includes(q);
+        const matchAudience = item.announcement_for?.toLowerCase().includes(q);
         const matchClass = item.target_class_name?.toLowerCase().includes(q);
-        if (!matchTitle && !matchDesc && !matchAuthor && !matchStudent && !matchClass) return false;
+        if (!matchTitle && !matchDesc && !matchAuthor && !matchStudent && !matchTargetUser && !matchAudience && !matchClass) return false;
       }
       // Priority filter
       if (selectedPriority !== "ALL_PRIORITY") {
@@ -319,16 +368,18 @@ export function AnnouncementsHub({
 
         if (selectedAudience === "ALL") {
           if (!isAll) return false;
-        } else if (selectedAudience === "STUDENTS_PARENTS") {
-          const forVal = (item.announcement_for || "").toUpperCase();
-          if (!isAll && forVal !== "STUDENTS_PARENTS" && forVal !== "STUDENT" && forVal !== "PARENT") return false;
-        } else if (selectedAudience === "PARTICULAR_STUDENT") {
-          if (!item.target_student && !item.target_student_name) return false;
+        } else if (selectedAudience === "PARTICULAR_PERSON" || selectedAudience === "PARTICULAR_STUDENT") {
+          if (!item.target_student && !item.target_student_name && !item.target_user && !item.target_user_name) return false;
         } else if (selectedAudience === "CLASS_TARGET") {
           if (!item.target_class && !item.target_class_name) return false;
+        } else if (selectedAudience === "STUDENTS_PARENTS") {
+          const forVal = (item.announcement_for || "").toUpperCase();
+          if (!isAll && !forVal.includes("STUDENT") && !forVal.includes("PARENT")) return false;
         } else {
+          // Specific role filter (matches if school-wide OR if the role is included in announcement_for)
           if (isAll) return true;
-          if ((item.announcement_for || "").toUpperCase() !== selectedAudience) return false;
+          const roles = (item.announcement_for || "").split(",").map((r) => r.trim().toUpperCase());
+          if (!roles.includes(selectedAudience.toUpperCase())) return false;
         }
       }
       return true;
@@ -362,32 +413,32 @@ export function AnnouncementsHub({
     : "Stay updated with important announcements, circulars, and notices from school administration.";
 
   return (
-    <div className="space-y-6 pb-16 min-w-0 max-w-7xl mx-auto w-full overflow-x-hidden">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs">
-              <Megaphone className="h-6 w-6 stroke-[2.2]" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
+        <div className="space-y-1 w-full min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100 truncate">
                 {pageTitle || defaultTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-2">
                 {pageSubtitle || defaultSubtitle}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => fetchAnnouncementsList(true)}
             disabled={refreshing}
-            className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs"
+            className="flex-1 sm:flex-initial h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs justify-center"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
             Refresh
@@ -399,7 +450,7 @@ export function AnnouncementsHub({
                 setEditingItem(null);
                 setModalOpen(true);
               }}
-              className="h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98]"
+              className="flex-1 sm:flex-initial h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] justify-center"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
               New Announcement
@@ -409,21 +460,21 @@ export function AnnouncementsHub({
       </div>
 
       {/* ─── STAT CARDS ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <Card
           onClick={() => setSelectedPriority("ALL_PRIORITY")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "ALL_PRIORITY"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
               <Bell className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Notices</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Total Notices</p>
               <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100">{totalCount}</p>
             </div>
           </CardContent>
@@ -433,16 +484,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("URGENT")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "URGENT"
-              ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-2xs">
               <Flame className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Urgent Alerts</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Urgent Alerts</p>
               <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">{urgentCount}</p>
             </div>
           </CardContent>
@@ -452,16 +503,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("IMPORTANT")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "IMPORTANT"
-              ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-2xs">
               <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Important</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Important</p>
               <p className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">{importantCount}</p>
             </div>
           </CardContent>
@@ -471,16 +522,16 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("NORMAL")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "NORMAL"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20"
-              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300"
-          } shadow-2xs`}
+              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
+          }`}
         >
-          <CardContent className="p-4 sm:p-5 flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+          <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
               <Info className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Normal Notices</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Normal Notices</p>
               <p className="text-xl sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{normalCount}</p>
             </div>
           </CardContent>
@@ -488,21 +539,21 @@ export function AnnouncementsHub({
       </div>
 
       {/* ─── SLEEK MODERN SEGMENTED FILTERS & SEARCH ──────────────────────── */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 space-y-3.5 shadow-2xs">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-full lg:max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by title, student, class, author..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-16 h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="pl-10 pr-16 h-10 sm:h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 px-2 py-0.5 rounded-lg bg-slate-200/60 dark:bg-zinc-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 px-2 py-0.5 rounded-lg bg-slate-200/60 dark:bg-zinc-700 transition-colors"
               >
                 Clear
               </button>
@@ -510,10 +561,10 @@ export function AnnouncementsHub({
           </div>
 
           {/* Priority Segmented Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl overflow-x-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               onClick={() => setSelectedPriority("ALL_PRIORITY")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "ALL_PRIORITY"
                   ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-xs"
                   : "text-slate-600 dark:text-zinc-400 hover:text-slate-900"
@@ -527,7 +578,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("URGENT")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "URGENT"
                   ? "bg-rose-500 text-white shadow-xs"
                   : "text-rose-600 dark:text-rose-400 hover:bg-rose-50/50"
@@ -542,7 +593,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("IMPORTANT")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "IMPORTANT"
                   ? "bg-amber-500 text-white shadow-xs"
                   : "text-amber-600 dark:text-amber-400 hover:bg-amber-50/50"
@@ -557,7 +608,7 @@ export function AnnouncementsHub({
 
             <button
               onClick={() => setSelectedPriority("NORMAL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "NORMAL"
                   ? "bg-[#5826df] text-white shadow-xs"
                   : "text-[#5826df] dark:text-indigo-400 hover:bg-indigo-50/50"
@@ -573,14 +624,14 @@ export function AnnouncementsHub({
         </div>
 
         {/* Audience Filter Pills */}
-        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Audience:
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+            <Filter className="w-3 h-3 text-[#5826df]" /> Audience:
           </span>
 
           <button
             onClick={() => setSelectedAudience("ALL_FILTER")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 ${
               selectedAudience === "ALL_FILTER"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -590,32 +641,32 @@ export function AnnouncementsHub({
           </button>
 
           <button
-            onClick={() => setSelectedAudience("STUDENTS_PARENTS")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              selectedAudience === "STUDENTS_PARENTS"
+            onClick={() => setSelectedAudience("ALL")}
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              selectedAudience === "ALL"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
-            <HeartHandshake className="w-3.5 h-3.5" />
-            Students & Parents
+            <Users className="w-3.5 h-3.5" />
+            School-Wide (Everyone)
           </button>
 
           <button
-            onClick={() => setSelectedAudience("PARTICULAR_STUDENT")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              selectedAudience === "PARTICULAR_STUDENT"
+            onClick={() => setSelectedAudience("PARTICULAR_PERSON")}
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              selectedAudience === "PARTICULAR_PERSON" || selectedAudience === "PARTICULAR_STUDENT"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
             <UserCheck className="w-3.5 h-3.5" />
-            Particular Student
+            Particular Individual
           </button>
 
           <button
             onClick={() => setSelectedAudience("CLASS_TARGET")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "CLASS_TARGET"
                 ? "bg-[#5826df] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -625,29 +676,24 @@ export function AnnouncementsHub({
             Class Targeted
           </button>
 
-          <button
-            onClick={() => setSelectedAudience("TEACHER")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              selectedAudience === "TEACHER"
-                ? "bg-[#5826df] text-white shadow-xs"
-                : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
-            }`}
-          >
-            <GraduationCap className="w-3.5 h-3.5" />
-            Teachers Only
-          </button>
-
-          <button
-            onClick={() => setSelectedAudience("ALL")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              selectedAudience === "ALL"
-                ? "bg-[#5826df] text-white shadow-xs"
-                : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            School-Wide (Everyone)
-          </button>
+          {TARGET_ROLE_OPTIONS.map((opt) => {
+            const IconComponent = opt.icon;
+            const isSelected = selectedAudience === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedAudience(opt.value)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-[#5826df] text-white shadow-xs"
+                    : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
+                }`}
+              >
+                <IconComponent className="w-3.5 h-3.5" />
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -697,19 +743,19 @@ export function AnnouncementsHub({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-5 shadow-2xs hover:border-[#5826df]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
+                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#5826df]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
               >
                 {/* Header info */}
                 <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {getPriorityBadge(item.priority)}
                       {getAudienceBadge(item.announcement_for, item.is_everyone)}
                       {getTargetScopeBadge(item)}
                     </div>
 
                     {/* Actions Menu */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -752,7 +798,7 @@ export function AnnouncementsHub({
                   <div>
                     <h3
                       onClick={() => setViewingItem(item)}
-                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] dark:hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase"
+                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] dark:hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase leading-snug"
                     >
                       {capitalizeFirstLetter(item.title)}
                     </h3>
@@ -764,7 +810,7 @@ export function AnnouncementsHub({
 
                 {/* Footer metadata */}
                 <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                  <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300 truncate">
+                  <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300 truncate min-w-0">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#5826df] shrink-0" />
                     <span className="truncate font-bold text-slate-800 dark:text-zinc-200">
                       {item.is_created_by_me || (item.created_by_name || "").toLowerCase() === "created by me"
@@ -772,7 +818,7 @@ export function AnnouncementsHub({
                         : (item.created_by_name || item.created_by_role || "Administration")}
                     </span>
                     {item.created_by_role && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50/80 dark:bg-zinc-800 text-[#5826df] dark:text-indigo-300 font-bold uppercase border border-indigo-100/60 dark:border-zinc-700">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50/80 dark:bg-zinc-800 text-[#5826df] dark:text-indigo-300 font-bold uppercase border border-indigo-100/60 dark:border-zinc-700 shrink-0">
                         {item.created_by_role}
                       </span>
                     )}
@@ -884,19 +930,36 @@ function AnnouncementFormModal({
   const [description, setDescription] = useState(announcement?.description ?? "");
   const [priority, setPriority] = useState<string>(announcement?.priority ?? "NORMAL");
 
-  // Audience
-  const defaultAudience = isTeacherRole ? "STUDENTS_PARENTS" : announcement?.announcement_for ?? "ALL";
-  const [announcementFor, setAnnouncementFor] = useState<string>(
-    announcement?.announcement_for ?? defaultAudience
-  );
+  // Multi-Role Target Audience State
+  const initialIsAll =
+    announcement?.is_everyone === true ||
+    String(announcement?.is_everyone) === "true" ||
+    (announcement?.announcement_for || "").toUpperCase() === "ALL" ||
+    (!announcement && !isTeacherRole);
 
-  // Target Scope: "ALL" | "CLASS" | "STUDENT"
-  const initialScope = announcement?.target_student
-    ? "STUDENT"
-    : announcement?.target_class
-    ? "CLASS"
-    : "ALL";
-  const [targetScope, setTargetScope] = useState<"ALL" | "CLASS" | "STUDENT">(initialScope);
+  const initialRoles: string[] = useMemo(() => {
+    if (initialIsAll) return TARGET_ROLE_OPTIONS.map((r) => r.value);
+    if (announcement?.announcement_for) {
+      return announcement.announcement_for
+        .split(",")
+        .map((r) => r.trim().toUpperCase())
+        .filter(Boolean);
+    }
+    if (isTeacherRole) return ["STUDENT", "PARENT"];
+    return TARGET_ROLE_OPTIONS.map((r) => r.value);
+  }, [announcement, initialIsAll, isTeacherRole]);
+
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(initialRoles);
+  const [isAllRoles, setIsAllRoles] = useState<boolean>(initialIsAll);
+
+  // Target Scope: "BROADCAST" | "CLASS" | "INDIVIDUAL"
+  const initialScope: "BROADCAST" | "CLASS" | "INDIVIDUAL" =
+    announcement?.target_user || announcement?.target_student
+      ? "INDIVIDUAL"
+      : announcement?.target_class
+      ? "CLASS"
+      : "BROADCAST";
+  const [targetScope, setTargetScope] = useState<"BROADCAST" | "CLASS" | "INDIVIDUAL">(initialScope);
 
   // Class & Division selection
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -908,18 +971,51 @@ function AnnouncementFormModal({
     announcement?.target_division ? String(announcement.target_division) : ""
   );
 
-  // Student selection
-  const [students, setStudents] = useState<StudentOption[]>([]);
-  const [studentsLoading, setStudentsLoading] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(
-    announcement?.target_student
-      ? {
-          id: Number(announcement.target_student),
-          name: announcement.target_student_name || `Student #${announcement.target_student}`,
-        }
-      : null
-  );
-  const [studentSearch, setStudentSearch] = useState("");
+  // Particular Individual Target State (For ANY role)
+  const initialIndividualRole = announcement?.target_student
+    ? "STUDENT"
+    : announcement?.announcement_for && TARGET_ROLE_OPTIONS.some((r) => r.value === announcement.announcement_for?.toUpperCase())
+    ? announcement.announcement_for.toUpperCase()
+    : "STUDENT";
+  const [individualRole, setIndividualRole] = useState<string>(initialIndividualRole);
+
+  const initialRecipient: AnnouncementRecipient | null = announcement?.target_student
+    ? {
+        id: Number(announcement.target_student),
+        student_id: Number(announcement.target_student),
+        name: announcement.target_student_name || `Student #${announcement.target_student}`,
+        role: "STUDENT",
+        details: announcement.target_class_name ? `Class: ${announcement.target_class_name}` : undefined,
+      }
+    : announcement?.target_user
+    ? {
+        id: Number(announcement.target_user),
+        user_id: Number(announcement.target_user),
+        name: announcement.target_user_name || `User #${announcement.target_user}`,
+        role: announcement.announcement_for || "STAFF",
+      }
+    : null;
+
+  const [selectedRecipient, setSelectedRecipient] = useState<AnnouncementRecipient | null>(initialRecipient);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [recipientsList, setRecipientsList] = useState<AnnouncementRecipient[]>([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+
+  // Dynamic scope calculation based on selected roles
+  const canTargetClass = isAllRoles || selectedRoles.includes("STUDENT") || selectedRoles.includes("PARENT");
+
+  // Parent Guided Target State (Class -> Division -> Student -> Parent)
+  const [parentClassId, setParentClassId] = useState<string>("");
+  const [parentDivision, setParentDivision] = useState<string>("ALL");
+  const [parentStudentId, setParentStudentId] = useState<number | null>(null);
+  const [parentStudentsList, setParentStudentsList] = useState<AnnouncementRecipient[]>([]);
+  const [parentStudentsLoading, setParentStudentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!canTargetClass && targetScope === "CLASS") {
+      setTargetScope("BROADCAST");
+    }
+  }, [canTargetClass, targetScope]);
 
   const formatForInput = (dateStr?: string) => {
     if (!dateStr) return "";
@@ -955,31 +1051,111 @@ function AnnouncementFormModal({
     loadMeta();
   }, []);
 
-  // Fetch students when class/division changes or student search is requested
-  const fetchStudentsList = useCallback(async () => {
-    if (targetScope !== "STUDENT") return;
-    setStudentsLoading(true);
-    try {
-      let url = `${API_BASE_URL}/get-student/?`;
-      if (selectedClassId) url += `school_class=${selectedClassId}&`;
-      if (selectedDivision && selectedDivision !== "ALL") url += `division=${selectedDivision}&`;
+  // Divisions available for parent selection
+  const parentAvailableDivisions = useMemo(() => {
+    if (!parentClassId) return [];
+    const targetClassId = String(parentClassId);
+    const selectedClassObj = classes.find((c) => String(c.id) === targetClassId);
+    const selectedClassName = selectedClassObj?.school_class?.toLowerCase().trim();
 
-      const res = await fetchWithAuth(url);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.data ?? data.results ?? [];
-        setStudents(list);
+    const uniqueDivs = new Set<string>();
+    divisions.forEach((d) => {
+      const rawClass =
+        typeof d.SchoolClass === "object" && d.SchoolClass !== null
+          ? (d.SchoolClass as { id: number }).id
+          : (d.SchoolClass ?? d.school_class ?? (d as any).school_class_id);
+
+      const className = d.class_name?.toLowerCase().trim();
+      const matchById = rawClass !== undefined && rawClass !== null && String(rawClass) === targetClassId;
+      const matchByName = selectedClassName && className && className === selectedClassName;
+
+      if ((matchById || matchByName) && d.division) {
+        let cleanDiv = String(d.division).trim();
+        if (cleanDiv.toLowerCase().startsWith("div ")) cleanDiv = cleanDiv.slice(4).trim();
+        else if (cleanDiv.toLowerCase().startsWith("div")) cleanDiv = cleanDiv.slice(3).trim();
+        if (cleanDiv) uniqueDivs.add(cleanDiv.toUpperCase());
+      }
+    });
+    return Array.from(uniqueDivs).sort();
+  }, [divisions, parentClassId, classes]);
+
+  // Load students for parent selection when Class & Division change
+  useEffect(() => {
+    if (targetScope === "INDIVIDUAL" && individualRole === "PARENT" && parentClassId) {
+      let active = true;
+      setParentStudentsLoading(true);
+      getAnnouncementRecipients("STUDENT", "", {
+        class_id: parentClassId,
+        division: parentDivision && parentDivision !== "ALL" ? parentDivision : null,
+      })
+        .then((students) => {
+          if (active) setParentStudentsList(students || []);
+        })
+        .catch(() => {
+          if (active) setParentStudentsList([]);
+        })
+        .finally(() => {
+          if (active) setParentStudentsLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }
+  }, [targetScope, individualRole, parentClassId, parentDivision]);
+
+  // Select parent by choosing a student ward
+  const handleSelectParentForStudent = async (st: AnnouncementRecipient) => {
+    setParentStudentId(st.id);
+    try {
+      const parents = await getAnnouncementRecipients("PARENT", "", { student_id: st.id });
+      if (parents && parents.length > 0) {
+        setSelectedRecipient(parents[0]);
+      } else {
+        const pName = st.father_name || st.mother_name || `Parent of ${st.name}`;
+        setSelectedRecipient({
+          id: st.id,
+          student_id: st.id,
+          user_id: st.user_id,
+          name: pName,
+          role: "PARENT",
+          mobile: st.mobile,
+          details: `Ward: ${st.name} (Class ${st.class_name || ""} ${st.division || ""}) • Ph: ${st.mobile || "N/A"}`,
+        });
       }
     } catch {
-      // Soft fail
-    } finally {
-      setStudentsLoading(false);
+      const pName = st.father_name || st.mother_name || `Parent of ${st.name}`;
+      setSelectedRecipient({
+        id: st.id,
+        student_id: st.id,
+        name: pName,
+        role: "PARENT",
+        mobile: st.mobile,
+        details: `Ward: ${st.name} • Class: ${st.class_name || ""} ${st.division || ""}`,
+      });
     }
-  }, [targetScope, selectedClassId, selectedDivision]);
+  };
+
+  // Fetch recipients when INDIVIDUAL scope is active and individualRole / search changes
+  const fetchRecipients = useCallback(async (role: string, query: string) => {
+    setRecipientsLoading(true);
+    try {
+      const data = await getAnnouncementRecipients(role, query);
+      setRecipientsList(Array.isArray(data) ? data : []);
+    } catch {
+      setRecipientsList([]);
+    } finally {
+      setRecipientsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchStudentsList();
-  }, [fetchStudentsList]);
+    if (targetScope === "INDIVIDUAL") {
+      const timer = setTimeout(() => {
+        fetchRecipients(individualRole, recipientSearch);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [targetScope, individualRole, recipientSearch, fetchRecipients]);
 
   // Compute divisions specifically belonging to the selected class
   const availableDivisions = useMemo(() => {
@@ -1012,44 +1188,8 @@ function AnnouncementFormModal({
       }
     });
 
-    // Also check students loaded for this class
-    students.forEach((s) => {
-      const sClass =
-        typeof s.school_class === "object" && s.school_class !== null
-          ? String((s.school_class as { id: number }).id)
-          : String(s.school_class || "");
-      if ((sClass === targetClassId || s.class_name?.toLowerCase().trim() === selectedClassName) && s.division) {
-        let cleanDiv = String(s.division).trim();
-        if (cleanDiv.toLowerCase().startsWith("div ")) {
-          cleanDiv = cleanDiv.slice(4).trim();
-        } else if (cleanDiv.toLowerCase().startsWith("div")) {
-          cleanDiv = cleanDiv.slice(3).trim();
-        }
-        if (cleanDiv) uniqueDivs.add(cleanDiv.toUpperCase());
-      }
-    });
-
     return Array.from(uniqueDivs).sort();
-  }, [divisions, selectedClassId, classes, students]);
-
-  // Filtered student list for picker
-  const filteredStudents = useMemo(() => {
-    if (!studentSearch.trim()) return students.slice(0, 30);
-    const q = studentSearch.toLowerCase();
-    return students.filter((s) => {
-      const nameMatch = (s.name || s.full_name || "").toLowerCase().includes(q);
-      const surnameMatch = (s.surname || "").toLowerCase().includes(q);
-      const rollMatch = String(s.roll_no || "").toLowerCase().includes(q);
-      const classMatch = (s.class_name || "").toLowerCase().includes(q);
-      return nameMatch || surnameMatch || rollMatch || classMatch;
-    }).slice(0, 40);
-  }, [students, studentSearch]);
-
-  const audienceList = isTeacherRole ? TEACHER_AUDIENCE_OPTIONS : ALL_AUDIENCE_OPTIONS;
-  const isStudentAudience =
-    announcementFor === "STUDENTS_PARENTS" ||
-    announcementFor === "STUDENT" ||
-    announcementFor === "PARENT";
+  }, [divisions, selectedClassId, classes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1062,13 +1202,13 @@ function AnnouncementFormModal({
       return;
     }
 
-    if (isStudentAudience && targetScope === "STUDENT" && !selectedStudent) {
-      setError("Please select a specific student from the list.");
+    if (targetScope === "INDIVIDUAL" && !selectedRecipient) {
+      setError(`Please select a specific individual ${individualRole.toLowerCase()} from the list.`);
       return;
     }
 
-    if (isStudentAudience && targetScope === "CLASS" && !selectedClassId) {
-      setError("Please select a target class standard.");
+    if (targetScope === "CLASS" && !selectedClassId) {
+      setError("Please select a target standard / class.");
       return;
     }
 
@@ -1083,35 +1223,42 @@ function AnnouncementFormModal({
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
       };
 
-      if (!isTeacherRole && announcementFor === "ALL") {
-        payload.is_everyone = true;
-        payload.announcement_for = "ALL";
+      if (targetScope === "INDIVIDUAL") {
+        if (!selectedRecipient) {
+          setError("Please select a recipient.");
+          setSaving(false);
+          return;
+        }
+        payload.is_everyone = false;
+        payload.announcement_for = individualRole;
+        if (selectedRecipient.student_id) {
+          payload.target_student = selectedRecipient.student_id;
+        }
+        if (selectedRecipient.user_id) {
+          payload.target_user = selectedRecipient.user_id;
+        }
+        payload.target_class = null;
+        payload.target_division = null;
+      } else if (targetScope === "CLASS") {
+        payload.is_everyone = false;
+        payload.announcement_for = isAllRoles ? "STUDENT,PARENT" : selectedRoles.join(",");
+        payload.target_class = Number(selectedClassId);
+        payload.target_division = selectedDivision && selectedDivision !== "ALL" ? selectedDivision : null;
+        payload.target_student = null;
+        payload.target_user = null;
+      } else {
+        // Broadcast
+        if (isAllRoles || selectedRoles.length === TARGET_ROLE_OPTIONS.length) {
+          payload.is_everyone = true;
+          payload.announcement_for = "ALL";
+        } else {
+          payload.is_everyone = false;
+          payload.announcement_for = selectedRoles.join(",");
+        }
         payload.target_class = null;
         payload.target_division = null;
         payload.target_student = null;
-      } else {
-        payload.is_everyone = false;
-        payload.announcement_for = announcementFor;
-
-        if (isStudentAudience) {
-          if (targetScope === "STUDENT" && selectedStudent) {
-            payload.target_student = selectedStudent.id;
-            payload.target_class = selectedClassId ? Number(selectedClassId) : null;
-            payload.target_division = selectedDivision && selectedDivision !== "ALL" ? selectedDivision : null;
-          } else if (targetScope === "CLASS" && selectedClassId) {
-            payload.target_class = Number(selectedClassId);
-            payload.target_division = selectedDivision && selectedDivision !== "ALL" ? selectedDivision : null;
-            payload.target_student = null;
-          } else {
-            payload.target_class = null;
-            payload.target_division = null;
-            payload.target_student = null;
-          }
-        } else {
-          payload.target_class = null;
-          payload.target_division = null;
-          payload.target_student = null;
-        }
+        payload.target_user = null;
       }
 
       if (isEdit && announcement) {
@@ -1132,13 +1279,13 @@ function AnnouncementFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl p-6 sm:p-7 max-h-[92vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
+        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-2xl p-4 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800">
@@ -1151,15 +1298,13 @@ function AnnouncementFormModal({
                 {isEdit ? "Edit Announcement" : "Create New Announcement"}
               </h2>
               <p className="text-xs text-slate-500">
-                {isTeacherRole
-                  ? "Publish class circulars, homework alerts, or individual student notes."
-                  : "Broadcast circulars, notices, and alerts across school panels in real-time."}
+                Broadcast circulars, notices, and alerts across school roles in real-time.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1225,30 +1370,99 @@ function AnnouncementFormModal({
             </div>
           </div>
 
-          {/* Target Audience Cards */}
-          <div className="space-y-2">
-            <label className="text-xs font-black text-slate-700 dark:text-zinc-300">
-              Target Audience
-            </label>
-            <div className={`grid ${isTeacherRole ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-3"} gap-2.5`}>
-              {audienceList.map((item) => {
-                const isSelected = announcementFor === item.value;
+          {/* Target Audience: 9-Role Multi-Selection */}
+          <div className="space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#5826df]" />
+                  Target Audience Roles ({isAllRoles ? "All 9 Roles" : `${selectedRoles.length} Selected`})
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Select one or more roles to send announcement to their panels, or click Everyone.
+                </p>
+              </div>
+
+              {/* Master Everyone Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAllRoles) {
+                    setIsAllRoles(false);
+                    setSelectedRoles(["STUDENT"]);
+                  } else {
+                    setIsAllRoles(true);
+                    setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  isAllRoles
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200"
+                }`}
+              >
+                <CheckCircle2 className={`w-3.5 h-3.5 ${isAllRoles ? "text-white" : "text-slate-400"}`} />
+                <span>All Roles (Everyone)</span>
+              </button>
+            </div>
+
+            {/* 10 Role Cards Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {TARGET_ROLE_OPTIONS.map((item) => {
+                const isSelected = isAllRoles || selectedRoles.includes(item.value);
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.value}
-                    onClick={() => setAnnouncementFor(item.value)}
-                    className={`cursor-pointer p-3 rounded-2xl border transition-all flex flex-col justify-between gap-1.5 ${
+                    onClick={() => {
+                      if (isAllRoles) {
+                        setIsAllRoles(false);
+                        setSelectedRoles([item.value]);
+                        setIndividualRole(item.value);
+                        setSelectedRecipient(null);
+                      } else {
+                        if (selectedRoles.includes(item.value)) {
+                          const updated = selectedRoles.filter((r) => r !== item.value);
+                          if (updated.length === 0) {
+                            setIsAllRoles(true);
+                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                            setIndividualRole(TARGET_ROLE_OPTIONS[0].value);
+                            setSelectedRecipient(null);
+                          } else {
+                            setSelectedRoles(updated);
+                            setIndividualRole(updated[updated.length - 1]);
+                            setSelectedRecipient(null);
+                          }
+                        } else {
+                          const updated = [...selectedRoles, item.value];
+                          if (updated.length === TARGET_ROLE_OPTIONS.length) {
+                            setIsAllRoles(true);
+                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                          } else {
+                            setSelectedRoles(updated);
+                          }
+                          setIndividualRole(item.value);
+                          setSelectedRecipient(null);
+                        }
+                      }
+                    }}
+                    className={`cursor-pointer p-2.5 rounded-2xl border transition-all flex flex-col justify-between gap-1.5 ${
                       isSelected
-                        ? "border-[#5826df] bg-indigo-50/40 dark:bg-indigo-950/30 ring-2 ring-[#5826df]/20 shadow-2xs"
+                        ? "border-[#5826df] bg-indigo-50/50 dark:bg-indigo-950/40 ring-1 ring-[#5826df]/30 shadow-2xs"
                         : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 hover:border-slate-300"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-[#5826df] flex items-center justify-center">
-                        <Icon className="w-4 h-4 stroke-[2.2]" />
+                      <div className="w-7 h-7 rounded-xl bg-indigo-100/70 dark:bg-indigo-950/60 text-[#5826df] flex items-center justify-center shrink-0">
+                        <Icon className="w-3.5 h-3.5 stroke-[2.2]" />
                       </div>
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-[#5826df]" />}
+                      <div
+                        className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                          isSelected ? "bg-[#5826df] text-white" : "border border-slate-300 dark:border-zinc-600"
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">{item.label}</p>
@@ -1260,144 +1474,432 @@ function AnnouncementFormModal({
             </div>
           </div>
 
-          {/* Target Scope Selection (Only for Student / Parent Audiences) */}
-          {isStudentAudience && (
-            <div className="p-4 rounded-3xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700/80 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#5826df]" />
-                  Target Scope & Student Selection
-                </label>
-                <span className="text-[10px] font-bold text-[#5826df] bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
-                  Precision Targeting
-                </span>
+          {/* Delivery Scope Selector */}
+          <div className="p-4 rounded-3xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700/80 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#5826df]" />
+                Audience Scope & Delivery Target
+              </label>
+              <span className="text-[10px] font-bold text-[#5826df] bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+                {targetScope === "BROADCAST" ? "Role Broadcast" : targetScope === "CLASS" ? "Class Scope" : "Particular Individual"}
+              </span>
+            </div>
+
+            {/* Scope Cards: dynamically sized according to selected roles */}
+            <div className={`grid ${canTargetClass ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+              <div
+                onClick={() => setTargetScope("BROADCAST")}
+                className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
+                  targetScope === "BROADCAST"
+                    ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
+                    : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
+                }`}
+              >
+                <Users className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
+                <p className="text-xs">Broadcast Roles</p>
+                <p className="text-[10px] text-slate-400 font-normal">All in Selected Roles</p>
               </div>
 
-              {/* 3 Scope Cards */}
-              <div className="grid grid-cols-3 gap-2">
-                <div
-                  onClick={() => setTargetScope("ALL")}
-                  className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
-                    targetScope === "ALL"
-                      ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
-                      : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium"
-                  }`}
-                >
-                  <Users className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
-                  <p className="text-xs">All Students</p>
-                  <p className="text-[10px] text-slate-400 font-normal">All Grades</p>
-                </div>
-
+              {canTargetClass && (
                 <div
                   onClick={() => setTargetScope("CLASS")}
                   className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
                     targetScope === "CLASS"
                       ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
-                      : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium"
+                      : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
                   }`}
                 >
                   <School className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
                   <p className="text-xs">Specific Class</p>
                   <p className="text-[10px] text-slate-400 font-normal">Class & Division</p>
                 </div>
+              )}
 
-                <div
-                  onClick={() => setTargetScope("STUDENT")}
-                  className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
-                    targetScope === "STUDENT"
-                      ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
-                      : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium"
-                  }`}
-                >
-                  <UserCheck className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
-                  <p className="text-xs">Particular Student</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Single Student Note</p>
-                </div>
+              <div
+                onClick={() => {
+                  setTargetScope("INDIVIDUAL");
+                  if (!isAllRoles && selectedRoles.length === 1) {
+                    setIndividualRole(selectedRoles[0]);
+                  }
+                }}
+                className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
+                  targetScope === "INDIVIDUAL"
+                    ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
+                    : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
+                }`}
+              >
+                <UserCheck className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
+                <p className="text-xs">Particular Person</p>
+                <p className="text-[10px] text-slate-400 font-normal">Any Staff, Student, etc.</p>
               </div>
+            </div>
 
-              {/* Class & Division Selectors for CLASS or STUDENT scope */}
-              {(targetScope === "CLASS" || targetScope === "STUDENT") && (
-                <div className="space-y-3 pt-2">
-                  <div className="space-y-3">
-                    {/* Class Selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <School className="w-3.5 h-3.5 text-[#5826df]" />
-                          Select Standard / Class <span className="text-rose-500">*</span>
-                        </span>
-                        {selectedClassId && (
-                          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
-                            Class Selected
-                          </span>
-                        )}
-                      </label>
-                      <select
-                        value={selectedClassId}
-                        onChange={(e) => {
-                          setSelectedClassId(e.target.value);
-                          setSelectedDivision("");
-                          setSelectedStudent(null);
+            {/* When INDIVIDUAL: Role picker and interactive person search */}
+            {targetScope === "INDIVIDUAL" && (
+              <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-zinc-700">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#5826df]" />
+                      1. Select Role of Recipient <span className="text-rose-500">*</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">Total {TARGET_ROLE_OPTIONS.length} Roles (Synced)</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
+                    {TARGET_ROLE_OPTIONS.map((r) => {
+                      const isSel = individualRole === r.value;
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => {
+                            setIndividualRole(r.value);
+                            setSelectedRecipient(null);
+                            setSelectedRoles([r.value]);
+                            setIsAllRoles(false);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                            isSel
+                              ? "bg-[#5826df] text-white shadow-xs"
+                              : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recipient Picker */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-[#5826df]" />
+                      2. Choose Particular {TARGET_ROLE_OPTIONS.find((r) => r.value === individualRole)?.label || "User"} <span className="text-rose-500">*</span>
+                    </label>
+                    {selectedRecipient && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRecipient(null);
+                          setParentStudentId(null);
                         }}
-                        className="w-full h-11 px-3.5 text-xs rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#5826df]/25 focus:border-[#5826df]"
+                        className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
                       >
-                        <option value="">-- Choose Standard / Class --</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.school_class}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        Change Recipient
+                      </button>
+                    )}
+                  </div>
 
-                    {/* Class-Specific Division Selector */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                          <Filter className="w-3.5 h-3.5 text-[#5826df]" />
-                          Division (Filtered for Selected Class)
-                        </label>
-                        {selectedClassId && (
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {availableDivisions.length > 0
-                              ? `${availableDivisions.length} Division${availableDivisions.length > 1 ? "s" : ""} found`
-                              : "No specific divisions registered"}
-                          </span>
-                        )}
+                  {selectedRecipient ? (
+                    <div className="p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-[#5826df]/30 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#5826df] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                          {(selectedRecipient.name || "U")[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 dark:text-zinc-100">
+                            {selectedRecipient.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {selectedRecipient.details || selectedRecipient.role}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className="bg-[#5826df] text-white text-[10px] font-bold rounded-lg px-2 py-0.5">
+                        Selected
+                      </Badge>
+                    </div>
+                  ) : individualRole === "PARENT" ? (
+                    /* Guided Parent Picker: Class -> Division -> Student -> Parent */
+                    <div className="space-y-2.5 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700">
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-zinc-800">
+                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                          <HeartHandshake className="w-4 h-4 text-[#5826df]" />
+                          Step-by-Step Parent Selection:
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">Class &gt; Division &gt; Student &gt; Parent</span>
                       </div>
 
-                      {!selectedClassId ? (
-                        <div className="p-3 rounded-2xl bg-slate-100/70 dark:bg-zinc-800/40 border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
-                          Please select a Standard / Class above to see its divisions
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedDivision("");
-                              setSelectedStudent(null);
+                      {/* Step 1: Class & Division */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            1. Select Class
+                          </label>
+                          <select
+                            value={parentClassId}
+                            onChange={(e) => {
+                              setParentClassId(e.target.value);
+                              setParentDivision("ALL");
+                              setParentStudentId(null);
                             }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                              !selectedDivision || selectedDivision === "ALL"
+                            className="w-full h-8 px-2 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
+                          >
+                            <option value="">-- Choose Class --</option>
+                            {classes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.school_class}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            2. Select Division
+                          </label>
+                          <select
+                            value={parentDivision}
+                            onChange={(e) => {
+                              setParentDivision(e.target.value);
+                              setParentStudentId(null);
+                            }}
+                            disabled={!parentClassId}
+                            className="w-full h-8 px-2 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold disabled:opacity-50"
+                          >
+                            <option value="ALL">All Divisions</option>
+                            {parentAvailableDivisions.map((d) => (
+                              <option key={d} value={d}>Division {d}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Student List in that Class */}
+                      {parentClassId ? (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                            3. Select Student Ward:
+                          </label>
+                          {parentStudentsLoading ? (
+                            <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5826df]" />
+                              Loading students in class...
+                            </div>
+                          ) : parentStudentsList.length === 0 ? (
+                            <div className="py-3 text-center text-xs text-slate-400">
+                              No students found in this class/division.
+                            </div>
+                          ) : (
+                            <div className="max-h-36 overflow-y-auto space-y-1 p-1 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950">
+                              {parentStudentsList.map((st) => (
+                                <div
+                                  key={st.id}
+                                  onClick={() => handleSelectParentForStudent(st)}
+                                  className="p-1.5 px-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                                >
+                                  <div>
+                                    <span className="font-bold text-slate-800 dark:text-zinc-200">{st.name}</span>
+                                    <span className="text-[10px] text-slate-400 ml-2">Roll: {st.roll_no || "N/A"}</span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-5 text-[9px] px-2 font-bold hover:bg-[#5826df] hover:text-white shrink-0"
+                                  >
+                                    Select Parent
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Fallback direct search for parent */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-800">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                          <Input
+                            placeholder="Or directly search parent by mobile, father, or mother name..."
+                            value={recipientSearch}
+                            onChange={(e) => setRecipientSearch(e.target.value)}
+                            className="pl-8 h-8 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
+                          />
+                        </div>
+                        {recipientSearch.trim() && (
+                          <div className="max-h-32 overflow-y-auto mt-1 space-y-1 p-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+                            {recipientsLoading ? (
+                              <div className="py-2 text-center text-xs text-slate-400">Searching...</div>
+                            ) : recipientsList.length === 0 ? (
+                              <div className="py-2 text-center text-xs text-slate-400">No matching parents found</div>
+                            ) : (
+                              recipientsList.map((rec) => (
+                                <div
+                                  key={`parent_search_${rec.id}`}
+                                  onClick={() => setSelectedRecipient(rec)}
+                                  className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer text-xs flex justify-between items-center"
+                                >
+                                  <div>
+                                    <p className="font-bold text-slate-800 dark:text-zinc-200">{rec.name}</p>
+                                    <p className="text-[10px] text-slate-400">{rec.details}</p>
+                                  </div>
+                                  <Button type="button" size="sm" variant="outline" className="h-5 text-[9px] px-2 font-bold">
+                                    Select
+                                  </Button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Standard search for other roles */
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                        <Input
+                          placeholder={`Search ${individualRole.toLowerCase()} by name, phone, email, or username...`}
+                          value={recipientSearch}
+                          onChange={(e) => setRecipientSearch(e.target.value)}
+                          className="pl-8 h-9 text-xs rounded-xl bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700"
+                        />
+                      </div>
+
+                      <div className="max-h-44 overflow-y-auto space-y-1.5 p-1 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+                        {recipientsLoading ? (
+                          <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#5826df]" />
+                            Loading {individualRole.toLowerCase()} list...
+                          </div>
+                        ) : recipientsList.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-slate-400">
+                            No {individualRole.toLowerCase()} users found in this school matching your search.
+                          </div>
+                        ) : (
+                          recipientsList.map((rec) => (
+                            <div
+                              key={`${rec.role}_${rec.id}`}
+                              onClick={() => setSelectedRecipient(rec)}
+                              className="p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between gap-2 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                  {(rec.name || "U")[0].toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
+                                    {rec.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 truncate">
+                                    {rec.details || rec.role}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px] rounded-lg px-2 font-bold hover:bg-[#5826df] hover:text-white shrink-0 cursor-pointer"
+                              >
+                                Select
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* When CLASS: Class & Division selectors */}
+            {targetScope === "CLASS" && (
+              <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-zinc-700">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <School className="w-3.5 h-3.5 text-[#5826df]" />
+                      Select Standard / Class <span className="text-rose-500">*</span>
+                    </span>
+                    {selectedClassId && (
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
+                        Class Selected
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => {
+                      setSelectedClassId(e.target.value);
+                      setSelectedDivision("");
+                    }}
+                    className="w-full h-11 px-3.5 text-xs rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#5826df]/25 focus:border-[#5826df]"
+                  >
+                    <option value="">-- Choose Standard / Class --</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.school_class}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                      <Filter className="w-3.5 h-3.5 text-[#5826df]" />
+                      Division
+                    </label>
+                    {selectedClassId && (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {availableDivisions.length > 0
+                          ? `${availableDivisions.length} Division${availableDivisions.length > 1 ? "s" : ""} found`
+                          : "No specific divisions registered"}
+                      </span>
+                    )}
+                  </div>
+
+                  {!selectedClassId ? (
+                    <div className="p-3 rounded-2xl bg-slate-100/70 dark:bg-zinc-800/40 border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                      Please select a Standard / Class above to see its divisions
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDivision("")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          !selectedDivision || selectedDivision === "ALL"
+                            ? "bg-[#5826df] text-white shadow-xs"
+                            : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        All Divisions
+                      </button>
+
+                      {availableDivisions.map((divName) => {
+                        const isSelected = selectedDivision.toUpperCase() === divName;
+                        return (
+                          <button
+                            key={divName}
+                            type="button"
+                            onClick={() => setSelectedDivision(divName)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
                                 ? "bg-[#5826df] text-white shadow-xs"
                                 : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                             }`}
                           >
-                            All Divisions
+                            Div {divName}
                           </button>
+                        );
+                      })}
 
-                          {availableDivisions.map((divName) => {
+                      {availableDivisions.length === 0 && (
+                        <>
+                          {["A", "B", "C", "D"].map((divName) => {
                             const isSelected = selectedDivision.toUpperCase() === divName;
                             return (
                               <button
                                 key={divName}
                                 type="button"
-                                onClick={() => {
-                                  setSelectedDivision(divName);
-                                  setSelectedStudent(null);
-                                }}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                                onClick={() => setSelectedDivision(divName)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                   isSelected
                                     ? "bg-[#5826df] text-white shadow-xs"
                                     : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
@@ -1407,136 +1909,14 @@ function AnnouncementFormModal({
                               </button>
                             );
                           })}
-
-                          {availableDivisions.length === 0 && (
-                            <>
-                              {["A", "B", "C", "D"].map((divName) => {
-                                const isSelected = selectedDivision.toUpperCase() === divName;
-                                return (
-                                  <button
-                                    key={divName}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedDivision(divName);
-                                      setSelectedStudent(null);
-                                    }}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                      isSelected
-                                        ? "bg-[#5826df] text-white shadow-xs"
-                                        : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
-                                    }`}
-                                  >
-                                    Div {divName}
-                                  </button>
-                                );
-                              })}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* If Target Scope is PARTICULAR STUDENT: Interactive Student Picker */}
-                  {targetScope === "STUDENT" && (
-                    <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-zinc-700">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-[#5826df]" />
-                          Choose Particular Student <span className="text-rose-500">*</span>
-                        </label>
-                        {selectedStudent && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedStudent(null)}
-                            className="text-[10px] font-bold text-rose-600 hover:underline"
-                          >
-                            Change Student
-                          </button>
-                        )}
-                      </div>
-
-                      {selectedStudent ? (
-                        <div className="p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-[#5826df]/30 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-[#5826df] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-                              {(selectedStudent.name || "S")[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-slate-900 dark:text-zinc-100">
-                                {selectedStudent.name || selectedStudent.full_name} {selectedStudent.surname || ""}
-                              </p>
-                              <p className="text-[10px] text-slate-500 font-medium">
-                                Roll #{selectedStudent.roll_no || "N/A"} • Class: {selectedStudent.class_name || "Assigned"} {selectedStudent.division ? `(${selectedStudent.division})` : ""}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge className="bg-[#5826df] text-white text-[10px] font-bold rounded-lg px-2 py-0.5">
-                            Selected
-                          </Badge>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                            <Input
-                              placeholder="Search student by name, roll no, or admission no..."
-                              value={studentSearch}
-                              onChange={(e) => setStudentSearch(e.target.value)}
-                              className="pl-8 h-9 text-xs rounded-xl bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700"
-                            />
-                          </div>
-
-                          <div className="max-h-40 overflow-y-auto space-y-1.5 p-1 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
-                            {studentsLoading ? (
-                              <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin text-[#5826df]" />
-                                Loading student list...
-                              </div>
-                            ) : filteredStudents.length === 0 ? (
-                              <div className="py-6 text-center text-xs text-slate-400">
-                                No students found. Try selecting another class or refining search.
-                              </div>
-                            ) : (
-                              filteredStudents.map((st) => (
-                                <div
-                                  key={st.id}
-                                  onClick={() => setSelectedStudent(st)}
-                                  className="p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between gap-2 transition-colors"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center font-bold text-[10px]">
-                                      {(st.name || "S")[0].toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
-                                        {st.name || st.full_name} {st.surname || ""}
-                                      </p>
-                                      <p className="text-[10px] text-slate-400 truncate">
-                                        Roll #{st.roll_no || "N/A"} • {st.class_name || "Class"} {st.division ? `(${st.division})` : ""}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-6 text-[10px] rounded-lg px-2 font-bold hover:bg-[#5826df] hover:text-white"
-                                  >
-                                    Select
-                                  </Button>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
 
           {/* Expiry Date */}
           <div className="space-y-1.5">
@@ -1575,17 +1955,17 @@ function AnnouncementFormModal({
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               {getPriorityBadge(priority)}
-              {getAudienceBadge(announcementFor, !isTeacherRole && announcementFor === "ALL")}
-              {targetScope === "STUDENT" && selectedStudent && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-purple-50 text-[#5826df] border border-[#5826df]/25 text-[11px] font-bold">
+              {getAudienceBadge(isAllRoles ? "ALL" : selectedRoles.join(","), isAllRoles)}
+              {targetScope === "INDIVIDUAL" && selectedRecipient && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
                   <UserCheck className="w-3 h-3" />
-                  Student: {selectedStudent.name || selectedStudent.full_name}
+                  Direct: {selectedRecipient.name} ({selectedRecipient.role})
                 </span>
               )}
               {targetScope === "CLASS" && selectedClassId && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-bold">
                   <School className="w-3 h-3" />
-                  Class ID #{selectedClassId} {selectedDivision ? `(Div ${selectedDivision})` : ""}
+                  Class #{selectedClassId} {selectedDivision ? `(Div ${selectedDivision})` : ""}
                 </span>
               )}
             </div>
@@ -1604,14 +1984,14 @@ function AnnouncementFormModal({
               variant="outline"
               onClick={onClose}
               disabled={saving}
-              className="rounded-2xl h-10 text-xs font-bold px-4 border-slate-200 hover:bg-slate-50"
+              className="rounded-2xl h-10 text-xs font-bold px-4 border-slate-200 hover:bg-slate-50 cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={saving}
-              className="bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#5826df]/25 transition-all"
+              className="bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#5826df]/25 transition-all cursor-pointer"
             >
               {saving ? (
                 <>
@@ -1641,13 +2021,13 @@ function AnnouncementDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-xl p-4 sm:p-7 max-h-[88vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
           <div className="space-y-2">

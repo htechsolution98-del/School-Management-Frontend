@@ -310,6 +310,7 @@ export async function loginUser(credentials: LoginRequest): Promise<LoginRespons
   setRoleCookies(userRoles, tokenMaxAge);
 
   if (typeof window !== "undefined") {
+    if (data.user?.id)    localStorage.setItem("user_id",     String(data.user.id));
     if (data.school_id)   localStorage.setItem("school_id",   String(data.school_id));
     if (data.school_name) localStorage.setItem("school_name", data.school_name);
     if (data.school_slug) localStorage.setItem("school_slug", data.school_slug);

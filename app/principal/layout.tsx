@@ -30,6 +30,7 @@ import {
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/principal", icon: LayoutDashboard },
+  { title: "Notifications", href: "/principal/notifications", icon: Bell },
   { title: "Staff Active / Deactive", href: "/principal/staff-status", icon: UserCheck },
   { title: "Academic Year", href: "/principal/academic-year", icon: Calendar },
   { title: "Result Dashboard", href: "/principal/result/dashboard", icon: BarChart3 },

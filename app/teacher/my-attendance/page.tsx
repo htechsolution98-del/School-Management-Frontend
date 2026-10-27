@@ -29,6 +29,7 @@ import {
 } from "@/lib/teacher";
 import { getLocationSettings } from "@/lib/clerk/location-settings";
 import { StaffBiometricCaptureDialog } from "@/components/attendance/StaffBiometricCaptureDialog";
+import { cn } from "@/lib/utils";
 import type {
   TodayAttendance,
   AttendanceLocationSettings,
@@ -392,7 +393,7 @@ export default function MyAttendancePage() {
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
           >
-            <Fingerprint className="w-9 h-9 text-[#5436F5]" />
+            <Fingerprint className="w-9 h-9 text-[#2563EB]" />
           </motion.div>
           <p className="text-xs font-bold text-[#7183A6] tracking-wider uppercase">
             Loading your attendance…
@@ -422,7 +423,7 @@ export default function MyAttendancePage() {
           </div>
           <button
             onClick={loadAll}
-            className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl bg-[#5436F5] text-white text-xs font-bold shadow-md hover:bg-[#4326DE] transition-all cursor-pointer"
+            className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl bg-[#2563EB] text-white text-xs font-bold shadow-md hover:bg-[#1D4ED8] transition-all cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
@@ -433,49 +434,42 @@ export default function MyAttendancePage() {
 
   // ── Main Page Content ─────────────────────────────────────────────────────────
   return (
-    <div className="w-full min-h-full max-w-lg mx-auto px-3.5 sm:px-5 py-3 sm:py-5 space-y-4 pb-28 lg:pb-8">
-      {/* ── Sub-header: Back Pill + Headings ── */}
+    <div className="w-full max-w-lg lg:max-w-5xl xl:max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 lg:py-6 space-y-3.5 sm:space-y-5 pb-3 lg:pb-8 font-['Sora',sans-serif]">
+      {/* ── Sub-header: Back Pill + Headings + Date Selector ── */}
       <motion.div
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-1.5"
+        className="space-y-2.5"
       >
-        {/* Back Button & MY ATTENDANCE Pill */}
-        <div className="inline-flex items-center">
+        <div className="flex items-center justify-between gap-2">
+          {/* Back Button & MY ATTENDANCE Pill */}
           <button
             type="button"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EDE9FE] text-[#5436F5] hover:bg-[#DDD6FE] transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors cursor-pointer group"
           >
-            <ChevronLeft className="w-3.5 h-3.5 text-[#5436F5] group-hover:-translate-x-0.5 transition-transform" />
+            <ChevronLeft className="w-3.5 h-3.5 text-[#2563EB] group-hover:-translate-x-0.5 transition-transform" />
             <span className="text-[11px] font-extrabold tracking-wider uppercase">
               MY ATTENDANCE
             </span>
           </button>
+
+          {/* Compact Date Selector Pill */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E5EAF4] shadow-xs text-xs font-bold text-[#142044]">
+            <Calendar className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+            <span className="truncate">{fmtHeaderDate(now)}</span>
+          </div>
         </div>
 
-        {/* Heading */}
-        <h1 className="text-[22px] sm:text-2xl font-black text-[#142044] tracking-tight leading-tight">
-          Attendance &amp; Duty
-        </h1>
-
-        {/* Subtitle */}
-        <p className="text-[13px] text-[#7183A6] font-normal leading-normal">
-          Track your daily check-in and check-out.
-        </p>
-
-        {/* Date Selector Pill */}
-        <div className="pt-1.5">
-          <div className="w-full bg-white border border-[#E5EAF4] rounded-2xl px-4 py-3 flex items-center justify-between shadow-[0_2px_8px_rgba(20,32,68,0.03)] hover:border-[#5436F5]/40 transition-all">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Calendar className="w-4 h-4 text-[#5436F5] shrink-0" />
-              <span className="text-sm font-bold text-[#142044] truncate">
-                {fmtHeaderDate(now)}
-              </span>
-            </div>
-            <ChevronDown className="w-4 h-4 text-[#7183A6] shrink-0" />
-          </div>
+        {/* Heading & Subtitle */}
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[#142044] tracking-tight leading-tight">
+            Attendance &amp; Duty
+          </h1>
+          <p className="text-xs sm:text-[13px] text-[#7183A6] mt-0.5 font-normal">
+            Track your daily check-in and check-out.
+          </p>
         </div>
       </motion.div>
 
@@ -488,7 +482,7 @@ export default function MyAttendancePage() {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl">
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl">
               <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
               <p className="text-xs text-red-600 font-semibold flex-1">
                 {actionError}
@@ -514,10 +508,10 @@ export default function MyAttendancePage() {
             className="overflow-hidden"
           >
             <div
-              className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border ${
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${
                 justDone === "in"
                   ? "bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]"
-                  : "bg-[#F5F3FF] border-[#DDD6FE] text-[#5436F5]"
+                  : "bg-[#EFF6FF] border-[#BFDBFE] text-[#2563EB]"
               }`}
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -531,90 +525,82 @@ export default function MyAttendancePage() {
         )}
       </AnimatePresence>
 
-      {/* ── 3. Main Attendance Card ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="bg-white rounded-3xl border border-[#E5EAF4] shadow-[0_4px_24px_rgba(20,32,68,0.05)] overflow-hidden"
-      >
-        {/* Section A: GPS & Current Time Lavender Panel */}
-        <div className="bg-[#F6F4FF] px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#EBE8F8]">
-          {/* GPS Readiness Status */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-xs border border-purple-100 shrink-0">
+      {/* ── Responsive Layout: 2 Columns on Desktop, 1 Column on Mobile ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 items-start">
+        {/* Left Column (7 Cols on Desktop): Main Attendance Card */}
+        <div className="lg:col-span-7 space-y-3.5 sm:space-y-5">
+          {/* ── 3. Main Attendance Card ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] overflow-hidden"
+          >
+        {/* Horizontal GPS & Current Time Blue Strip */}
+        <div className="bg-slate-50 px-3.5 sm:px-4 py-2.5 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-blue-100 shadow-xs shrink-0">
               <MapPin
-                className={`w-5 h-5 ${
-                  gpsPermission === "denied"
-                    ? "text-[#EF4444]"
-                    : "text-[#5436F5]"
-                }`}
+                className={cn(
+                  "w-3.5 h-3.5",
+                  gpsPermission === "denied" ? "text-red-500" : "text-blue-600"
+                )}
               />
             </div>
-            <div>
-              <p
-                className={`text-[11px] font-black uppercase tracking-wider ${
-                  gpsPermission === "denied"
-                    ? "text-[#EF4444]"
-                    : "text-[#5436F5]"
-                }`}
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "text-xs font-bold tracking-tight",
+                  gpsPermission === "denied" ? "text-red-600" : "text-blue-600"
+                )}
               >
-                {gpsPermission === "denied" ? "GPS DISABLED" : "GPS READY"}
-              </p>
-              <p className="text-[11px] text-[#7183A6] font-medium leading-tight">
-                {gpsPermission === "denied"
-                  ? "Enable location permission"
-                  : "Mark your attendance"}
-              </p>
+                {gpsPermission === "denied" ? "GPS Disabled" : "GPS Ready"}
+              </span>
+              {gpsPermission !== "denied" && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
             </div>
           </div>
 
-          {/* Current Local Time */}
-          <div className="text-right">
-            <p className="text-[10px] font-bold text-[#7183A6] uppercase tracking-wider">
-              Current Time
-            </p>
-            <p className="text-[19px] sm:text-xl font-black text-[#5436F5] tracking-tight tabular-nums leading-tight">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-[#7183A6] shrink-0" />
+            <span className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums tracking-tight">
               {fmtClock(now)}
-            </p>
+            </span>
           </div>
         </div>
 
-        {/* Section B: Check In & Check Out Stepper Flow */}
-        <div className="px-4 sm:px-5 py-4 space-y-3.5">
-          {/* Step 1: Check In */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-[#EDE9FE] flex items-center justify-center shrink-0">
-                  <LogIn className="w-4 h-4 text-[#5436F5]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[#142044] leading-tight">
-                    Check In
-                  </h3>
-                  {checkedIn ? (
-                    <p className="text-[11px] text-[#16A34A] font-semibold mt-0.5">
-                      {fmtApiTime(today?.check_in)}
-                    </p>
-                  ) : null}
-                </div>
+        {/* Balanced Single-Row (2-Column) Check In & Check Out Section */}
+        <div className="p-2.5 sm:p-3.5 grid grid-cols-2 gap-2 sm:gap-3">
+          {/* Column 1: Check In */}
+          <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <LogIn className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-xs font-bold text-[#142044] truncate">Check In</span>
               </div>
-
-              {/* Status Pill Badge */}
               <div className="shrink-0">
                 {checkedIn ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] text-[11px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                    Checked In
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    In
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] text-[11px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     Pending
                   </span>
                 )}
               </div>
+            </div>
+
+            <div className="py-0.5">
+              <p className="text-[10px] text-[#7183A6] font-medium uppercase tracking-wider leading-none">
+                {checkedIn ? "Recorded" : "Status"}
+              </p>
+              <p className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums mt-1 truncate">
+                {checkedIn ? fmtApiTime(today?.check_in) : "Pending"}
+              </p>
             </div>
 
             {/* Check In Action Button */}
@@ -623,76 +609,68 @@ export default function MyAttendancePage() {
                 type="button"
                 onClick={() => handleAction("in")}
                 disabled={actionLoading !== null}
-                className="w-full bg-[#10B981] hover:bg-[#059669] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-2xl shadow-[0_4px_14px_rgba(16,185,129,0.32)] flex items-center justify-center gap-2 transition-all cursor-pointer text-sm disabled:opacity-70"
+                className="w-full h-10 sm:h-11 bg-[#10B981] hover:bg-[#059669] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
               >
                 {actionLoading === "in" ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verifying &amp; Checking In…</span>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="truncate">Verifying…</span>
                   </>
                 ) : (
                   <>
-                    <LogIn className="w-4 h-4" />
-                    <span>Check In Now</span>
+                    <LogIn className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Check In Now</span>
                   </>
                 )}
               </button>
-            ) : null}
-          </div>
-
-          {/* Dotted Stepper Connector */}
-          <div className="flex items-center pl-4 -my-1">
-            <div className="h-5 border-l-2 border-dashed border-[#CBD5E1]" />
-          </div>
-
-          {/* Step 2: Check Out */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                    checkedIn && !checkedOut ? "bg-[#EDE9FE]" : "bg-[#F1F5F9]"
-                  }`}
-                >
-                  <LogOut
-                    className={`w-4 h-4 ${
-                      checkedIn && !checkedOut
-                        ? "text-[#5436F5]"
-                        : "text-[#7183A6]"
-                    }`}
-                  />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[#142044] leading-tight">
-                    Check Out
-                  </h3>
-                  {checkedOut ? (
-                    <p className="text-[11px] text-[#5436F5] font-semibold mt-0.5">
-                      {fmtApiTime(today?.check_out)}
-                    </p>
-                  ) : null}
-                </div>
+            ) : (
+              <div className="w-full h-10 sm:h-11 bg-emerald-50/80 border border-emerald-200/80 rounded-xl flex items-center justify-center gap-1 text-emerald-700 text-xs font-bold px-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">{fmtApiTime(today?.check_in)}</span>
               </div>
+            )}
+          </div>
 
-              {/* Status Pill Badge */}
+          {/* Column 2: Check Out */}
+          <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <LogOut className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-xs font-bold text-[#142044] truncate">Check Out</span>
+              </div>
               <div className="shrink-0">
                 {checkedOut ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EDE9FE] text-[#5436F5] text-[11px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#5436F5]" />
-                    Completed
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    Done
                   </span>
                 ) : checkedIn ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] text-[11px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
-                    Pending
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Ready
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] text-[11px] font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#94A3B8]" />
-                    Not started
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium border border-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    Wait
                   </span>
                 )}
               </div>
+            </div>
+
+            <div className="py-0.5">
+              <p className="text-[10px] text-[#7183A6] font-medium uppercase tracking-wider leading-none">
+                {checkedOut ? "Recorded" : "Duration"}
+              </p>
+              <p className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums mt-1 truncate">
+                {checkedOut
+                  ? fmtApiTime(today?.check_out)
+                  : checkedIn
+                  ? duration !== "--h --m"
+                    ? duration
+                    : "In Progress"
+                  : "--:--"}
+              </p>
             </div>
 
             {/* Check Out Action Button */}
@@ -701,159 +679,148 @@ export default function MyAttendancePage() {
                 type="button"
                 onClick={() => handleAction("out")}
                 disabled={actionLoading !== null}
-                className="w-full bg-[#5436F5] hover:bg-[#4326DE] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-2xl shadow-[0_4px_14px_rgba(84,54,245,0.32)] flex items-center justify-center gap-2 transition-all cursor-pointer text-sm disabled:opacity-70"
+                className="w-full h-10 sm:h-11 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
               >
                 {actionLoading === "out" ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verifying &amp; Checking Out…</span>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="truncate">Verifying…</span>
                   </>
                 ) : (
                   <>
-                    <LogOut className="w-4 h-4" />
-                    <span>Check Out Now</span>
+                    <LogOut className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Check Out Now</span>
                   </>
                 )}
               </button>
-            ) : !checkedOut ? (
+            ) : checkedOut ? (
+              <div className="w-full h-10 sm:h-11 bg-blue-50/80 border border-blue-200/80 rounded-xl flex items-center justify-center gap-1 text-[#2563EB] text-xs font-bold px-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                <span className="truncate">{fmtApiTime(today?.check_out)}</span>
+              </div>
+            ) : (
               <button
                 type="button"
                 disabled
-                className="w-full bg-[#F1F5F9] text-[#94A3B8] font-semibold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed border border-[#E2E8F0] text-sm"
+                className="w-full h-10 sm:h-11 bg-[#F1F5F9] text-[#94A3B8] font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#E2E8F0] text-xs px-1"
               >
-                <LogOut className="w-4 h-4 text-[#94A3B8]" />
-                <span>Check Out</span>
+                <LogOut className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
+                <span className="truncate">Check Out</span>
               </button>
-            ) : null}
+            )}
           </div>
         </div>
 
-        {/* Section C: Footer Info Tiles */}
-        <div className="border-t border-[#E5EAF4] grid grid-cols-2 divide-x divide-[#E5EAF4] bg-[#FAFBFF]">
-          {/* Tile 1: Location Status */}
-          <div className="px-3.5 sm:px-4 py-3 flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center shrink-0">
-              <MapPin className="w-4 h-4 text-[#10B981]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium text-[#7183A6] leading-none">
-                Location Status
+        {/* Bottom Information Chips */}
+        <div className="px-3.5 sm:px-4 py-2.5 bg-[#FAFBFD] border-t border-[#ECEEF5] grid grid-cols-2 gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+            <div className="min-w-0 truncate">
+              <p className="text-[10px] text-[#7183A6] leading-none font-medium">
+                Campus Zone
               </p>
-              <p className="text-[11px] font-bold text-[#10B981] mt-0.5 truncate flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] shrink-0 inline-block" />
-                <span>
-                  {gpsPermission === "denied"
-                    ? "Location Disabled"
-                    : "Location Enabled"}
-                </span>
+              <p className="text-[11px] font-bold text-[#142044] truncate mt-0.5">
+                {locationSettings?.school_name || "School Geofence"}
               </p>
             </div>
           </div>
-
-          {/* Tile 2: Attendance Policy */}
-          <div className="px-3.5 sm:px-4 py-3 flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-[#EFF6FF] flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4 text-[#3B82F6]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium text-[#7183A6] leading-none">
-                Attendance Policy
+          <div className="flex items-center gap-2 min-w-0">
+            <Clock className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+            <div className="min-w-0 truncate">
+              <p className="text-[10px] text-[#7183A6] leading-none font-medium">
+                Working Hours
               </p>
-              <p className="text-[11px] font-bold text-[#142044] mt-0.5 truncate">
+              <p className="text-[11px] font-bold text-[#142044] truncate mt-0.5">
                 {workPolicyStr}
               </p>
             </div>
           </div>
         </div>
       </motion.div>
+    </div>
 
-      {/* ── 4. Weekly Summary Card ── */}
+    {/* Right Column (5 Cols on Desktop): Weekly Summary + Recent Attendance */}
+    <div className="lg:col-span-5 space-y-3.5 sm:space-y-4">
+      {/* ── 4. Weekly Attendance Summary ── */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white rounded-3xl border border-[#E5EAF4] shadow-[0_4px_24px_rgba(20,32,68,0.05)] p-4 sm:p-5"
+        className="bg-white rounded-2xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] p-3.5 sm:p-4"
       >
-        {/* Header Row */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-[#F1F5F9]">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#EDE9FE] flex items-center justify-center shrink-0">
-              <Calendar className="w-4 h-4 text-[#5436F5]" />
-            </div>
-            <div className="flex items-center gap-1 cursor-pointer">
-              <span className="text-sm font-bold text-[#142044]">This Week</span>
-              <ChevronDown className="w-3.5 h-3.5 text-[#142044]" />
-            </div>
+        <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-[#2563EB]" />
+            <span className="text-xs sm:text-sm font-bold text-[#142044]">
+              Weekly Summary
+            </span>
           </div>
-          <ChevronDown className="w-4 h-4 text-[#7183A6]" />
+          <span className="text-[11px] font-semibold text-[#7183A6]">
+            This Week
+          </span>
         </div>
 
-        {/* 3 Stats Columns */}
-        <div className="grid grid-cols-3 divide-x divide-[#F1F5F9] pt-3.5 text-center">
+        <div className="grid grid-cols-3 divide-x divide-[#F1F5F9] pt-2.5 text-center">
           {/* Present */}
-          <div className="px-2">
-            <div className="flex items-center justify-center gap-1 text-[#142044] text-xs font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+          <div className="px-1">
+            <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-600">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <span>Present</span>
             </div>
-            <p className="text-base sm:text-lg font-extrabold text-[#142044] mt-1 tracking-tight">
+            <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
               {weeklyStats.presentDays}{" "}
-              <span className="text-xs font-medium text-[#7183A6]">
+              <span className="text-[11px] font-normal text-[#7183A6]">
                 {weeklyStats.presentDays === 1 ? "day" : "days"}
               </span>
             </p>
           </div>
 
           {/* Late */}
-          <div className="px-2">
-            <div className="flex items-center justify-center gap-1 text-[#142044] text-xs font-semibold">
-              <Clock className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+          <div className="px-1">
+            <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-amber-600">
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>Late</span>
             </div>
-            <p className="text-base sm:text-lg font-extrabold text-[#142044] mt-1 tracking-tight">
+            <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
               {weeklyStats.lateCount}
             </p>
           </div>
 
           {/* Absent */}
-          <div className="px-2">
-            <div className="flex items-center justify-center gap-1 text-[#142044] text-xs font-semibold">
-              <XCircle className="w-3.5 h-3.5 text-[#EF4444] shrink-0" />
+          <div className="px-1">
+            <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-rose-600">
+              <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
               <span>Absent</span>
             </div>
-            <p className="text-base sm:text-lg font-extrabold text-[#142044] mt-1 tracking-tight">
+            <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
               {weeklyStats.absentCount}
             </p>
           </div>
         </div>
       </motion.div>
 
-      {/* ── 5. Attendance History Card ── */}
+      {/* ── 5. Recent Attendance ── */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="bg-white rounded-3xl border border-[#E5EAF4] shadow-[0_4px_24px_rgba(20,32,68,0.05)] p-4 sm:p-5"
+        className="bg-white rounded-2xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] p-3.5 sm:p-4"
       >
-        {/* Header Row */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#EDE9FE] flex items-center justify-center shrink-0">
-              <Clock className="w-4 h-4 text-[#5436F5]" />
-            </div>
-            <h2 className="text-sm font-bold text-[#142044]">
-              Attendance History
+        <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-[#2563EB]" />
+            <h2 className="text-xs sm:text-sm font-bold text-[#142044]">
+              Recent Attendance
             </h2>
           </div>
           <Link
             href="/teacher/attendance"
-            className="text-xs font-bold text-[#5436F5] hover:underline"
+            className="text-xs font-bold text-[#2563EB] hover:underline"
           >
             View All
           </Link>
         </div>
 
-        {/* History List Items */}
         <div className="divide-y divide-[#F1F5F9]">
           {recentHistory.length > 0 ? (
             recentHistory.map((item, idx) => {
@@ -865,74 +832,60 @@ export default function MyAttendancePage() {
               const isHalfDay = item.is_half_day;
 
               let badgeText = "Present";
-              let badgeColor = "bg-[#DCFCE7] text-[#16A34A]";
-              let dotColor = "bg-[#16A34A]";
+              let badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+              let dotColor = "bg-emerald-500";
 
               if (isLate) {
                 badgeText = "Late";
-                badgeColor = "bg-[#FEF3C7] text-[#D97706]";
-                dotColor = "bg-[#F59E0B]";
+                badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                dotColor = "bg-amber-500";
               } else if (isHalfDay) {
                 badgeText = "Half Day";
-                badgeColor = "bg-[#EDE9FE] text-[#5436F5]";
-                dotColor = "bg-[#5436F5]";
+                badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
+                dotColor = "bg-blue-600";
               } else if (!isPresent) {
                 badgeText = "Absent";
-                badgeColor = "bg-[#FEE2E2] text-[#DC2626]";
-                dotColor = "bg-[#EF4444]";
+                badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+                dotColor = "bg-rose-500";
               }
+
+              const inTime = fmtApiTime(item.check_in || item.date_time);
+              const outTime = item.check_out ? fmtApiTime(item.check_out) : "--:--";
 
               return (
                 <div
                   key={item.id ?? idx}
-                  className="py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors px-1 rounded-xl"
+                  className="py-2.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors px-1 rounded-xl"
                 >
-                  <p className="text-xs sm:text-sm font-semibold text-[#142044]">
-                    {dateDisplay}
-                  </p>
-                  <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
+                      {dateDisplay}
+                    </p>
+                    <p className="text-[11px] text-[#7183A6] mt-0.5">
+                      In: {inTime} • Out: {outTime}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeColor}`}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${badgeColor}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                       {badgeText}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8]" />
                   </div>
                 </div>
               );
             })
           ) : (
-            // Default sample rows as per mockup when new user has no records yet
-            <>
-              <div className="py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors px-1 rounded-xl">
-                <p className="text-xs sm:text-sm font-semibold text-[#142044]">
-                  Fri, 16 Oct, 2026
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#16A34A]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                    Present
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
-                </div>
-              </div>
-              <div className="py-3 flex items-center justify-between hover:bg-slate-50/70 transition-colors px-1 rounded-xl">
-                <p className="text-xs sm:text-sm font-semibold text-[#142044]">
-                  Thu, 15 Oct, 2026
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#16A34A]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                    Present
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
-                </div>
-              </div>
-            </>
+            <div className="py-6 text-center text-xs text-[#7183A6] font-medium">
+              No recent attendance records recorded yet.
+            </div>
           )}
         </div>
       </motion.div>
+    </div>
+  </div>
 
       {/* ── Biometric Capture Modal ── */}
       <StaffBiometricCaptureDialog

@@ -5,20 +5,20 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-clip-padding text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[#5826df]/30 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-clip-padding text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[#2563EB]/30 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-[#5826df] text-white shadow-sm shadow-indigo-600/20 hover:bg-[#4a1ec6] active:bg-[#3b15a6]",
+        default: "bg-[#2563EB] text-white shadow-sm shadow-blue-600/20 hover:bg-[#1D4ED8] hover:text-white active:bg-[#1E40AF]",
         outline:
-          "border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-indigo-50 hover:text-[#5826df] hover:border-indigo-200",
+          "border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300",
         secondary:
-          "bg-indigo-50 text-[#5826df] border border-indigo-100/80 hover:bg-indigo-100 hover:text-[#4a1ec6]",
+          "bg-blue-50 text-[#2563EB] border border-blue-100/80 hover:bg-blue-100 hover:text-[#1D4ED8]",
         ghost:
-          "text-slate-700 hover:bg-indigo-50 hover:text-[#5826df]",
+          "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
         destructive:
           "bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 hover:text-rose-800 focus-visible:ring-rose-500/20",
-        link: "text-[#5826df] underline-offset-4 hover:underline",
+        link: "text-[#2563EB] underline-offset-4 hover:underline",
       },
       size: {
         default:
@@ -59,11 +59,17 @@ function Button({
     ? (React.Children.only(children) as React.ReactElement)
     : undefined
 
+  const isStrClass = typeof className === "string"
+  const resolvedVariant =
+    variant === "default" && isStrClass && (className.includes("bg-white") || className.includes("border-slate") || className.includes("text-slate-700"))
+      ? "outline"
+      : variant
+
   return (
     <ButtonPrimitive
       data-slot="button"
       suppressHydrationWarning={suppressHydrationWarning}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant: resolvedVariant, size, className }))}
       render={render}
       nativeButton={!asChild} // add this after error 
       {...props}

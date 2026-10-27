@@ -165,11 +165,11 @@ export default function MyLeavesPage() {
     setEndDate(req.end_date);
     setIsHalfDay(Number(req.total_days) === 0.5);
     setHalfDaySession((req.half_day_session === "SECOND_HALF" ? "SECOND_HALF" : "FIRST_HALF") as any);
-    
+
     // Find matching leave type ID from balances if possible
     const match = balances.find((b) => b.leave_type.toUpperCase() === String(req.leave_type).toUpperCase());
     setLeaveTypeId(match ? String(match.leave_type_id ?? match.leave_type) : "");
-    
+
     setReason(req.reason);
     setTotalDays(req.total_days);
     setIsDialogOpen(true);
@@ -312,7 +312,7 @@ export default function MyLeavesPage() {
       const numId = Number(val);
       const match = balances.find(b => (b.leave_type_id ?? b.leave_type) === numId);
       if (match) return (match as any).leave_type_name ?? match.leave_type;
-      
+
       const mapping: Record<number, string> = {
         1: "Casual Leave",
         2: "Sick Leave",
@@ -337,7 +337,7 @@ export default function MyLeavesPage() {
     const type = getLeaveTypeDisplay(leaveType).toUpperCase();
     if (type.includes("SICK")) return "bg-rose-500/10 text-rose-600 border-rose-200/50 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/50";
     if (type.includes("CASUAL")) return "bg-sky-500/10 text-sky-600 border-sky-200/50 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/50";
-    if (type.includes("MATERNITY") || type.includes("PATERNITY")) return "bg-purple-500/10 text-purple-600 border-purple-200/50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50";
+    if (type.includes("MATERNITY") || type.includes("PATERNITY")) return "bg-teal-500/10 text-teal-600 border-teal-200/50 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50";
     return "bg-zinc-500/10 text-zinc-600 border-zinc-200/50 dark:bg-zinc-800/30 dark:text-zinc-400 dark:border-zinc-800/50";
   };
 
@@ -443,13 +443,28 @@ export default function MyLeavesPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28 lg:pb-8 w-full min-w-0 overflow-x-hidden">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3">
+    <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-3 lg:pb-8 w-full min-w-0 overflow-x-hidden">
+      {/* Page Header with Leave Hero Artwork on the Right */}
+      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5 pt-1">
+        {/* Background Artwork on the Right with Smooth Gradient Effect */}
+        <div className="absolute inset-y-0 right-0 w-3/4 sm:w-3/5 md:w-1/2 pointer-events-none select-none overflow-hidden">
+          <img
+            src="/leave-hero-bg.jpg"
+            alt=""
+            className="w-full h-full object-cover object-right opacity-45 sm:opacity-60 dark:opacity-20"
+          />
+          {/* Horizontal fade from solid background into image */}
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent dark:from-background dark:via-background/80 dark:to-transparent" />
+          {/* Bottom fade to seamlessly blend with the border line */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+          {/* Top fade */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-transparent" />
+        </div>
+
+        <div className="relative z-10">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl">
-              <CalendarCheck className="h-8 w-8 text-primary" />
+              <CalendarCheck className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
             </div>
             My Leaves Dashboard
           </h1>
@@ -457,7 +472,7 @@ export default function MyLeavesPage() {
             View leave balances, submit leave requests, and track your request history.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-3">
           <Button
             variant="default"
             onClick={handleOpenCreateDialog}
@@ -471,7 +486,7 @@ export default function MyLeavesPage() {
             size="sm"
             onClick={fetchData}
             disabled={isLoading}
-            className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs bg-background/80 backdrop-blur-xs"
           >
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
             Refresh
@@ -512,12 +527,12 @@ export default function MyLeavesPage() {
               const leaveTypeVal = (bal as any).leave_type_name ?? bal.leave_type ?? (bal as any).type ?? "";
               const typeLabel = getLeaveTypeDisplay(leaveTypeVal);
               const remainingPct = totalAllowed > 0 ? (remaining / totalAllowed) * 100 : 0;
-              
+
               // Decide border gradient color based on type
               let accentColor = "from-sky-400 to-sky-500";
               if (typeLabel.toUpperCase().includes("SICK")) accentColor = "from-rose-400 to-rose-500";
-              if (typeLabel.toUpperCase().includes("MATERNITY") || typeLabel.toUpperCase().includes("PATERNITY")) accentColor = "from-purple-400 to-purple-500";
-              if (typeLabel.toUpperCase().includes("EARNED")) accentColor = "from-emerald-400 to-emerald-500";              const timelineVal = (bal as any).leave_template_timeline ?? (bal as any).timeline ?? "";
+              if (typeLabel.toUpperCase().includes("MATERNITY") || typeLabel.toUpperCase().includes("PATERNITY")) accentColor = "from-teal-400 to-teal-500";
+              if (typeLabel.toUpperCase().includes("EARNED")) accentColor = "from-emerald-400 to-emerald-500"; const timelineVal = (bal as any).leave_template_timeline ?? (bal as any).timeline ?? "";
               const formattedTimeline = (() => {
                 if (!timelineVal) return "";
                 const t = timelineVal.trim().toUpperCase();
@@ -556,9 +571,9 @@ export default function MyLeavesPage() {
                           cx="28"
                           cy="28"
                           r="23"
-                          className={cn("fill-none transition-all duration-500", 
+                          className={cn("fill-none transition-all duration-500",
                             typeLabel.toUpperCase().includes("SICK") ? "stroke-rose-500" :
-                            typeLabel.toUpperCase().includes("EARNED") ? "stroke-emerald-500" : "stroke-sky-500"
+                              typeLabel.toUpperCase().includes("EARNED") ? "stroke-emerald-500" : "stroke-sky-500"
                           )}
                           strokeWidth="4"
                           strokeDasharray={2 * Math.PI * 23}
@@ -620,9 +635,8 @@ export default function MyLeavesPage() {
                 size="sm"
                 variant={viewMode === "table" ? "secondary" : "ghost"}
                 onClick={() => setViewMode("table")}
-                className={`h-7 text-xs px-3 rounded-lg gap-1.5 font-bold ${
-                  viewMode === "table" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500"
-                }`}
+                className={`h-7 text-xs px-3 rounded-lg gap-1.5 font-bold ${viewMode === "table" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500"
+                  }`}
               >
                 <LayoutList className="h-3.5 w-3.5" /> Table View
               </Button>
@@ -630,9 +644,8 @@ export default function MyLeavesPage() {
                 size="sm"
                 variant={viewMode === "grid" ? "secondary" : "ghost"}
                 onClick={() => setViewMode("grid")}
-                className={`h-7 text-xs px-3 rounded-lg gap-1.5 font-bold ${
-                  viewMode === "grid" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500"
-                }`}
+                className={`h-7 text-xs px-3 rounded-lg gap-1.5 font-bold ${viewMode === "grid" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "text-slate-500"
+                  }`}
               >
                 <LayoutGrid className="h-3.5 w-3.5" /> Grid Cards
               </Button>
@@ -785,10 +798,10 @@ export default function MyLeavesPage() {
                     const statusBorderColor = isApproved
                       ? "border-l-emerald-500 dark:border-l-emerald-600"
                       : isRejected
-                      ? "border-l-rose-500 dark:border-l-rose-600"
-                      : isPartial
-                      ? "border-l-sky-500 dark:border-l-sky-600"
-                      : "border-l-amber-500 dark:border-l-amber-600";
+                        ? "border-l-rose-500 dark:border-l-rose-600"
+                        : isPartial
+                          ? "border-l-sky-500 dark:border-l-sky-600"
+                          : "border-l-amber-500 dark:border-l-amber-600";
 
                     return (
                       <motion.div
@@ -801,7 +814,7 @@ export default function MyLeavesPage() {
                         className="w-full"
                       >
                         <Card className={cn(
-                          "border border-zinc-200/80 dark:border-zinc-800/80 border-l-4 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 w-full", 
+                          "border border-zinc-200/80 dark:border-zinc-800/80 border-l-4 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 w-full",
                           statusBorderColor
                         )}>
                           <CardHeader className="p-4 pb-2.5">
