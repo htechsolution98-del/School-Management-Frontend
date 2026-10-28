@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import CashDenominationCalculator, {
   CashDenominationState,
@@ -20,6 +20,8 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Tag,
   X,
   CheckCircle2,
@@ -32,6 +34,8 @@ import {
   BookOpen,
   GraduationCap,
   UserX,
+  Layers,
+  ExternalLink,
 } from "lucide-react";
 import {
   fetchStudents,
@@ -170,18 +174,20 @@ const Modal = ({
   title,
   children,
   maxWidth = "max-w-lg",
+  zIndex = "z-[100]",
 }: {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  zIndex?: string;
 }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4`}>
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/75 backdrop-blur-md"
         onClick={onClose}
       />
       <div
@@ -191,7 +197,7 @@ const Modal = ({
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <X size={18} className="text-gray-500" />
           </button>
@@ -496,6 +502,334 @@ const CreateFeeModal = ({
               </>
             ) : (
               "Create Fee"
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Bulk Generate Fee Modal (Class-Wise)
+const BulkGenerateFeeModal = ({
+  isOpen,
+  onClose,
+  students,
+  academicYears,
+  feeWiseClasses,
+  onSuccess,
+  defaultClass = "",
+  defaultPeriod = "",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  students: Student[];
+  academicYears: AcademicYear[];
+  feeWiseClasses: FeeWiseClass[];
+  onSuccess: () => void;
+  defaultClass?: string;
+  defaultPeriod?: string;
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const initialMonth = defaultPeriod || new Date().toISOString().slice(0, 7);
+  const [form, setForm] = useState({
+    selected_class: defaultClass,
+    academic_year: "",
+    fee_wise_class: "",
+    feetype: "",
+    billing_period: initialMonth,
+    due_date: `${initialMonth}-10`,
+  });
+
+  const uniqueClassOptions = Array.from(
+    new Map([
+      ...feeWiseClasses.map((fc) => [String(fc.school_class), fc.school_class_name] as [string, string]),
+      ...students.filter((s) => s.school_class && s.class_name).map((s) => [String(s.school_class), s.class_name!] as [string, string]),
+    ]).entries(),
+  ).map(([id, name]) => ({ id, name }));
+
+  useEffect(() => {
+    if (isOpen) {
+      const activeYear = academicYears.find((y) => y.is_active);
+      const curMonth = defaultPeriod || new Date().toISOString().slice(0, 7);
+
+      let initialClassId = "";
+      if (defaultClass) {
+        const matched = uniqueClassOptions.find(
+          (c) => c.name.toLowerCase() === defaultClass.toLowerCase() || String(c.id) === String(defaultClass)
+        );
+        if (matched) initialClassId = String(matched.id);
+      }
+
+      setForm({
+        selected_class: initialClassId,
+        academic_year: activeYear ? String(activeYear.id) : (academicYears[0] ? String(academicYears[0].id) : ""),
+        fee_wise_class: "",
+        feetype: "",
+        billing_period: curMonth,
+        due_date: `${curMonth}-10`,
+      });
+      setErrors({});
+      setToast(null);
+    }
+  }, [isOpen, defaultClass, defaultPeriod, academicYears]);
+
+  const targetStudents = students.filter((s) => {
+    if (!form.selected_class) return false;
+    const matchId = String(s.school_class) === String(form.selected_class);
+    const selectedClsObj = uniqueClassOptions.find((c) => String(c.id) === String(form.selected_class));
+    const matchName = selectedClsObj && s.class_name && selectedClsObj.name.toLowerCase() === s.class_name.toLowerCase();
+    const matchDirectName = s.class_name && s.class_name.toLowerCase() === form.selected_class.toLowerCase();
+    return matchId || matchName || matchDirectName;
+  });
+
+  const filteredFeeClasses = form.selected_class
+    ? feeWiseClasses.filter((fc) => String(fc.school_class) === form.selected_class)
+    : feeWiseClasses;
+
+  const selectedFeeClass = feeWiseClasses.find((fc) => String(fc.id) === form.fee_wise_class);
+
+  const update = (key: string, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const errs: Record<string, string> = {};
+    if (!form.selected_class) errs.selected_class = "Class is required";
+    if (!form.academic_year) errs.academic_year = "Academic year is required";
+    if (!form.fee_wise_class) errs.fee_wise_class = "Fee structure is required";
+    if (!form.billing_period) errs.billing_period = "Billing period is required";
+    if (!form.due_date) errs.due_date = "Due date is required";
+
+    if (form.selected_class && targetStudents.length === 0) {
+      errs.selected_class = "No students found in the selected class";
+    }
+
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLoading(true);
+    setToast(null);
+
+    let created = 0;
+    let alreadyExisted = 0;
+    let failed = 0;
+
+    try {
+      const yearId = parseInt(form.academic_year);
+      const feeWiseClassId = parseInt(form.fee_wise_class);
+      const feetypeId = parseInt(form.feetype);
+
+      for (const student of targetStudents) {
+        try {
+          const res = await createMonthlyStudentFee({
+            student: student.id,
+            academic_year: yearId,
+            fee_wise_class: feeWiseClassId,
+            feetype: feetypeId,
+            billing_period: form.billing_period,
+            due_date: form.due_date,
+          });
+
+          if (res.success) {
+            created++;
+          } else {
+            const errLower = (res.error || "").toLowerCase();
+            if (errLower.includes("already exist")) {
+              alreadyExisted++;
+            } else {
+              failed++;
+            }
+          }
+        } catch {
+          failed++;
+        }
+      }
+
+      if (created > 0) {
+        setToast({
+          type: "success",
+          message: `Generated fees for ${created} student(s) successfully!${alreadyExisted > 0 ? ` (${alreadyExisted} already existed)` : ""}`,
+        });
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1800);
+      } else if (alreadyExisted > 0 && failed === 0) {
+        setToast({
+          type: "success",
+          message: `All ${alreadyExisted} students in this class already have fees generated for this period.`,
+        });
+        setTimeout(() => {
+          onClose();
+        }, 2200);
+      } else {
+        setToast({
+          type: "error",
+          message: `Failed to generate fees. (${failed} errors encountered)`,
+        });
+      }
+    } catch (err) {
+      setToast({
+        type: "error",
+        message: err instanceof Error ? err.message : "Bulk fee generation failed",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Generate Bulk Fees (Class-Wise)">
+      {toast && (
+        <div
+          className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
+            toast.type === "success"
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 size={16} className="flex-shrink-0" />
+          ) : (
+            <XCircle size={16} className="flex-shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Class Selection */}
+        <FormField label="Target Class" error={errors.selected_class} required>
+          <CustomDropdown
+            value={form.selected_class}
+            onChange={(v) => {
+              update("selected_class", v);
+              update("fee_wise_class", "");
+              update("feetype", "");
+            }}
+            options={uniqueClassOptions.map((cls) => ({ value: String(cls.id), label: cls.name }))}
+            placeholder="Select class for bulk generation..."
+            error={!!errors.selected_class}
+          />
+        </FormField>
+
+        {form.selected_class && (
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+            <span className="font-medium">Students enrolled in selected class:</span>
+            <span className="font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+              {targetStudents.length} Students
+            </span>
+          </div>
+        )}
+
+        {/* Academic Year */}
+        <FormField label="Academic Year" error={errors.academic_year} required>
+          <CustomDropdown
+            value={form.academic_year}
+            onChange={(v) => update("academic_year", v)}
+            placeholder="Select academic year..."
+            options={academicYears.map((ay) => ({
+              value: String(ay.id),
+              label: `${ay.name}${ay.is_active ? " (Active)" : ""}`,
+            }))}
+            error={!!errors.academic_year}
+          />
+        </FormField>
+
+        {/* Fee Structure */}
+        <FormField label="Fee Structure" error={errors.fee_wise_class} required>
+          <CustomDropdown
+            value={form.fee_wise_class}
+            onChange={(v) => {
+              const sel = feeWiseClasses.find((fc) => fc.id === Number(v));
+              update("fee_wise_class", v);
+              update("feetype", sel ? String(sel.feetype) : "");
+            }}
+            disabled={!form.selected_class}
+            placeholder={form.selected_class ? "Select fee structure..." : "Select class first"}
+            options={filteredFeeClasses.map((fc) => ({
+              value: String(fc.id),
+              label: `${fc.feetype_name} — ₹${parseFloat(fc.amount).toLocaleString("en-IN")}`,
+            }))}
+            error={!!errors.fee_wise_class}
+          />
+        </FormField>
+
+        {/* Billing Period */}
+        <FormField label="Billing Month / Period" error={errors.billing_period} required>
+          <input
+            type="month"
+            className={inputClass}
+            value={form.billing_period}
+            onChange={(e) => {
+              const val = e.target.value;
+              update("billing_period", val);
+              if (val && /^\d{4}-\d{2}$/.test(val)) {
+                update("due_date", `${val}-10`);
+              }
+            }}
+          />
+        </FormField>
+
+        {/* Due Date */}
+        <FormField label="Due Date" error={errors.due_date} required>
+          <DatePicker
+            value={form.due_date}
+            onChange={(val) => update("due_date", val)}
+            className="w-full"
+          />
+        </FormField>
+
+        {/* Estimated Summary */}
+        {selectedFeeClass && targetStudents.length > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-2 text-xs">
+            <div className="flex justify-between text-gray-600">
+              <span>Class Students:</span>
+              <span className="font-semibold text-gray-900">{targetStudents.length}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Fee per Student:</span>
+              <span className="font-semibold text-gray-900">{formatCurrency(selectedFeeClass.amount)}</span>
+            </div>
+            <div className="flex justify-between text-blue-700 font-bold pt-2 border-t border-gray-200">
+              <span>Total Class Billable:</span>
+              <span>{formatCurrency(String(parseFloat(selectedFeeClass.amount) * targetStudents.length))}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || (form.selected_class !== "" && targetStudents.length === 0)}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Generating Fees...
+              </>
+            ) : (
+              <>
+                <Users size={16} /> Generate Class Fees
+              </>
             )}
           </button>
         </div>
@@ -1170,29 +1504,47 @@ const ViewFeeModal = ({
   isOpen,
   onClose,
   fee,
+  academicYears,
   onSuccess,
   onViewReceipt,
 }: {
   isOpen: boolean;
   onClose: () => void;
   fee: StudentFee | null;
+  academicYears?: AcademicYear[];
   onSuccess?: () => void;
   onViewReceipt?: (receiptNo: string) => void;
 }) => {
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
 
   if (!fee) return null;
+
+  const yearDisplay =
+    fee.academic_year_name ||
+    academicYears?.find((y) => y.id === fee.academic_year)?.name ||
+    (fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A");
+
+  const classSectionDisplay =
+    fee.student_class_display ||
+    (fee.school_class_name
+      ? `${fee.school_class_name.toLowerCase().startsWith("class") ? fee.school_class_name : `Class ${fee.school_class_name}`}${fee.student_division ? ` - ${fee.student_division} Section` : ""}`
+      : (fee.class_name ? (fee.class_name.toLowerCase().startsWith("class") ? fee.class_name : `Class ${fee.class_name}`) : "Class N/A"));
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Fee Details">
       <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
           <StudentAvatar name={fee.student_name} size="md" />
-          <div>
-            <p className="font-semibold text-gray-900 text-base">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-gray-900 text-base leading-tight">
               {fee.student_name} {fee.student_surname || ""}
             </p>
-            <p className="text-sm text-gray-500">{fee.class_name}</p>
-            <StatusBadge status={fee.status} />
+            <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5 inline-block mt-1 mb-1.5">
+              {classSectionDisplay}
+            </p>
+            <div>
+              <StatusBadge status={fee.status} />
+            </div>
           </div>
         </div>
 
@@ -1200,14 +1552,24 @@ const ViewFeeModal = ({
           {[
             {
               label: "Academic Year",
-              value: fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A",
+              value: yearDisplay,
               icon: CalendarDays,
             },
             {
               label: "Fee Structure",
               value: fee.feetype_name || "N/A",
+              subtitle: (fee.discount_note && !fee.discount_note.includes("[Cash Recd")) ? fee.discount_note : null,
               icon: BookOpen,
             },
+            ...(fee.discount_note && !fee.discount_note.includes("[Cash Recd")
+              ? [
+                  {
+                    label: "Particulars",
+                    value: fee.discount_note,
+                    icon: Tag,
+                  },
+                ]
+              : []),
             {
               label: "Billing Period",
               value: formatBillingPeriod(fee.billing_period),
@@ -1218,7 +1580,7 @@ const ViewFeeModal = ({
               value: formatDisplayDate(fee.due_date),
               icon: Clock,
             },
-          ].map(({ label, value, icon: Icon }) => (
+          ].map(({ label, value, subtitle, icon: Icon }: any) => (
             <div key={label} className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={12} className="text-gray-400" />
@@ -1227,6 +1589,11 @@ const ViewFeeModal = ({
                 </span>
               </div>
               <p className="text-sm font-semibold text-gray-900">{value}</p>
+              {subtitle && (
+                <p className="text-xs font-medium text-amber-800 bg-amber-50 rounded px-1.5 py-0.5 mt-1 border border-amber-200 w-fit">
+                  {subtitle}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -1372,6 +1739,219 @@ const ViewFeeModal = ({
     </Modal>
   );
 };
+// Student Fee Grouping for Student-Centric Dashboard View
+export interface StudentFeeGroup {
+  student_id: number;
+  student_name: string;
+  student_surname?: string | null;
+  student_class_display?: string;
+  school_class_name?: string;
+  class_name?: string;
+  student_division?: string;
+  is_rte_govt_claim?: boolean;
+  fees: StudentFee[];
+  totalAmount: number;
+  totalDiscount: number;
+  totalPayable: number;
+  totalPaid: number;
+  totalBalance: number;
+  consolidatedStatus: "paid" | "partial" | "unpaid" | "overdue";
+  billingPeriods: string[];
+}
+
+// Slide-Out Panel for Student Individual Fee Items
+const StudentFeesSlideOut = ({
+  isOpen,
+  onClose,
+  group,
+  onViewFee,
+  onCollectFee,
+  onDiscountFee,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  group: StudentFeeGroup | null;
+  onViewFee: (fee: StudentFee) => void;
+  onCollectFee: (fee: StudentFee) => void;
+  onDiscountFee: (fee: StudentFee) => void;
+}) => {
+  if (!isOpen || !group) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          {/* Header */}
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+            <div className="flex items-center gap-3">
+              <StudentAvatar name={group.student_name} size="md" />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-bold text-gray-900 leading-tight">
+                    {group.student_name} {group.student_surname || ""}
+                  </h3>
+                  {group.is_rte_govt_claim && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      RTE Quota
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-blue-700 font-semibold mt-0.5">
+                  {group.student_class_display ||
+                    (group.school_class_name
+                      ? `${group.school_class_name.toLowerCase().startsWith("class") ? group.school_class_name : `Class ${group.school_class_name}`}${group.student_division ? ` - ${group.student_division} Section` : ""}`
+                      : (group.class_name || "Class N/A"))}
+                  <span className="text-gray-400 font-normal ml-1.5">ID#{group.student_id.toString().padStart(3, "0")}</span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Financial Summary Cards */}
+          <div className="p-4 bg-blue-50/40 border-b border-blue-100/60 grid grid-cols-3 gap-2 text-center">
+            <div className="bg-white p-2.5 rounded-xl border border-blue-100 shadow-2xs">
+              <p className="text-[10px] uppercase font-bold text-gray-500">Total Payable</p>
+              <p className="text-sm font-bold text-gray-900 mt-0.5">₹{group.totalPayable.toLocaleString("en-IN")}</p>
+            </div>
+            <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+              <p className="text-[10px] uppercase font-bold text-emerald-600">Total Paid</p>
+              <p className="text-sm font-bold text-emerald-700 mt-0.5">₹{group.totalPaid.toLocaleString("en-IN")}</p>
+            </div>
+            <div className="bg-white p-2.5 rounded-xl border border-rose-100 shadow-2xs">
+              <p className="text-[10px] uppercase font-bold text-rose-600">Balance</p>
+              <p className="text-sm font-bold text-rose-700 mt-0.5">₹{group.totalBalance.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+
+          {/* Fee Items List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                Fee Items Breakdown ({group.fees.length})
+              </h4>
+              <span className="text-xs text-gray-400">
+                {group.billingPeriods.map(formatBillingPeriod).join(", ") || "Monthly"}
+              </span>
+            </div>
+
+            {group.fees.map((fee) => {
+              const isPaid = fee.status === "paid";
+              return (
+                <div
+                  key={fee.id}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isPaid ? "bg-emerald-50/20 border-emerald-200/70" : "bg-white border-gray-200 shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                          {fee.feetype_name}
+                        </span>
+                        <StatusBadge status={fee.status} />
+                      </div>
+                      {(fee.discount_note && !fee.discount_note.includes("[Cash Recd")) && (
+                        <div className="mt-1.5 flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-2 py-1 rounded-md text-xs">
+                          <span>📦</span>
+                          <span className="text-[10px] uppercase font-bold text-amber-800">Particulars:</span>
+                          <span className="font-semibold">{fee.discount_note}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Due: {formatDisplayDate(fee.due_date)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 py-2 border-y border-gray-100 text-xs">
+                    <div>
+                      <p className="text-gray-400 text-[10px] uppercase">Base</p>
+                      <p className="font-semibold text-gray-800">₹{parseFloat(fee.amount).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-[10px] uppercase">Discount</p>
+                      <p className="font-semibold text-green-600">
+                        {parseFloat(fee.discount_amount ?? "0") > 0 ? `-₹${parseFloat(fee.discount_amount ?? "0").toLocaleString("en-IN")}` : "₹0"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-[10px] uppercase">Payable</p>
+                      <p className="font-bold text-gray-900">₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-[10px] uppercase">Balance</p>
+                      <p className="font-bold text-rose-600">₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2.5">
+                    <button
+                      onClick={() => onViewFee(fee)}
+                      className="px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye size={13} /> View
+                    </button>
+                    {!isPaid && (
+                      <button
+                        onClick={() => onDiscountFee(fee)}
+                        className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Percent size={13} /> Discount
+                      </button>
+                    )}
+                    {!isPaid ? (
+                      <button
+                        onClick={() => onCollectFee(fee)}
+                        className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <IndianRupee size={13} /> Collect
+                      </button>
+                    ) : (
+                      <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 size={13} /> Paid
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
+            <a
+              href={`/fees/student-ledger`}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+            >
+              <span>Go to Student Ledger</span>
+              <ChevronRight size={14} />
+            </a>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main Page Component
 export default function GenerateFeesPage() {
   const [activeTab, setActiveTab] = useState<"monthly" | "single">("monthly");
@@ -1392,6 +1972,7 @@ export default function GenerateFeesPage() {
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -1400,6 +1981,24 @@ export default function GenerateFeesPage() {
   const [loading, setLoading] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [searchedReceiptNumber, setSearchedReceiptNumber] = useState<string | null>(null);
+
+  // Student-centric state
+  const [expandedStudentIds, setExpandedStudentIds] = useState<number[]>([]);
+  const [slideOutGroup, setSlideOutGroup] = useState<StudentFeeGroup | null>(null);
+  const [isSlideOutOpen, setIsSlideOutOpen] = useState(false);
+
+  const toggleExpandStudent = (studentId: number) => {
+    setExpandedStudentIds((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const handleOpenSlideOut = (group: StudentFeeGroup) => {
+    setSlideOutGroup(group);
+    setIsSlideOutOpen(true);
+  };
 
   const uniqueClasses = getUniqueClasses(students);
 
@@ -1450,12 +2049,76 @@ export default function GenerateFeesPage() {
     return matchTab;
   });
 
+  // Student-Centric Grouping for Monthly Fees Tab
+  const studentFeeGroups = useMemo(() => {
+    if (activeTab !== "monthly") return [];
 
+    const groupMap = new Map<number, StudentFeeGroup>();
+
+    filteredFees.forEach((fee) => {
+      const studentId = fee.student;
+      if (!groupMap.has(studentId)) {
+        groupMap.set(studentId, {
+          student_id: studentId,
+          student_name: fee.student_name,
+          student_surname: fee.student_surname,
+          student_class_display: fee.student_class_display,
+          school_class_name: fee.school_class_name,
+          class_name: fee.class_name,
+          student_division: fee.student_division,
+          is_rte_govt_claim: Boolean(fee.is_rte_govt_claim),
+          fees: [],
+          totalAmount: 0,
+          totalDiscount: 0,
+          totalPayable: 0,
+          totalPaid: 0,
+          totalBalance: 0,
+          consolidatedStatus: "unpaid",
+          billingPeriods: [],
+        });
+      }
+
+      const grp = groupMap.get(studentId)!;
+      grp.fees.push(fee);
+      grp.totalAmount += parseFloat(fee.amount || "0");
+      grp.totalDiscount += parseFloat(fee.discount_amount || "0");
+      grp.totalPayable += parseFloat(fee.payable_amount || "0");
+      grp.totalPaid += parseFloat(fee.paid_amount || "0");
+      grp.totalBalance += parseFloat(fee.balance_amount || "0");
+      if (fee.is_rte_govt_claim) grp.is_rte_govt_claim = true;
+      if (fee.billing_period && !grp.billingPeriods.includes(fee.billing_period)) {
+        grp.billingPeriods.push(fee.billing_period);
+      }
+    });
+
+    return Array.from(groupMap.values()).map((grp) => {
+      let status: "paid" | "partial" | "unpaid" | "overdue" = "unpaid";
+      if (grp.totalBalance <= 0) {
+        status = "paid";
+      } else if (grp.totalPaid > 0) {
+        status = "partial";
+      } else if (grp.fees.some((f) => f.status === "overdue")) {
+        status = "overdue";
+      } else {
+        status = "unpaid";
+      }
+      return {
+        ...grp,
+        consolidatedStatus: status,
+      };
+    });
+  }, [filteredFees, activeTab]);
+
+  const totalItems = activeTab === "monthly" ? studentFeeGroups.length : filteredFees.length;
+  const paginatedGroups = studentFeeGroups.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
   const paginatedFees = filteredFees.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
-  const totalPages = Math.ceil(filteredFees.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   // Stats
   const totalStudents = students.length;
@@ -1630,6 +2293,17 @@ export default function GenerateFeesPage() {
               </div>
             )}
 
+            {/* Generate Bulk Fees Button */}
+            <button
+              type="button"
+              onClick={() => setBulkModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-medium transition-all shadow-xs hover:border-blue-300 flex-shrink-0 cursor-pointer"
+              title="Generate fees in bulk for an entire class"
+            >
+              <Users size={16} className="text-blue-600" />
+              <span>Generate Bulk Fees</span>
+            </button>
+
             {/* Search */}
             <div className="relative flex-1 min-w-0 sm:max-w-xs">
               <Search
@@ -1664,20 +2338,278 @@ export default function GenerateFeesPage() {
             <div className="flex items-center justify-center py-20">
               <Loader2 size={32} className="animate-spin text-blue-500" />
             </div>
-          ) : paginatedFees.length === 0 ? (
+          ) : (activeTab === "monthly" ? paginatedGroups.length === 0 : paginatedFees.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <Filter size={40} className="mb-3 opacity-50" />
               <p className="font-medium">No fees found</p>
               <p className="text-sm mt-1">Try adjusting your filters</p>
             </div>
+          ) : activeTab === "monthly" ? (
+            /* Student-Centric Monthly Table */
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="w-10 px-3 py-3 text-center text-xs font-semibold text-gray-400"></th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Student Name / Class
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Fee Breakdown / Particulars
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Total Payable (₹)
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Total Paid (₹)
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Total Balance (₹)
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedGroups.map((group) => {
+                  const isExpanded = expandedStudentIds.includes(group.student_id);
+
+                  return (
+                    <React.Fragment key={group.student_id}>
+                      <tr className={`hover:bg-blue-50/30 transition-colors border-b border-gray-100 ${isExpanded ? "bg-blue-50/20" : ""}`}>
+                        <td className="px-3 py-3.5 text-center">
+                          <button
+                            onClick={() => toggleExpandStudent(group.student_id)}
+                            className="p-1.5 hover:bg-gray-200/70 rounded-md text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                            title={isExpanded ? "Collapse fee items" : "Expand fee items"}
+                          >
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <StudentAvatar name={group.student_name} />
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {group.student_name} {group.student_surname || ""}
+                                </p>
+                                {group.is_rte_govt_claim && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    RTE
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-blue-700 font-semibold mt-0.5">
+                                {group.student_class_display ||
+                                  (group.school_class_name
+                                    ? `${group.school_class_name.toLowerCase().startsWith("class") ? group.school_class_name : `Class ${group.school_class_name}`}${group.student_division ? ` - ${group.student_division} Section` : ""}`
+                                    : (group.class_name || "Class N/A"))}
+                                <span className="text-gray-400 font-normal ml-1.5">ID#{group.student_id.toString().padStart(3, "0")}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td
+                          className="px-4 py-3.5 cursor-pointer hover:bg-blue-50/40 transition-colors"
+                          onClick={() => handleOpenSlideOut(group)}
+                          title="Click to view full fee breakdown in slide-out panel"
+                        >
+                          <div className="flex flex-col gap-1 max-w-xs">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-800 border border-gray-200 transition-colors cursor-pointer"
+                                title="Click to view breakdown"
+                              >
+                                {group.fees.length} {group.fees.length === 1 ? "Item" : "Items"}
+                              </span>
+                              {group.fees.slice(0, 2).map((f) => (
+                                <span
+                                  key={f.id}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 truncate max-w-[130px]"
+                                >
+                                  {f.feetype_name}
+                                </span>
+                              ))}
+                              {group.fees.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSlideOut(group);
+                                  }}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-300 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                                  title="Click to view all fee items in slide-out panel"
+                                >
+                                  +{group.fees.length - 2} more
+                                </button>
+                              )}
+                            </div>
+                            {group.fees.some((f) => f.discount_note && !f.discount_note.includes("[Cash Recd")) && (
+                              <p
+                                className="text-[11px] font-medium text-amber-900 bg-amber-50 rounded px-1.5 py-0.5 border border-amber-200 truncate"
+                                title={group.fees.map((f) => f.discount_note).filter((n): n is string => Boolean(n && !n.includes("[Cash Recd"))).join(", ")}
+                              >
+                                📦 {group.fees.map((f) => f.discount_note).filter((n): n is string => Boolean(n && !n.includes("[Cash Recd"))).join(", ")}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-bold text-gray-900 text-sm whitespace-nowrap">
+                          ₹{group.totalPayable.toLocaleString("en-IN")}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-bold text-emerald-600 text-sm whitespace-nowrap">
+                          ₹{group.totalPaid.toLocaleString("en-IN")}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-bold text-rose-600 text-sm whitespace-nowrap">
+                          ₹{group.totalBalance.toLocaleString("en-IN")}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          {group.consolidatedStatus === "paid" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 size={12} /> Paid
+                            </span>
+                          ) : group.consolidatedStatus === "partial" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              <Clock size={12} /> Partial
+                            </span>
+                          ) : group.consolidatedStatus === "overdue" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              <AlertCircle size={12} /> Overdue
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                              <XCircle size={12} /> Unpaid
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center">
+                            <button
+                              onClick={() => handleOpenSlideOut(group)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors shadow-2xs cursor-pointer"
+                              title="View Individual Fee Items"
+                            >
+                              <Eye size={13} />
+                              <span>Breakdown</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-blue-50/20 border-b border-gray-200">
+                          <td colSpan={8} className="p-3 pl-12 pr-6">
+                            <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+                              <div className="bg-gray-50/80 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wide text-gray-600">
+                                  Fee Items for {group.student_name}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {group.fees.length} {group.fees.length === 1 ? "record" : "records"}
+                                </span>
+                              </div>
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wide bg-gray-50/40">
+                                    <th className="py-2.5 px-3">Fee Type</th>
+                                    <th className="py-2.5 px-3">Particulars</th>
+                                    <th className="py-2.5 px-3">Due Date</th>
+                                    <th className="py-2.5 px-3 text-right">Payable</th>
+                                    <th className="py-2.5 px-3 text-right">Paid</th>
+                                    <th className="py-2.5 px-3 text-right">Balance</th>
+                                    <th className="py-2.5 px-3 text-center">Status</th>
+                                    <th className="py-2.5 px-3 text-center">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {group.fees.map((fee) => (
+                                    <tr key={fee.id} className="hover:bg-gray-50/60">
+                                      <td className="py-2.5 px-3 font-semibold text-gray-900">
+                                        {fee.feetype_name}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-gray-700">
+                                        {fee.discount_note || fee.discount_reference ? (
+                                          <span className="inline-flex items-center gap-1 font-semibold text-amber-900 bg-amber-50 rounded px-1.5 py-0.5 border border-amber-200">
+                                            📦 {fee.discount_note || fee.discount_reference}
+                                          </span>
+                                        ) : (
+                                          <span className="text-gray-400">—</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-gray-600 whitespace-nowrap">
+                                        {formatDisplayDate(fee.due_date)}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-bold text-gray-900">
+                                        ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-bold text-emerald-600">
+                                        ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-bold text-rose-600">
+                                        ₹{parseFloat(fee.balance_amount || "0").toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <StatusBadge status={fee.status} />
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <button
+                                            onClick={() => handleView(fee)}
+                                            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
+                                            title="View Fee"
+                                          >
+                                            <Eye size={13} />
+                                          </button>
+                                          <button
+                                            onClick={() => handleCollect(fee)}
+                                            className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                                            title="Collect Fee"
+                                          >
+                                            <IndianRupee size={13} />
+                                          </button>
+                                          {fee.status !== "paid" && (
+                                            <button
+                                              onClick={() => handleDiscount(fee)}
+                                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                                              title="Discount"
+                                            >
+                                              <Percent size={13} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           ) : (
+            /* Single Fees Table */
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   {[
                     "Student",
                     "Class & Section",
-                    "Billing Period",
                     "Due Date",
                     "Amount (₹)",
                     "Discount (₹)",
@@ -1723,18 +2655,23 @@ export default function GenerateFeesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-sm text-gray-700 font-medium capitalize">
-                        {fee.class_name?.replace(/_/g, " ")}
-                      </p>
-                      <p className="text-xs text-gray-400">A Section</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {fee.billing_period ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
-                          {formatBillingPeriod(fee.billing_period)}
-                        </span>
+                      {fee.student_class_display ? (
+                        <p className="text-sm text-gray-900 font-semibold">
+                          {fee.student_class_display}
+                        </p>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <div>
+                          <p className="text-sm text-gray-900 font-semibold capitalize">
+                            {fee.school_class_name
+                              ? (fee.school_class_name.toLowerCase().startsWith("class") ? fee.school_class_name : `Class ${fee.school_class_name}`)
+                              : (fee.class_name?.replace(/_/g, " ") || "—")}
+                          </p>
+                          {fee.student_division ? (
+                            <p className="text-xs text-gray-500 font-medium uppercase mt-0.5">
+                              {fee.student_division} Section
+                            </p>
+                          ) : null}
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
@@ -1753,8 +2690,7 @@ export default function GenerateFeesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                      ₹
-                      {parseFloat(fee.payable_amount).toLocaleString("en-IN")}
+                      ₹{parseFloat(fee.payable_amount).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-green-600">
                       ₹{parseFloat(fee.paid_amount || "0").toLocaleString("en-IN")}
@@ -1764,83 +2700,29 @@ export default function GenerateFeesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={fee.status} />
-                      {fee.is_rte_govt_claim && (
-                        <div className="text-[10px] text-indigo-700 font-semibold mt-0.5">
-                          Govt: {fee.rte_govt_status || 'pending'}
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleView(fee)}
-                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
+                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700 cursor-pointer"
                         >
                           <Eye size={15} />
                         </button>
                         <button
                           onClick={() => handleCollect(fee)}
-                          className="p-1.5 hover:bg-green-50 rounded-lg transition-colors text-gray-400 hover:text-green-600"
+                          className="p-1.5 hover:bg-green-50 rounded-lg transition-colors text-gray-400 hover:text-green-600 cursor-pointer"
                         >
                           <IndianRupee size={15} />
                         </button>
                         {fee.status !== "paid" && (
                           <button
                             onClick={() => handleDiscount(fee)}
-                            className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                            className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600 cursor-pointer"
                           >
                             <Percent size={15} />
                           </button>
                         )}
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              setOpenMenuId(
-                                openMenuId === fee.id ? null : fee.id,
-                              )
-                            }
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
-                          >
-                            <MoreVertical size={15} />
-                          </button>
-                          {openMenuId === fee.id && (
-                            <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 py-1">
-                              <button
-                                onClick={() => handleView(fee)}
-                                className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <Eye size={14} /> View
-                              </button>
-                              <button
-                                onClick={() => handleCollect(fee)}
-                                className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <IndianRupee size={14} /> Collect
-                              </button>
-                              {fee.status !== "paid" && (
-                                <button
-                                  onClick={() => handleDiscount(fee)}
-                                  className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Percent size={14} /> Discount
-                                </button>
-                              )}
-                              <hr className="my-1 border-gray-100" />
-                              <button
-                                onClick={async () => {
-                                  await deleteStudentFee(fee.id);
-                                  setFees((prev) =>
-                                    prev.filter((f) => f.id !== fee.id),
-                                  );
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <X size={14} /> Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </td>
                   </tr>
@@ -1856,12 +2738,114 @@ export default function GenerateFeesPage() {
             <div className="flex items-center justify-center py-16">
               <Loader2 size={32} className="animate-spin text-blue-500" />
             </div>
-          ) : paginatedFees.length === 0 ? (
+          ) : (activeTab === "monthly" ? paginatedGroups.length === 0 : paginatedFees.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <Filter size={32} className="mb-2 opacity-50" />
               <p className="text-sm font-medium">No fees found</p>
             </div>
+          ) : activeTab === "monthly" ? (
+            /* Student-Centric Mobile Cards */
+            paginatedGroups.map((group) => {
+              const isExpanded = expandedStudentIds.includes(group.student_id);
+
+              return (
+                <div key={group.student_id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <StudentAvatar name={group.student_name} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {group.student_name} {group.student_surname || ""}
+                        </p>
+                        <p className="text-xs text-blue-700 font-semibold">
+                          {group.student_class_display ||
+                            (group.school_class_name
+                              ? `${group.school_class_name}${group.student_division ? ` - ${group.student_division} Section` : ""}`
+                              : (group.class_name || "Class N/A"))}
+                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[10px] font-bold border border-gray-200">
+                            {group.fees.length} {group.fees.length === 1 ? "Item" : "Items"}
+                          </span>
+                          {group.fees.some((f) => f.discount_note || f.discount_reference) && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-medium truncate max-w-[170px]">
+                              📦 {group.fees.find((f) => f.discount_note || f.discount_reference)?.discount_note || group.fees.find((f) => f.discount_note || f.discount_reference)?.discount_reference}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {group.consolidatedStatus === "paid" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Paid
+                      </span>
+                    ) : group.consolidatedStatus === "partial" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Partial
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
+                        Unpaid
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-[10px] uppercase text-gray-400">Payable</p>
+                      <p className="font-bold text-gray-900 mt-0.5">₹{group.totalPayable.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-lg p-2">
+                      <p className="text-[10px] uppercase text-emerald-600">Paid</p>
+                      <p className="font-bold text-emerald-700 mt-0.5">₹{group.totalPaid.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="bg-rose-50 rounded-lg p-2">
+                      <p className="text-[10px] uppercase text-rose-600">Balance</p>
+                      <p className="font-bold text-rose-700 mt-0.5">₹{group.totalBalance.toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => handleOpenSlideOut(group)}
+                      className="flex-1 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Eye size={13} /> View Items ({group.fees.length})
+                    </button>
+                    <button
+                      onClick={() => toggleExpandStudent(group.student_id)}
+                      className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-200 text-xs">
+                      {group.fees.map((f) => (
+                        <div key={f.id} className="p-2 bg-white rounded-lg border border-gray-100">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-semibold text-gray-900">{f.feetype_name}</span>
+                            <StatusBadge status={f.status} />
+                          </div>
+                          {(f.discount_note || f.discount_reference) && (
+                            <p className="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mb-1 font-medium">
+                              📦 Particulars: {f.discount_note || f.discount_reference}
+                            </p>
+                          )}
+                          <div className="flex justify-between text-gray-500 text-[11px]">
+                            <span>Payable: ₹{parseFloat(f.payable_amount).toLocaleString("en-IN")}</span>
+                            <span className="text-rose-600 font-bold">Bal: ₹{parseFloat(f.balance_amount || "0").toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
+            /* Single Fees Mobile Cards */
             paginatedFees.map((fee) => (
               <div
                 key={fee.id}
@@ -1874,14 +2858,13 @@ export default function GenerateFeesPage() {
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {fee.student_name}
                       </p>
-                      <p className="text-xs text-gray-400 capitalize">
-                        {fee.class_name?.replace(/_/g, " ")}
+                      <p className="text-xs text-gray-500 font-medium capitalize">
+                        {fee.student_class_display || (
+                          fee.school_class_name
+                            ? `${fee.school_class_name}${fee.student_division ? ` - ${fee.student_division} Section` : ""}`
+                            : (fee.class_name?.replace(/_/g, " ") || "")
+                        )}
                       </p>
-                      {fee.billing_period && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-medium mt-1">
-                          {formatBillingPeriod(fee.billing_period)}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <StatusBadge status={fee.status} />
@@ -1936,16 +2919,16 @@ export default function GenerateFeesPage() {
         </div>
 
         {/* Pagination */}
-        {filteredFees.length > 0 && (
+        {(activeTab === "monthly" ? studentFeeGroups.length : filteredFees.length) > 0 && (
           <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs text-gray-500">
               Showing{" "}
               {Math.min(
                 (currentPage - 1) * ITEMS_PER_PAGE + 1,
-                filteredFees.length,
+                activeTab === "monthly" ? studentFeeGroups.length : filteredFees.length,
               )}{" "}
-              to {Math.min(currentPage * ITEMS_PER_PAGE, filteredFees.length)}{" "}
-              of {filteredFees.length} entries
+              to {Math.min(currentPage * ITEMS_PER_PAGE, activeTab === "monthly" ? studentFeeGroups.length : filteredFees.length)}{" "}
+              of {activeTab === "monthly" ? studentFeeGroups.length : filteredFees.length} {activeTab === "monthly" ? "students" : "entries"}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -2058,6 +3041,38 @@ export default function GenerateFeesPage() {
         activeTab={activeTab}
       />
 
+      <BulkGenerateFeeModal
+        isOpen={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        students={students}
+        academicYears={academicYears}
+        feeWiseClasses={feeWiseClasses}
+        onSuccess={() => { loadData(); }}
+        defaultClass={filterClass}
+        defaultPeriod={filterPeriod}
+      />
+
+      <StudentFeesSlideOut
+        isOpen={isSlideOutOpen}
+        onClose={() => {
+          setIsSlideOutOpen(false);
+          setSlideOutGroup(null);
+        }}
+        group={slideOutGroup}
+        onViewFee={(f) => {
+          setSelectedFee(f);
+          setViewModalOpen(true);
+        }}
+        onCollectFee={(f) => {
+          setSelectedFee(f);
+          setIsCollectFeeModalOpen(true);
+        }}
+        onDiscountFee={(f) => {
+          setSelectedFee(f);
+          setDiscountModalOpen(true);
+        }}
+      />
+
       <DiscountModal
         isOpen={discountModalOpen}
         onClose={() => setDiscountModalOpen(false)}
@@ -2069,6 +3084,7 @@ export default function GenerateFeesPage() {
         isOpen={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         fee={selectedFee}
+        academicYears={academicYears}
         onSuccess={() => { loadData(); }}
         onViewReceipt={(receiptNo) => {
           setSearchedReceiptNumber(receiptNo);

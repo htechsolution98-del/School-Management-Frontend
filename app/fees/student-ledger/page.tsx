@@ -176,18 +176,20 @@ const Modal = ({
   title,
   children,
   maxWidth = "max-w-lg",
+  zIndex = "z-[100]",
 }: {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  zIndex?: string;
 }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4`}>
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/75 backdrop-blur-md"
         onClick={onClose}
       />
       <div
@@ -197,7 +199,7 @@ const Modal = ({
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <X size={18} className="text-gray-500" />
           </button>
@@ -1545,12 +1547,19 @@ const ViewFeeModal = ({
       <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
           <StudentAvatar name={fee.student_name} size="md" />
-          <div>
-            <p className="font-semibold text-gray-900 text-base">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-gray-900 text-base leading-tight">
               {fee.student_name} {fee.student_surname || ""}
             </p>
-            <p className="text-sm text-gray-500">{fee.class_name}</p>
-            <StatusBadge status={fee.status} />
+            <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5 inline-block mt-1 mb-1.5">
+              {fee.student_class_display ||
+                (fee.school_class_name
+                  ? `${fee.school_class_name.toLowerCase().startsWith("class") ? fee.school_class_name : `Class ${fee.school_class_name}`}${fee.student_division ? ` - ${fee.student_division} Section` : ""}`
+                  : (fee.class_name ? (fee.class_name.toLowerCase().startsWith("class") ? fee.class_name : `Class ${fee.class_name}`) : "Class N/A"))}
+            </p>
+            <div>
+              <StatusBadge status={fee.status} />
+            </div>
           </div>
         </div>
 
@@ -1558,12 +1567,13 @@ const ViewFeeModal = ({
           {[
             {
               label: "Academic Year",
-              value: fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A",
+              value: fee.academic_year_name || (fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A"),
               icon: CalendarDays,
             },
             {
               label: "Fee Structure",
               value: fee.feetype_name || "N/A",
+              subtitle: (fee.discount_note && !fee.discount_note.includes("[Cash Recd")) ? fee.discount_note : undefined,
               icon: BookOpen,
             },
             {
@@ -1576,8 +1586,18 @@ const ViewFeeModal = ({
               value: formatDisplayDate(fee.due_date),
               icon: Clock,
             },
-          ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="bg-gray-50 rounded-lg p-3">
+            ...(fee.discount_note && !fee.discount_note.includes("[Cash Recd")
+              ? [
+                  {
+                    label: "Particulars",
+                    value: fee.discount_note,
+                    icon: BookOpen,
+                    fullWidth: true,
+                  },
+                ]
+              : []),
+          ].map(({ label, value, subtitle, icon: Icon, fullWidth }: any) => (
+            <div key={label} className={`bg-gray-50 rounded-lg p-3 ${fullWidth ? "col-span-2" : ""}`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={12} className="text-gray-400" />
                 <span className="text-xs text-gray-400 font-medium">
@@ -1585,6 +1605,7 @@ const ViewFeeModal = ({
                 </span>
               </div>
               <p className="text-sm font-semibold text-gray-900">{value}</p>
+              {subtitle && <p className="text-xs text-blue-600 mt-0.5">{subtitle}</p>}
             </div>
           ))}
         </div>
@@ -1769,24 +1790,59 @@ const ViewFeeDetailsModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Fee Details">
       <div className="space-y-4">
+        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+          <StudentAvatar name={fee.student_name} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-gray-900 text-base leading-tight">
+              {fee.student_name} {fee.student_surname || ""}
+            </p>
+            <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5 inline-block mt-1 mb-1.5">
+              {fee.student_class_display ||
+                (fee.school_class_name
+                  ? `${fee.school_class_name.toLowerCase().startsWith("class") ? fee.school_class_name : `Class ${fee.school_class_name}`}${fee.student_division ? ` - ${fee.student_division} Section` : ""}`
+                  : (fee.class_name ? (fee.class_name.toLowerCase().startsWith("class") ? fee.class_name : `Class ${fee.class_name}`) : "Class N/A"))}
+            </p>
+            <div>
+              <StatusBadge status={fee.status} />
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           {[
             {
               label: "Academic Year",
-              value: fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A",
+              value: fee.academic_year_name || (fee.academic_year ? `Year ID: ${fee.academic_year}` : "N/A"),
               icon: CalendarDays,
             },
             {
               label: "Fee Structure",
               value: fee.feetype_name || "N/A",
+              subtitle: (fee.discount_note && !fee.discount_note.includes("[Cash Recd")) ? fee.discount_note : undefined,
               icon: BookOpen,
             },
             {
               label: "Billing Period",
+              value: formatBillingPeriod(fee.billing_period),
               icon: Clock,
             },
-          ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="bg-gray-50 rounded-lg p-3">
+            {
+              label: "Due Date",
+              value: formatDisplayDate(fee.due_date),
+              icon: Clock,
+            },
+            ...(fee.discount_note && !fee.discount_note.includes("[Cash Recd")
+              ? [
+                  {
+                    label: "Particulars",
+                    value: fee.discount_note,
+                    icon: BookOpen,
+                    fullWidth: true,
+                  },
+                ]
+              : []),
+          ].map(({ label, value, subtitle, icon: Icon, fullWidth }: any) => (
+            <div key={label} className={`bg-gray-50 rounded-lg p-3 ${fullWidth ? "col-span-2" : ""}`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={12} className="text-gray-400" />
                 <span className="text-xs text-gray-400 font-medium">
@@ -1794,6 +1850,7 @@ const ViewFeeDetailsModal = ({
                 </span>
               </div>
               <p className="text-sm font-semibold text-gray-900">{value}</p>
+              {subtitle && <p className="text-xs text-blue-600 mt-0.5">{subtitle}</p>}
             </div>
           ))}
         </div>
@@ -2104,6 +2161,49 @@ export default function StudentLedgerPage() {
       {/* Dashboard Cards & Table */}
       {selectedLedgerStudent && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Selected Student Banner / Profile Card */}
+          <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 mb-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <StudentAvatar name={selectedLedgerStudent.name} size="md" />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-bold text-gray-900 leading-tight">
+                    {selectedLedgerStudent.name} {selectedLedgerStudent.surname || ""}
+                  </h2>
+                  {(selectedLedgerStudent.gr_no || selectedLedgerStudent.gr_number) && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                      GR: #{selectedLedgerStudent.gr_no || selectedLedgerStudent.gr_number}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-0.5 inline-flex items-center gap-1">
+                    <GraduationCap size={13} className="text-blue-600" />
+                    {selectedLedgerStudent.class_name
+                      ? `${selectedLedgerStudent.class_name.toLowerCase().startsWith("class") ? selectedLedgerStudent.class_name : `Class ${selectedLedgerStudent.class_name}`}${selectedLedgerStudent.division ? ` - ${selectedLedgerStudent.division} Section` : ""}`
+                      : "Class N/A"}
+                  </span>
+                  {selectedLedgerStudent.roll_number && (
+                    <span className="text-xs text-gray-500 font-medium">
+                      Roll No: {selectedLedgerStudent.roll_number}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSelectedLedgerStudent(null);
+                  setLedgerFees([]);
+                }}
+                className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+
            {/* Summary Cards */}
            {(() => {
              const isRteStudent = Boolean(
@@ -2364,6 +2464,9 @@ export default function StudentLedgerPage() {
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
                                     {fee.feetype_name}
                                   </span>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-semibold border border-gray-200">
+                                    {fee.student_class_display || (selectedLedgerStudent ? `${selectedLedgerStudent.class_name} - ${selectedLedgerStudent.division} Sec` : "Class N/A")}
+                                  </span>
                                   {fee.is_rte_govt_claim && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold uppercase tracking-wider border border-indigo-200">
                                       🏛️ RTE Claim
@@ -2374,6 +2477,11 @@ export default function StudentLedgerPage() {
                                   <h4 className="font-semibold text-gray-900">{formatBillingPeriod(fee.billing_period)}</h4>
                                 ) : (
                                   <h4 className="font-semibold text-gray-900">Due: {formatDisplayDate(fee.due_date)}</h4>
+                                )}
+                                {(fee.discount_note && !fee.discount_note.includes("[Cash Recd")) && (
+                                  <p className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                                    <span>📦 {fee.discount_note}</span>
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -2492,6 +2600,7 @@ export default function StudentLedgerPage() {
                           />
                         </th>
                         <th className="py-3.5 px-4">Fee Name / Period</th>
+                        <th className="py-3.5 px-4">Class & Section</th>
                         <th className="py-3.5 px-4">Due Date</th>
                         <th className="py-3.5 px-4 text-center">Status</th>
                         <th className="py-3.5 px-4 text-right">Base Amount</th>
@@ -2547,7 +2656,20 @@ export default function StudentLedgerPage() {
                                 <span className="font-semibold text-gray-900">
                                   {fee.billing_period ? formatBillingPeriod(fee.billing_period) : "Single Fee"}
                                 </span>
+                                {(fee.discount_note && !fee.discount_note.includes("[Cash Recd")) && (
+                                  <span className="text-xs text-blue-600 font-medium mt-0.5 truncate max-w-xs" title={fee.discount_note}>
+                                    📦 {fee.discount_note}
+                                  </span>
+                                )}
                               </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-xs font-medium text-gray-700 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 border border-gray-200">
+                                {fee.student_class_display ||
+                                  (selectedLedgerStudent
+                                    ? `${selectedLedgerStudent.class_name ? (selectedLedgerStudent.class_name.toLowerCase().startsWith("class") ? selectedLedgerStudent.class_name : `Class ${selectedLedgerStudent.class_name}`) : "Class N/A"}${selectedLedgerStudent.division ? ` - ${selectedLedgerStudent.division} Section` : ""}`
+                                    : "—")}
+                              </span>
                             </td>
                             <td className="py-3.5 px-4 text-gray-600 text-xs whitespace-nowrap">
                               {formatDisplayDate(fee.due_date)}

@@ -27,6 +27,7 @@ export default function StudentItemIssuePage() {
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [entitlements, setEntitlements] = useState<any[]>([]);
+  const [pricings, setPricings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Student Issue Ledger state
@@ -96,7 +97,7 @@ export default function StudentItemIssuePage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [itemsRes, classRes, sizesRes, colorsRes, yearsRes, entRes, studsRes] = await Promise.all([
+      const [itemsRes, classRes, sizesRes, colorsRes, yearsRes, entRes, studsRes, pricingRes] = await Promise.all([
         inventoryApi.get("/items/"),
         coreApi.get("/getclass/").catch(() => coreApi.get("/classes/")).catch(() => ({ data: [] })),
         inventoryApi.get("/sizes/"),
@@ -104,6 +105,7 @@ export default function StudentItemIssuePage() {
         coreApi.get("/academic-year/").catch(() => coreApi.get("/main-academic-year/")).catch(() => ({ data: [] })),
         inventoryApi.get("/entitlements/"),
         coreApi.get("/get-student/").catch(() => ({ data: [] })),
+        inventoryApi.get("/pricing/").catch(() => ({ data: [] })),
       ]);
 
       const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
@@ -131,6 +133,7 @@ export default function StudentItemIssuePage() {
 
       setEntitlements(Array.isArray(entRes.data) ? entRes.data : entRes.data.results || []);
       setStudents(Array.isArray(studsRes.data) ? studsRes.data : studsRes.data.results || []);
+      setPricings(Array.isArray(pricingRes.data) ? pricingRes.data : pricingRes.data?.results || []);
     } catch (err) {
       console.error("Failed to load issue data:", err);
       showApiError(err, "Failed to load student issue dependencies.");
@@ -516,14 +519,261 @@ export default function StudentItemIssuePage() {
     }
   };
 
+  // Helper to extract clean class, roll, and GR context from student object
+  const getStudentDisplayDetails = (st: any) => {
+    if (!st) {
+      return {
+        classDisplay: "Class N/A",
+        rollDisplay: "Roll: N/A",
+        grDisplay: "GR: N/A",
+        combinedContext: "Class N/A | Roll: N/A",
+        classId: null,
+        className: "",
+      };
+    }
+
+    let rawClass =
+      st.class_name ||
+      st.school_class_name ||
+      (typeof st.school_class === "object" ? (st.school_class?.school_class || st.school_class?.name) : null);
+
+    const rawClassId = typeof st.school_class === "object" ? st.school_class?.id : (Number(st.school_class) || null);
+
+    if (!rawClass && rawClassId && classes.length > 0) {
+      const foundCls = classes.find((c: any) => Number(c.id) === Number(rawClassId));
+      if (foundCls) {
+        rawClass = foundCls.school_class || foundCls.name || foundCls.class_name;
+      }
+    }
+
+    const division = st.division || st.student_division || st.section || "";
+    let formattedClass = "";
+    if (rawClass) {
+      const normalized = rawClass.toString().toLowerCase().startsWith("class") ? rawClass : `Class ${rawClass}`;
+      formattedClass = division ? `${normalized} - ${division}` : normalized;
+    } else if (division) {
+      formattedClass = `Section ${division}`;
+    } else {
+      formattedClass = "Class N/A";
+    }
+
+    const roll = st.roll_no || st.roll_number || "";
+    const gr = st.gr_no || st.gr_number || "";
+
+    return {
+      classDisplay: formattedClass,
+      rollDisplay: roll ? `Roll: ${roll}` : "Roll: N/A",
+      grDisplay: gr ? `GR: ${gr}` : "",
+      combinedContext: `${formattedClass} | ${roll ? `Roll: ${roll}` : "Roll: N/A"}${gr ? ` | GR: ${gr}` : ""}`,
+      classId: rawClassId,
+      className: rawClass ? rawClass.toString() : "",
+    };
+  };
+
+  // Helper to determine if an item is applicable to a specific class (or all classes)
+  const checkItemApplicability = (
+    item: any,
+    targetClassId: number | string | null,
+    targetClassName?: string | null
+  ): { isApplicable: boolean; applicabilityLabel: string } => {
+    const direct = item.class_applicability ?? item.applicable_class ?? item.school_class;
+    let itemClassId: number | null = null;
+    let itemClassName: string | null = null;
+    let isAll = false;
+
+    if (direct === undefined || direct === null) {
+      if (item.active_pricing) {
+        if (item.active_pricing.school_class) {
+          itemClassId = Number(item.active_pricing.school_class);
+          itemClassName = item.active_pricing.school_class_name || null;
+        } else if (item.active_pricing.school_class_name && item.active_pricing.school_class_name !== "All Classes") {
+          itemClassName = item.active_pricing.school_class_name;
+        } else {
+          isAll = true;
+        }
+      } else {
+        const itemP = pricings.filter((p: any) => p.item === item.id || p.item?.id === item.id);
+        const specificP = itemP.find((p: any) => p.school_class || (p.school_class_name && p.school_class_name !== "All Classes"));
+        if (specificP) {
+          itemClassId = specificP.school_class ? Number(specificP.school_class) : null;
+          itemClassName = specificP.school_class_name || null;
+        } else {
+          isAll = true;
+        }
+      }
+    } else if (typeof direct === "string") {
+      const clean = direct.trim().toLowerCase();
+      if (!clean || clean === "all" || clean === "all classes" || clean === "null" || clean === "none") {
+        isAll = true;
+      } else {
+        itemClassName = direct;
+        if (!isNaN(Number(direct))) itemClassId = Number(direct);
+      }
+    } else if (typeof direct === "number") {
+      itemClassId = direct;
+    } else if (typeof direct === "object") {
+      itemClassId = direct.id || null;
+      itemClassName = direct.school_class || direct.name || direct.class_name || null;
+    }
+
+    const applicabilityLabel = isAll || (!itemClassId && !itemClassName)
+      ? "All Classes"
+      : (itemClassName ? (itemClassName.toLowerCase().startsWith("class") ? itemClassName : `Class ${itemClassName}`) : `Class ID: ${itemClassId}`);
+
+    if (isAll || (!itemClassId && !itemClassName)) {
+      return { isApplicable: true, applicabilityLabel: "All Classes" };
+    }
+
+    if (!targetClassId && !targetClassName) {
+      return { isApplicable: true, applicabilityLabel };
+    }
+
+    const targetIdNum = targetClassId ? Number(targetClassId) : null;
+    let targetNameClean = (targetClassName || "").toLowerCase().replace(/^class\s*/i, "").trim();
+
+    if (targetIdNum && !targetNameClean && classes.length > 0) {
+      const found = classes.find((c: any) => c.id === targetIdNum);
+      if (found) {
+        targetNameClean = (found.school_class || found.class_name || found.name || "").toLowerCase().replace(/^class\s*/i, "").trim();
+      }
+    }
+
+    if (itemClassId && targetIdNum && itemClassId === targetIdNum) {
+      return { isApplicable: true, applicabilityLabel };
+    }
+
+    if (itemClassName && targetNameClean) {
+      const itemClean = itemClassName.toLowerCase().replace(/^class\s*/i, "").trim();
+      if (itemClean === targetNameClean) {
+        return { isApplicable: true, applicabilityLabel };
+      }
+    }
+
+    if (itemClassId && targetNameClean && classes.length > 0) {
+      const found = classes.find((c: any) => c.id === itemClassId);
+      if (found) {
+        const foundName = (found.school_class || found.class_name || found.name || "").toLowerCase().replace(/^class\s*/i, "").trim();
+        if (foundName === targetNameClean) {
+          return { isApplicable: true, applicabilityLabel };
+        }
+      }
+    }
+
+    return { isApplicable: false, applicabilityLabel };
+  };
+
+  // Class-Aware Item Filtering for Individual Student Issue
+  const singleFilteredItems = useMemo(() => {
+    if (!selectedStudent) return items;
+    const details = getStudentDisplayDetails(selectedStudent);
+    return items.filter((it) => {
+      const { isApplicable } = checkItemApplicability(it, details.classId, details.className);
+      return isApplicable;
+    });
+  }, [items, selectedStudent, classes, pricings]);
+
+  useEffect(() => {
+    if (singleFilteredItems.length > 0) {
+      const exists = singleFilteredItems.some((it) => String(it.id) === String(singleItem));
+      if (!exists) {
+        setSingleItem(String(singleFilteredItems[0].id));
+        setSingleSize("");
+        setSingleColor("");
+      }
+    } else if (items.length > 0 && selectedStudent) {
+      setSingleItem("");
+    }
+  }, [singleFilteredItems, singleItem, items.length, selectedStudent]);
+
+  // Class-Aware Item Filtering for Bulk Class Distribution
+  const bulkFilteredItems = useMemo(() => {
+    if (!bulkClass) return items;
+    const foundClass = classes.find((c: any) => String(c.id) === String(bulkClass));
+    const className = foundClass ? (foundClass.school_class || foundClass.class_name || foundClass.name) : null;
+    return items.filter((it) => {
+      const { isApplicable } = checkItemApplicability(it, bulkClass, className);
+      return isApplicable;
+    });
+  }, [items, bulkClass, classes, pricings]);
+
+  useEffect(() => {
+    if (bulkFilteredItems.length > 0) {
+      const exists = bulkFilteredItems.some((it) => String(it.id) === String(bulkItem));
+      if (!exists) {
+        setBulkItem(String(bulkFilteredItems[0].id));
+        setBulkSize("");
+        setBulkColor("");
+      }
+    } else if (items.length > 0 && bulkClass) {
+      setBulkItem("");
+    }
+  }, [bulkFilteredItems, bulkItem, items.length, bulkClass]);
+
+  // Prior Issue Check for Selected Student and Item
+  const [dynamicPriorQty, setDynamicPriorQty] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (selectedStudent?.id && singleItem) {
+      inventoryApi.get(`/issues/?student=${selectedStudent.id}&item=${singleItem}`)
+        .then((res) => {
+          const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+          const activeYearObj = academicYears.find((y: any) => y.is_active || y.is_current) || academicYears[0];
+          const activeYearId = activeYearObj?.id;
+          const filtered = list.filter((iss: any) => {
+            if (activeYearId && iss.academic_year) {
+              const yId = typeof iss.academic_year === "object" ? iss.academic_year.id : Number(iss.academic_year);
+              if (yId && yId !== Number(activeYearId)) return false;
+            }
+            return true;
+          });
+          const total = filtered.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 0), 0);
+          setDynamicPriorQty(total);
+        })
+        .catch(() => {
+          setDynamicPriorQty(null);
+        });
+    } else {
+      setDynamicPriorQty(null);
+    }
+  }, [selectedStudent?.id, singleItem, academicYears]);
+
+  const priorIssuedQty = useMemo(() => {
+    if (dynamicPriorQty !== null) return dynamicPriorQty;
+    if (!selectedStudent || !singleItem) return 0;
+    const sId = Number(selectedStudent.id);
+    const itId = Number(singleItem);
+
+    const activeYearObj = academicYears.find((y: any) => y.is_active || y.is_current) || academicYears[0];
+    const activeYearId = activeYearObj?.id;
+
+    const matchingIssues = ledgerIssues.filter((iss: any) => {
+      const issStudentId = typeof iss.student === "object" ? iss.student?.id : Number(iss.student);
+      const issItemId = typeof iss.item === "object" ? iss.item?.id : Number(iss.item);
+
+      if (issStudentId !== sId || issItemId !== itId) return false;
+
+      if (activeYearId && iss.academic_year) {
+        const issYearId = typeof iss.academic_year === "object" ? iss.academic_year?.id : Number(iss.academic_year);
+        if (issYearId && issYearId !== Number(activeYearId)) return false;
+      }
+      return true;
+    });
+
+    return matchingIssues.reduce((sum: number, iss: any) => sum + (Number(iss.quantity) || 0), 0);
+  }, [dynamicPriorQty, selectedStudent, singleItem, ledgerIssues, academicYears]);
+
   const filteredStudentSearchList = students.filter((s) => {
     if (!singleStudentSearch) return false;
     const q = singleStudentSearch.toLowerCase();
     const fullName = `${s.name || ""} ${s.surname || ""}`.toLowerCase();
+    const roll = (s.roll_no || s.roll_number || "").toString().toLowerCase();
+    const gr = (s.gr_no || s.gr_number || "").toString().toLowerCase();
+    const classCtx = getStudentDisplayDetails(s).combinedContext.toLowerCase();
     return (
       fullName.includes(q) ||
-      s.roll_no?.toString().includes(q) ||
-      s.gr_no?.toString().includes(q)
+      roll.includes(q) ||
+      gr.includes(q) ||
+      classCtx.includes(q)
     );
   });
 
@@ -656,7 +906,8 @@ export default function StudentItemIssuePage() {
                         key={st.id}
                         onClick={() => {
                           setSelectedStudent(st);
-                          setSingleStudentSearch(`${st.name || ""} ${st.surname || ""} (Roll ${st.roll_no || "N/A"})`);
+                          const details = getStudentDisplayDetails(st);
+                          setSingleStudentSearch(`${st.name || ""} ${st.surname || ""} (${details.classDisplay} | ${details.rollDisplay})`);
                         }}
                         className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between"
                       >
@@ -664,8 +915,8 @@ export default function StudentItemIssuePage() {
                           <div className="font-semibold text-sm text-slate-900 dark:text-white">
                             {st.name} {st.surname}
                           </div>
-                          <div className="text-xs text-slate-400">
-                            Class: {st.school_class_name || "N/A"} | Roll: {st.roll_no || "N/A"} | GR: {st.gr_no || "N/A"}
+                          <div className="text-xs text-slate-500 font-medium mt-0.5">
+                            {getStudentDisplayDetails(st).combinedContext}
                           </div>
                         </div>
                         <span className="text-xs text-blue-600 font-semibold">Select</span>
@@ -676,13 +927,13 @@ export default function StudentItemIssuePage() {
               )}
 
               {selectedStudent && (
-                <div className="p-3.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex items-center justify-between">
+                <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex items-center justify-between shadow-2xs">
                   <div>
                     <div className="text-sm font-bold text-blue-900 dark:text-blue-200">
                       {selectedStudent.name} {selectedStudent.surname}
                     </div>
-                    <div className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                      Roll #{selectedStudent.roll_no || "N/A"} | GR #{selectedStudent.gr_no || "N/A"}
+                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mt-0.5">
+                      {getStudentDisplayDetails(selectedStudent).combinedContext}
                     </div>
                   </div>
                   <button
@@ -690,7 +941,7 @@ export default function StudentItemIssuePage() {
                       setSelectedStudent(null);
                       setSingleStudentSearch("");
                     }}
-                    className="text-xs font-semibold text-red-600 hover:underline"
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
                   >
                     Change
                   </button>
@@ -707,15 +958,36 @@ export default function StudentItemIssuePage() {
                   <select
                     required
                     value={singleItem}
-                onChange={(e) => { setSingleItem(e.target.value); setSingleSize(""); setSingleColor(""); }}
+                    onChange={(e) => { setSingleItem(e.target.value); setSingleSize(""); setSingleColor(""); }}
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
                   >
-                    {items.map((it) => (
-                      <option key={it.id} value={it.id}>
-                        {it.item_name} ({it.current_stock} in stock)
-                      </option>
-                    ))}
+                    {singleFilteredItems.length === 0 ? (
+                      <option value="">No items configured for this student's class</option>
+                    ) : (
+                      singleFilteredItems.map((it) => {
+                        const { applicabilityLabel } = checkItemApplicability(
+                          it,
+                          getStudentDisplayDetails(selectedStudent).classId,
+                          getStudentDisplayDetails(selectedStudent).className
+                        );
+                        return (
+                          <option key={it.id} value={it.id}>
+                            {it.item_name} ({it.current_stock} in stock){applicabilityLabel !== "All Classes" ? ` • ${applicabilityLabel}` : ""}
+                          </option>
+                        );
+                      })
+                    )}
                   </select>
+
+                  {/* Prior Issue Warning Badge */}
+                  {selectedStudent && singleItem && priorIssuedQty > 0 && (
+                    <div className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-in fade-in duration-200 shadow-2xs">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>
+                        ⚠️ Note: <strong className="font-bold underline">{priorIssuedQty} unit(s)</strong> previously issued to this student.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -995,9 +1267,20 @@ export default function StudentItemIssuePage() {
                 onChange={(e) => { setBulkItem(e.target.value); setBulkSize(""); setBulkColor(""); }}
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
               >
-                {items.map((it) => (
-                  <option key={it.id} value={it.id}>{it.item_name}</option>
-                ))}
+                {bulkFilteredItems.length === 0 ? (
+                  <option value="">No items configured for this class</option>
+                ) : (
+                  bulkFilteredItems.map((it) => {
+                    const foundClass = classes.find((c: any) => String(c.id) === String(bulkClass));
+                    const className = foundClass ? (foundClass.school_class || foundClass.class_name || foundClass.name) : null;
+                    const { applicabilityLabel } = checkItemApplicability(it, bulkClass, className);
+                    return (
+                      <option key={it.id} value={it.id}>
+                        {it.item_name} ({it.current_stock} in stock){applicabilityLabel !== "All Classes" ? ` • ${applicabilityLabel}` : ""}
+                      </option>
+                    );
+                  })
+                )}
               </select>
             </div>
 
@@ -1145,11 +1428,11 @@ export default function StudentItemIssuePage() {
                           onChange={() => {}}
                         />
                       </td>
-                      <td className="py-2.5 px-4 font-mono">{st.roll_no || "—"}</td>
+                      <td className="py-2.5 px-4 font-mono">{st.roll_no || st.roll_number || "—"}</td>
                       <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
                         {st.name} {st.surname}
                       </td>
-                      <td className="py-2.5 px-4 text-slate-500">{st.gr_no || "—"}</td>
+                      <td className="py-2.5 px-4 text-slate-500">{st.gr_no || st.gr_number || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -198,43 +198,43 @@ export default function CategoriesAndVariantsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 flex-nowrap overflow-x-auto whitespace-nowrap hide-scrollbar scrollbar-none pb-0.5 sm:pb-0">
         <button
           onClick={() => setActiveTab("categories")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "categories"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Tag className="w-4 h-4" /> Item Categories ({categories.length})
+          <Tag className="w-4 h-4 shrink-0" /> Item Categories ({categories.length})
         </button>
 
         <button
           onClick={() => setActiveTab("sizes")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "sizes"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Maximize2 className="w-4 h-4" /> Size Variants ({sizes.length})
+          <Maximize2 className="w-4 h-4 shrink-0" /> Size Variants ({sizes.length})
         </button>
 
         <button
           onClick={() => setActiveTab("colors")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "colors"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Palette className="w-4 h-4" /> Color Variants ({colors.length})
+          <Palette className="w-4 h-4 shrink-0" /> Color Variants ({colors.length})
         </button>
       </div>
 
       {/* Tab Contents */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-5 md:p-6 shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading attributes...
@@ -245,17 +245,17 @@ export default function CategoriesAndVariantsPage() {
             {categories.map((cat: any) => (
               <div
                 key={cat.id}
-                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 hover:shadow-md transition-all flex items-start justify-between"
+                className="p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 hover:shadow-md transition-all flex items-start justify-between gap-3"
               >
                 <div>
-                  <div className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-blue-500" />
+                  <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-blue-500 shrink-0" />
                     {cat.name}
                   </div>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                     {cat.description || "No description provided."}
                   </p>
-                  <div className="mt-3 text-xs">
+                  <div className="mt-2.5 sm:mt-3 text-xs">
                     {(cat.items_count || (cat.attached_items_list && cat.attached_items_list.length) || 0) > 0 ? (
                       <button
                         type="button"
@@ -271,7 +271,7 @@ export default function CategoriesAndVariantsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleOpenModal(cat)}
                     className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-colors"
@@ -296,12 +296,12 @@ export default function CategoriesAndVariantsPage() {
             {sizes.map((s: any) => (
               <div
                 key={s.id}
-                className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 text-center flex flex-col justify-between items-center relative group min-h-[110px]"
+                className="p-2.5 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 text-center flex flex-col justify-between items-center relative group min-h-[95px] sm:min-h-[110px]"
               >
-                <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-1">
                   {s.name}
                 </div>
-                <span className="text-[11px] text-slate-400 font-medium mt-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
+                <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
                   {s.size_type || "General"}
                 </span>
                 <div className="mt-2 text-xs">
@@ -344,22 +344,22 @@ export default function CategoriesAndVariantsPage() {
             {colors.map((c: any) => (
               <div
                 key={c.id}
-                className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 flex items-center justify-between group"
+                className="p-2.5 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 flex items-center justify-between group gap-2"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                   <span
-                    className="w-5 h-5 rounded-full border border-black/20 shadow-sm shrink-0"
+                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-black/20 shadow-sm shrink-0"
                     style={{ backgroundColor: c.hex_code || "#1e40af" }}
                   />
-                  <div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{c.name}</div>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{c.name}</div>
                     <div className="text-[10px] font-mono text-slate-400">{c.hex_code}</div>
                     <div className="mt-1 text-xs">
                       {(c.items_count || (c.attached_items_list && c.attached_items_list.length) || 0) > 0 ? (
                         <button
                           type="button"
                           onClick={() => openAttachedModal(c.name, "Color Variant", c.attached_items_list)}
-                          className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer text-left"
+                          className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer text-left truncate block max-w-full"
                         >
                           {c.items_count || c.attached_items_list?.length} items attached
                         </button>
@@ -371,7 +371,7 @@ export default function CategoriesAndVariantsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
                   <button
                     onClick={() => handleOpenModal(c)}
                     className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600"
@@ -395,10 +395,10 @@ export default function CategoriesAndVariantsPage() {
 
       {/* Attribute Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-md mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                 {editingId ? "Edit" : "Add"}{" "}
                 {activeTab === "categories" ? "Category" : activeTab === "sizes" ? "Size Variant" : "Color Variant"}
               </h2>
@@ -410,7 +410,7 @@ export default function CategoriesAndVariantsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4">
               {activeTab === "categories" ? (
                 <>
                   <div>
@@ -531,16 +531,16 @@ export default function CategoriesAndVariantsPage() {
 
       {/* Generic Attached Items Modal */}
       {attachedModal.isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-lg mx-auto shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     Attached Items
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -559,7 +559,7 @@ export default function CategoriesAndVariantsPage() {
             </div>
 
             {/* Content List */}
-            <div className="p-6">
+            <div className="p-3.5 sm:p-5 md:p-6">
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <span>Item Name ({attachedModal.items.length})</span>
                 <span>Code</span>
@@ -570,18 +570,18 @@ export default function CategoriesAndVariantsPage() {
                   {attachedModal.items.map((item: any, idx: number) => (
                     <div
                       key={item.id || idx}
-                      className="py-2.5 px-3 flex items-center justify-between rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group"
+                      className="py-2 px-2.5 sm:py-2.5 sm:px-3 flex items-center justify-between rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs font-semibold flex items-center justify-center shrink-0">
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+                        <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[11px] sm:text-xs font-semibold flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
-                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                           {item.name || item.item_name || "Unnamed Item"}
                         </span>
                       </div>
                       {item.item_code ? (
-                        <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        <span className="text-[11px] sm:text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
                           {item.item_code}
                         </span>
                       ) : null}
@@ -596,11 +596,11 @@ export default function CategoriesAndVariantsPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-slate-800/20 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50/50 dark:bg-slate-800/20 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <button
                 type="button"
                 onClick={() => setAttachedModal({ ...attachedModal, isOpen: false })}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-xs"
+                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-xs"
               >
                 Close
               </button>

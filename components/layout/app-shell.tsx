@@ -932,7 +932,7 @@ export function
         <main
           className={cn(
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
-            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-3 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-4 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
             mainClassName
           )}
         >
