@@ -378,8 +378,14 @@ export default function TrusteeDashboard() {
                 <tbody className="divide-y divide-gray-100">
                   {meetings.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-gray-400">
-                        No board meetings scheduled yet.
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <img
+                          src="/images/empty-folder.png"
+                          alt="No meetings"
+                          className="mx-auto mb-2 h-20 w-20 object-contain"
+                        />
+                        <div className="font-semibold text-slate-700 text-sm">No board meetings scheduled yet</div>
+                        <p className="text-xs text-slate-400 mt-1">Scheduled board meetings will appear here.</p>
                       </td>
                     </tr>
                   ) : (

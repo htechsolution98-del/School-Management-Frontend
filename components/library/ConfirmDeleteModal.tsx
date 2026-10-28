@@ -102,7 +102,7 @@ export function ConfirmDeleteModal({
               className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
                 isDestructive
                   ? "bg-rose-50 text-rose-600 border border-rose-100"
-                  : "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                  : "bg-blue-50 text-blue-600 border border-blue-100"
               }`}
             >
               {isDestructive ? (
@@ -182,7 +182,7 @@ export function ConfirmDeleteModal({
             className={`h-10 px-5 rounded-xl font-bold text-white shadow-xs gap-1.5 transition-all ${
               isDestructive
                 ? "bg-rose-600 hover:bg-rose-700 active:bg-rose-800 focus:ring-2 focus:ring-rose-500/20"
-                : "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 focus:ring-2 focus:ring-indigo-500/20"
+                : "bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-blue-800 focus:ring-2 focus:ring-blue-500/20"
             }`}
           >
             {loading ? (

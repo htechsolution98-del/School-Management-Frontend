@@ -12,6 +12,7 @@ import {
   BookOpen,
   CalendarCheck,
   ChevronDown,
+  ClipboardList,
   Clock,
   FileCheck,
   FileText,
@@ -659,7 +660,16 @@ export function
       ];
     }
 
-    // Default for Admin, Super Admin, Trustee, Principal, Librarian, etc.
+    if (role.includes("librarian")) {
+      return [
+        { title: "Dashboard", href: "/librarian", icon: LayoutDashboard },
+        { title: "Library", href: "/librarian/library", icon: BookOpen },
+        { title: "Attendance", href: "/librarian/attendance", icon: ClipboardList },
+        { title: "Leaves", href: "/librarian/leaves", icon: CalendarCheck },
+      ];
+    }
+
+    // Default for Admin, Super Admin, Trustee, Principal, etc.
     return links.slice(0, 4).map((l) => ({
       title: l.title.split(" ")[0],
       href: l.href,
@@ -724,8 +734,8 @@ export function
 
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden print:h-auto print:overflow-visible print:block">
-        {/* Top Header Bar: Purple on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-[#392BC9]/30 lg:border-[#E5EAF4] bg-[#4634D2] lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
+        {/* Top Header Bar: Premium blue-to-indigo gradient on mobile, clean surface on desktop */}
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-blue-700/30 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
               {!logoImgError && activeLogo ? (
@@ -928,7 +938,7 @@ export function
           </div>
         )}
 
-        {/* Content Body: Snug pb-20 on mobile clears the 64px floating glass bar without creating excessive empty space */}
+        {/* Content Body: Snug pb-16 on mobile clears the 64px floating glass bar without creating excessive empty space */}
         <main
           className={cn(
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
@@ -939,13 +949,16 @@ export function
           {children}
         </main>
 
-        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Compact) */}
-        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Exact Reference Match) */}
+        {/* Floating Frosted Glass Mobile Bottom Navigation Bar (Detached Island) */}
         <nav
           aria-label="Mobile Bottom Navigation"
-          className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E5EAF4] shadow-[0_-4px_20px_rgba(20,32,68,0.04)] lg:hidden print:hidden"
+          style={{
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+            backdropFilter: "blur(24px) saturate(180%)",
+          }}
+          className="fixed bottom-3 inset-x-3 sm:inset-x-8 max-w-md mx-auto z-40 rounded-3xl bg-white/25 border border-slate-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.04)] p-1.5 lg:hidden print:hidden"
         >
-          <div className="flex items-center justify-around px-2 py-1.5 w-full">
+          <div className="flex items-center justify-around w-full">
             {mobileNavItems.map((item, idx) => {
               const pathLower = pathname.toLowerCase();
               const itemHrefLower = (item.href || "").toLowerCase();
@@ -972,17 +985,23 @@ export function
                 >
                   {isActive ? (
                     <div className="flex flex-col items-center">
-                      <div className="px-4 py-1.5 rounded-2xl bg-gradient-to-b from-blue-50 to-blue-100 border border-blue-200/80 shadow-xs flex flex-col items-center">
-                        <Icon className="w-4 h-4 text-[#2563EB]" />
-                        <span className="text-[9.5px] font-bold text-[#2563EB] mt-0.5 leading-none">
+                      <div
+                        style={{
+                          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                          backdropFilter: "blur(20px) saturate(180%)",
+                        }}
+                        className="px-3.5 py-1.5 rounded-2xl bg-white/40 border border-slate-300 text-slate-900 shadow-xs flex flex-col items-center"
+                      >
+                        <Icon className="w-4 h-4 text-slate-900" />
+                        <span className="text-[9.5px] font-bold text-slate-900 mt-0.5 leading-none">
                           {item.title}
                         </span>
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center py-1">
-                      <Icon className="w-4 h-4 text-[#8E95A9]" />
-                      <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
+                      <Icon className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-colors" />
+                      <span className="text-[9.5px] font-semibold text-slate-500 group-hover:text-slate-800 transition-colors mt-0.5 leading-none">
                         {item.title}
                       </span>
                     </div>
@@ -996,10 +1015,10 @@ export function
               type="button"
               onClick={() => setMobileOpen(true)}
               aria-label="Open full menu"
-              className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[#8E95A9] hover:text-[#1A1D2F] transition-all cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
             >
-              <MoreHorizontal className="w-4 h-4 text-[#8E95A9]" />
-              <span className="text-[9.5px] font-semibold text-[#8E95A9] mt-0.5 leading-none">
+              <MoreHorizontal className="w-4 h-4 text-slate-500" />
+              <span className="text-[9.5px] font-semibold text-slate-500 mt-0.5 leading-none">
                 More
               </span>
             </button>

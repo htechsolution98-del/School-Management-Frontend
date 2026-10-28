@@ -574,6 +574,11 @@ export default function DivisionsPage() {
                           className="py-14 text-center text-slate-500 align-middle"
                         >
                           <div className="flex flex-col items-center justify-center gap-1.5">
+                            <img
+                              src="/images/empty-folder.png"
+                              alt="No divisions"
+                              className="mx-auto mb-2 h-20 w-20 object-contain"
+                            />
                             <p className="font-semibold text-slate-700 text-sm">
                               {divisions.length === 0
                                 ? "No divisions created yet"

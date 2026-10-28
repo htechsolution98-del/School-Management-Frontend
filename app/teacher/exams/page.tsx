@@ -687,17 +687,18 @@ export default function TeacherExamsPage() {
 
               <Button
                 variant="outline"
+                size="icon"
                 onClick={loadPageData}
                 disabled={isLoading}
-                className="flex items-center gap-1.5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 rounded-xl shadow-2xs h-10 px-3 text-xs font-bold transition-all"
-                title="Refresh"
+                className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 rounded-xl shadow-2xs h-10 w-10 shrink-0 transition-all"
+                title="Refresh exams"
+                aria-label="Refresh exams"
               >
                 {isLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                 ) : (
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                  <RefreshCw className="w-4 h-4 text-slate-500" />
                 )}
-                <span className="hidden xs:inline">Refresh</span>
               </Button>
 
               <Button

@@ -194,7 +194,16 @@ export default function PrincipalDashboard() {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {staff.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center text-gray-400 py-12">No staff found.</td></tr>
+                          <tr>
+                            <td colSpan={5} className="text-center py-12">
+                              <img
+                                src="/images/empty-folder.png"
+                                alt="No staff found"
+                                className="mx-auto mb-2 h-20 w-20 object-contain"
+                              />
+                              <p className="font-semibold text-slate-700 text-sm">No staff found</p>
+                            </td>
+                          </tr>
                         ) : staff.map((s, i) => (
                           <tr key={s.id} className="hover:bg-gray-50/80 transition-colors">
                             <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
@@ -221,7 +230,16 @@ export default function PrincipalDashboard() {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {students.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center text-gray-400 py-12">No students found.</td></tr>
+                          <tr>
+                            <td colSpan={5} className="text-center py-12">
+                              <img
+                                src="/images/empty-folder.png"
+                                alt="No students found"
+                                className="mx-auto mb-2 h-20 w-20 object-contain"
+                              />
+                              <p className="font-semibold text-slate-700 text-sm">No students found</p>
+                            </td>
+                          </tr>
                         ) : students.map((s: any, i) => (
                           <tr key={s.id} className="hover:bg-gray-50/80 transition-colors">
                             <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
@@ -248,7 +266,16 @@ export default function PrincipalDashboard() {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {admissions.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center text-gray-400 py-12">No incomplete admissions.</td></tr>
+                          <tr>
+                            <td colSpan={5} className="text-center py-12">
+                              <img
+                                src="/images/empty-folder.png"
+                                alt="No incomplete admissions"
+                                className="mx-auto mb-2 h-20 w-20 object-contain"
+                              />
+                              <p className="font-semibold text-slate-700 text-sm">No incomplete admissions</p>
+                            </td>
+                          </tr>
                         ) : admissions.map((a: any, i) => (
                           <tr key={a.id} className="hover:bg-gray-50/80 transition-colors">
                             <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>

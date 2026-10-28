@@ -14,12 +14,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarcodeSvg } from "./BarcodeSvg";
 import { Book, BookCopy, Rack, Shelf } from "@/lib/library";
+import {
+  MobileSelectDrawer,
+  MobileSelectTrigger,
+  MobileSelectOption,
+} from "@/components/ui/mobile-select-drawer";
 
 export interface ManageCopiesModalProps {
   isOpen: boolean;
@@ -56,6 +62,15 @@ export function ManageCopiesModal({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Active Mobile Select Drawer for bottom sheet selection
+  const [activeSelectDrawer, setActiveSelectDrawer] = useState<{
+    title: string;
+    subtitle?: string;
+    options: MobileSelectOption[];
+    selectedValue: string | number;
+    onSelect: (val: any) => void;
+  } | null>(null);
 
   // Add copies form state
   const [addCount, setAddCount] = useState(1);
@@ -107,39 +122,49 @@ export function ManageCopiesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
       <div
-        className="bg-white rounded-3xl p-5 sm:p-6 max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden"
+        className="bg-white rounded-none sm:rounded-3xl p-4 sm:p-6 max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col border-0 sm:border border-slate-200 shadow-2xl overflow-hidden"
         role="dialog"
         aria-modal="true"
       >
         {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 pb-4 shrink-0">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                {book.category || "General"}
-              </span>
-              <span className="text-xs text-slate-400 font-mono">Book ID #{book.id}</span>
+        <div className="flex items-start justify-between border-b border-slate-100 pb-3 sm:pb-4 shrink-0">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0 mt-0.5"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                  {book.category || "General"}
+                </span>
+                <span className="text-xs text-slate-400 font-mono">Book ID #{book.id}</span>
+              </div>
+              <h2 className="text-base sm:text-xl font-bold text-slate-900 line-clamp-1">
+                {book.title}
+              </h2>
+              <p className="text-xs text-slate-500">
+                by <span className="font-semibold text-slate-700">{book.author}</span> •{" "}
+                <span className="font-bold text-blue-700">{totalActive}</span> Active Copies (
+                <span className="font-bold text-emerald-600">{availableCount} Available</span>,{" "}
+                <span className="font-bold text-blue-600">{issuedCount} Issued</span>)
+              </p>
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 line-clamp-1">
-              {book.title}
-            </h2>
-            <p className="text-xs text-slate-500">
-              by <span className="font-semibold text-slate-700">{book.author}</span> •{" "}
-              <span className="font-bold text-indigo-700">{totalActive}</span> Active Copies (
-              <span className="font-bold text-emerald-600">{availableCount} Available</span>,{" "}
-              <span className="font-bold text-blue-600">{issuedCount} Issued</span>)
-            </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               type="button"
               size="sm"
               variant="outline"
               onClick={() => onPrintAllBarcodes(book, copies)}
-              className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 hover:text-indigo-700 text-xs font-semibold gap-1.5 shadow-2xs"
+              className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 hover:text-blue-700 text-xs font-semibold gap-1.5 shadow-2xs"
               title="Print barcode labels sheet for all physical copies"
             >
               <Printer className="h-3.5 w-3.5" />
@@ -148,7 +173,7 @@ export function ManageCopiesModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+              className="hidden sm:flex text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -188,7 +213,7 @@ export function ManageCopiesModal({
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="h-9 rounded-xl border border-slate-200 bg-white text-xs px-2.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500/20"
+                className="hidden md:block h-9 rounded-xl border border-slate-200 bg-white text-xs px-2.5 text-slate-700 font-medium focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="ALL">All Statuses ({copies.length})</option>
                 <option value="AVAILABLE">Available ({availableCount})</option>
@@ -199,6 +224,40 @@ export function ManageCopiesModal({
                 <option value="LOST">Lost</option>
                 <option value="DISPOSED">Disposed</option>
               </select>
+              <MobileSelectTrigger
+                className="h-9 md:hidden"
+                label="Status"
+                valueLabel={
+                  statusFilter === "ALL"
+                    ? `All (${copies.length})`
+                    : statusFilter === "AVAILABLE"
+                    ? `Available (${availableCount})`
+                    : statusFilter === "ISSUED"
+                    ? `Issued (${issuedCount})`
+                    : statusFilter
+                }
+                onClick={() =>
+                  setActiveSelectDrawer({
+                    title: "Filter by Copy Status",
+                    subtitle: "Choose copy status filter",
+                    options: [
+                      { label: `All Statuses (${copies.length})`, value: "ALL" },
+                      { label: `Available (${availableCount})`, value: "AVAILABLE" },
+                      { label: `Issued (${issuedCount})`, value: "ISSUED" },
+                      { label: "Reserved", value: "RESERVED" },
+                      { label: "Under Repair", value: "UNDER_REPAIR" },
+                      { label: "Damaged", value: "DAMAGED" },
+                      { label: "Lost", value: "LOST" },
+                      { label: "Disposed", value: "DISPOSED" },
+                    ],
+                    selectedValue: statusFilter,
+                    onSelect: (val) => {
+                      setStatusFilter(val);
+                      setCurrentPage(1);
+                    },
+                  })
+                }
+              />
             </div>
           </div>
 
@@ -206,7 +265,7 @@ export function ManageCopiesModal({
             type="button"
             size="sm"
             onClick={() => setShowAddForm((prev) => !prev)}
-            className="h-9 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1.5 shadow-2xs"
+            className="h-9 px-3 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>{showAddForm ? "Hide Form" : "+ Add Copies"}</span>
@@ -217,7 +276,7 @@ export function ManageCopiesModal({
         {showAddForm && (
           <form
             onSubmit={handleAddSubmit}
-            className="p-3.5 my-2.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl grid grid-cols-1 sm:grid-cols-4 gap-3 items-end animate-in fade-in duration-100 shrink-0"
+            className="p-3.5 my-2.5 bg-blue-50/50 border border-blue-100 rounded-2xl grid grid-cols-1 sm:grid-cols-4 gap-3 items-end animate-in fade-in duration-100 shrink-0"
           >
             <div>
               <Label className="text-xs font-semibold text-slate-800">Number of Copies</Label>
@@ -238,7 +297,7 @@ export function ManageCopiesModal({
                   setAddRack(e.target.value);
                   setAddShelf("");
                 }}
-                className="w-full h-9 rounded-xl border border-slate-200 text-xs px-2.5 mt-1 bg-white"
+                className="hidden md:block w-full h-9 rounded-xl border border-slate-200 text-xs px-2.5 mt-1 bg-white"
               >
                 <option value="">-- Same as Book ({book.rack_code || "None"}) --</option>
                 {racks
@@ -249,6 +308,38 @@ export function ManageCopiesModal({
                     </option>
                   ))}
               </select>
+              <MobileSelectTrigger
+                className="w-full h-9 mt-1 md:hidden"
+                label="Rack"
+                valueLabel={
+                  addRack
+                    ? (() => {
+                        const found = racks.find((r) => String(r.id) === String(addRack));
+                        return found ? `${found.rack_code} - ${found.rack_name}` : "-- Default --";
+                      })()
+                    : `-- Same as Book (${book.rack_code || "None"}) --`
+                }
+                onClick={() =>
+                  setActiveSelectDrawer({
+                    title: "Rack Location",
+                    subtitle: "Select rack for newly generated copies",
+                    options: [
+                      { label: `-- Same as Book (${book.rack_code || "None"}) --`, value: "" },
+                      ...racks
+                        .filter((r) => r.is_active !== false || String(r.id) === String(addRack))
+                        .map((r) => ({
+                          label: `${r.rack_code} - ${r.rack_name}${r.is_active === false ? " (Deactivated)" : ""}`,
+                          value: String(r.id),
+                        })),
+                    ],
+                    selectedValue: String(addRack || ""),
+                    onSelect: (val) => {
+                      setAddRack(String(val));
+                      setAddShelf("");
+                    },
+                  })
+                }
+              />
             </div>
             <div>
               <Label className="text-xs font-semibold text-slate-800">Shelf Location</Label>
@@ -256,7 +347,7 @@ export function ManageCopiesModal({
                 value={addShelf}
                 onChange={(e) => setAddShelf(e.target.value)}
                 disabled={!addRack}
-                className="w-full h-9 rounded-xl border border-slate-200 text-xs px-2.5 mt-1 bg-white disabled:bg-slate-100"
+                className="hidden md:block w-full h-9 rounded-xl border border-slate-200 text-xs px-2.5 mt-1 bg-white disabled:bg-slate-100"
               >
                 <option value="">-- Same as Book ({book.shelf_code || "None"}) --</option>
                 {shelves
@@ -271,12 +362,47 @@ export function ManageCopiesModal({
                     </option>
                   ))}
               </select>
+              <MobileSelectTrigger
+                className={`w-full h-9 mt-1 md:hidden ${!addRack ? "opacity-60" : ""}`}
+                label="Shelf"
+                valueLabel={
+                  !addRack
+                    ? "-- Select Rack First --"
+                    : addShelf
+                    ? (() => {
+                        const found = shelves.find((s) => String(s.id) === String(addShelf));
+                        return found ? `${found.shelf_code} (${found.shelf_name})` : "-- Default --";
+                      })()
+                    : `-- Same as Book (${book.shelf_code || "None"}) --`
+                }
+                onClick={() => {
+                  if (!addRack) return;
+                  const rackShelves = shelves.filter(
+                    (s) =>
+                      String(s.rack) === String(addRack) &&
+                      (s.is_active !== false || String(s.id) === String(addShelf))
+                  );
+                  setActiveSelectDrawer({
+                    title: "Shelf Location",
+                    subtitle: "Select shelf for newly generated copies",
+                    options: [
+                      { label: `-- Same as Book (${book.shelf_code || "None"}) --`, value: "" },
+                      ...rackShelves.map((s) => ({
+                        label: `${s.shelf_code} (${s.shelf_name})${s.is_active === false ? " (Deactivated)" : ""}`,
+                        value: String(s.id),
+                      })),
+                    ],
+                    selectedValue: String(addShelf || ""),
+                    onSelect: (val) => setAddShelf(String(val)),
+                  });
+                }}
+              />
             </div>
             <div>
               <Button
                 type="submit"
                 disabled={actionLoading}
-                className="w-full h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl gap-1 shadow-2xs"
+                className="w-full h-9 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs rounded-xl gap-1 shadow-2xs cursor-pointer"
               >
                 {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 <span>Generate Copies</span>
@@ -291,12 +417,12 @@ export function ManageCopiesModal({
             paginatedCopies.map((copy) => (
               <div
                 key={copy.id}
-                className="p-3.5 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-indigo-300 hover:bg-white transition-all shadow-2xs"
+                className="p-3.5 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-blue-300 hover:bg-white transition-all shadow-2xs"
               >
                 {/* Left: Identifier, Barcode & Locations */}
                 <div className="flex items-start gap-3.5">
                   <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <BookOpen className="h-5 w-5 text-indigo-600" />
+                    <BookOpen className="h-5 w-5 text-[#2563EB]" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -358,10 +484,10 @@ export function ManageCopiesModal({
                     size="sm"
                     variant="outline"
                     onClick={() => onPrintSticker(copy)}
-                    className="h-8 px-2.5 rounded-xl border-slate-200 text-slate-700 hover:text-indigo-700 text-xs font-semibold gap-1"
+                    className="h-8 px-2.5 rounded-xl border-slate-200 text-slate-700 hover:text-blue-700 text-xs font-semibold gap-1 cursor-pointer"
                     title="Print individual barcode sticker"
                   >
-                    <Printer className="h-3.5 w-3.5 text-indigo-600" />
+                    <Printer className="h-3.5 w-3.5 text-[#2563EB]" />
                     <span>Sticker</span>
                   </Button>
 
@@ -387,7 +513,7 @@ export function ManageCopiesModal({
                     size="sm"
                     variant="outline"
                     onClick={() => onTransferClick(copy)}
-                    className="h-8 px-2.5 rounded-xl border-slate-200 text-indigo-600 hover:bg-indigo-50 text-xs font-semibold gap-1"
+                    className="h-8 px-2.5 rounded-xl border-slate-200 text-[#2563EB] hover:bg-blue-50 text-xs font-semibold gap-1 cursor-pointer"
                     title="Transfer physical copy to another rack or shelf"
                   >
                     <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -459,6 +585,22 @@ export function ManageCopiesModal({
           </div>
         </div>
       </div>
+
+      {/* Mobile Select Bottom Drawer */}
+      {activeSelectDrawer && (
+        <MobileSelectDrawer
+          isOpen={!!activeSelectDrawer}
+          onClose={() => setActiveSelectDrawer(null)}
+          title={activeSelectDrawer.title}
+          subtitle={activeSelectDrawer.subtitle}
+          options={activeSelectDrawer.options}
+          selectedValue={activeSelectDrawer.selectedValue}
+          onSelect={(val) => {
+            activeSelectDrawer.onSelect(val);
+            setActiveSelectDrawer(null);
+          }}
+        />
+      )}
     </div>
   );
 }

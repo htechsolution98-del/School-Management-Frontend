@@ -606,10 +606,11 @@ function HomeworkListView({
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-2xs disabled:opacity-50 self-start sm:self-auto"
+          className="flex items-center justify-center h-10 w-10 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-2xs disabled:opacity-50 self-start sm:self-auto shrink-0"
+          title="Refresh homework"
+          aria-label="Refresh homework"
         >
-          <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : ""} />
-          Refresh Homework
+          <RefreshCw size={14} className={loading ? "animate-spin text-indigo-600" : ""} />
         </button>
       </div>
 

@@ -19,17 +19,20 @@ import {
   CreditCard,
   Building,
   ShieldCheck,
+  Wallet,
+  BarChart2,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getMyPayslips } from "@/lib/hr-config";
+import { getMyPayslips, getStoredMyPayslips } from "@/lib/hr-config";
 import { SalarySlipModal } from "@/components/payroll/SalarySlipModal";
 import type { PayrollPayslip } from "@/types/hr-config";
 
 function formatCurrency(val: number | string | null | undefined): string {
-  if (val === null || val === undefined || val === "") return "₹0.00";
+  if (val === null || val === undefined || val === "") return "₹0";
   const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "₹0.00";
+  if (isNaN(num) || num === 0) return "₹0";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -63,8 +66,8 @@ export function MyPayslipsView({
   roleTitle = "Staff",
   badgeText = "Employee Self-Service",
 }: MyPayslipsViewProps) {
-  const [payslips, setPayslips] = useState<PayrollPayslip[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [payslips, setPayslips] = useState<PayrollPayslip[]>(() => getStoredMyPayslips());
+  const [loading, setLoading] = useState<boolean>(() => getStoredMyPayslips().length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedYear, setSelectedYear] = useState<string>("ALL");
@@ -152,155 +155,199 @@ export function MyPayslipsView({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 pb-24 lg:pb-8 space-y-4 sm:space-y-6 w-full min-w-0 overflow-x-hidden font-sans">
-      {/* ── Top Header (Shown Directly on the Page, Border-b, Hero Artwork on Right) ── */}
-      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5 pt-1">
-        {/* Background Artwork on the Right with Smooth Multi-Directional Gradient */}
-        <div className="absolute inset-y-0 right-0 w-3/4 sm:w-3/5 md:w-1/2 pointer-events-none select-none overflow-hidden">
-          <img
-            src="/salary-hero-bg.jpg"
-            alt=""
-            className="w-full h-full object-cover object-right opacity-45 sm:opacity-60 dark:opacity-20"
-          />
-          {/* Horizontal fade from solid background on left into image */}
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent dark:from-background dark:via-background/80 dark:to-transparent" />
-          {/* Bottom fade to blend cleanly with bottom border */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-          {/* Top fade */}
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-transparent" />
-        </div>
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-5 space-y-3.5 sm:space-y-4 w-full min-w-0 font-sans">
+      {/* ── 1. Hero Card (Exact Reference Match with 3D Illustration) ── */}
+      <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-[0_4px_25px_rgba(20,32,68,0.04)] p-4 sm:p-6 lg:p-7">
+        {/* Soft background blue glow behind the right side */}
+        <div className="absolute right-0 top-0 bottom-0 w-3/5 bg-gradient-to-l from-blue-50/70 via-sky-50/20 to-transparent pointer-events-none rounded-r-3xl" />
+        <div className="absolute -right-6 -bottom-6 w-48 h-48 bg-blue-100/50 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <Banknote className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
+        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-4">
+          {/* Header Row: Icon + Title in a SINGLE LINE across full width */}
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 shadow-xs">
+              <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-[#2563EB]" />
             </div>
-            My Salary Payslips
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm md:text-base">
-            Review monthly compensation statements, gross earnings, itemized deductions, and download receipts.
-          </p>
-        </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight truncate sm:whitespace-normal">
+                My Salary Payslips
+              </h1>
+            </div>
+          </div>
 
-        <div className="relative z-10 flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchPayslips}
-            disabled={loading}
-            className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs bg-background/80 backdrop-blur-xs"
-          >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
+          {/* Content Row: Bottom Paragraph & Refresh on Left, 3D Illustration on Right */}
+          <div className="flex items-center justify-between gap-3 sm:gap-6 w-full min-w-0">
+            <div className="flex-1 min-w-0 pr-1">
+              <p className="text-xs sm:text-sm text-slate-500 max-w-[280px] sm:max-w-md lg:max-w-lg leading-relaxed font-normal">
+                Review monthly compensation statements, gross earnings, itemized deductions, and download receipts.
+              </p>
+
+              <button
+                type="button"
+                onClick={fetchPayslips}
+                disabled={loading}
+                aria-label="Refresh payslips"
+                className="mt-3 sm:mt-4 w-9 h-9 rounded-2xl border border-blue-100/90 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs transition-all cursor-pointer active:scale-95"
+              >
+                <RefreshCw className={cn("w-4 h-4 text-[#2563EB]", loading && "animate-spin")} />
+              </button>
+            </div>
+
+            {/* Right 3D Illustration */}
+            <div className="shrink-0 flex items-center justify-end relative">
+              <img
+                src="/images/payslip-hero.png"
+                alt="My Salary Payslips"
+                className="w-24 sm:w-40 md:w-48 lg:w-56 h-auto object-contain select-none pointer-events-none drop-shadow-sm"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── KPI Stat Cards ── */}
+      {/* ── 2. KPI Stat Cards (2x2 on Mobile, 4 Across on Desktop like Reference Image 2) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
-            <span className="uppercase tracking-wider text-[11px]">Latest Disbursed Pay</span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
-              <Banknote className="w-4 h-4" />
+        {/* Card 1: Latest Disbursed Pay */}
+        <div className="relative bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] p-3.5 sm:p-4.5 overflow-hidden flex flex-col justify-between">
+          <div className="absolute top-0 inset-x-0 h-[2.5px] bg-[#10B981]" />
+          <div>
+            <div className="flex items-center justify-between gap-1.5 mb-2">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-500 shrink-0">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 leading-tight flex-1 text-left pl-1">
+                LATEST DISBURSED PAY
+              </span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0">
+                <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              {formatCurrency(kpis.latestNet)}
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
-            {formatCurrency(kpis.latestNet)}
-          </div>
-          <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+          <div className="text-[11px] sm:text-xs font-semibold text-emerald-600 mt-1 truncate">
             {payslips.length > 0 ? formatMonthYear(payslips[0]?.salary_month) : "No records"}
           </div>
         </div>
 
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-600 to-cyan-500" />
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
-            <span className="uppercase tracking-wider text-[11px]">Cumulative Received</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
-              <TrendingUp className="w-4 h-4" />
+        {/* Card 2: Cumulative Received */}
+        <div className="relative bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] p-3.5 sm:p-4.5 overflow-hidden flex flex-col justify-between">
+          <div className="absolute top-0 inset-x-0 h-[2.5px] bg-[#3B82F6]" />
+          <div>
+            <div className="flex items-center justify-between gap-1.5 mb-2">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-50 border border-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+                <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 leading-tight flex-1 text-left pl-1">
+                CUMULATIVE RECEIVED
+              </span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              {formatCurrency(kpis.totalNet)}
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
-            {formatCurrency(kpis.totalNet)}
+          <div className="text-[11px] sm:text-xs font-normal text-slate-400 mt-1 truncate">
+            Across all issued statements
           </div>
-          <div className="text-xs text-slate-400 font-medium mt-1">Across all issued statements</div>
         </div>
 
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-400" />
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
-            <span className="uppercase tracking-wider text-[11px]">Average Monthly Net</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
-              <Sparkles className="w-4 h-4" />
+        {/* Card 3: Average Monthly Net */}
+        <div className="relative bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] p-3.5 sm:p-4.5 overflow-hidden flex flex-col justify-between">
+          <div className="absolute top-0 inset-x-0 h-[2.5px] bg-[#F59E0B]" />
+          <div>
+            <div className="flex items-center justify-between gap-1.5 mb-2">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-amber-500 shrink-0">
+                <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 leading-tight flex-1 text-left pl-1">
+                AVERAGE MONTHLY NET
+              </span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 shrink-0">
+                <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              {formatCurrency(kpis.avgNet)}
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
-            {formatCurrency(kpis.avgNet)}
+          <div className="text-[11px] sm:text-xs font-normal text-slate-400 mt-1 truncate">
+            Monthly average take-home
           </div>
-          <div className="text-xs text-slate-400 font-medium mt-1">Monthly average take-home</div>
         </div>
 
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
-            <span className="uppercase tracking-wider text-[11px]">Total Issued Payslips</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
-              <FileText className="w-4 h-4" />
+        {/* Card 4: Total Issued Payslips */}
+        <div className="relative bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] p-3.5 sm:p-4.5 overflow-hidden flex flex-col justify-between">
+          <div className="absolute top-0 inset-x-0 h-[2.5px] bg-[#8B5CF6]" />
+          <div>
+            <div className="flex items-center justify-between gap-1.5 mb-2">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-50 border border-purple-100/80 flex items-center justify-center text-purple-600 shrink-0">
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-700 leading-tight flex-1 text-left pl-1">
+                TOTAL ISSUED PAYSLIPS
+              </span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 shrink-0">
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              {kpis.count}
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
-            {kpis.count}
+          <div className="text-[11px] sm:text-xs font-normal text-slate-400 mt-1 truncate">
+            Available for PDF download
           </div>
-          <div className="text-xs text-slate-400 font-medium mt-1">Available for PDF download</div>
         </div>
       </div>
 
-      {/* ── Filters & Search ── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      {/* ── 3. Filters & Search (Single Row) ── */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             placeholder="Search month or slip ref..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full pl-11 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-full border border-slate-200/80 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="pl-8 pr-8 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
-            >
-              <option value="ALL">All Years</option>
-              {availableYears.map((yr) => (
-                <option key={yr} value={yr}>
-                  {yr}
-                </option>
-              ))}
-            </select>
-            <Calendar className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+        {/* Filter Dropdown in Same Row */}
+        <div className="relative shrink-0">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="appearance-none inline-flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white pl-9 pr-8 py-2.5 sm:py-3 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="ALL">All Years</option>
+            {availableYears.map((yr) => (
+              <option key={yr} value={yr}>
+                {yr}
+              </option>
+            ))}
+          </select>
+          <Calendar className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </div>
 
-      {/* ── Payslip List / Cards ── */}
+      {/* ── 4. Empty State / Payslips List ── */}
       <div className="space-y-3.5">
         {loading ? (
-          <div className="bg-white dark:bg-slate-900 p-16 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center space-y-3 shadow-sm">
+          <div className="bg-white rounded-3xl border border-slate-100 p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
             <p className="text-sm text-slate-500 font-medium">Fetching your salary slips...</p>
           </div>
         ) : error ? (
-          <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
+          <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-sm">
             <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-2" />
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
+            <h3 className="text-base font-semibold text-slate-800">
               Could not load payslips
             </h3>
             <p className="text-sm text-slate-500 mt-1">{error}</p>
@@ -312,27 +359,34 @@ export function MyPayslipsView({
             </button>
           </div>
         ) : filteredPayslips.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 py-16 px-6 sm:px-12 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center shadow-2xs flex flex-col items-center justify-center relative overflow-hidden">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/40 dark:to-sky-950/30 border border-blue-200/40 shadow-2xs flex items-center justify-center text-blue-600 mb-4">
-              <Banknote className="w-8 h-8 sm:w-10 sm:h-10 stroke-[1.8]" />
+          /* Exact Reference Match Empty State Card */
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(20,32,68,0.03)] py-12 px-6 sm:px-10 text-center flex flex-col items-center justify-center">
+            {/* Soft oval backdrop with 3D folder and rays */}
+            <div className="relative mb-3 flex items-center justify-center">
+              <div className="w-36 h-28 rounded-full bg-blue-50/70 absolute -z-0" />
+
+              <img
+                src="/images/empty-folder.png"
+                alt="No payslips found"
+                className="relative z-10 w-24 h-24 object-contain filter drop-shadow-sm select-none pointer-events-none"
+              />
+
+              {/* Decorative blue spark lines */}
+              <div className="absolute top-1 right-2 z-20 pointer-events-none select-none">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 12L1 10.5" stroke="#60A5FA" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M8 5L6 1.5" stroke="#60A5FA" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M15 8L19 4" stroke="#60A5FA" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
             </div>
-            <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 tracking-tight">
+
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
               No payslips found
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
-              No payroll payslips have been processed for your profile for this period yet. Once the school administration or Trustee generates salary disbursement, your verified statements will appear here automatically.
+            <p className="text-xs sm:text-sm text-slate-400 max-w-xs mx-auto mt-1 leading-relaxed">
+              Your salary payslips will appear here once they are issued.
             </p>
-            <div className="flex items-center gap-4 text-[11px] font-medium text-slate-400 dark:text-zinc-500 mt-6 pt-4 border-t border-slate-100 dark:border-zinc-800">
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Verified by School Accounts
-              </span>
-              <span className="text-slate-300 dark:text-zinc-700">•</span>
-              <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                Official Electronic Receipts
-              </span>
-            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

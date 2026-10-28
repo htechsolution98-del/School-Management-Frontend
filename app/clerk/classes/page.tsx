@@ -442,9 +442,16 @@ export default function ClassesPage() {
             </Button>
           </div>
 
-          <Button variant="outline" onClick={fetchData} disabled={isLoading} size="sm">
-            <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
-            Refresh
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchData}
+            disabled={isLoading}
+            className="h-9 w-9 rounded-xl"
+            title="Refresh classes"
+            aria-label="Refresh classes"
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
           <Button onClick={() => setIsCategoryDialogOpen(true)} size="sm" variant="secondary">
             <FolderOpen className="mr-2 h-4 w-4" />
@@ -520,16 +527,6 @@ export default function ClassesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => loadClassStudents(selectedClass.id)}
-                  disabled={isStudentsLoading}
-                  className="h-9 px-2.5"
-                  title="Refresh student list"
-                >
-                  <RefreshCw className={cn("w-3.5 h-3.5", isStudentsLoading && "animate-spin")} />
-                </Button>
               </div>
             </div>
 

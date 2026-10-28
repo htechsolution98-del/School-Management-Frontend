@@ -414,18 +414,18 @@ body:has(.app-workspace)::-webkit-scrollbar,
   max-width: 25rem;
   margin-left: auto;
   margin-right: auto;
-  background: rgba(255, 255, 255, 0.88);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.45);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 9999px;
-  box-shadow: 0 10px 30px -5px rgba(79, 70, 229, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.03);
   z-index: 40;
 }
 
 @supports not ((-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px))) {
   .glass-bottom-nav {
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(255, 255, 255, 0.85);
   }
 }
 

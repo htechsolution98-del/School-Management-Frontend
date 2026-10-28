@@ -24,6 +24,10 @@ import {
   HelpCircle,
   Check,
   ShieldAlert,
+  Search,
+  Umbrella,
+  HeartPulse,
+  Stethoscope,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -62,6 +66,8 @@ import {
   withdrawLeaveRequest,
   requestCancellation,
   calculateLeaveDays,
+  getStoredRemainingLeaves,
+  getStoredMyLeaveRequests,
   type RemainingLeave,
   type MyLeaveRequest,
   type LeaveCalculationPreview,
@@ -76,12 +82,15 @@ export function StaffLeavesDesk({
   roleTitle = "Staff",
   subtitle = "View your allocated balances, submit leave requests, and track approval status.",
 }: StaffLeavesDeskProps) {
-  const [balances, setBalances] = useState<RemainingLeave[]>([]);
-  const [history, setHistory] = useState<MyLeaveRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [balances, setBalances] = useState<RemainingLeave[]>(() => getStoredRemainingLeaves());
+  const [history, setHistory] = useState<MyLeaveRequest[]>(() => getStoredMyLeaveRequests());
+  const [isLoading, setIsLoading] = useState<boolean>(() => getStoredRemainingLeaves().length === 0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [academicYear, setAcademicYear] = useState("2026-2027");
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -179,13 +188,16 @@ export function StaffLeavesDesk({
     };
   }, [startDate, endDate, leaveTypeId, isHalfDay, halfDaySession]);
 
-  const fetchData = async () => {
-    setIsLoading(true);
+  const fetchData = async (options?: boolean | any) => {
+    const isManual = typeof options === "boolean" ? options : false;
+    if (isManual || balances.length === 0) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const [remainingData, historyData] = await Promise.all([
-        getRemainingLeaves(),
-        getMyLeaveRequests(),
+        getRemainingLeaves(isManual),
+        getMyLeaveRequests(isManual),
       ]);
       setBalances(Array.isArray(remainingData) ? remainingData : []);
       setHistory(Array.isArray(historyData) ? historyData : []);
@@ -339,13 +351,23 @@ export function StaffLeavesDesk({
   const filteredHistory = useMemo(() => {
     return history.filter((req) => {
       const status = (req.status || "").toUpperCase();
-      if (activeTab === "pending") return status === "PENDING";
-      if (activeTab === "approved") return status === "APPROVED";
-      if (activeTab === "rejected") return status === "REJECTED";
-      if (activeTab === "cancelled") return status === "CANCELLED";
+      if (activeTab === "pending" && status !== "PENDING") return false;
+      if (activeTab === "approved" && status !== "APPROVED") return false;
+      if (activeTab === "rejected" && status !== "REJECTED") return false;
+      if (activeTab === "cancelled" && status !== "CANCELLED") return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const leaveType = String(req.dynamic_leave_type_name || req.leave_type || "").toLowerCase();
+        const reason = (req.reason || "").toLowerCase();
+        const dates = `${req.start_date || ""} ${req.end_date || ""}`.toLowerCase();
+        if (!leaveType.includes(q) && !reason.includes(q) && !dates.includes(q)) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [history, activeTab]);
+  }, [history, activeTab, searchQuery]);
 
   const counts = useMemo(() => {
     return {
@@ -358,43 +380,89 @@ export function StaffLeavesDesk({
   }, [history]);
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600/10 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 flex items-center justify-center font-bold">
-              <CalendarCheck className="w-6 h-6" />
+    <div className="space-y-3.5 sm:space-y-5 max-w-5xl mx-auto px-3 sm:px-5 py-3 sm:py-4 pb-16 sm:pb-20 w-full min-w-0 overflow-x-hidden font-['Sora',sans-serif]">
+      {/* ── Leave Portal Hero Section ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-4 sm:p-6 lg:p-7 shadow-sm relative overflow-hidden">
+        {/* Soft subtle blue background glow */}
+        <div className="absolute -right-8 -top-8 w-64 h-64 bg-blue-50/60 dark:bg-blue-950/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-4">
+          {/* Header Row: Badge / Icon + Title in a SINGLE LINE across full width */}
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#EFF6FF] dark:bg-blue-950/70 border border-blue-100/70 dark:border-blue-900/50 flex items-center justify-center shrink-0 shadow-2xs">
+              <CalendarCheck className="w-5 h-5 sm:w-6 sm:h-6 text-[#2563EB]" />
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {roleTitle} Leaves & Absence
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mb-1 rounded-full bg-[#EFF6FF] dark:bg-blue-950/70 text-[#2563EB] dark:text-blue-400 text-[10px] font-black tracking-wider uppercase border border-blue-100/70 dark:border-blue-900/50">
+                {roleTitle ? `${roleTitle.toUpperCase()} LEAVE DESK` : "STAFF LEAVE DESK"}
+              </div>
+              <h1 className="text-base sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate sm:whitespace-normal">
+                Leaves &amp; Absence Portal
               </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                {subtitle}
-              </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchData}
-            disabled={isLoading}
-            className="rounded-xl border-slate-200 dark:border-slate-800 h-10 px-3.5 text-xs font-semibold"
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", isLoading && "animate-spin")} />
-            Refresh
-          </Button>
-          <Button
-            onClick={handleOpenCreateDialog}
-            className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-4 text-xs shadow-md shadow-blue-500/20"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Apply for Leave
-          </Button>
+          {/* Content Row: Bottom Paragraph & Action Buttons on Left, 3D Illustration on Right */}
+          <div className="flex items-center justify-between gap-3 sm:gap-6 w-full min-w-0">
+            <div className="flex-1 min-w-0 pr-1">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] sm:max-w-md">
+                {subtitle}
+              </p>
+
+              {/* Desktop Buttons */}
+              <div className="hidden sm:flex items-center gap-2.5 pt-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={fetchData}
+                  disabled={isLoading}
+                  className="h-9 w-9 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#2563EB] hover:bg-blue-50/50 shadow-2xs shrink-0 cursor-pointer"
+                  title="Refresh leaves"
+                  aria-label="Refresh leaves"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5 text-[#2563EB]", isLoading && "animate-spin")} />
+                </Button>
+                <Button
+                  onClick={handleOpenCreateDialog}
+                  className="h-9 rounded-full bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1D4ED8] hover:to-[#1E40AF] text-white font-bold px-4 sm:px-5 text-xs shadow-md shadow-blue-500/25 flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Apply for Leave
+                </Button>
+              </div>
+            </div>
+
+            {/* 3D Illustration on right */}
+            <div className="shrink-0 flex items-center justify-end relative">
+              <img
+                src="/images/leaves/leave-hero-illustration.png"
+                alt="Leaves Desk"
+                className="w-24 sm:w-40 md:w-48 lg:w-56 h-auto object-contain max-h-40 sm:max-h-52 filter drop-shadow-md select-none pointer-events-none"
+              />
+            </div>
+          </div>
+
+          {/* Mobile Buttons Row - Guaranteed Single Line across full width */}
+          <div className="flex sm:hidden items-center gap-2 w-full mt-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={fetchData}
+              disabled={isLoading}
+              className="h-9 w-9 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#2563EB] hover:bg-blue-50/50 shadow-2xs shrink-0 cursor-pointer"
+              title="Refresh leaves"
+              aria-label="Refresh leaves"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5 text-[#2563EB]", isLoading && "animate-spin")} />
+            </Button>
+            <Button
+              onClick={handleOpenCreateDialog}
+              className="flex-1 h-9 rounded-full bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1D4ED8] hover:to-[#1E40AF] text-white font-bold px-3 text-xs shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer truncate"
+            >
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Apply for Leave</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -407,34 +475,53 @@ export function StaffLeavesDesk({
         </Alert>
       )}
 
-      {/* ── Leave Balances Section ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-blue-500" />
-            Allocated Leave Balances
-          </h2>
-          <span className="text-xs text-slate-400">
-            Real-time balance deduction & carry forward applied
-          </span>
+      {/* ── Allocated Leave Balances Container ── */}
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-[#2563EB] shrink-0" />
+            <h2 className="text-sm sm:text-base font-black uppercase tracking-wide text-slate-900 dark:text-slate-100">
+              ALLOCATED LEAVE BALANCES
+            </h2>
+          </div>
+
+          <Select value={academicYear} onValueChange={(val: any) => setAcademicYear(val || "2026-2027")}>
+            <SelectTrigger className="h-8 text-[11px] sm:text-xs rounded-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-semibold px-3 w-auto gap-1.5 shadow-2xs text-slate-700 dark:text-slate-200 cursor-pointer">
+              <Calendar className="w-3 h-3 text-slate-400" />
+              <SelectValue placeholder="Academic Year 2026–27" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="2026-2027">Academic Year 2026–27</SelectItem>
+              <SelectItem value="2025-2026">Academic Year 2025–26</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 rounded-2xl bg-slate-100 dark:bg-slate-800/40 animate-pulse border border-slate-200/60" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-44 rounded-2xl bg-slate-100 dark:bg-slate-800/40 animate-pulse border border-slate-200/60" />
             ))}
           </div>
         ) : balances.length === 0 ? (
-          <Card className="rounded-2xl border-dashed border-slate-200 dark:border-slate-800 p-8 text-center bg-slate-50/50 dark:bg-slate-900/30">
+          <div className="rounded-2xl border-dashed border-slate-200 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900 shadow-sm">
             <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No leave quota assigned yet</p>
             <p className="text-xs text-slate-400 mt-1">
               Your leave template or categories have not been allocated for this cycle. Please contact Administrator/Clerk.
             </p>
-          </Card>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div
+            className={cn(
+              "grid grid-cols-2 gap-2.5 sm:gap-4",
+              balances.length === 1 && "md:grid-cols-1",
+              balances.length === 2 && "md:grid-cols-2",
+              balances.length === 3 && "md:grid-cols-3",
+              balances.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+              balances.length >= 5 && "md:grid-cols-3 lg:grid-cols-5"
+            )}
+          >
             {balances.map((b) => {
               const allocated = Number(b.allocated ?? b.total_allowed ?? 0);
               const carry = Number(b.carry_forward ?? 0);
@@ -443,56 +530,110 @@ export function StaffLeavesDesk({
               const pending = Number(b.pending ?? 0);
               const remaining = Number(b.remaining ?? b.remaining_leaves ?? 0);
               const isPaid = b.is_paid !== false;
+              const name = b.leave_type_name || b.leave_type || "Leave";
+
+              const isSick = name.toUpperCase().includes("SICK");
+              const isCasual = name.toUpperCase().includes("CASUAL");
+
+              // Specific icons, descriptions, and color accents matching reference image
+              let iconNode = <Stethoscope className="w-4 h-4 text-violet-600" />;
+              let iconBg = "bg-violet-50 text-violet-600 border border-violet-100";
+              let cardTopBar = "bg-[#8B5CF6]";
+              let progressFill = "bg-[#8B5CF6]";
+              let numberColor = "text-violet-600";
+              let defaultSubtitle = "Emergency medical leave";
+
+              if (isCasual) {
+                iconNode = <Umbrella className="w-4 h-4 text-[#2563EB]" />;
+                iconBg = "bg-blue-50 text-[#2563EB] border border-blue-100";
+                cardTopBar = "bg-[#2563EB]";
+                progressFill = "bg-[#2563EB]";
+                numberColor = "text-[#2563EB]";
+                defaultSubtitle = "For personal and general use";
+              } else if (isSick) {
+                iconNode = <HeartPulse className="w-4 h-4 text-rose-500" />;
+                iconBg = "bg-rose-50 text-rose-500 border border-rose-100";
+                cardTopBar = "bg-[#F87171]";
+                progressFill = "bg-[#F87171]";
+                numberColor = "text-rose-500";
+                defaultSubtitle = "For medical and health reasons";
+              }
+
+              const description = (b as any).description || defaultSubtitle;
+              const percentage = totalQuota > 0 ? Math.min(100, Math.max(0, (remaining / totalQuota) * 100)) : 0;
 
               return (
                 <motion.div
                   key={b.leave_type_id || b.leave_type}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between group hover:border-blue-300 dark:hover:border-blue-700 transition"
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-3 sm:p-4 relative overflow-hidden flex flex-col justify-between"
                 >
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500" />
-                  
+                  {/* Top accent bar */}
+                  <div className={cn("absolute top-0 left-0 right-0 h-1", cardTopBar)} />
+
                   <div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="font-bold text-slate-900 dark:text-slate-100 text-base leading-snug">
-                        {b.leave_type_name || b.leave_type}
+                    {/* Header: Icon + Name & Subtitle + PAID badge */}
+                    <div className="flex items-start justify-between gap-1.5 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", iconBg)}>
+                          {iconNode}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm leading-tight truncate capitalize" title={name}>
+                            {name}
+                          </h3>
+                          <p className="text-[9.5px] sm:text-[10.5px] text-slate-400 truncate mt-0.5" title={description}>
+                            {description}
+                          </p>
+                        </div>
                       </div>
+
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full",
+                          "text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shrink-0 tracking-wider",
                           isPaid
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            ? "bg-[#ECFDF5] text-[#059669] border-[#A7F3D0] dark:bg-emerald-950/40 dark:text-emerald-300"
                             : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
                         )}
                       >
-                        {isPaid ? "Paid" : "LOP / Unpaid"}
+                        {isPaid ? "PAID" : "LOP"}
                       </Badge>
                     </div>
 
-                    <div className="flex items-baseline gap-2 mt-3">
-                      <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
+                    {/* Big count + / quota left */}
+                    <div className="flex items-baseline gap-1 mt-2.5">
+                      <span className={cn("text-2xl sm:text-3xl font-black leading-none", numberColor)}>
                         {remaining}
                       </span>
-                      <span className="text-xs font-semibold text-slate-400">
-                        / {totalQuota} days left
+                      <span className="text-[11px] sm:text-xs font-semibold text-slate-400">
+                        / {totalQuota} left
                       </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden my-2.5">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", progressFill)}
+                        style={{ width: `${percentage}%` }}
+                      />
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] grid grid-cols-3 gap-1 text-slate-500 dark:text-slate-400">
+                  {/* 3-Column Stats Box */}
+                  <div className="bg-[#F8FAFC] dark:bg-slate-800/60 rounded-xl py-1.5 px-2 grid grid-cols-3 text-center divide-x divide-slate-100 dark:divide-slate-700/60">
                     <div>
-                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Used</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{used} d</span>
+                      <span className="text-slate-400 block text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-wider">USED</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">{used}d</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Pending</span>
-                      <span className="font-semibold text-amber-600 dark:text-amber-400">{pending} d</span>
+                      <span className="text-slate-400 block text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-wider">PENDING</span>
+                      <span className="font-bold text-amber-500 text-[11px] sm:text-xs">{pending}d</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Carry Fwd</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">+{carry} d</span>
+                      <span className="text-slate-400 block text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-wider">CARRY</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">+{carry}d</span>
                     </div>
                   </div>
                 </motion.div>
@@ -502,182 +643,405 @@ export function StaffLeavesDesk({
         )}
       </div>
 
-      {/* ── My Requests History ── */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden p-5 sm:p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
-              Leave Applications & History
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Review all your pending, approved, and past leave submissions.
-            </p>
+      {/* ── Leave Applications & History ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm p-4 sm:p-6 space-y-3.5 sm:space-y-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <FileText className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 leading-tight">
+                Leave Applications &amp; History
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-snug">
+                Review all your pending, approved, and past leave submissions.
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList className="bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl h-9">
-                <TabsTrigger value="all" className="text-xs font-semibold px-3 py-1 rounded-lg">
-                  All ({counts.all})
-                </TabsTrigger>
-                <TabsTrigger value="pending" className="text-xs font-semibold px-3 py-1 rounded-lg">
-                  Pending ({counts.pending})
-                </TabsTrigger>
-                <TabsTrigger value="approved" className="text-xs font-semibold px-3 py-1 rounded-lg">
-                  Approved ({counts.approved})
-                </TabsTrigger>
-                <TabsTrigger value="rejected" className="text-xs font-semibold px-3 py-1 rounded-lg">
-                  Rejected ({counts.rejected})
-                </TabsTrigger>
-                <TabsTrigger value="cancelled" className="text-xs font-semibold px-3 py-1 rounded-lg">
-                  Cancelled ({counts.cancelled})
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <button
+            onClick={() => setShowSearch(!showSearch)}
+            className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-800 shadow-2xs shrink-0 cursor-pointer"
+            title="Search requests"
+          >
+            <Search className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+          </button>
+        </div>
+
+        {/* Expandable Search Input */}
+        {showSearch && (
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by leave type, reason, or date..."
+              className="pl-8.5 pr-8 h-9 text-xs rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/70"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+        )}
+
+        {/* Filter Pills with Dividers exactly like reference image */}
+        <div className="bg-[#F1F5F9] dark:bg-slate-800/80 p-1 rounded-2xl flex items-center justify-between gap-1 w-full overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={cn(
+              "flex-1 text-xs font-semibold py-1.5 px-2.5 sm:px-3 rounded-xl transition-all text-center whitespace-nowrap cursor-pointer",
+              activeTab === "all"
+                ? "bg-[#EEF4FF] border border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            )}
+          >
+            All ({counts.all})
+          </button>
+          <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-700 shrink-0" />
+          <button
+            onClick={() => setActiveTab("pending")}
+            className={cn(
+              "flex-1 text-xs font-semibold py-1.5 px-2.5 sm:px-3 rounded-xl transition-all text-center whitespace-nowrap cursor-pointer",
+              activeTab === "pending"
+                ? "bg-[#EEF4FF] border border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            )}
+          >
+            Pending ({counts.pending})
+          </button>
+          <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-700 shrink-0" />
+          <button
+            onClick={() => setActiveTab("approved")}
+            className={cn(
+              "flex-1 text-xs font-semibold py-1.5 px-2.5 sm:px-3 rounded-xl transition-all text-center whitespace-nowrap cursor-pointer",
+              activeTab === "approved"
+                ? "bg-[#EEF4FF] border border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            )}
+          >
+            Approved ({counts.approved})
+          </button>
+          <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-700 shrink-0" />
+          <button
+            onClick={() => setActiveTab("rejected")}
+            className={cn(
+              "flex-1 text-xs font-semibold py-1.5 px-2.5 sm:px-3 rounded-xl transition-all text-center whitespace-nowrap cursor-pointer",
+              activeTab === "rejected"
+                ? "bg-[#EEF4FF] border border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            )}
+          >
+            Rejected ({counts.rejected})
+          </button>
+          {counts.cancelled > 0 && (
+            <>
+              <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-700 shrink-0" />
+              <button
+                onClick={() => setActiveTab("cancelled")}
+                className={cn(
+                  "flex-1 text-xs font-semibold py-1.5 px-2.5 sm:px-3 rounded-xl transition-all text-center whitespace-nowrap cursor-pointer",
+                  activeTab === "cancelled"
+                    ? "bg-[#EEF4FF] border border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                )}
+              >
+                Cancelled ({counts.cancelled})
+              </button>
+            </>
+          )}
         </div>
 
         {/* Requests List */}
         {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-3">
+          <div className="py-16 flex flex-col items-center justify-center space-y-3">
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
             <p className="text-xs text-slate-500 font-medium">Loading personal leave records...</p>
           </div>
         ) : filteredHistory.length === 0 ? (
-          <div className="py-16 text-center">
-            <FileText className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">No leave requests found</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-              You haven't submitted any leave requests in this category yet. Click "Apply for Leave" above to create one.
+          <div className="py-10 sm:py-12 text-center flex flex-col items-center justify-center">
+            <img
+              src="/images/leaves/empty-folder-illustration.png"
+              alt="No leave applications yet"
+              className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+            />
+            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100">
+              No leave applications yet
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs">
+              Your submitted leave requests will appear here.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50/80 dark:bg-slate-800/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">Leave Type</th>
-                  <th className="py-3 px-4">Dates</th>
-                  <th className="py-3 px-4">Duration</th>
-                  <th className="py-3 px-4">Reason</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                {filteredHistory.map((req) => {
-                  const status = (req.status || "").toUpperCase();
-                  const isPending = status === "PENDING";
-                  const isApproved = status === "APPROVED";
-                  const isRejected = status === "REJECTED";
-                  const isCancelled = status === "CANCELLED";
+          <>
+            {/* Desktop Full Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50/80 dark:bg-slate-800/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Leave Type</th>
+                    <th className="py-3 px-4">Dates</th>
+                    <th className="py-3 px-4">Duration</th>
+                    <th className="py-3 px-4">Reason</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {filteredHistory.map((req) => {
+                    const status = (req.status || "").toUpperCase();
+                    const isPending = status === "PENDING";
+                    const isApproved = status === "APPROVED";
+                    const isRejected = status === "REJECTED";
+                    const isCancelled = status === "CANCELLED";
 
-                  return (
-                    <tr key={req.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">
-                          {req.dynamic_leave_type_name || req.leave_type}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          Applied: {req.created_at ? new Date(req.created_at).toLocaleDateString("en-IN") : "—"}
-                        </div>
-                      </td>
+                    return (
+                      <tr key={req.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src="/images/leaves/empty-folder-illustration.png"
+                              alt="Leave request"
+                              className="w-7 h-7 object-contain shrink-0 filter drop-shadow-2xs select-none pointer-events-none"
+                            />
+                            <div>
+                              <div className="font-semibold text-slate-900 dark:text-slate-100">
+                                {req.dynamic_leave_type_name || req.leave_type}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                Applied: {req.created_at ? new Date(req.created_at).toLocaleDateString("en-IN") : "—"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
 
-                      <td className="py-3.5 px-4 font-mono text-xs text-slate-700 dark:text-slate-300">
+                        <td className="py-3.5 px-4 font-mono text-xs text-slate-700 dark:text-slate-300">
+                          {req.start_date === req.end_date ? (
+                            req.start_date
+                          ) : (
+                            <span>
+                              {req.start_date} <ArrowRight className="inline w-3 h-3 text-slate-400 mx-0.5" /> {req.end_date}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                            {req.total_days} {Number(req.total_days) === 1 ? "day" : "days"}
+                          </span>
+                          {req.is_half_day && (
+                            <span className="ml-1 text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+                              Half Day ({req.half_day_session === "SECOND_HALF" ? "2nd" : "1st"})
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 max-w-xs truncate text-xs text-slate-600 dark:text-slate-400">
+                          {req.reason || "—"}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit",
+                              isPending && "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+                              isApproved && "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+                              isRejected && "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400",
+                              isCancelled && "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400"
+                            )}
+                          >
+                            {isPending && <Clock className="w-3 h-3" />}
+                            {isApproved && <CheckCircle2 className="w-3 h-3" />}
+                            {isRejected && <XCircle className="w-3 h-3" />}
+                            {req.status}
+                          </Badge>
+
+                          {req.cancellation_status === "REQUESTED" && (
+                            <div className="text-[10px] text-amber-600 font-bold mt-1">
+                              Cancellation Pending Review
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isPending && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenEditDialog(req)}
+                                  className="h-8 px-2 text-xs text-slate-600 hover:text-blue-600"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleWithdrawRequest(req.id)}
+                                  disabled={deletingId === req.id}
+                                  className="h-8 px-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                >
+                                  {deletingId === req.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                              </>
+                            )}
+
+                            {isApproved && req.cancellation_status !== "REQUESTED" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenCancellationModal(req.id)}
+                                className="h-7 text-[11px] px-2.5 rounded-lg border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900"
+                              >
+                                Request Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Cards View */}
+            <div className="space-y-3 block md:hidden">
+              {filteredHistory.map((req) => {
+                const status = (req.status || "").toUpperCase();
+                const isPending = status === "PENDING";
+                const isApproved = status === "APPROVED";
+                const isRejected = status === "REJECTED";
+                const isCancelled = status === "CANCELLED";
+
+                return (
+                  <div
+                    key={req.id}
+                    className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src="/images/leaves/empty-folder-illustration.png"
+                          alt="Leave request"
+                          className="w-8 h-8 object-contain shrink-0 filter drop-shadow-2xs select-none pointer-events-none"
+                        />
+                        <div>
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {req.dynamic_leave_type_name || req.leave_type}
+                          </h4>
+                          <p className="text-[10.5px] text-slate-400 mt-0.5">
+                            Applied: {req.created_at ? new Date(req.created_at).toLocaleDateString("en-IN") : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0",
+                          isPending && "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+                          isApproved && "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+                          isRejected && "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400",
+                          isCancelled && "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400"
+                        )}
+                      >
+                        {isPending && <Clock className="w-2.5 h-2.5" />}
+                        {isApproved && <CheckCircle2 className="w-2.5 h-2.5" />}
+                        {isRejected && <XCircle className="w-2.5 h-2.5" />}
+                        {req.status}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60 text-xs">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold text-[11px]">
+                        <Calendar className="w-3 h-3 text-[#2563EB]" />
                         {req.start_date === req.end_date ? (
                           req.start_date
                         ) : (
                           <span>
-                            {req.start_date} <ArrowRight className="inline w-3 h-3 text-slate-400 mx-0.5" /> {req.end_date}
+                            {req.start_date} → {req.end_date}
                           </span>
                         )}
-                      </td>
+                      </div>
 
-                      <td className="py-3.5 px-4">
-                        <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                          {req.total_days} {Number(req.total_days) === 1 ? "day" : "days"}
-                        </span>
-                        {req.is_half_day && (
-                          <span className="ml-1 text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
-                            Half Day ({req.half_day_session === "SECOND_HALF" ? "2nd" : "1st"})
-                          </span>
-                        )}
-                      </td>
+                      <span className="font-bold text-slate-700 dark:text-slate-300 text-xs px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#2563EB]">
+                        {req.total_days} {Number(req.total_days) === 1 ? "day" : "days"}
+                        {req.is_half_day && ` (${req.half_day_session === "SECOND_HALF" ? "2nd" : "1st"} Half)`}
+                      </span>
+                    </div>
 
-                      <td className="py-3.5 px-4 max-w-xs truncate text-xs text-slate-600 dark:text-slate-400">
-                        {req.reason || "—"}
-                      </td>
+                    {req.reason && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-800/40 p-2 rounded-xl border border-slate-100 dark:border-slate-800 line-clamp-2">
+                        {req.reason}
+                      </p>
+                    )}
 
-                      <td className="py-3.5 px-4">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit",
-                            isPending && "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
-                            isApproved && "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
-                            isRejected && "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400",
-                            isCancelled && "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400"
-                          )}
-                        >
-                          {isPending && <Clock className="w-3 h-3" />}
-                          {isApproved && <CheckCircle2 className="w-3 h-3" />}
-                          {isRejected && <XCircle className="w-3 h-3" />}
-                          {req.status}
-                        </Badge>
+                    {req.cancellation_status === "REQUESTED" && (
+                      <div className="text-[10px] text-amber-600 font-bold bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded-lg border border-amber-200">
+                        Cancellation Pending Review
+                      </div>
+                    )}
 
-                        {req.cancellation_status === "REQUESTED" && (
-                          <div className="text-[10px] text-amber-600 font-bold mt-1">
-                            Cancellation Pending Review
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isPending && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenEditDialog(req)}
-                                className="h-8 px-2 text-xs text-slate-600 hover:text-blue-600"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleWithdrawRequest(req.id)}
-                                disabled={deletingId === req.id}
-                                className="h-8 px-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                              >
-                                {deletingId === req.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-
-                          {isApproved && req.cancellation_status !== "REQUESTED" && (
+                    {/* Action Buttons on Mobile */}
+                    {(isPending || (isApproved && req.cancellation_status !== "REQUESTED")) && (
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        {isPending && (
+                          <>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleOpenCancellationModal(req.id)}
-                              className="h-7 text-[11px] px-2.5 rounded-lg border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900"
+                              onClick={() => handleOpenEditDialog(req)}
+                              className="h-8 px-3 text-xs gap-1 text-slate-700"
                             >
-                              Request Cancel
+                              <Edit2 className="w-3 h-3 text-blue-600" />
+                              Edit
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleWithdrawRequest(req.id)}
+                              disabled={deletingId === req.id}
+                              className="h-8 px-3 text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50"
+                            >
+                              {deletingId === req.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3 h-3" />
+                              )}
+                              Withdraw
+                            </Button>
+                          </>
+                        )}
+
+                        {isApproved && req.cancellation_status !== "REQUESTED" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenCancellationModal(req.id)}
+                            className="h-8 text-xs px-3 rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900"
+                          >
+                            Request Cancellation
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

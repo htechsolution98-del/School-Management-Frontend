@@ -38,6 +38,7 @@ import {
   Square,
   Check,
   Package,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -47,10 +48,11 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
   getAnnouncementRecipients,
+  getStoredAnnouncements,
   type AnnouncementResponse,
   type AnnouncementPayload,
   type AnnouncementRecipient,
-} from "@/lib/principal";
+} from "@/lib/principal/announcements";
 import { getSchoolClasses } from "@/lib/clerk/classes";
 import { getDivisions } from "@/lib/clerk/divisions";
 import { fetchWithAuth } from "@/lib/auth";
@@ -60,6 +62,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
 
 export interface AnnouncementsHubProps {
   roleTitle: string;
@@ -107,6 +110,14 @@ export const TARGET_ROLE_OPTIONS = [
   { value: "INVENTORY", label: "Inventory", desc: "Inventory & assets department", icon: Package },
 ];
 
+export const AUDIENCE_FILTER_OPTIONS = [
+  { value: "ALL_FILTER", label: "All Audiences (Show All)", desc: "Show every notice regardless of audience", icon: Filter },
+  { value: "ALL", label: "School-Wide (Everyone)", desc: "General announcements sent to whole school", icon: Users },
+  { value: "PARTICULAR_PERSON", label: "Particular Individual", desc: "Notices sent directly to specific person", icon: UserCheck },
+  { value: "CLASS_TARGET", label: "Class Targeted", desc: "Announcements targeted to specific standard", icon: School },
+  ...TARGET_ROLE_OPTIONS,
+];
+
 const ALL_AUDIENCE_OPTIONS = [
   { value: "ALL", label: "Everyone (All Roles)", desc: "School-wide broadcast to all panels", icon: Users },
   { value: "STUDENT", label: "Students", desc: "Visible exclusively on student portal", icon: GraduationCap },
@@ -133,9 +144,9 @@ const PRIORITY_OPTIONS = [
     value: "NORMAL",
     label: "Normal Notice",
     desc: "General updates & standard circulars",
-    badgeBg: "bg-indigo-50 dark:bg-indigo-950/60 text-[#5826df] dark:text-indigo-300 border-indigo-200/80",
+    badgeBg: "bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300 border-blue-200/80",
     icon: Info,
-    color: "#5826df",
+    color: "#2563EB",
   },
   {
     value: "IMPORTANT",
@@ -174,8 +185,8 @@ function getPriorityBadge(priority?: string) {
     );
   }
   return (
-    <Badge className="bg-indigo-50 text-[#5826df] dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-      <Info className="w-3 h-3 text-[#5826df]" />
+    <Badge className="bg-blue-50 text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+      <Info className="w-3 h-3 text-[#2563EB]" />
       Normal
     </Badge>
   );
@@ -202,8 +213,8 @@ function getAudienceBadge(announcementFor?: string, isEveryone?: boolean | strin
       return match ? match.label : val;
     });
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 text-[11px] font-bold shadow-2xs">
-        <Users className="w-3 h-3 text-indigo-600" /> {labels.join(" + ")}
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 text-[11px] font-bold shadow-2xs">
+        <Users className="w-3 h-3 text-blue-600" /> {labels.join(" + ")}
       </span>
     );
   }
@@ -228,8 +239,8 @@ function getTargetScopeBadge(item: AnnouncementResponse) {
   }
   if (item.target_student_name || item.target_student) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-purple-50 text-[#5826df] dark:bg-purple-950/50 dark:text-purple-300 border border-[#5826df]/25 text-[11px] font-bold shadow-2xs">
-        <UserCheck className="w-3 h-3 text-[#5826df]" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-[#2563EB] dark:bg-blue-950/50 dark:text-blue-300 border border-[#2563EB]/25 text-[11px] font-bold shadow-2xs">
+        <UserCheck className="w-3 h-3 text-[#2563EB]" />
         Student: {item.target_student_name || `ID #${item.target_student}`}
       </span>
     );
@@ -275,12 +286,19 @@ export function AnnouncementsHub({
   pageTitle,
   pageSubtitle,
 }: AnnouncementsHubProps) {
-  const [announcements, setAnnouncements] = useState<AnnouncementResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<AnnouncementResponse[]>(() => getStoredAnnouncements());
+  const [loading, setLoading] = useState(() => getStoredAnnouncements().length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAudience, setSelectedAudience] = useState<string>("ALL_FILTER");
+  const [audienceDrawerOpen, setAudienceDrawerOpen] = useState(false);
   const [selectedPriority, setSelectedPriority] = useState<string>("ALL_PRIORITY");
+
+  const activeAudienceOption = useMemo(
+    () => AUDIENCE_FILTER_OPTIONS.find((o) => o.value === selectedAudience) || AUDIENCE_FILTER_OPTIONS[0],
+    [selectedAudience]
+  );
+  const ActiveAudienceIcon = activeAudienceOption.icon;
 
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
@@ -413,49 +431,99 @@ export function AnnouncementsHub({
     : "Stay updated with important announcements, circulars, and notices from school administration.";
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
-      {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
-        <div className="space-y-1 w-full min-w-0 flex-1">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
+      {/* ─── TOP HEADER CARD (HERO BANNER) ─────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-[0_4px_25px_rgba(37, 99, 235,0.05)] p-4 sm:p-6 lg:p-7 w-full min-w-0">
+        {/* Soft background blue glow behind right 3D illustration */}
+        <div className="absolute right-0 top-0 bottom-0 w-3/5 bg-gradient-to-l from-blue-100/50 via-blue-50/20 to-transparent dark:from-blue-950/20 dark:via-zinc-900/10 pointer-events-none rounded-r-3xl" />
+        <div className="absolute -right-6 -bottom-6 w-48 h-48 bg-blue-200/30 dark:bg-blue-900/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-4">
+          {/* Header Row: Icon + Title in a SINGLE LINE across full width */}
           <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
-            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#2563EB]/15 to-[#1D4ED8]/25 text-[#2563EB] border border-[#2563EB]/20 flex items-center justify-center shrink-0 shadow-2xs">
               <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100 truncate">
+              <h1 className="text-base sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight leading-tight truncate sm:whitespace-normal">
                 {pageTitle || defaultTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-2">
-                {pageSubtitle || defaultSubtitle}
-              </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchAnnouncementsList(true)}
-            disabled={refreshing}
-            className="flex-1 sm:flex-initial h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-2 transition-all shadow-2xs justify-center"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
-            Refresh
-          </Button>
+          {/* Content Row: Bottom Paragraph on Left, 3D Megaphone on Right */}
+          <div className="flex items-center justify-between gap-3 sm:gap-6 w-full min-w-0">
+            <div className="flex-1 min-w-0 pr-1">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-[280px] sm:max-w-md lg:max-w-xl leading-relaxed font-normal">
+                {pageSubtitle || defaultSubtitle}
+              </p>
 
-          {canCreate && (
+              {/* Desktop Buttons Row (hidden on mobile, shown on sm+) */}
+              <div className="hidden sm:flex items-center gap-2.5 sm:gap-3 mt-4 flex-nowrap">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fetchAnnouncementsList(true)}
+                  disabled={refreshing}
+                  className="h-10 w-10 rounded-2xl text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#2563EB]/30 hover:bg-blue-50/40 hover:text-[#2563EB] transition-all shadow-2xs justify-center shrink-0 cursor-pointer"
+                  title="Refresh announcements"
+                  aria-label="Refresh announcements"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
+                </Button>
+
+                {canCreate && (
+                  <Button
+                    onClick={() => {
+                      setEditingItem(null);
+                      setModalOpen(true);
+                    }}
+                    className="h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white font-bold text-sm rounded-2xl px-5 gap-2 shadow-md shadow-[#2563EB]/25 transition-all hover:shadow-[#2563EB]/35 active:scale-[0.98] justify-center cursor-pointer whitespace-nowrap"
+                  >
+                    <Plus className="h-4 w-4 stroke-[2.5]" />
+                    New Announcement
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Right 3D Megaphone Illustration */}
+            <div className="shrink-0 flex items-center justify-end relative">
+              <img
+                src="/images/announcement-hero.png"
+                alt="Announcements"
+                className="w-24 sm:w-40 md:w-48 lg:w-56 h-auto object-contain select-none pointer-events-none drop-shadow-md"
+              />
+            </div>
+          </div>
+
+          {/* Mobile Buttons Row (shown on mobile, hidden on sm+) - Guaranteed Single Line */}
+          <div className="flex sm:hidden items-center gap-2 w-full mt-1">
             <Button
-              onClick={() => {
-                setEditingItem(null);
-                setModalOpen(true);
-              }}
-              className="flex-1 sm:flex-initial h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-2xl px-5 gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] justify-center"
+              variant="outline"
+              size="icon"
+              onClick={() => fetchAnnouncementsList(true)}
+              disabled={refreshing}
+              className="h-10 w-10 rounded-2xl text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#2563EB]/30 hover:bg-blue-50/40 hover:text-[#2563EB] transition-all shadow-2xs justify-center shrink-0 cursor-pointer"
+              title="Refresh announcements"
+              aria-label="Refresh announcements"
             >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
-              New Announcement
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
             </Button>
-          )}
+
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  setEditingItem(null);
+                  setModalOpen(true);
+                }}
+                className="flex-1 h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white font-bold text-xs rounded-2xl px-4 gap-2 shadow-md shadow-[#2563EB]/25 transition-all hover:shadow-[#2563EB]/35 active:scale-[0.98] justify-center cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="h-4 w-4 stroke-[2.5]" />
+                New Announcement
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -465,12 +533,12 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("ALL_PRIORITY")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "ALL_PRIORITY"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              ? "border-[#2563EB] ring-2 ring-[#2563EB]/20 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs"
               : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
           }`}
         >
           <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 flex items-center justify-center text-[#2563EB] shrink-0 shadow-2xs">
               <Bell className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
@@ -522,17 +590,17 @@ export function AnnouncementsHub({
           onClick={() => setSelectedPriority("NORMAL")}
           className={`rounded-3xl border cursor-pointer transition-all duration-200 ${
             selectedPriority === "NORMAL"
-              ? "border-[#5826df] ring-2 ring-[#5826df]/20 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xs"
+              ? "border-[#2563EB] ring-2 ring-[#2563EB]/20 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs"
               : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 shadow-2xs"
           }`}
         >
           <CardContent className="p-3.5 sm:p-5 flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 flex items-center justify-center text-[#2563EB] shrink-0 shadow-2xs">
               <Info className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider truncate">Normal Notices</p>
-              <p className="text-xl sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{normalCount}</p>
+              <p className="text-xl sm:text-2xl font-black text-[#2563EB] dark:text-blue-400">{normalCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -548,7 +616,7 @@ export function AnnouncementsHub({
               placeholder="Search by title, student, class, author..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-16 h-10 sm:h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="pl-10 pr-16 h-10 sm:h-11 text-xs rounded-2xl bg-slate-50/90 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
             />
             {searchQuery && (
               <button
@@ -610,30 +678,112 @@ export function AnnouncementsHub({
               onClick={() => setSelectedPriority("NORMAL")}
               className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedPriority === "NORMAL"
-                  ? "bg-[#5826df] text-white shadow-xs"
-                  : "text-[#5826df] dark:text-indigo-400 hover:bg-indigo-50/50"
+                  ? "bg-[#2563EB] text-white shadow-xs"
+                  : "text-[#2563EB] dark:text-blue-400 hover:bg-blue-50/50"
               }`}
             >
               <Info className="w-3.5 h-3.5" />
               Normal
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-200 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200 font-black">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 font-black">
                 {normalCount}
               </span>
             </button>
           </div>
         </div>
 
-        {/* Audience Filter Pills */}
-        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
+        {/* Mobile Audience Selection Trigger (Opens Bottom Drawer) */}
+        <div className="sm:hidden pt-2 border-t border-slate-100 dark:border-zinc-800">
+          <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 mb-1.5">
+            <Filter className="w-3 h-3 text-[#2563EB]" /> Audience Filter:
+          </label>
+          <button
+            type="button"
+            onClick={() => setAudienceDrawerOpen(true)}
+            className="w-full flex items-center justify-between p-2.5 px-3.5 bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-6 h-6 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                <ActiveAudienceIcon className="w-3.5 h-3.5" />
+              </div>
+              <span className="truncate">{activeAudienceOption.label}</span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </button>
+        </div>
+
+        {/* Audience Selection Bottom Drawer */}
+        <MobileBottomDrawer
+          isOpen={audienceDrawerOpen}
+          onClose={() => setAudienceDrawerOpen(false)}
+          title="Filter by Audience"
+          subtitle="Select target audience to filter circulars & notices"
+          badge={
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300">
+              {AUDIENCE_FILTER_OPTIONS.length} Options
+            </span>
+          }
+        >
+          <div className="space-y-1.5 py-1">
+            {AUDIENCE_FILTER_OPTIONS.map((opt) => {
+              const isSelected = selectedAudience === opt.value;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAudience(opt.value);
+                    setAudienceDrawerOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between p-3 rounded-2xl text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-blue-50 dark:bg-blue-950/40 border-2 border-[#2563EB] text-[#2563EB] shadow-xs"
+                      : "bg-slate-50 dark:bg-zinc-800/60 hover:bg-slate-100 text-slate-700 dark:text-zinc-300 border border-slate-200/80 dark:border-zinc-700/80"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-[#2563EB] text-white shadow-xs shadow-[#2563EB]/30"
+                          : "bg-white dark:bg-zinc-800 text-slate-500 border border-slate-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      <Icon className="w-4.5 h-4.5 stroke-[2.2]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold leading-tight ${isSelected ? "text-[#2563EB] font-black" : "text-slate-800 dark:text-zinc-200"}`}>
+                        {opt.label}
+                      </p>
+                      {opt.desc && (
+                        <p className="text-[10px] text-slate-400 dark:text-zinc-500 truncate mt-0.5">
+                          {opt.desc}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <div className="h-5 w-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Check className="h-3.5 w-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </MobileBottomDrawer>
+
+        {/* Desktop Audience Filter Pills */}
+        <div className="hidden sm:flex pt-2 border-t border-slate-100 dark:border-zinc-800 items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-            <Filter className="w-3 h-3 text-[#5826df]" /> Audience:
+            <Filter className="w-3 h-3 text-[#2563EB]" /> Audience:
           </span>
 
           <button
             onClick={() => setSelectedAudience("ALL_FILTER")}
             className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 ${
               selectedAudience === "ALL_FILTER"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -644,7 +794,7 @@ export function AnnouncementsHub({
             onClick={() => setSelectedAudience("ALL")}
             className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "ALL"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -656,7 +806,7 @@ export function AnnouncementsHub({
             onClick={() => setSelectedAudience("PARTICULAR_PERSON")}
             className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "PARTICULAR_PERSON" || selectedAudience === "PARTICULAR_STUDENT"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -668,7 +818,7 @@ export function AnnouncementsHub({
             onClick={() => setSelectedAudience("CLASS_TARGET")}
             className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               selectedAudience === "CLASS_TARGET"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -685,7 +835,7 @@ export function AnnouncementsHub({
                 onClick={() => setSelectedAudience(opt.value)}
                 className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
                   isSelected
-                    ? "bg-[#5826df] text-white shadow-xs"
+                    ? "bg-[#2563EB] text-white shadow-xs"
                     : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
                 }`}
               >
@@ -700,12 +850,12 @@ export function AnnouncementsHub({
       {/* ─── ANNOUNCEMENTS FEED LIST ───────────────────────────────────── */}
       {loading ? (
         <div className="py-20 text-center flex flex-col items-center justify-center gap-3 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-          <Loader2 className="w-8 h-8 text-[#5826df] animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin" />
           <p className="text-xs font-bold text-slate-500">Loading notices and circulars...</p>
         </div>
       ) : filteredAnnouncements.length === 0 ? (
         <div className="py-20 text-center flex flex-col items-center justify-center gap-3 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs p-6">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-center text-[#5826df] mb-1">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center text-[#2563EB] mb-1">
             <Megaphone className="w-7 h-7 stroke-[2]" />
           </div>
           <h3 className="text-base font-bold text-slate-800 dark:text-zinc-200">
@@ -726,7 +876,7 @@ export function AnnouncementsHub({
                 setEditingItem(null);
                 setModalOpen(true);
               }}
-              className="mt-2 h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white text-xs font-bold rounded-2xl px-5 gap-2 shadow-sm"
+              className="mt-2 h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white text-xs font-bold rounded-2xl px-5 gap-2 shadow-sm"
             >
               <Plus className="h-4 w-4" /> Create First Announcement
             </Button>
@@ -743,7 +893,7 @@ export function AnnouncementsHub({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#5826df]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
+                className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#2563EB]/35 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
               >
                 {/* Header info */}
                 <div className="space-y-3">
@@ -760,7 +910,7 @@ export function AnnouncementsHub({
                         size="sm"
                         variant="ghost"
                         onClick={() => setViewingItem(item)}
-                        className="h-8 w-8 p-0 rounded-xl bg-indigo-50 text-[#5826df] hover:bg-[#5826df] hover:text-white transition-all shadow-2xs"
+                        className="h-8 w-8 p-0 rounded-xl bg-blue-50 text-[#2563EB] hover:bg-[#2563EB] hover:text-white transition-all shadow-2xs"
                         title="View Notice Details"
                       >
                         <Eye className="h-4 w-4" />
@@ -798,7 +948,7 @@ export function AnnouncementsHub({
                   <div>
                     <h3
                       onClick={() => setViewingItem(item)}
-                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] dark:hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase leading-snug"
+                      className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#2563EB] dark:hover:text-blue-400 transition-colors cursor-pointer line-clamp-2 first-letter:uppercase leading-snug"
                     >
                       {capitalizeFirstLetter(item.title)}
                     </h3>
@@ -811,14 +961,14 @@ export function AnnouncementsHub({
                 {/* Footer metadata */}
                 <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                   <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300 truncate min-w-0">
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#5826df] shrink-0" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
                     <span className="truncate font-bold text-slate-800 dark:text-zinc-200">
                       {item.is_created_by_me || (item.created_by_name || "").toLowerCase() === "created by me"
                         ? "Created by me"
                         : (item.created_by_name || item.created_by_role || "Administration")}
                     </span>
                     {item.created_by_role && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50/80 dark:bg-zinc-800 text-[#5826df] dark:text-indigo-300 font-bold uppercase border border-indigo-100/60 dark:border-zinc-700 shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50/80 dark:bg-zinc-800 text-[#2563EB] dark:text-blue-300 font-bold uppercase border border-blue-100/60 dark:border-zinc-700 shrink-0">
                         {item.created_by_role}
                       </span>
                     )}
@@ -978,6 +1128,7 @@ function AnnouncementFormModal({
     ? announcement.announcement_for.toUpperCase()
     : "STUDENT";
   const [individualRole, setIndividualRole] = useState<string>(initialIndividualRole);
+  const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
 
   const initialRecipient: AnnouncementRecipient | null = announcement?.target_student
     ? {
@@ -1279,32 +1430,41 @@ function AnnouncementFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs hidden sm:block" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-2xl p-4 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 15 }}
+        className="relative bg-white dark:bg-zinc-900 w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-7 overflow-y-auto z-10 border-0 sm:border sm:border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs">
-              <Megaphone className="h-5 w-5 stroke-[2.2]" />
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-zinc-800 sticky top-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm z-20 -mx-4 px-4 pt-1 sm:pt-0 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1.5 -ml-1 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#2563EB]/15 to-[#1D4ED8]/25 text-[#2563EB] border border-[#2563EB]/20 shadow-2xs shrink-0">
+              <Megaphone className="h-4.5 w-4.5 sm:h-5 sm:w-5 stroke-[2.2]" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-zinc-100">
                 {isEdit ? "Edit Announcement" : "Create New Announcement"}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1">
                 Broadcast circulars, notices, and alerts across school roles in real-time.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1327,7 +1487,7 @@ function AnnouncementFormModal({
               placeholder="e.g., Mathematics Unit Test Schedule & Syllabus"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
               required
             />
           </div>
@@ -1347,7 +1507,7 @@ function AnnouncementFormModal({
                     onClick={() => setPriority(p.value)}
                     className={`cursor-pointer p-3 rounded-2xl border transition-all flex flex-col justify-between gap-2 ${
                       isSelected
-                        ? "border-[#5826df] bg-indigo-50/40 dark:bg-indigo-950/30 ring-2 ring-[#5826df]/20 shadow-2xs"
+                        ? "border-[#2563EB] bg-blue-50/40 dark:bg-blue-950/30 ring-2 ring-[#2563EB]/20 shadow-2xs"
                         : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 hover:border-slate-300"
                     }`}
                   >
@@ -1358,7 +1518,7 @@ function AnnouncementFormModal({
                       >
                         <Icon className="w-4 h-4 stroke-[2.2]" />
                       </div>
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-[#5826df]" />}
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-[#2563EB]" />}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">{p.label}</p>
@@ -1370,16 +1530,16 @@ function AnnouncementFormModal({
             </div>
           </div>
 
-          {/* Target Audience: 9-Role Multi-Selection */}
+          {/* Target Audience: 10-Role Multi-Selection */}
           <div className="space-y-2.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-[#5826df]" />
-                  Target Audience Roles ({isAllRoles ? "All 9 Roles" : `${selectedRoles.length} Selected`})
+                  <Users className="w-4 h-4 text-[#2563EB]" />
+                  Target Audience Roles ({isAllRoles ? "All Roles" : `${selectedRoles.length} Selected`})
                 </label>
                 <p className="text-[11px] text-slate-400">
-                  Select one or more roles to send announcement to their panels, or click Everyone.
+                  Select one or more roles to receive this announcement, or toggle Everyone.
                 </p>
               </div>
 
@@ -1395,7 +1555,7 @@ function AnnouncementFormModal({
                     setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
                   }
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                className={`hidden sm:flex px-3 py-1.5 rounded-xl text-xs font-bold transition-all items-center gap-1.5 cursor-pointer shrink-0 ${
                   isAllRoles
                     ? "bg-emerald-600 text-white shadow-xs"
                     : "bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200"
@@ -1406,8 +1566,133 @@ function AnnouncementFormModal({
               </button>
             </div>
 
-            {/* 10 Role Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {/* Mobile Selection List (< sm) */}
+            <div className="sm:hidden flex flex-col divide-y divide-slate-100 dark:divide-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40 rounded-2xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden">
+              {/* All Roles Master Option */}
+              <div
+                onClick={() => {
+                  if (isAllRoles) {
+                    setIsAllRoles(false);
+                    setSelectedRoles(["STUDENT"]);
+                  } else {
+                    setIsAllRoles(true);
+                    setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                  }
+                }}
+                className={`p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                  isAllRoles ? "bg-emerald-50/70 dark:bg-emerald-950/30" : ""
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                      isAllRoles
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-white dark:bg-zinc-800 text-slate-500 border border-slate-200 dark:border-zinc-700"
+                    }`}
+                  >
+                    <Users className="w-4.5 h-4.5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-black leading-tight ${isAllRoles ? "text-emerald-700 dark:text-emerald-400" : "text-slate-800 dark:text-zinc-200"}`}>
+                      All Roles (Everyone)
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      School-wide broadcast to all 10 roles
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                    isAllRoles
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "border-2 border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900"
+                  }`}
+                >
+                  {isAllRoles && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+              </div>
+
+              {/* Individual 10 Roles */}
+              {TARGET_ROLE_OPTIONS.map((item) => {
+                const isSelected = isAllRoles || selectedRoles.includes(item.value);
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={`mobile_role_${item.value}`}
+                    onClick={() => {
+                      if (isAllRoles) {
+                        setIsAllRoles(false);
+                        setSelectedRoles([item.value]);
+                        setIndividualRole(item.value);
+                        setSelectedRecipient(null);
+                      } else {
+                        if (selectedRoles.includes(item.value)) {
+                          const updated = selectedRoles.filter((r) => r !== item.value);
+                          if (updated.length === 0) {
+                            setIsAllRoles(true);
+                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                            setIndividualRole(TARGET_ROLE_OPTIONS[0].value);
+                            setSelectedRecipient(null);
+                          } else {
+                            setSelectedRoles(updated);
+                            setIndividualRole(updated[updated.length - 1]);
+                            setSelectedRecipient(null);
+                          }
+                        } else {
+                          const updated = [...selectedRoles, item.value];
+                          if (updated.length === TARGET_ROLE_OPTIONS.length) {
+                            setIsAllRoles(true);
+                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
+                          } else {
+                            setSelectedRoles(updated);
+                          }
+                          setIndividualRole(item.value);
+                          setSelectedRecipient(null);
+                        }
+                      }
+                    }}
+                    className={`p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                      isSelected ? "bg-blue-50/40 dark:bg-blue-950/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-[#2563EB] text-white shadow-xs shadow-[#2563EB]/30"
+                            : "bg-white dark:bg-zinc-800 text-slate-500 border border-slate-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        <Icon className="w-4.5 h-4.5 stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold leading-tight ${isSelected ? "text-[#2563EB] dark:text-blue-400 font-black" : "text-slate-800 dark:text-zinc-200"}`}>
+                          {item.label}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                        isSelected
+                          ? "bg-[#2563EB] text-white shadow-xs"
+                          : "border-2 border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Grid (>= sm) */}
+            <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {TARGET_ROLE_OPTIONS.map((item) => {
                 const isSelected = isAllRoles || selectedRoles.includes(item.value);
                 const Icon = item.icon;
@@ -1448,17 +1733,17 @@ function AnnouncementFormModal({
                     }}
                     className={`cursor-pointer p-2.5 rounded-2xl border transition-all flex flex-col justify-between gap-1.5 ${
                       isSelected
-                        ? "border-[#5826df] bg-indigo-50/50 dark:bg-indigo-950/40 ring-1 ring-[#5826df]/30 shadow-2xs"
+                        ? "border-[#2563EB] bg-blue-50/50 dark:bg-blue-950/40 ring-1 ring-[#2563EB]/30 shadow-2xs"
                         : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 hover:border-slate-300"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-7 h-7 rounded-xl bg-indigo-100/70 dark:bg-indigo-950/60 text-[#5826df] flex items-center justify-center shrink-0">
+                      <div className="w-7 h-7 rounded-xl bg-blue-100/70 dark:bg-blue-950/60 text-[#2563EB] flex items-center justify-center shrink-0">
                         <Icon className="w-3.5 h-3.5 stroke-[2.2]" />
                       </div>
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
-                          isSelected ? "bg-[#5826df] text-white" : "border border-slate-300 dark:border-zinc-600"
+                          isSelected ? "bg-[#2563EB] text-white" : "border border-slate-300 dark:border-zinc-600"
                         }`}
                       >
                         {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -1478,41 +1763,49 @@ function AnnouncementFormModal({
           <div className="p-4 rounded-3xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700/80 space-y-3.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#5826df]" />
+                <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
                 Audience Scope & Delivery Target
               </label>
-              <span className="text-[10px] font-bold text-[#5826df] bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-[#2563EB] bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
                 {targetScope === "BROADCAST" ? "Role Broadcast" : targetScope === "CLASS" ? "Class Scope" : "Particular Individual"}
               </span>
             </div>
 
             {/* Scope Cards: dynamically sized according to selected roles */}
-            <div className={`grid ${canTargetClass ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+            <div className={`flex flex-col sm:grid ${canTargetClass ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-2`}>
               <div
                 onClick={() => setTargetScope("BROADCAST")}
-                className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
+                className={`cursor-pointer p-3 rounded-2xl border transition-all flex sm:flex-col items-center sm:text-center gap-3 sm:gap-1.5 ${
                   targetScope === "BROADCAST"
-                    ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
+                    ? "border-[#2563EB] bg-white dark:bg-zinc-900 text-[#2563EB] font-bold ring-2 ring-[#2563EB]/20 shadow-xs"
                     : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
                 }`}
               >
-                <Users className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
-                <p className="text-xs">Broadcast Roles</p>
-                <p className="text-[10px] text-slate-400 font-normal">All in Selected Roles</p>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 sm:mx-auto sm:mb-1 ${targetScope === "BROADCAST" ? "bg-blue-50 dark:bg-blue-950/60 text-[#2563EB]" : "bg-slate-100 dark:bg-zinc-800 text-slate-500"}`}>
+                  <Users className="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <div className="text-left sm:text-center">
+                  <p className="text-xs font-bold">Broadcast Roles</p>
+                  <p className="text-[10px] text-slate-400 font-normal">All in Selected Roles</p>
+                </div>
               </div>
 
               {canTargetClass && (
                 <div
                   onClick={() => setTargetScope("CLASS")}
-                  className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
+                  className={`cursor-pointer p-3 rounded-2xl border transition-all flex sm:flex-col items-center sm:text-center gap-3 sm:gap-1.5 ${
                     targetScope === "CLASS"
-                      ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
+                      ? "border-[#2563EB] bg-white dark:bg-zinc-900 text-[#2563EB] font-bold ring-2 ring-[#2563EB]/20 shadow-xs"
                       : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
                   }`}
                 >
-                  <School className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
-                  <p className="text-xs">Specific Class</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Class & Division</p>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 sm:mx-auto sm:mb-1 ${targetScope === "CLASS" ? "bg-blue-50 dark:bg-blue-950/60 text-[#2563EB]" : "bg-slate-100 dark:bg-zinc-800 text-slate-500"}`}>
+                    <School className="w-4 h-4 stroke-[2.2]" />
+                  </div>
+                  <div className="text-left sm:text-center">
+                    <p className="text-xs font-bold">Specific Class</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Class & Division</p>
+                  </div>
                 </div>
               )}
 
@@ -1523,15 +1816,19 @@ function AnnouncementFormModal({
                     setIndividualRole(selectedRoles[0]);
                   }
                 }}
-                className={`cursor-pointer p-3 rounded-2xl border text-center transition-all ${
+                className={`cursor-pointer p-3 rounded-2xl border transition-all flex sm:flex-col items-center sm:text-center gap-3 sm:gap-1.5 ${
                   targetScope === "INDIVIDUAL"
-                    ? "border-[#5826df] bg-white dark:bg-zinc-900 text-[#5826df] font-bold ring-2 ring-[#5826df]/20 shadow-xs"
+                    ? "border-[#2563EB] bg-white dark:bg-zinc-900 text-[#2563EB] font-bold ring-2 ring-[#2563EB]/20 shadow-xs"
                     : "border-slate-200 dark:border-zinc-700 bg-white/60 dark:bg-zinc-800/40 text-slate-600 dark:text-zinc-400 font-medium hover:border-slate-300"
                 }`}
               >
-                <UserCheck className="w-4 h-4 mx-auto mb-1 stroke-[2.2]" />
-                <p className="text-xs">Particular Person</p>
-                <p className="text-[10px] text-slate-400 font-normal">Any Staff, Student, etc.</p>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 sm:mx-auto sm:mb-1 ${targetScope === "INDIVIDUAL" ? "bg-blue-50 dark:bg-blue-950/60 text-[#2563EB]" : "bg-slate-100 dark:bg-zinc-800 text-slate-500"}`}>
+                  <UserCheck className="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <div className="text-left sm:text-center">
+                  <p className="text-xs font-bold">Particular Person</p>
+                  <p className="text-[10px] text-slate-400 font-normal">Any Staff, Student, etc.</p>
+                </div>
               </div>
             </div>
 
@@ -1541,12 +1838,82 @@ function AnnouncementFormModal({
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#5826df]" />
+                      <User className="w-3.5 h-3.5 text-[#2563EB]" />
                       1. Select Role of Recipient <span className="text-rose-500">*</span>
                     </span>
                     <span className="text-[10px] text-slate-400">Total {TARGET_ROLE_OPTIONS.length} Roles (Synced)</span>
                   </label>
-                  <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
+                  {/* Mobile Role Picker Trigger (Opens Bottom Drawer) */}
+                  <div className="sm:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setRoleDrawerOpen(true)}
+                      className="w-full flex items-center justify-between p-2.5 px-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-800 dark:text-zinc-200 shadow-2xs cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 text-[#2563EB]" />
+                        <span>{TARGET_ROLE_OPTIONS.find((r) => r.value === individualRole)?.label || individualRole}</span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    </button>
+
+                    <MobileBottomDrawer
+                      isOpen={roleDrawerOpen}
+                      onClose={() => setRoleDrawerOpen(false)}
+                      title="Select Recipient Role"
+                      subtitle="Choose the role of the recipient to send direct notice"
+                    >
+                      <div className="space-y-1.5 py-1">
+                        {TARGET_ROLE_OPTIONS.map((r) => {
+                          const isSel = individualRole === r.value;
+                          const RoleIcon = r.icon;
+                          return (
+                            <button
+                              key={r.value}
+                              type="button"
+                              onClick={() => {
+                                setIndividualRole(r.value);
+                                setSelectedRecipient(null);
+                                setSelectedRoles([r.value]);
+                                setIsAllRoles(false);
+                                setRoleDrawerOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between p-3 rounded-2xl text-left transition-all cursor-pointer ${
+                                isSel
+                                  ? "bg-blue-50 dark:bg-blue-950/40 border-2 border-[#2563EB] text-[#2563EB] shadow-xs"
+                                  : "bg-slate-50 dark:bg-zinc-800/60 hover:bg-slate-100 text-slate-700 dark:text-zinc-300 border border-slate-200/80 dark:border-zinc-700/80"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                    isSel
+                                      ? "bg-[#2563EB] text-white shadow-xs"
+                                      : "bg-white dark:bg-zinc-800 text-slate-500 border border-slate-200 dark:border-zinc-700"
+                                  }`}
+                                >
+                                  <RoleIcon className="w-4 h-4 stroke-[2.2]" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className={`text-xs font-bold leading-tight ${isSel ? "text-[#2563EB] font-black" : "text-slate-800 dark:text-zinc-200"}`}>
+                                    {r.label}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{r.desc}</p>
+                                </div>
+                              </div>
+                              {isSel && (
+                                <div className="h-5 w-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </MobileBottomDrawer>
+                  </div>
+                  {/* Desktop Role Pills */}
+                  <div className="hidden sm:flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
                     {TARGET_ROLE_OPTIONS.map((r) => {
                       const isSel = individualRole === r.value;
                       return (
@@ -1561,7 +1928,7 @@ function AnnouncementFormModal({
                           }}
                           className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                             isSel
-                              ? "bg-[#5826df] text-white shadow-xs"
+                              ? "bg-[#2563EB] text-white shadow-xs"
                               : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                           }`}
                         >
@@ -1576,7 +1943,7 @@ function AnnouncementFormModal({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-[#5826df]" />
+                      <UserCheck className="w-3.5 h-3.5 text-[#2563EB]" />
                       2. Choose Particular {TARGET_ROLE_OPTIONS.find((r) => r.value === individualRole)?.label || "User"} <span className="text-rose-500">*</span>
                     </label>
                     {selectedRecipient && (
@@ -1594,9 +1961,9 @@ function AnnouncementFormModal({
                   </div>
 
                   {selectedRecipient ? (
-                    <div className="p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-[#5826df]/30 flex items-center justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-[#2563EB]/30 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#5826df] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                        <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                           {(selectedRecipient.name || "U")[0].toUpperCase()}
                         </div>
                         <div>
@@ -1608,7 +1975,7 @@ function AnnouncementFormModal({
                           </p>
                         </div>
                       </div>
-                      <Badge className="bg-[#5826df] text-white text-[10px] font-bold rounded-lg px-2 py-0.5">
+                      <Badge className="bg-[#2563EB] text-white text-[10px] font-bold rounded-lg px-2 py-0.5">
                         Selected
                       </Badge>
                     </div>
@@ -1617,7 +1984,7 @@ function AnnouncementFormModal({
                     <div className="space-y-2.5 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700">
                       <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-zinc-800">
                         <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                          <HeartHandshake className="w-4 h-4 text-[#5826df]" />
+                          <HeartHandshake className="w-4 h-4 text-[#2563EB]" />
                           Step-by-Step Parent Selection:
                         </span>
                         <span className="text-[10px] text-slate-400 font-medium">Class &gt; Division &gt; Student &gt; Parent</span>
@@ -1674,7 +2041,7 @@ function AnnouncementFormModal({
                           </label>
                           {parentStudentsLoading ? (
                             <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5826df]" />
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2563EB]" />
                               Loading students in class...
                             </div>
                           ) : parentStudentsList.length === 0 ? (
@@ -1687,7 +2054,7 @@ function AnnouncementFormModal({
                                 <div
                                   key={st.id}
                                   onClick={() => handleSelectParentForStudent(st)}
-                                  className="p-1.5 px-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                                  className="p-1.5 px-2 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
                                 >
                                   <div>
                                     <span className="font-bold text-slate-800 dark:text-zinc-200">{st.name}</span>
@@ -1697,7 +2064,7 @@ function AnnouncementFormModal({
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    className="h-5 text-[9px] px-2 font-bold hover:bg-[#5826df] hover:text-white shrink-0"
+                                    className="h-5 text-[9px] px-2 font-bold hover:bg-[#2563EB] hover:text-white shrink-0"
                                   >
                                     Select Parent
                                   </Button>
@@ -1730,7 +2097,7 @@ function AnnouncementFormModal({
                                 <div
                                   key={`parent_search_${rec.id}`}
                                   onClick={() => setSelectedRecipient(rec)}
-                                  className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer text-xs flex justify-between items-center"
+                                  className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer text-xs flex justify-between items-center"
                                 >
                                   <div>
                                     <p className="font-bold text-slate-800 dark:text-zinc-200">{rec.name}</p>
@@ -1762,7 +2129,7 @@ function AnnouncementFormModal({
                       <div className="max-h-44 overflow-y-auto space-y-1.5 p-1 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
                         {recipientsLoading ? (
                           <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin text-[#5826df]" />
+                            <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
                             Loading {individualRole.toLowerCase()} list...
                           </div>
                         ) : recipientsList.length === 0 ? (
@@ -1774,7 +2141,7 @@ function AnnouncementFormModal({
                             <div
                               key={`${rec.role}_${rec.id}`}
                               onClick={() => setSelectedRecipient(rec)}
-                              className="p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between gap-2 transition-colors"
+                              className="p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-between gap-2 transition-colors"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center font-bold text-[10px] shrink-0">
@@ -1793,7 +2160,7 @@ function AnnouncementFormModal({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-6 text-[10px] rounded-lg px-2 font-bold hover:bg-[#5826df] hover:text-white shrink-0 cursor-pointer"
+                                className="h-6 text-[10px] rounded-lg px-2 font-bold hover:bg-[#2563EB] hover:text-white shrink-0 cursor-pointer"
                               >
                                 Select
                               </Button>
@@ -1813,7 +2180,7 @@ function AnnouncementFormModal({
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <School className="w-3.5 h-3.5 text-[#5826df]" />
+                      <School className="w-3.5 h-3.5 text-[#2563EB]" />
                       Select Standard / Class <span className="text-rose-500">*</span>
                     </span>
                     {selectedClassId && (
@@ -1828,7 +2195,7 @@ function AnnouncementFormModal({
                       setSelectedClassId(e.target.value);
                       setSelectedDivision("");
                     }}
-                    className="w-full h-11 px-3.5 text-xs rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#5826df]/25 focus:border-[#5826df]"
+                    className="w-full h-11 px-3.5 text-xs rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB]"
                   >
                     <option value="">-- Choose Standard / Class --</option>
                     {classes.map((c) => (
@@ -1842,7 +2209,7 @@ function AnnouncementFormModal({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <Filter className="w-3.5 h-3.5 text-[#5826df]" />
+                      <Filter className="w-3.5 h-3.5 text-[#2563EB]" />
                       Division
                     </label>
                     {selectedClassId && (
@@ -1865,7 +2232,7 @@ function AnnouncementFormModal({
                         onClick={() => setSelectedDivision("")}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           !selectedDivision || selectedDivision === "ALL"
-                            ? "bg-[#5826df] text-white shadow-xs"
+                            ? "bg-[#2563EB] text-white shadow-xs"
                             : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                         }`}
                       >
@@ -1881,7 +2248,7 @@ function AnnouncementFormModal({
                             onClick={() => setSelectedDivision(divName)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                               isSelected
-                                ? "bg-[#5826df] text-white shadow-xs"
+                                ? "bg-[#2563EB] text-white shadow-xs"
                                 : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                             }`}
                           >
@@ -1901,7 +2268,7 @@ function AnnouncementFormModal({
                                 onClick={() => setSelectedDivision(divName)}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                   isSelected
-                                    ? "bg-[#5826df] text-white shadow-xs"
+                                    ? "bg-[#2563EB] text-white shadow-xs"
                                     : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                                 }`}
                               >
@@ -1928,7 +2295,7 @@ function AnnouncementFormModal({
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
             />
           </div>
 
@@ -1943,14 +2310,14 @@ function AnnouncementFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium leading-relaxed focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium leading-relaxed focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
               required
             />
           </div>
 
           {/* Live Dynamic Preview Card */}
-          <div className="p-4 rounded-3xl bg-indigo-50/40 dark:bg-zinc-800/40 border border-indigo-100 dark:border-zinc-800 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#5826df] dark:text-indigo-400 flex items-center gap-1.5">
+          <div className="p-4 rounded-3xl bg-blue-50/40 dark:bg-zinc-800/40 border border-blue-100 dark:border-zinc-800 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB] dark:text-blue-400 flex items-center gap-1.5">
               <Sparkles className="w-3 h-3" /> Live Circular Preview
             </p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1991,7 +2358,7 @@ function AnnouncementFormModal({
             <Button
               type="submit"
               disabled={saving}
-              className="bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#5826df]/25 transition-all cursor-pointer"
+              className="bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#2563EB]/25 transition-all cursor-pointer"
             >
               {saving ? (
                 <>
@@ -2021,13 +2388,13 @@ function AnnouncementDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs hidden sm:block" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-xl p-4 sm:p-7 max-h-[88vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 15 }}
+        className="relative bg-white dark:bg-zinc-900 w-full h-[100dvh] sm:h-auto sm:max-h-[88vh] sm:max-w-xl sm:rounded-3xl shadow-2xl p-4 sm:p-7 overflow-y-auto z-10 border-0 sm:border sm:border-slate-200 dark:border-zinc-800 space-y-4"
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
           <div className="space-y-2">
@@ -2053,7 +2420,7 @@ function AnnouncementDetailModal({
           <div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Posted By</p>
             <p className="font-bold text-slate-800 dark:text-zinc-200 mt-0.5 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#5826df]" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
               {announcement.is_created_by_me || (announcement.created_by_name || "").toLowerCase() === "created by me"
                 ? "Created by me"
                 : (announcement.created_by_name || announcement.created_by_role || "School Administration")}
@@ -2089,7 +2456,7 @@ function AnnouncementDetailModal({
         <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-zinc-800">
           <Button
             onClick={onClose}
-            className="rounded-2xl h-10 px-6 text-xs font-bold bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white shadow-md shadow-[#5826df]/25 transition-all active:scale-[0.98]"
+            className="rounded-2xl h-10 px-6 text-xs font-bold bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white shadow-md shadow-[#2563EB]/25 transition-all active:scale-[0.98]"
           >
             Close Notice
           </Button>

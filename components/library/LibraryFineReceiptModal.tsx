@@ -17,6 +17,7 @@ import {
   DollarSign,
   ShieldCheck,
   Hash,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { FinePaymentResult, BookIssued } from "@/lib/library";
@@ -120,7 +121,7 @@ export function LibraryFineReceiptModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto receipt-modal-wrapper">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto receipt-modal-wrapper">
       <style>{`
         @media print {
           body * {
@@ -157,27 +158,35 @@ export function LibraryFineReceiptModal({
       `}</style>
 
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200"
+        className="relative bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-xl h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden border-0 sm:border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar (Modal UI Only) */}
-        <div className="receipt-no-print flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/80">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+        <div className="receipt-no-print flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-200 bg-slate-50/80 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-200/50 transition-colors cursor-pointer shrink-0"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
               <Receipt className="h-4 w-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 leading-tight">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-slate-900 leading-tight truncate">
                 Library Fine Payment Receipt
               </h2>
-              <p className="text-[11px] text-slate-500 font-mono">
+              <p className="text-[11px] text-slate-500 font-mono truncate">
                 {receiptData.receipt_no}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/50 transition-colors"
+            className="hidden sm:flex text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
             title="Close Receipt"
           >
             <X className="h-5 w-5" />

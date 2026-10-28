@@ -618,8 +618,12 @@ export default function AccountLedgerPage() {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <Receipt className="h-8 w-8 text-slate-300 dark:text-slate-700" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No transactions"
+                        className="mx-auto mb-1 h-20 w-20 object-contain"
+                      />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         No transactions found for the selected period
                       </span>
                       <p className="text-xs text-slate-400">

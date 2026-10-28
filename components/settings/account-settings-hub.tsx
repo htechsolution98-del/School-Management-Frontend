@@ -205,7 +205,7 @@ export function AccountSettingsHub({
   const strengthMeta = getStrengthMeta();
 
   return (
-    <div className="space-y-6 pb-16 w-full min-w-0 max-w-6xl mx-auto overflow-x-hidden">
+    <div className="space-y-6 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 max-w-6xl mx-auto overflow-x-hidden">
       {/* ─── HEADER CARD ────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
         <div className="flex items-center gap-3.5 min-w-0">
@@ -229,13 +229,14 @@ export function AccountSettingsHub({
 
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => fetchProfile(true)}
           disabled={refreshing}
-          className="h-10 rounded-2xl px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-blue-500/30 hover:bg-blue-50/40 hover:text-[#2563EB] gap-2 transition-all shadow-2xs shrink-0"
+          className="h-10 w-10 rounded-2xl text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-blue-500/30 hover:bg-blue-50/40 hover:text-[#2563EB] transition-all shadow-2xs shrink-0 justify-center"
+          title="Refresh profile"
+          aria-label="Refresh profile"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
-          Refresh
         </Button>
       </div>
 

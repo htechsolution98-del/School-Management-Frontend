@@ -756,6 +756,7 @@ export default function AllHomeworkPage() {
 
   const stats = useMemo(() => {
     let dueTodayCount = 0;
+    let assignedCount = 0;
     let activeCount = 0;
     let overdueCount = 0;
     let draftCount = 0;
@@ -763,6 +764,7 @@ export default function AllHomeworkPage() {
 
     homeworks.forEach((h) => {
       if (isDueToday(h.due_date)) dueTodayCount++;
+      if (h.is_active) assignedCount++;
       if (isOverdue(h.due_date)) {
         overdueCount++;
       } else if (h.is_active) {
@@ -775,6 +777,7 @@ export default function AllHomeworkPage() {
 
     return {
       dueToday: dueTodayCount,
+      assigned: assignedCount,
       active: activeCount,
       overdue: overdueCount,
       draft: draftCount,
@@ -859,7 +862,7 @@ export default function AllHomeworkPage() {
       {/* Content Container (Layered above ambient background) */}
       <div className="relative z-10 space-y-3.5 sm:space-y-4">
         {/* ── 1. Hero Introduction & 3D Artwork in Background (Exact Reference Matching) ── */}
-        <div className="relative pt-1">
+        <div className="relative pt-3 sm:pt-4">
           {/* 3D Notepad Artwork positioned in Background */}
           <div className="absolute -top-2 right-0 sm:right-4 w-32 h-36 sm:w-40 sm:h-44 pointer-events-none select-none z-0">
             {/* Soft ambient royal blue cloud behind notepad matching reference screenshot */}
@@ -951,7 +954,7 @@ export default function AllHomeworkPage() {
                 ASSIGNED
               </p>
               <p className="text-lg sm:text-xl font-black text-[#1A1D2F] leading-none mt-1">
-                {stats.active}
+                {stats.assigned}
               </p>
             </div>
           </div>
@@ -1275,7 +1278,12 @@ export default function AllHomeworkPage() {
                     <div className="flex items-center gap-2">
                       <Users size={16} className="text-[#2563EB]" />
                       <h3 className="text-xs font-bold text-[#1A1D2F]">
-                        Student Submissions ({submissions.length})
+                        Student Submissions{" "}
+                        {loadingSub
+                          ? selectedHw?.submission_count !== undefined
+                            ? `(${selectedHw.submission_count})`
+                            : ""
+                          : `(${submissions.length})`}
                       </h3>
                     </div>
 
@@ -1327,7 +1335,13 @@ export default function AllHomeworkPage() {
                                   {sub.student_name}
                                 </h4>
                                 <p className="text-[10px] text-[#8E95A9] truncate leading-tight mt-0.5">
-                                  {(sub as any).parent_name || (sub as any).guardian_name || `jin itadori`}
+                                  {(sub as any).parent_name
+                                    ? `Parent: ${(sub as any).parent_name}`
+                                    : (sub as any).roll_no
+                                    ? `Roll No: ${(sub as any).roll_no}`
+                                    : sub.status === "checked"
+                                    ? `Graded (${sub.marks ?? 0} marks)`
+                                    : "Submitted"}
                                 </p>
                               </div>
                             </div>
@@ -1338,7 +1352,7 @@ export default function AllHomeworkPage() {
                                 Submitted At
                               </p>
                               <p className="text-[11px] font-semibold text-[#1A1D2F] mt-1 leading-none">
-                                {formatToDDMMYYYY(sub.submitted_at || sub.submission_date) || "12-10-2026"}
+                                {formatToDDMMYYYY(sub.submitted_at || sub.submission_date) || "—"}
                               </p>
                             </div>
 

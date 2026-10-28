@@ -8,7 +8,7 @@ export default function LibrarianAnnouncementsPage() {
     <AnnouncementsHub
       roleTitle="Librarian"
       canCreate={true}
-      accentColor="purple"
+      accentColor="blue"
       pageTitle="Library Circulars & Notices"
       pageSubtitle="Broadcast book return deadlines, library schedule updates, and reading club notices."
     />
