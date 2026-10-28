@@ -209,8 +209,16 @@ export function SchoolDirectoryTable({
               </tr>
             ) : paginatedSchools.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-12 text-center text-xs text-slate-500">
-                  No schools match your search or filter criteria.
+                <td colSpan={8} className="p-10 text-center text-xs text-slate-500">
+                  <div className="flex flex-col items-center justify-center">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No schools"
+                      className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                    />
+                    <p className="font-bold text-slate-700 text-sm">No schools found</p>
+                    <p className="text-slate-400 mt-1">No schools match your search or filter criteria.</p>
+                  </div>
                 </td>
               </tr>
             ) : (

@@ -31,33 +31,31 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Book,
-  BookIssued,
-  BookReservation,
-  LibrarySetting,
-  getBooks,
-  getIssuedBooks,
-  getReservations,
-  getLibrarySettings,
-  getInventoryAudit,
-  getMostBorrowedReport,
-  getCategoryTrendsReport,
-  getFeeCollectionReport,
-  getPendingClearanceStudents,
+  LibraryDashboardSummary,
+  getLibraryDashboardSummary,
+  getStoredDashboardSummary,
   checkReservationExpiries,
 } from "@/lib/library";
 
+function MetricValue({
+  value,
+  loading,
+  className = "",
+}: {
+  value: React.ReactNode;
+  loading: boolean;
+  className?: string;
+}) {
+  if (loading) {
+    return <span className={`inline-block h-5 w-12 bg-slate-200/80 animate-pulse rounded my-0.5 ${className}`} />;
+  }
+  return <span className={className}>{value}</span>;
+}
+
 export default function LibrarianDashboard() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [loans, setLoans] = useState<BookIssued[]>([]);
-  const [reservations, setReservations] = useState<BookReservation[]>([]);
-  const [settings, setSettings] = useState<LibrarySetting | null>(null);
-  const [inventoryAudit, setInventoryAudit] = useState<any>(null);
-  const [mostBorrowed, setMostBorrowed] = useState<any[]>([]);
-  const [categoryTrends, setCategoryTrends] = useState<any[]>([]);
-  const [feeCollection, setFeeCollection] = useState<any>(null);
-  const [pendingClearance, setPendingClearance] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<LibraryDashboardSummary | null>(() => getStoredDashboardSummary());
+  const [loading, setLoading] = useState<boolean>(() => !getStoredDashboardSummary());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [sweepLoading, setSweepLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -66,92 +64,47 @@ export default function LibrarianDashboard() {
     setTimeout(() => setNotification(null), 4500);
   };
 
-  const loadDashboardData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [
-        booksData,
-        loansData,
-        resData,
-        settingsData,
-        auditData,
-        borrowedData,
-        trendsData,
-        feeData,
-        clearanceData,
-      ] = await Promise.all([
-        getBooks().catch(() => []),
-        getIssuedBooks().catch(() => []),
-        getReservations().catch(() => []),
-        getLibrarySettings().catch(() => null),
-        getInventoryAudit().catch(() => null),
-        getMostBorrowedReport().catch(() => []),
-        getCategoryTrendsReport().catch(() => []),
-        getFeeCollectionReport().catch(() => null),
-        getPendingClearanceStudents().catch(() => ({ pending_clearance_students_count: 0, results: [] })),
-      ]);
+  const loadDashboardData = useCallback(async (isManual = false) => {
+    if (isManual) {
+      setIsRefreshing(true);
+    } else if (!summary) {
+      setLoading(true);
+    }
 
-      setBooks(booksData);
-      setLoans(loansData);
-      setReservations(resData);
-      setSettings(settingsData);
-      setInventoryAudit(auditData);
-      setMostBorrowed(borrowedData);
-      setCategoryTrends(trendsData);
-      setFeeCollection(feeData);
-      const clearanceList = Array.isArray(clearanceData)
-        ? clearanceData
-        : (clearanceData as any)?.results || [];
-      setPendingClearance(clearanceList);
+    try {
+      const summaryData = await getLibraryDashboardSummary(isManual);
+      setSummary(summaryData);
     } catch {
       // ignore
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [summary]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    loadDashboardData(true);
+  }, []);
 
-  // Derived metrics
-  const activeLoans = useMemo(() => loans.filter((l) => l.status === "ISSUED"), [loans]);
-  const overdueLoans = useMemo(() => {
-    const now = new Date();
-    return activeLoans.filter((l) => new Date(l.due_date) < now);
-  }, [activeLoans]);
+  // Derived metrics from instant SWR cache / backend response
+  const titlesCount = summary?.titles ?? 0;
+  const totalCopies = summary?.total_physical_copies ?? 0;
+  const availableCopies = summary?.available_copies ?? 0;
+  const activeLoansCount = summary?.active_loans_count ?? 0;
+  const overdueCount = summary?.overdue_count ?? 0;
+  const waitingReservationsCount = summary?.waiting_reservations_count ?? 0;
+  const availableHoldsCount = summary?.available_holds_count ?? 0;
+  const lostDamagedCount = summary?.lost_damaged_count ?? 0;
+  const totalFinesDue = Number(summary?.total_fines_due || 0);
+  const totalFinesSettled = Number(summary?.total_fines_settled || 0);
+  const pendingClearanceCount = summary?.pending_clearance_count ?? 0;
 
-  const totalCopies = useMemo(() => books.reduce((sum, b) => sum + (b.total_copies || 0), 0), [books]);
-  const availableCopies = useMemo(() => books.reduce((sum, b) => sum + (b.available_copies || 0), 0), [books]);
-
-  const waitingReservations = useMemo(() => reservations.filter((r) => r.status === "WAITING"), [reservations]);
-  const availableHolds = useMemo(() => reservations.filter((r) => r.status === "AVAILABLE"), [reservations]);
-
-  const totalFinesSettled = useMemo(() => {
-    if (feeCollection?.total_fees_collected !== undefined) return Number(feeCollection.total_fees_collected);
-    return loans.reduce((sum, l) => sum + Number(l.fine_paid_amount || 0), 0);
-  }, [loans, feeCollection]);
-
-  const totalFinesDue = useMemo(() => {
-    if (feeCollection?.total_pending_dues !== undefined) return Number(feeCollection.total_pending_dues);
-    return loans.reduce((sum, l) => {
-      const remaining = Number(l.total_fine || 0) - Number(l.fine_paid_amount || 0);
-      return sum + Math.max(0, remaining);
-    }, 0);
-  }, [loans, feeCollection]);
-
-  const lostDamagedCount = useMemo(() => {
-    const fromAudit = (inventoryAudit?.damaged_copies || 0) + (inventoryAudit?.lost_copies || 0);
-    const fromDamageRecords = feeCollection?.damage_records?.length || 0;
-    const fromLoans = loans.filter(
-      (l) => l.status === "DAMAGED" || l.status === "LOST" || ["MINOR_DAMAGE", "MAJOR_DAMAGE", "LOST"].includes(l.condition_on_return || "")
-    ).length;
-    return Math.max(fromAudit, fromDamageRecords, fromLoans);
-  }, [inventoryAudit, feeCollection, loans]);
-
-  const recentTransactions = useMemo(() => {
-    return [...loans].sort((a, b) => b.id - a.id).slice(0, 5);
-  }, [loans]);
+  const overdueLoans = summary?.overdue_loans_sample || [];
+  const availableHolds = summary?.available_holds_sample || [];
+  const recentTransactions = summary?.recent_transactions || [];
+  const mostBorrowed = summary?.most_borrowed_sample || [];
+  const categoryTrends = summary?.category_trends_sample || [];
+  const inventoryAudit = summary?.inventory_audit_overview;
 
   // Sweep holds
   const handleSweepHolds = async () => {
@@ -159,7 +112,7 @@ export default function LibrarianDashboard() {
     try {
       const res = await checkReservationExpiries();
       showToast("success", res.detail || "Expired reservations swept successfully.");
-      await loadDashboardData();
+      await loadDashboardData(true);
     } catch (err: any) {
       showToast("error", err?.message || "Failed to sweep holds.");
     } finally {
@@ -167,8 +120,10 @@ export default function LibrarianDashboard() {
     }
   };
 
+  const isInitialLoading = loading && !summary;
+
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-4 pb-3 sm:pb-5 lg:pb-6 w-full min-w-0 overflow-x-hidden font-sans">
       {/* Toast */}
       {notification && (
         <div
@@ -209,12 +164,13 @@ export default function LibrarianDashboard() {
             <span className="text-white/80 font-bold sm:hidden">›</span>
           </Link>
           <button
-            onClick={loadDashboardData}
-            disabled={loading}
-            className="py-2 px-3 sm:px-4 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            onClick={() => loadDashboardData(true)}
+            disabled={isRefreshing}
+            className="p-2 h-9 w-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0"
+            title="Refresh dashboard"
+            aria-label="Refresh dashboard"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-white shrink-0 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-4 h-4 text-white shrink-0 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
@@ -231,12 +187,18 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-slate-900">{books.length}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{totalCopies} physical</p>
+              <div className="text-lg sm:text-xl font-black text-slate-900">
+                <MetricValue value={titlesCount} loading={isInitialLoading} />
+              </div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
+                <MetricValue value={`${totalCopies} physical`} loading={isInitialLoading} />
+              </p>
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
-            <span className="text-emerald-600 font-bold truncate">{availableCopies} avail</span>
+            <span className="text-emerald-600 font-bold truncate">
+              <MetricValue value={`${availableCopies} avail`} loading={isInitialLoading} />
+            </span>
             <span className="text-slate-400 font-medium shrink-0 ml-1">In stock</span>
           </div>
         </div>
@@ -251,7 +213,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-slate-900">{activeLoans.length}</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900">
+                <MetricValue value={activeLoansCount} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Borrowers</p>
             </div>
           </div>
@@ -271,7 +235,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-rose-600">{overdueLoans.length}</div>
+              <div className="text-lg sm:text-xl font-black text-rose-600">
+                <MetricValue value={overdueCount} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Past return date</p>
             </div>
           </div>
@@ -291,8 +257,12 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-slate-900">{waitingReservations.length}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{availableHolds.length} ready pickup</p>
+              <div className="text-lg sm:text-xl font-black text-slate-900">
+                <MetricValue value={waitingReservationsCount} loading={isInitialLoading} />
+              </div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
+                <MetricValue value={`${availableHoldsCount} ready pickup`} loading={isInitialLoading} />
+              </p>
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] truncate">
@@ -311,7 +281,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-red-600">{lostDamagedCount}</div>
+              <div className="text-lg sm:text-xl font-black text-red-600">
+                <MetricValue value={lostDamagedCount} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Damaged or lost copies</p>
             </div>
           </div>
@@ -331,7 +303,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-amber-700">₹{totalFinesDue.toFixed(0)}</div>
+              <div className="text-lg sm:text-xl font-black text-amber-700">
+                <MetricValue value={`₹${totalFinesDue.toFixed(0)}`} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Pending collection</p>
             </div>
           </div>
@@ -351,7 +325,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-emerald-600">₹{totalFinesSettled.toFixed(0)}</div>
+              <div className="text-lg sm:text-xl font-black text-emerald-600">
+                <MetricValue value={`₹${totalFinesSettled.toFixed(0)}`} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Total collected</p>
             </div>
           </div>
@@ -371,7 +347,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-1.5">
-              <div className="text-lg sm:text-xl font-black text-slate-800">{pendingClearance.length}</div>
+              <div className="text-lg sm:text-xl font-black text-slate-800">
+                <MetricValue value={pendingClearanceCount} loading={isInitialLoading} />
+              </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Students blocked</p>
             </div>
           </div>
@@ -485,7 +463,7 @@ export default function LibrarianDashboard() {
                 {mostBorrowed.slice(0, 5).map((item, idx) => {
                   const maxBorrow = mostBorrowed[0]?.times_issued || 1;
                   const pct = Math.round(((item.times_issued || 0) / maxBorrow) * 100);
-                  const itemKey = item.book_id ?? item.id ?? `borrowed-${idx}`;
+                  const itemKey = item.book_id ?? `borrowed-${idx}`;
                   return (
                     <div key={itemKey} className="space-y-1 text-xs">
                       <div className="flex justify-between items-center">
@@ -533,17 +511,15 @@ export default function LibrarianDashboard() {
             ) : (
               <div className="space-y-3.5">
                 {categoryTrends.slice(0, 5).map((cat, idx) => {
-                  const maxCount = categoryTrends[0]?.total_books || categoryTrends[0]?.times_issued || 1;
-                  const loanCount = cat.times_issued ?? cat.total_loans ?? 0;
-                  const pct = Math.round(((cat.total_books || loanCount || 0) / maxCount) * 100);
+                  const maxCount = categoryTrends[0]?.total_books || 1;
+                  const pct = Math.round(((cat.total_books || 0) / maxCount) * 100);
                   const catKey = cat.category || `cat-${idx}`;
                   return (
                     <div key={catKey} className="space-y-1 text-xs">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-slate-800">{cat.category || "General"}</span>
                         <span className="font-bold text-purple-700">
-                          {cat.total_books ? `${cat.total_books} books ` : ""}
-                          {loanCount > 0 ? `(${loanCount} loans)` : ""}
+                          {cat.total_books ? `${cat.total_books} books` : "0 books"}
                         </span>
                       </div>
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -583,25 +559,25 @@ export default function LibrarianDashboard() {
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
                 <div className="text-slate-400 text-[11px]">Registered Copies</div>
                 <div className="text-lg font-bold text-slate-900 mt-0.5">
-                  {inventoryAudit?.overview?.total_copies || totalCopies}
+                  {inventoryAudit?.total_copies ?? totalCopies}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100">
                 <div className="text-emerald-700 text-[11px]">Available on Shelf</div>
                 <div className="text-lg font-bold text-emerald-700 mt-0.5">
-                  {inventoryAudit?.overview?.available || availableCopies}
+                  {inventoryAudit?.available ?? availableCopies}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100">
                 <div className="text-amber-700 text-[11px]">Under Repair</div>
                 <div className="text-lg font-bold text-amber-700 mt-0.5">
-                  {inventoryAudit?.overview?.under_repair || 0}
+                  {inventoryAudit?.under_repair ?? 0}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-rose-50/60 border border-rose-100">
                 <div className="text-rose-700 text-[11px]">Lost / Damaged</div>
                 <div className="text-lg font-bold text-rose-700 mt-0.5">
-                  {(inventoryAudit?.overview?.lost || 0) + (inventoryAudit?.overview?.damaged || 0)}
+                  {(inventoryAudit?.lost ?? 0) + (inventoryAudit?.damaged ?? 0)}
                 </div>
               </div>
             </div>
@@ -609,7 +585,7 @@ export default function LibrarianDashboard() {
             <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs flex justify-between items-center">
               <span className="text-slate-500 font-medium">Estimated Collection Value:</span>
               <span className="font-bold text-slate-900">
-                ₹{Number(inventoryAudit?.overview?.total_value || 0).toLocaleString()}
+                ₹{Number(inventoryAudit?.total_value || 0).toLocaleString()}
               </span>
             </div>
           </div>
@@ -637,7 +613,7 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 shrink-0">
-              {overdueLoans.length} Loans
+              {overdueCount} Loans
             </span>
           </div>
 
@@ -648,7 +624,7 @@ export default function LibrarianDashboard() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
-              {overdueLoans.slice(0, 4).map((loan, idx) => {
+              {overdueLoans.slice(0, 4).map((loan: any, idx: number) => {
                 const overdueDays = Math.max(
                   1,
                   Math.floor((Date.now() - new Date(loan.due_date).getTime()) / (1000 * 60 * 60 * 24))
@@ -658,7 +634,7 @@ export default function LibrarianDashboard() {
                     <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">{loan.book_title}</div>
                       <div className="text-[11px] sm:text-xs text-slate-500 truncate">
-                        Borrower: <strong>{loan.student_name || loan.staff_name}</strong> · GR: {loan.student_gr_no || "N/A"}
+                        Borrower: <strong>{loan.student_name || loan.staff_name || "Borrower"}</strong> · GR: {loan.student_gr_no || "N/A"}
                       </div>
                       <div className="text-[10px] sm:text-[11px] text-rose-600 font-semibold">
                         Due: {new Date(loan.due_date).toLocaleDateString()} ({overdueDays} days late)
@@ -744,66 +720,122 @@ export default function LibrarianDashboard() {
         {recentTransactions.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-400">No circulation history recorded yet.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
-                <tr>
-                  <th className="py-3 px-4">Book Title</th>
-                  <th className="py-3 px-4">Borrower</th>
-                  <th className="py-3 px-4">Issue Date</th>
-                  <th className="py-3 px-4">Due Date</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Fine Settlement</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recentTransactions.map((tx, idx) => (
-                  <tr key={tx.id ?? `tx-${idx}`} className="hover:bg-slate-50/50">
-                    <td className="py-3 px-4 font-semibold text-slate-900 max-w-[220px] truncate">
-                      {tx.book_title}
-                    </td>
-                    <td className="py-3 px-4 text-slate-700">
-                      {tx.student_name || tx.staff_name || "Borrower"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">
-                      {new Date(tx.book_issued_date).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">
-                      {new Date(tx.due_date).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          tx.status === "RETURNED"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : tx.status === "ISSUED"
-                            ? "bg-sky-50 text-sky-700 border border-sky-200"
-                            : "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
+          <>
+            {/* Desktop Full Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+                  <tr>
+                    <th className="py-3 px-4">Book Title</th>
+                    <th className="py-3 px-4">Borrower</th>
+                    <th className="py-3 px-4">Issue Date</th>
+                    <th className="py-3 px-4">Due Date</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Fine Settlement</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentTransactions.map((tx, idx) => (
+                    <tr key={tx.id ?? `tx-${idx}`} className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-semibold text-slate-900 max-w-[220px] truncate">
+                        {tx.book_title}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        {tx.student_name || tx.staff_name || "Borrower"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {new Date(tx.book_issued_date).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {new Date(tx.due_date).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                            tx.status === "RETURNED"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : tx.status === "ISSUED"
+                              ? "bg-sky-50 text-sky-700 border border-sky-200"
+                              : "bg-rose-50 text-rose-700 border border-rose-200"
+                          }`}
+                        >
+                          {tx.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {Number(tx.total_fine || 0) > 0 ? (
+                          tx.is_fine_paid ? (
+                            <span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> Paid ₹{tx.fine_paid_amount}
+                            </span>
+                          ) : (
+                            <span className="text-rose-600 font-semibold text-[11px] flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" /> Due ₹{Number(tx.total_fine) - Number(tx.fine_paid_amount || 0)}
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">No fine</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Zero-X-Scroll Card View */}
+            <div className="divide-y divide-slate-100 block md:hidden w-full">
+              {recentTransactions.map((tx, idx) => (
+                <div key={tx.id ?? `mobile-tx-${idx}`} className="py-3 space-y-2 w-full">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                        {tx.book_title}
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                        Borrower: <span className="font-semibold text-slate-700">{tx.student_name || tx.staff_name || "Borrower"}</span>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                        tx.status === "RETURNED"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : tx.status === "ISSUED"
+                          ? "bg-sky-50 text-sky-700 border border-sky-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200"
+                      }`}
+                    >
+                      {tx.status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5 border-t border-slate-50">
+                    <div className="min-w-0 truncate text-[11px]">
+                      <span>Due: <strong className="text-slate-800">{new Date(tx.due_date).toLocaleDateString()}</strong></span>
+                      <span className="text-slate-300 mx-1.5">•</span>
+                      <span className="text-slate-400 text-[10px]">{new Date(tx.book_issued_date).toLocaleDateString()}</span>
+                    </div>
+
+                    <div className="shrink-0 text-right">
                       {Number(tx.total_fine || 0) > 0 ? (
                         tx.is_fine_paid ? (
-                          <span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
+                          <span className="text-emerald-700 font-bold text-[11px] flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Paid ₹{tx.fine_paid_amount}
                           </span>
                         ) : (
-                          <span className="text-rose-600 font-semibold text-[11px] flex items-center gap-1">
+                          <span className="text-rose-600 font-bold text-[11px] flex items-center gap-1">
                             <AlertCircle className="h-3 w-3" /> Due ₹{Number(tx.total_fine) - Number(tx.fine_paid_amount || 0)}
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400 text-[11px]">No fine</span>
+                        <span className="text-slate-400 text-[10px]">No fine</span>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

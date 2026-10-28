@@ -539,8 +539,14 @@ export default function GeneralRegisterPage() {
                 </tr>
               ) : filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="p-10 text-center text-gray-400">
-                    No G.R. records found.
+                  <td colSpan={14} className="p-12 text-center text-gray-500">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No records found"
+                      className="mx-auto mb-3 h-24 w-24 object-contain"
+                    />
+                    <div className="font-semibold text-slate-700 text-sm">No G.R. records found</div>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search keywords.</p>
                     <button type="button" onClick={resetFilters} className="no-print mx-auto mt-3 block text-sm font-medium text-teal-700 hover:underline">Clear filters and show all records</button>
                   </td>
                 </tr>

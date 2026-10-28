@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Search, Plus, Check, ChevronDown, X, BookOpen } from "lucide-react";
 import { BookCategory } from "@/lib/library";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
 
 export interface CategoryComboboxProps {
   value: string;
@@ -161,12 +162,12 @@ export function CategoryCombobox({
           error
             ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
             : isOpen
-            ? "border-indigo-600 ring-2 ring-indigo-500/20"
+            ? "border-[#2563EB] ring-2 ring-blue-500/20"
             : "border-slate-200 hover:border-slate-300"
         } ${disabled ? "opacity-60 cursor-not-allowed bg-slate-50" : "cursor-pointer"}`}
       >
         <div className="flex items-center gap-2 truncate">
-          <BookOpen className="h-4 w-4 text-indigo-500 shrink-0" />
+          <BookOpen className="h-4 w-4 text-[#2563EB] shrink-0" />
           {value ? (
             <span className="font-semibold text-slate-900 truncate">{value}</span>
           ) : (
@@ -196,15 +197,15 @@ export function CategoryCombobox({
           )}
           <ChevronDown
             className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
-              isOpen ? "rotate-180 text-indigo-600" : ""
+              isOpen ? "rotate-180 text-[#2563EB]" : ""
             }`}
           />
         </div>
       </button>
 
-      {/* Dropdown Menu / Popover */}
+      {/* Dropdown Menu / Popover (Desktop) */}
       {isOpen && (
-        <div className="absolute z-[9999] left-0 top-[calc(100%+4px)] w-full min-w-[280px] bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="hidden md:block absolute z-[9999] left-0 top-[calc(100%+4px)] w-full min-w-[280px] bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           {/* Internal Search Input */}
           <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
             <div className="relative">
@@ -218,7 +219,7 @@ export function CategoryCombobox({
                   setHighlightedIndex(0);
                 }}
                 placeholder="Search subject (e.g. Math, Science)..."
-                className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-slate-200 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"
+                className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-slate-200 bg-white focus:outline-hidden focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 text-slate-800 placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
@@ -228,7 +229,7 @@ export function CategoryCombobox({
                     setHighlightedIndex(0);
                     searchInputRef.current?.focus();
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -251,14 +252,14 @@ export function CategoryCombobox({
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between transition-colors ${
                       isSelected
-                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                        ? "bg-blue-50 text-blue-700 font-bold"
                         : isHighlighted
                         ? "bg-slate-100 text-slate-900"
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     <span className="truncate">{opt.name}</span>
-                    {isSelected && <Check className="h-4 w-4 text-indigo-600 shrink-0 ml-2" />}
+                    {isSelected && <Check className="h-4 w-4 text-[#2563EB] shrink-0 ml-2" />}
                   </li>
                 );
               })
@@ -275,11 +276,11 @@ export function CategoryCombobox({
                 aria-selected={false}
                 onClick={() => handleCreate(searchQuery)}
                 onMouseEnter={() => setHighlightedIndex(filteredOptions.length)}
-                className={`px-3 py-2.5 rounded-lg cursor-pointer border border-dashed border-indigo-200 mt-1 flex items-center gap-2 text-indigo-700 font-bold transition-colors ${
-                  highlightedIndex === filteredOptions.length ? "bg-indigo-50/80" : "bg-indigo-50/40 hover:bg-indigo-50"
+                className={`px-3 py-2.5 rounded-lg cursor-pointer border border-dashed border-blue-200 mt-1 flex items-center gap-2 text-blue-700 font-bold transition-colors ${
+                  highlightedIndex === filteredOptions.length ? "bg-blue-50/80" : "bg-blue-50/40 hover:bg-blue-50"
                 }`}
               >
-                <Plus className="h-4 w-4 text-indigo-600 shrink-0" />
+                <Plus className="h-4 w-4 text-[#2563EB] shrink-0" />
                 <span className="truncate">
                   Create &ldquo;<span className="underline">{searchQuery.trim()}</span>&rdquo; as new subject
                 </span>
@@ -288,6 +289,88 @@ export function CategoryCombobox({
           </ul>
         </div>
       )}
+
+      {/* Mobile Bottom Drawer for Subject Selection */}
+      <MobileBottomDrawer
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Category / Subject"
+        subtitle="Search or create a category/subject"
+      >
+        <div className="space-y-3 pb-2">
+          {/* Mobile Search Input */}
+          <div className="relative">
+            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setHighlightedIndex(0);
+              }}
+              placeholder="Search or type subject..."
+              className="w-full h-10 pl-9 pr-8 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/20 text-slate-800 placeholder:text-slate-400"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Options List */}
+          <ul className="max-h-[50vh] overflow-y-auto space-y-1.5 text-sm divide-y-0 pr-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => {
+                const isSelected = value.trim().toLowerCase() === opt.name.trim().toLowerCase();
+                return (
+                  <li
+                    key={opt.name}
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => handleSelect(opt)}
+                    className={`px-3.5 py-3 rounded-2xl cursor-pointer flex items-center justify-between transition-all ${
+                      isSelected
+                        ? "bg-blue-50 border-2 border-[#2563EB] text-[#2563EB] font-bold shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 active:bg-slate-200 font-medium"
+                    }`}
+                  >
+                    <span className="truncate">{opt.name}</span>
+                    {isSelected && (
+                      <div className="h-5 w-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Check className="h-3.5 w-3.5 stroke-[3]" />
+                      </div>
+                    )}
+                  </li>
+                );
+              })
+            ) : !canCreateNew ? (
+              <li className="px-3 py-6 text-center text-slate-400 text-xs">
+                No subjects found matching &ldquo;{searchQuery}&rdquo;.
+              </li>
+            ) : null}
+
+            {/* Mobile Create New Option */}
+            {canCreateNew && (
+              <li
+                role="option"
+                aria-selected={false}
+                onClick={() => handleCreate(searchQuery)}
+                className="px-3.5 py-3 rounded-2xl cursor-pointer border border-dashed border-blue-300 bg-blue-50/60 hover:bg-blue-50 flex items-center gap-2.5 text-[#2563EB] font-bold transition-colors"
+              >
+                <Plus className="h-4 w-4 text-[#2563EB] shrink-0" />
+                <span className="truncate">
+                  Create &ldquo;<span className="underline">{searchQuery.trim()}</span>&rdquo; as new subject
+                </span>
+              </li>
+            )}
+          </ul>
+        </div>
+      </MobileBottomDrawer>
     </div>
   );
 }

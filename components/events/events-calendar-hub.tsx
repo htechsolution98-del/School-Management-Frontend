@@ -27,6 +27,9 @@ import {
   CalendarDays,
   ListTodo,
   Info,
+  ArrowLeft,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -36,6 +39,7 @@ import {
   updateSchoolEvent,
   deleteSchoolEvent,
   seedDefaultSchoolHolidays,
+  getStoredSchoolEvents,
   type SchoolEventResponse,
   type SchoolEventPayload,
 } from "@/lib/events";
@@ -44,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
 
 export interface EventsCalendarHubProps {
   roleTitle: string;
@@ -66,8 +71,8 @@ const EVENT_TYPES = [
     label: "School Event",
     desc: "Functions, sports, cultural events",
     icon: Trophy,
-    color: "#5826df",
-    bgClass: "bg-indigo-50 text-[#5826df] dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200",
+    color: "#2563EB",
+    bgClass: "bg-blue-50 text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300 border-blue-200",
   },
   {
     value: "EXAM",
@@ -103,13 +108,22 @@ const EVENT_TYPES = [
   },
 ];
 
-const AUDIENCE_OPTIONS = [
-  { value: "ALL", label: "Everyone (All Roles)" },
-  { value: "STUDENTS_PARENTS", label: "Students & Parents" },
-  { value: "STUDENT", label: "Students Only" },
-  { value: "PARENT", label: "Parents Only" },
-  { value: "TEACHER", label: "Teachers Only" },
-  { value: "STAFF", label: "Staff & Administration" },
+export const EVENT_FILTER_OPTIONS = [
+  { value: "ALL", label: "All Events & Holidays", icon: CalendarDays, color: "#2563EB" },
+  { value: "HOLIDAY", label: "Holidays Only", icon: Palmtree, color: "#f59e0b" },
+  { value: "EVENT", label: "School Events", icon: Trophy, color: "#2563EB" },
+  { value: "EXAM", label: "Exams & Tests", icon: BookOpen, color: "#e11d48" },
+  { value: "MEETING", label: "Meetings / PTM", icon: Users2, color: "#059669" },
+  { value: "CELEBRATION", label: "Celebrations", icon: PartyPopper, color: "#0284c7" },
+];
+
+export const AUDIENCE_OPTIONS = [
+  { value: "ALL", label: "Everyone (All Roles)", desc: "School-wide broadcast to all panels", icon: Users2 },
+  { value: "STUDENTS_PARENTS", label: "Students & Parents", desc: "Visible to students and their guardians", icon: BookOpen },
+  { value: "STUDENT", label: "Students Only", desc: "Visible exclusively on student portal", icon: Sparkles },
+  { value: "PARENT", label: "Parents Only", desc: "Visible exclusively on parent portal", icon: Users2 },
+  { value: "TEACHER", label: "Teachers Only", desc: "Academic staff notices & circulars", icon: BookOpen },
+  { value: "STAFF", label: "Staff & Administration", desc: "Non-academic staff & office circulars", icon: ShieldCheck },
 ];
 
 const MONTH_NAMES = [
@@ -203,10 +217,11 @@ export function EventsCalendarHub({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
 
-  const [events, setEvents] = useState<SchoolEventResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<SchoolEventResponse[]>(() => getStoredSchoolEvents());
+  const [loading, setLoading] = useState(() => getStoredSchoolEvents().length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("ALL");
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"CALENDAR" | "AGENDA">("CALENDAR");
 
   // Selected date for day drawer/modal
@@ -464,64 +479,127 @@ export function EventsCalendarHub({
     : "Stay updated with official school academic calendars, public holidays, exams, and celebrations.";
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
-      {/* ─── TOP HEADER CARD ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-zinc-900 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs w-full min-w-0 overflow-hidden">
-        <div className="space-y-1 w-full min-w-0 flex-1">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
+      {/* ─── TOP HEADER CARD (HERO BANNER) ─────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-[0_4px_25px_rgba(37,99,235,0.05)] p-4 sm:p-6 lg:p-7 w-full min-w-0">
+        {/* Soft background blue glow behind right 3D illustration */}
+        <div className="absolute right-0 top-0 bottom-0 w-3/5 bg-gradient-to-l from-blue-100/50 via-blue-50/20 to-transparent dark:from-blue-950/20 dark:via-zinc-900/10 pointer-events-none rounded-r-3xl" />
+        <div className="absolute -right-6 -bottom-6 w-48 h-48 bg-blue-200/30 dark:bg-blue-900/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-4">
+          {/* Header Row: Icon + Title in a SINGLE LINE across full width */}
           <div className="flex items-center gap-2.5 sm:gap-3 w-full min-w-0">
-            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20 shadow-2xs shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#2563EB]/15 to-[#1D4ED8]/25 text-[#2563EB] border border-[#2563EB]/20 flex items-center justify-center shrink-0 shadow-2xs">
               <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 dark:text-zinc-100 truncate">
+              <h1 className="text-base sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight leading-tight truncate sm:whitespace-normal">
                 {pageTitle || defaultTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-2">
-                {pageSubtitle || defaultSubtitle}
-              </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchEventsList(true)}
-            disabled={refreshing}
-            className="flex-1 sm:flex-initial h-8 sm:h-10 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs font-bold text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#5826df]/30 hover:bg-indigo-50/40 hover:text-[#5826df] gap-1.5 sm:gap-2 transition-all shadow-2xs justify-center"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${refreshing ? "animate-spin text-[#5826df]" : ""}`} />
-            Refresh
-          </Button>
+          {/* Content Row: Bottom Paragraph on Left, 3D Image on Right */}
+          <div className="flex items-center justify-between gap-3 sm:gap-6 w-full min-w-0">
+            <div className="flex-1 min-w-0 pr-1">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-[280px] sm:max-w-md lg:max-w-xl leading-relaxed font-normal">
+                {pageSubtitle || defaultSubtitle}
+              </p>
 
-          {canManage && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSeedDefaults}
-                disabled={isSeeding || refreshing}
-                title="Automatically load and synchronize standard public and school holidays"
-                className="flex-1 sm:flex-initial h-8 sm:h-10 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1.5 sm:gap-2 transition-all shadow-2xs justify-center"
-              >
-                <Sparkles className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isSeeding ? "animate-spin text-amber-500" : "text-amber-500"}`} />
-                {isSeeding ? "Syncing..." : "Sync Holidays"}
-              </Button>
+              {/* Desktop Buttons Row (hidden on mobile, shown on sm+) */}
+              <div className="hidden sm:flex items-center gap-2.5 sm:gap-3 mt-4 flex-nowrap">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fetchEventsList(true)}
+                  disabled={refreshing}
+                  className="h-10 w-10 rounded-2xl text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#2563EB]/30 hover:bg-blue-50/40 hover:text-[#2563EB] transition-all shadow-2xs justify-center shrink-0 cursor-pointer"
+                  title="Refresh events"
+                  aria-label="Refresh events"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
+                </Button>
 
-              <Button
-                onClick={() => {
-                  setEditingEvent(null);
-                  setInitialDateForForm("");
-                  setFormModalOpen(true);
-                }}
-                className="flex-1 sm:flex-initial h-8 sm:h-10 bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white font-bold text-xs rounded-xl sm:rounded-2xl px-4 sm:px-5 gap-1.5 sm:gap-2 shadow-md shadow-[#5826df]/25 transition-all hover:shadow-[#5826df]/35 active:scale-[0.98] justify-center"
-              >
-                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-                Add Event / Holiday
-              </Button>
-            </>
-          )}
+                {canManage && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleSeedDefaults}
+                      disabled={isSeeding || refreshing}
+                      title="Automatically load and synchronize standard public and school holidays"
+                      className="h-10 rounded-2xl px-4 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 bg-amber-50/60 hover:bg-amber-100 dark:hover:bg-amber-950/40 gap-2 transition-all shadow-2xs justify-center cursor-pointer whitespace-nowrap"
+                    >
+                      <Sparkles className={`h-4 w-4 ${isSeeding ? "animate-spin text-amber-500" : "text-amber-500"}`} />
+                      {isSeeding ? "Syncing..." : "Sync Holidays"}
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        setEditingEvent(null);
+                        setInitialDateForForm("");
+                        setFormModalOpen(true);
+                      }}
+                      className="h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white font-bold text-sm rounded-2xl px-5 gap-2 shadow-md shadow-[#2563EB]/25 transition-all hover:shadow-[#2563EB]/35 active:scale-[0.98] justify-center cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus className="h-4 w-4 stroke-[2.5]" />
+                      Add Event / Holiday
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Right 3D Books with Calendar Illustration */}
+            <div className="shrink-0 flex items-center justify-end relative">
+              <img
+                src="/images/Books-with-calendar.png"
+                alt="Events & Calendar"
+                className="w-24 sm:w-40 md:w-48 lg:w-56 h-auto object-contain select-none pointer-events-none drop-shadow-md"
+              />
+            </div>
+          </div>
+
+          {/* Mobile Buttons Row (shown on mobile, hidden on sm+) - Guaranteed Single Line */}
+          <div className="flex sm:hidden items-center gap-2 w-full mt-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => fetchEventsList(true)}
+              disabled={refreshing}
+              className="h-10 w-10 rounded-2xl text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#2563EB]/30 hover:bg-blue-50/40 hover:text-[#2563EB] transition-all shadow-2xs justify-center shrink-0 cursor-pointer"
+              title="Refresh events"
+              aria-label="Refresh events"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-[#2563EB]" : ""}`} />
+            </Button>
+
+            {canManage && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSeedDefaults}
+                  disabled={isSeeding || refreshing}
+                  title="Sync public holidays"
+                  className="flex-1 h-10 rounded-2xl px-2 text-xs font-bold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 bg-amber-50/60 hover:bg-amber-100 gap-1.5 transition-all shadow-2xs justify-center cursor-pointer truncate"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 shrink-0 ${isSeeding ? "animate-spin text-amber-500" : "text-amber-500"}`} />
+                  <span className="truncate">{isSeeding ? "Syncing..." : "Sync Holidays"}</span>
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    setEditingEvent(null);
+                    setInitialDateForForm("");
+                    setFormModalOpen(true);
+                  }}
+                  className="flex-1 h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] text-white font-bold text-xs rounded-2xl px-2.5 gap-1.5 shadow-md shadow-[#2563EB]/25 transition-all active:scale-[0.98] justify-center cursor-pointer truncate"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[2.5] shrink-0" />
+                  <span className="truncate">Add Event</span>
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -541,12 +619,12 @@ export function EventsCalendarHub({
 
         <Card className="rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
           <CardContent className="p-2.5 sm:p-5 flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-[#5826df] shrink-0 shadow-2xs">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 flex items-center justify-center text-[#2563EB] shrink-0 shadow-2xs">
               <Trophy className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Events & Fests</p>
-              <p className="text-lg sm:text-2xl font-black text-[#5826df] dark:text-indigo-400">{schoolEventsCount}</p>
+              <p className="text-lg sm:text-2xl font-black text-[#2563EB] dark:text-blue-400">{schoolEventsCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -607,7 +685,7 @@ export function EventsCalendarHub({
 
             <button
               onClick={handleGoToday}
-              className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-[#5826df] hover:bg-indigo-100 border border-[#5826df]/20 transition-all shadow-2xs"
+              className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] hover:bg-blue-100 border border-[#2563EB]/20 transition-all shadow-2xs"
             >
               Today
             </button>
@@ -640,17 +718,83 @@ export function EventsCalendarHub({
           </div>
         </div>
 
-        {/* Filter Pills Bar */}
-        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
+        {/* Mobile Filter Drawer Trigger (Mobile Only) */}
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex sm:hidden items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterDrawerOpen(true)}
+            className="flex-1 h-10 px-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 flex items-center justify-between gap-2 text-xs font-bold text-slate-800 dark:text-zinc-200 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Filter className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+              <span className="text-slate-400 font-semibold text-[11px]">Filter:</span>
+              <span className="text-[#2563EB] truncate">
+                {EVENT_FILTER_OPTIONS.find((o) => o.value === selectedTypeFilter)?.label || "All Events"}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </button>
+        </div>
+
+        {/* Mobile Bottom Drawer for Calendar Category Filter */}
+        <MobileBottomDrawer
+          isOpen={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          title="Filter Calendar Events"
+          subtitle="Select category of events to display"
+        >
+          <div className="space-y-2 py-1">
+            {EVENT_FILTER_OPTIONS.map((opt) => {
+              const isSelected = selectedTypeFilter === opt.value;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTypeFilter(opt.value);
+                    setFilterDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left cursor-pointer ${
+                    isSelected
+                      ? "border-[#2563EB] bg-blue-50/70 dark:bg-blue-950/40 text-[#2563EB] font-black shadow-xs ring-1 ring-[#2563EB]"
+                      : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 font-semibold hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: isSelected ? "#2563EB15" : "#64748b15",
+                        color: isSelected ? "#2563EB" : opt.color || "#64748b",
+                      }}
+                    >
+                      <Icon className="w-4 h-4 stroke-[2.2]" />
+                    </div>
+                    <span className="text-xs sm:text-sm">{opt.label}</span>
+                  </div>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </MobileBottomDrawer>
+
+        {/* Desktop Filter Pills Bar (Hidden on Mobile, Visible on Desktop) */}
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 hidden sm:flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-            <Filter className="w-3 h-3 text-[#5826df]" /> Filter:
+            <Filter className="w-3 h-3 text-[#2563EB]" /> Filter:
           </span>
 
           <button
             onClick={() => setSelectedTypeFilter("ALL")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               selectedTypeFilter === "ALL"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -659,7 +803,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("HOLIDAY")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
               selectedTypeFilter === "HOLIDAY"
                 ? "bg-amber-500 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -671,9 +815,9 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("EVENT")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
               selectedTypeFilter === "EVENT"
-                ? "bg-[#5826df] text-white shadow-xs"
+                ? "bg-[#2563EB] text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
             }`}
           >
@@ -683,7 +827,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("EXAM")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
               selectedTypeFilter === "EXAM"
                 ? "bg-rose-500 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -695,7 +839,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("MEETING")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
               selectedTypeFilter === "MEETING"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -707,7 +851,7 @@ export function EventsCalendarHub({
 
           <button
             onClick={() => setSelectedTypeFilter("CELEBRATION")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
               selectedTypeFilter === "CELEBRATION"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200"
@@ -722,7 +866,7 @@ export function EventsCalendarHub({
       {/* ─── MAIN CALENDAR / AGENDA VIEW ─────────────────────────────────── */}
       {loading ? (
         <div className="py-24 text-center flex flex-col items-center justify-center gap-3 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
-          <Loader2 className="w-8 h-8 text-[#5826df] animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin" />
           <p className="text-xs font-bold text-slate-500">Loading academic calendar...</p>
         </div>
       ) : viewMode === "CALENDAR" ? (
@@ -757,7 +901,7 @@ export function EventsCalendarHub({
                       !day.isCurrentMonth
                         ? "bg-slate-50/40 dark:bg-zinc-950/40 text-slate-300 dark:text-zinc-600 cursor-default"
                         : isSelected
-                        ? "ring-2 ring-inset ring-[#5826df] bg-indigo-50/70 dark:bg-indigo-950/40"
+                        ? "ring-2 ring-inset ring-[#2563EB] bg-blue-50/70 dark:bg-blue-950/40"
                         : isSunday
                         ? "bg-rose-50/20 dark:bg-rose-950/10 hover:bg-slate-50 dark:hover:bg-zinc-800/50"
                         : "hover:bg-slate-50 dark:hover:bg-zinc-800/50"
@@ -768,9 +912,9 @@ export function EventsCalendarHub({
                     <span
                       className={`text-[11px] sm:text-xs font-black w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-all ${
                         day.isToday
-                          ? "bg-[#5826df] text-white shadow-xs"
+                          ? "bg-[#2563EB] text-white shadow-xs"
                           : isSelected
-                          ? "bg-[#5826df]/20 text-[#5826df] font-black"
+                          ? "bg-[#2563EB]/20 text-[#2563EB] font-black"
                           : day.isCurrentMonth
                           ? isSunday
                             ? "text-rose-500 font-bold"
@@ -805,7 +949,7 @@ export function EventsCalendarHub({
                           );
                         })}
                         {day.events.length > 3 && (
-                          <span className="text-[7px] font-black text-[#5826df] leading-none">
+                          <span className="text-[7px] font-black text-[#2563EB] leading-none">
                             +
                           </span>
                         )}
@@ -835,7 +979,7 @@ export function EventsCalendarHub({
                         })}
 
                         {day.events.length > 2 && (
-                          <p className="text-[9px] font-black text-[#5826df] dark:text-indigo-400 pl-1">
+                          <p className="text-[9px] font-black text-[#2563EB] dark:text-blue-400 pl-1">
                             +{day.events.length - 2} more
                           </p>
                         )}
@@ -853,7 +997,7 @@ export function EventsCalendarHub({
                           setInitialDateForForm(day.dateStr);
                           setFormModalOpen(true);
                         }}
-                        className="text-[10px] font-bold text-[#5826df] hover:underline flex items-center gap-0.5"
+                        className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5"
                       >
                         <Plus className="w-3 h-3" /> Add
                       </button>
@@ -873,7 +1017,7 @@ export function EventsCalendarHub({
               <div
                 className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl shrink-0 ${
                   selectedDateStr
-                    ? "bg-indigo-50 text-[#5826df] border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900"
+                    ? "bg-blue-50 text-[#2563EB] border border-blue-100 dark:bg-blue-950/40 dark:border-blue-900"
                     : "bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900"
                 }`}
               >
@@ -911,7 +1055,7 @@ export function EventsCalendarHub({
                   onClick={() => setSelectedDateStr(null)}
                   className="rounded-xl text-[11px] sm:text-xs font-bold gap-1.5 h-7 sm:h-8 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800"
                 >
-                  <CalendarDays className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#5826df]" /> Show All {MONTH_NAMES[currentMonth]}
+                  <CalendarDays className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#2563EB]" /> Show All {MONTH_NAMES[currentMonth]}
                 </Button>
               )}
               {canManage && (
@@ -922,7 +1066,7 @@ export function EventsCalendarHub({
                     setEditingEvent(null);
                     setFormModalOpen(true);
                   }}
-                  className="bg-[#5826df] hover:bg-[#4c1fc7] text-white text-[11px] sm:text-xs font-bold rounded-xl px-3 sm:px-3.5 h-7 sm:h-8 gap-1.5 shadow-2xs"
+                  className="bg-[#2563EB] hover:bg-[#1E40AF] text-white text-[11px] sm:text-xs font-bold rounded-xl px-3 sm:px-3.5 h-7 sm:h-8 gap-1.5 shadow-2xs"
                 >
                   <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Add {selectedDateStr ? "for This Date" : "Event / Holiday"}
                 </Button>
@@ -967,7 +1111,7 @@ export function EventsCalendarHub({
                       setEditingEvent(null);
                       setFormModalOpen(true);
                     }}
-                    className="bg-[#5826df] hover:bg-[#4c1fc7] text-white rounded-xl text-xs font-bold"
+                    className="bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-xl text-xs font-bold"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
                   </Button>
@@ -1038,7 +1182,7 @@ export function EventsCalendarHub({
                           )}
                         </div>
 
-                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100 line-clamp-1 group-hover:text-[#5826df] transition-colors first-letter:uppercase">
+                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100 line-clamp-1 group-hover:text-[#2563EB] transition-colors first-letter:uppercase">
                           {capitalizeFirstLetter(ev.title || ev.name)}
                         </h4>
                       </div>
@@ -1079,7 +1223,7 @@ export function EventsCalendarHub({
                     <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-3 text-[11px] text-slate-500 dark:text-zinc-400 flex-wrap">
                       {hasRange ? (
                         <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-zinc-300">
-                          <CalendarIcon className="w-3 h-3 text-[#5826df]" />
+                          <CalendarIcon className="w-3 h-3 text-[#2563EB]" />
                           {formatDateDisplay(ev.start_date)} - {formatDateDisplay(ev.end_date)}
                         </span>
                       ) : (
@@ -1151,11 +1295,11 @@ export function EventsCalendarHub({
                     layout
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#5826df]/35 transition-all flex items-start gap-3 sm:gap-4 group"
+                    className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs hover:border-[#2563EB]/35 transition-all flex items-start gap-3 sm:gap-4 group"
                   >
                     {/* Date Block */}
-                    <div className="w-13 sm:w-16 rounded-2xl bg-indigo-50/70 dark:bg-zinc-800/60 border border-indigo-100 dark:border-zinc-700 flex flex-col items-center justify-center py-2 px-1 text-center shrink-0 shadow-2xs">
-                      <span className="text-[10px] font-black uppercase text-[#5826df] tracking-wider">
+                    <div className="w-13 sm:w-16 rounded-2xl bg-blue-50/70 dark:bg-zinc-800/60 border border-blue-100 dark:border-zinc-700 flex flex-col items-center justify-center py-2 px-1 text-center shrink-0 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase text-[#2563EB] tracking-wider">
                         {monthStr}
                       </span>
                       <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100 leading-none my-0.5 sm:my-1">
@@ -1209,7 +1353,7 @@ export function EventsCalendarHub({
 
                       <h3
                         onClick={() => setViewingDetailEvent(ev)}
-                        className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#5826df] cursor-pointer first-letter:uppercase line-clamp-1 leading-snug"
+                        className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 hover:text-[#2563EB] cursor-pointer first-letter:uppercase line-clamp-1 leading-snug"
                       >
                         {capitalizeFirstLetter(ev.title || ev.name)}
                       </h3>
@@ -1222,7 +1366,7 @@ export function EventsCalendarHub({
 
                       <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2 text-[11px] text-slate-400 flex-wrap">
                         <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
-                          <Clock className="w-3.5 h-3.5 text-[#5826df] shrink-0" />
+                          <Clock className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
                           <span>{formatDateDisplay(ev.start_date)}</span>
                           {ev.end_date && ev.end_date !== ev.start_date && (
                             <span> &rarr; {formatDateDisplay(ev.end_date)}</span>
@@ -1250,40 +1394,50 @@ export function EventsCalendarHub({
       {/* ─── SINGLE EVENT DETAIL VIEW MODAL ─────────────────────────────── */}
       <AnimatePresence>
         {viewingDetailEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setViewingDetailEvent(null)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 max-h-[85vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-4"
+              className="relative bg-white dark:bg-zinc-900 rounded-none sm:rounded-3xl shadow-2xl w-full h-[100dvh] sm:h-auto sm:max-h-[85vh] sm:max-w-md p-4 sm:p-6 overflow-y-auto z-10 border-0 sm:border border-slate-200 dark:border-zinc-800 space-y-4"
             >
               <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(() => {
-                      const cfg = getEventTypeConfig(viewingDetailEvent.event_type);
-                      const Icon = cfg.icon;
-                      return (
-                        <Badge className={`${cfg.bgClass} text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1`}>
-                          <Icon className="w-3 h-3" /> {cfg.label}
-                        </Badge>
-                      );
-                    })()}
-                    {viewingDetailEvent.is_holiday && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                        School Closed
-                      </span>
-                    )}
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    onClick={() => setViewingDetailEvent(null)}
+                    className="sm:hidden p-1.5 -ml-1 text-slate-700 dark:text-zinc-300 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+                    aria-label="Back"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {(() => {
+                        const cfg = getEventTypeConfig(viewingDetailEvent.event_type);
+                        const Icon = cfg.icon;
+                        return (
+                          <Badge className={`${cfg.bgClass} text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1`}>
+                            <Icon className="w-3 h-3" /> {cfg.label}
+                          </Badge>
+                        );
+                      })()}
+                      {viewingDetailEvent.is_holiday && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          School Closed
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-zinc-100 first-letter:uppercase truncate">
+                      {capitalizeFirstLetter(viewingDetailEvent.title || viewingDetailEvent.name)}
+                    </h3>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-zinc-100 first-letter:uppercase">
-                    {capitalizeFirstLetter(viewingDetailEvent.title || viewingDetailEvent.name)}
-                  </h3>
                 </div>
 
                 <button
                   onClick={() => setViewingDetailEvent(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                  className="hidden sm:block p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1323,7 +1477,7 @@ export function EventsCalendarHub({
               <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-zinc-800">
                 <Button
                   onClick={() => setViewingDetailEvent(null)}
-                  className="rounded-2xl h-9 px-5 text-xs font-bold bg-gradient-to-r from-[#5826df] to-[#6d3df5] text-white"
+                  className="rounded-2xl h-9 px-5 text-xs font-bold bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white"
                 >
                   Close
                 </Button>
@@ -1424,6 +1578,7 @@ function EventFormModal({
   const [endDate, setEndDate] = useState<string>(toISODateString(event?.end_date) || "");
   const [description, setDescription] = useState<string>(event?.description || "");
   const [targetAudience, setTargetAudience] = useState<string>(event?.target_audience || "ALL");
+  const [audienceDrawerOpen, setAudienceDrawerOpen] = useState(false);
   const [location, setLocation] = useState<string>(event?.location || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1473,32 +1628,41 @@ function EventFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-[95vw] sm:max-w-xl p-4 sm:p-7 max-h-[90vh] overflow-y-auto z-10 border border-slate-200 dark:border-zinc-800 space-y-5"
+        className="relative bg-white dark:bg-zinc-900 rounded-none sm:rounded-3xl shadow-2xl w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-xl p-4 sm:p-7 overflow-y-auto z-10 border-0 sm:border border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-[#5826df]/15 to-[#6d3df5]/25 text-[#5826df] border border-[#5826df]/20">
-              <CalendarIcon className="h-5 w-5 stroke-[2.2]" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1.5 -ml-1 text-slate-700 dark:text-zinc-300 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-br from-[#2563EB]/15 to-[#1D4ED8]/25 text-[#2563EB] border border-[#2563EB]/20 shrink-0">
+              <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.2]" />
             </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 dark:text-zinc-100">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-zinc-100 truncate">
                 {isEdit ? "Edit Calendar Event / Holiday" : "Schedule Event / Holiday"}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500 truncate">
                 Add an official date to the school academic calendar
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800"
+            className="hidden sm:block p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1521,7 +1685,7 @@ function EventFormModal({
               placeholder="e.g., Diwali Vacation, Annual Sports Day, Mid-Term Exam"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#5826df] focus-visible:ring-2 focus-visible:ring-[#5826df]/20"
+              className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
               required
             />
           </div>
@@ -1544,7 +1708,7 @@ function EventFormModal({
                     }}
                     className={`cursor-pointer p-2.5 rounded-2xl border transition-all flex items-center gap-2 ${
                       isSelected
-                        ? "border-[#5826df] bg-indigo-50/40 dark:bg-indigo-950/30 ring-2 ring-[#5826df]/20 shadow-2xs font-bold"
+                        ? "border-[#2563EB] bg-blue-50/40 dark:bg-blue-950/30 ring-2 ring-[#2563EB]/20 shadow-2xs font-bold"
                         : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 hover:border-slate-300"
                     }`}
                   >
@@ -1577,7 +1741,7 @@ function EventFormModal({
               checked={isHoliday || eventType === "HOLIDAY"}
               onChange={(e) => setIsHoliday(e.target.checked)}
               disabled={eventType === "HOLIDAY"}
-              className="w-4 h-4 text-[#5826df] rounded accent-[#5826df] cursor-pointer"
+              className="w-4 h-4 text-[#2563EB] rounded accent-[#2563EB] cursor-pointer"
             />
           </div>
 
@@ -1617,17 +1781,94 @@ function EventFormModal({
               <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
                 Target Audience
               </label>
-              <select
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-                className="w-full h-10 px-3 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 font-semibold text-slate-800 dark:text-zinc-200"
+              {/* Mobile Audience Drawer Trigger */}
+              <div className="block sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setAudienceDrawerOpen(true)}
+                  className="w-full h-10 px-3.5 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 flex items-center justify-between text-xs font-semibold text-slate-800 dark:text-zinc-200 active:scale-[0.99] transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {(() => {
+                      const matched = AUDIENCE_OPTIONS.find((a) => a.value === targetAudience);
+                      const Icon = matched?.icon || Users2;
+                      return (
+                        <>
+                          <Icon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                          <span className="truncate">{matched?.label || "Everyone"}</span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+              </div>
+
+              {/* Mobile Bottom Drawer for Audience Selection */}
+              <MobileBottomDrawer
+                isOpen={audienceDrawerOpen}
+                onClose={() => setAudienceDrawerOpen(false)}
+                title="Select Target Audience"
+                subtitle="Who should see this event or holiday?"
               >
-                {AUDIENCE_OPTIONS.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
+                <div className="space-y-2 py-1">
+                  {AUDIENCE_OPTIONS.map((a) => {
+                    const isSelected = targetAudience === a.value;
+                    const Icon = a.icon || Users2;
+                    return (
+                      <button
+                        key={a.value}
+                        type="button"
+                        onClick={() => {
+                          setTargetAudience(a.value);
+                          setAudienceDrawerOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left cursor-pointer ${
+                          isSelected
+                            ? "border-[#2563EB] bg-blue-50/70 dark:bg-blue-950/40 text-[#2563EB] font-black shadow-xs ring-1 ring-[#2563EB]"
+                            : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 font-semibold hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                            style={{
+                              backgroundColor: isSelected ? "#2563EB15" : "#64748b15",
+                              color: isSelected ? "#2563EB" : "#64748b",
+                            }}
+                          >
+                            <Icon className="w-4 h-4 stroke-[2.2]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-bold truncate">{a.label}</p>
+                            {a.desc && <p className="text-[10px] text-slate-400 truncate">{a.desc}</p>}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </MobileBottomDrawer>
+
+              {/* Desktop Native Select */}
+              <div className="hidden sm:block">
+                <select
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  className="w-full h-10 px-3 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 font-semibold text-slate-800 dark:text-zinc-200 cursor-pointer"
+                >
+                  {AUDIENCE_OPTIONS.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -1672,7 +1913,7 @@ function EventFormModal({
             <Button
               type="submit"
               disabled={saving}
-              className="bg-gradient-to-r from-[#5826df] to-[#6d3df5] hover:from-[#4c1fc7] hover:to-[#5e2de0] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#5826df]/25"
+              className="bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-white rounded-2xl h-10 text-xs font-bold px-6 gap-2 shadow-md shadow-[#2563EB]/25"
             >
               {saving ? (
                 <>

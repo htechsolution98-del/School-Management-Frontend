@@ -60,14 +60,33 @@ export default function StaffRequisitionView({
   title = "Stock & Consumable Supplies Management",
   description = "Monitor supplies (chalk, dusters, paper, notebooks, pens, markers) and request stock items.",
 }: RequisitionFormProps) {
-  const [stockList, setStockList] = useState<InventoryItem[]>([]);
-  const [requests, setRequests] = useState<RequisitionRecord[]>([]);
-  const [loadingItems, setLoadingItems] = useState(true);
-  const [loadingRequests, setLoadingRequests] = useState(true);
+  const getCachedItems = (): InventoryItem[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("sms_inventory_items");
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  };
+
+  const getCachedRequisitions = (): RequisitionRecord[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("sms_inventory_requisitions");
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  };
+
+  const [stockList, setStockList] = useState<InventoryItem[]>(() => getCachedItems());
+  const [requests, setRequests] = useState<RequisitionRecord[]>(() => getCachedRequisitions());
+  const [loadingItems, setLoadingItems] = useState(() => getCachedItems().length === 0);
+  const [loadingRequests, setLoadingRequests] = useState(() => getCachedRequisitions().length === 0);
   const [submitting, setSubmitting] = useState(false);
 
   // Form State
-  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [selectedItemId, setSelectedItemId] = useState<string>(() => {
+    const cached = getCachedItems();
+    return cached.length > 0 ? cached[0].id.toString() : "";
+  });
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState("");
 
@@ -76,13 +95,15 @@ export default function StaffRequisitionView({
   // Fetch Items list from /api/inventory/items/
   const fetchItems = useCallback(async () => {
     try {
-      setLoadingItems(true);
       const res = await inventoryApi.get("/items/");
       const items: InventoryItem[] = Array.isArray(res.data)
         ? res.data
         : res.data?.results || [];
       const activeItems = items.filter((item) => item.is_active !== false);
       setStockList(activeItems);
+      if (activeItems.length > 0) {
+        try { localStorage.setItem("sms_inventory_items", JSON.stringify(activeItems)); } catch {}
+      }
 
       // Pre-select first item if none selected and items exist
       if (activeItems.length > 0 && !selectedItemId) {
@@ -99,12 +120,14 @@ export default function StaffRequisitionView({
   // Fetch Requisitions list from /api/inventory/requisitions/
   const fetchRequests = useCallback(async () => {
     try {
-      setLoadingRequests(true);
       const res = await inventoryApi.get("/requisitions/");
       const data: RequisitionRecord[] = Array.isArray(res.data)
         ? res.data
         : res.data?.results || [];
       setRequests(data);
+      if (data.length > 0) {
+        try { localStorage.setItem("sms_inventory_requisitions", JSON.stringify(data)); } catch {}
+      }
     } catch (err) {
       console.error("Failed to load requisitions:", err);
       showApiError(err, "Failed to load requisition requests.");
@@ -193,7 +216,7 @@ export default function StaffRequisitionView({
   };
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 pb-3 sm:pb-5 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
@@ -207,15 +230,16 @@ export default function StaffRequisitionView({
         </div>
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => {
             fetchItems();
             fetchRequests();
           }}
-          className="rounded-xl text-xs font-bold gap-2 border-zinc-200 dark:border-zinc-800 shrink-0"
+          className="h-9 w-9 rounded-xl border-zinc-200 dark:border-zinc-800 shrink-0"
+          title="Refresh data"
+          aria-label="Refresh data"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests || loadingItems ? "animate-spin" : ""}`} />
-          Refresh Data
+          <RefreshCw className={`h-4 w-4 ${loadingRequests || loadingItems ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
@@ -417,8 +441,12 @@ export default function StaffRequisitionView({
                     </tr>
                   ) : requests.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-500">
-                        <Package className="h-8 w-8 mx-auto text-slate-300 dark:text-zinc-700 mb-2" />
+                      <td colSpan={5} className="py-10 text-center text-slate-500">
+                        <img
+                          src="/images/empty-folder.png"
+                          alt="No requisitions"
+                          className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                        />
                         <p className="font-semibold text-slate-700 dark:text-zinc-300">No requisitions submitted yet</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
                           Use the form on the left to request consumable supplies.

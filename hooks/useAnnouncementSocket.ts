@@ -124,14 +124,36 @@ export function useAnnouncementSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to load read IDs from localStorage
+  // Helper to load read IDs from localStorage (checking both user-scoped and global keys)
   const getReadIds = useCallback((): (number | string)[] => {
     if (typeof window === "undefined") return [];
     try {
-      const stored = localStorage.getItem(READ_IDS_KEY);
-      return stored ? JSON.parse(stored) : [];
+      const currentUserId = localStorage.getItem("user_id");
+      const userKey = currentUserId ? `${READ_IDS_KEY}_${currentUserId}` : READ_IDS_KEY;
+      const userStored = localStorage.getItem(userKey);
+      const generalStored = localStorage.getItem(READ_IDS_KEY);
+      
+      const userIds: (number | string)[] = userStored ? JSON.parse(userStored) : [];
+      const generalIds: (number | string)[] = generalStored ? JSON.parse(generalStored) : [];
+      
+      const merged = Array.from(new Set([...userIds, ...generalIds].map(String)));
+      return merged;
     } catch {
       return [];
+    }
+  }, []);
+
+  // Save read IDs helper
+  const persistReadIds = useCallback((ids: (number | string)[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      const currentUserId = localStorage.getItem("user_id");
+      const userKey = currentUserId ? `${READ_IDS_KEY}_${currentUserId}` : READ_IDS_KEY;
+      const strIds = Array.from(new Set(ids.map(String)));
+      localStorage.setItem(userKey, JSON.stringify(strIds));
+      localStorage.setItem(READ_IDS_KEY, JSON.stringify(strIds));
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -150,7 +172,27 @@ export function useAnnouncementSocket() {
     }
 
     try {
-      const freshList = await getAnnouncements();
+      // Fetch announcements and server-persisted read IDs in parallel
+      const [freshList, readIdsRes] = await Promise.all([
+        getAnnouncements().catch(() => [] as AnnouncementResponse[]),
+        fetchWithAuth(`${API_BASE_URL}/announcements/read-ids/`).catch(() => null),
+      ]);
+
+      let serverReadIds: (string | number)[] = [];
+      if (readIdsRes && readIdsRes.ok) {
+        try {
+          const rJson = await readIdsRes.json();
+          if (Array.isArray(rJson.read_ids)) {
+            serverReadIds = rJson.read_ids;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Check is_read flags from serializer as well
+      const serializerReadIds = freshList
+        .filter((ann: any) => ann.is_read === true)
+        .map((ann) => ann.id);
+
       // Filter by user role target audience & direct target user
       const filtered = freshList.filter((ann) => isTargetAudienceForUser(ann, userRoles, currentUserId));
 
@@ -185,19 +227,25 @@ export function useAnnouncementSocket() {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
 
+      // Merge local read IDs with server database read IDs
+      const localReadIds = getReadIds();
+      const allMergedReadIds = Array.from(
+        new Set([...localReadIds, ...serverReadIds, ...serializerReadIds].map(String))
+      );
+      persistReadIds(allMergedReadIds);
+      setReadIds(allMergedReadIds);
+
       setNotifications(sorted);
       if (typeof window !== "undefined") {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sorted));
-        const rIds = getReadIds();
-        setReadIds(rIds);
-        const unread = sorted.filter((n) => !rIds.some((r) => String(r) === String(n.id))).length;
+        const unread = sorted.filter((n) => !allMergedReadIds.some((r) => String(r) === String(n.id))).length;
         setUnreadCount(unread);
         localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
       }
     } catch (err) {
       console.warn("Failed to fetch fresh announcements from API:", err);
     }
-  }, [getReadIds]);
+  }, [getReadIds, persistReadIds]);
 
   // Initialize notifications from localStorage & fetch active announcements from API
   useEffect(() => {
@@ -237,6 +285,8 @@ export function useAnnouncementSocket() {
     saveNotifications([], 0);
     setReadIds([]);
     if (typeof window !== "undefined") {
+      const currentUserId = localStorage.getItem("user_id");
+      if (currentUserId) localStorage.removeItem(`${READ_IDS_KEY}_${currentUserId}`);
       localStorage.removeItem(READ_IDS_KEY);
     }
   }, [saveNotifications]);
@@ -249,7 +299,7 @@ export function useAnnouncementSocket() {
         const exists = rIds.some((existing) => String(existing) === strId);
         if (!exists) {
           const updatedReadIds = [...rIds, id];
-          localStorage.setItem(READ_IDS_KEY, JSON.stringify(updatedReadIds));
+          persistReadIds(updatedReadIds);
           setReadIds(updatedReadIds);
           
           setNotifications((prev) => {
@@ -261,24 +311,38 @@ export function useAnnouncementSocket() {
             return prev;
           });
         }
+
+        // Always persist to backend database asynchronously
+        fetchWithAuth(`${API_BASE_URL}/announcements/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }).catch((err) => console.warn("Failed to sync mark announcement read to server:", err));
       } catch (err) {
         console.error("Failed to mark announcement as read:", err);
       }
     }
-  }, [getReadIds]);
+  }, [getReadIds, persistReadIds]);
 
   const markAllAsRead = useCallback(() => {
     if (typeof window !== "undefined") {
       try {
         const ids = notifications.map((n) => n.id);
-        localStorage.setItem(READ_IDS_KEY, JSON.stringify(ids));
+        persistReadIds(ids);
         setReadIds(ids);
         saveNotifications(notifications, 0);
+
+        // Persist all-read to backend database
+        fetchWithAuth(`${API_BASE_URL}/announcements/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true, ids }),
+        }).catch((err) => console.warn("Failed to sync mark-all-read to server:", err));
       } catch (err) {
         console.error("Failed to mark all as read:", err);
       }
     }
-  }, [notifications, saveNotifications]);
+  }, [notifications, saveNotifications, persistReadIds]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;

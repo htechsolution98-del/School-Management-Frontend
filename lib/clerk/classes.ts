@@ -2,7 +2,18 @@ import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { SchoolClass } from "@/types/clerk";
 
-export async function getSchoolClasses(): Promise<SchoolClass[]> {
+interface ClassesCacheRecord<T> {
+  data: T;
+  timestamp: number;
+}
+let classesCache: ClassesCacheRecord<SchoolClass[]> | null = null;
+const CLASSES_CACHE_TTL = 60 * 1000;
+
+export async function getSchoolClasses(forceFresh = false): Promise<SchoolClass[]> {
+  if (!forceFresh && classesCache && Date.now() - classesCache.timestamp < CLASSES_CACHE_TTL) {
+    return classesCache.data;
+  }
+
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.CLASSES}`);
 
   if (!response.ok) {
@@ -15,11 +26,13 @@ export async function getSchoolClasses(): Promise<SchoolClass[]> {
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? data : data.data ?? data.results ?? [];
+  const list = Array.isArray(data) ? data : data.data ?? data.results ?? [];
+  classesCache = { data: list, timestamp: Date.now() };
+  return list;
 }
 
-export async function getClasses(): Promise<SchoolClass[]> {
-  return getSchoolClasses();
+export async function getClasses(forceFresh = false): Promise<SchoolClass[]> {
+  return getSchoolClasses(forceFresh);
 }
 
 export async function getSchoolClassesForExam(): Promise<SchoolClass[]> {
@@ -54,6 +67,7 @@ export async function saveSchoolClasses(classes: string[]): Promise<void> {
     } catch {}
     throw new Error(message);
   }
+  classesCache = null;
 }
 
 export async function deleteSchoolClass(id: number): Promise<void> {
@@ -69,4 +83,5 @@ export async function deleteSchoolClass(id: number): Promise<void> {
     } catch {}
     throw new Error(message);
   }
+  classesCache = null;
 }

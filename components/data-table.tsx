@@ -425,14 +425,24 @@ export function DataTable<T>({
                   ) : error ? (
                     <p>{error}</p>
                   ) : data.length && hasFilters ? (
-                    <div>
-                      <p className="font-medium text-slate-600">{noResultsTitle}</p>
-                      {noResultsDescription && <p className="mt-1 text-xs">{noResultsDescription}</p>}
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No records"
+                        className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                      />
+                      <p className="font-bold text-slate-700">{noResultsTitle}</p>
+                      {noResultsDescription && <p className="mt-1 text-xs text-slate-400">{noResultsDescription}</p>}
                     </div>
                   ) : (
-                    <div>
-                      <p className="font-medium text-slate-600">{emptyTitle}</p>
-                      {emptyDescription && <p className="mt-1 text-xs">{emptyDescription}</p>}
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No records"
+                        className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                      />
+                      <p className="font-bold text-slate-700">{emptyTitle}</p>
+                      {emptyDescription && <p className="mt-1 text-xs text-slate-400">{emptyDescription}</p>}
                     </div>
                   )}
                 </td>

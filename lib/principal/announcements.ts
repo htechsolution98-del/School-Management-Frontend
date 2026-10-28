@@ -55,23 +55,57 @@ export interface AnnouncementResponse {
   target_user_name?: string | null;
 }
 
+const ANNOUNCEMENTS_CACHE_KEY = "sms_cached_announcements";
+
+export function getStoredAnnouncements(): AnnouncementResponse[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(ANNOUNCEMENTS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < 10 * 60 * 1000 && Array.isArray(parsed.data)) {
+      return parsed.data;
+    }
+  } catch {}
+  return [];
+}
+
+export function setStoredAnnouncements(data: AnnouncementResponse[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ANNOUNCEMENTS_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {}
+}
+
+export function invalidateAnnouncementsCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ANNOUNCEMENTS_CACHE_KEY);
+  } catch {}
+}
+
 export async function getAnnouncements(): Promise<AnnouncementResponse[]> {
   const data = await apiFetch<unknown>(
     API_ENDPOINTS.ANNOUNCEMENT,
     { method: "GET" },
     "Failed to fetch announcements."
   );
-  if (Array.isArray(data)) return data as AnnouncementResponse[];
-  if (data && typeof data === "object") {
+  let list: AnnouncementResponse[] = [];
+  if (Array.isArray(data)) list = data as AnnouncementResponse[];
+  else if (data && typeof data === "object") {
     const val = data as { results?: AnnouncementResponse[]; data?: AnnouncementResponse[] };
-    return val.results ?? val.data ?? [];
+    list = val.results ?? val.data ?? [];
   }
-  return [];
+  if (list.length > 0) {
+    setStoredAnnouncements(list);
+  }
+  return list;
 }
 
 export async function createAnnouncement(
   payload: AnnouncementPayload
 ): Promise<AnnouncementResponse> {
+  invalidateAnnouncementsCache();
   return apiFetch<AnnouncementResponse>(
     API_ENDPOINTS.ANNOUNCEMENT,
     {
@@ -86,6 +120,7 @@ export async function updateAnnouncement(
   id: number,
   payload: AnnouncementPayload
 ): Promise<AnnouncementResponse> {
+  invalidateAnnouncementsCache();
   return apiFetch<AnnouncementResponse>(
     `${API_ENDPOINTS.ANNOUNCEMENT}${id}/`,
     {
@@ -97,6 +132,7 @@ export async function updateAnnouncement(
 }
 
 export async function deleteAnnouncement(id: number): Promise<void> {
+  invalidateAnnouncementsCache();
   return apiFetch<void>(
     `${API_ENDPOINTS.ANNOUNCEMENT}${id}/`,
     {

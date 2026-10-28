@@ -1076,16 +1076,13 @@ function StudentListView({
               ))}
               {paginated.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      padding: "32px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                      fontSize: 13,
-                    }}
-                  >
-                    No students found.
+                  <td colSpan={5} className="py-10 text-center">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No students found"
+                      className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                    />
+                    <p className="font-bold text-slate-700 text-sm">No students found</p>
                   </td>
                 </tr>
               )}

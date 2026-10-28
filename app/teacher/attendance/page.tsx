@@ -1238,8 +1238,12 @@ export default function AttendanceHistoryPage() {
                     </tr>
                   ) : paginatedRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center">
-                        <Calendar className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                      <td colSpan={8} className="py-12 text-center">
+                        <img
+                          src="/images/empty-folder.png"
+                          alt="No records found"
+                          className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                        />
                         <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
                           No records found
                         </div>

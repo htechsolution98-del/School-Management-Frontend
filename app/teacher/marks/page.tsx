@@ -588,7 +588,7 @@ export default function EnterMarksPage() {
   const maxMarks = selectedExam?.max_marks || 100;
 
   return (
-    <div className="space-y-4 pb-24 lg:pb-10 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-4 pb-3 sm:pb-5 lg:pb-10 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
       {/* ── Top Compact Breadcrumb Header Bar ── */}
       <div className="bg-white dark:bg-zinc-900 px-4 py-3 sm:py-3.5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">

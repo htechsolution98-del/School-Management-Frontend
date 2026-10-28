@@ -693,8 +693,16 @@ export default function StudentPromotionPage() {
                 </tr>
               ) : computedStudentsWithRoll.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-gray-400">
-                    No active students with assigned G.R. numbers found in this class.
+                  <td colSpan={6} className="p-12 text-center text-gray-500">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No students found"
+                      className="mx-auto mb-3 h-24 w-24 object-contain"
+                    />
+                    <div className="font-semibold text-slate-700 text-sm">No students found</div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      No active students with assigned G.R. numbers found in this class.
+                    </p>
                   </td>
                 </tr>
               ) : (

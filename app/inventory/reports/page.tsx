@@ -583,7 +583,15 @@ export default function InventoryReportsPage() {
                   </tr>
                 ) : filteredSales.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-8 text-center text-slate-400">No sales or issue transactions found for this period.</td>
+                    <td colSpan={11} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No sales records"
+                        className="mx-auto mb-2 h-20 w-20 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No sales or issue transactions found</div>
+                      <p className="text-xs text-slate-400 mt-1">Try adjusting the date range or filters above.</p>
+                    </td>
                   </tr>
                 ) : (
                   filteredSales.map((r) => (
@@ -656,7 +664,15 @@ export default function InventoryReportsPage() {
                   </tr>
                 ) : filteredPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">No purchase records found.</td>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No purchase records"
+                        className="mx-auto mb-2 h-20 w-20 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No purchase records found</div>
+                      <p className="text-xs text-slate-400 mt-1">Try selecting another date range or supplier filter.</p>
+                    </td>
                   </tr>
                 ) : (
                   filteredPurchases.map((p) => (
@@ -706,7 +722,15 @@ export default function InventoryReportsPage() {
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {freeItems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">No free items issued in this period.</td>
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No free items"
+                        className="mx-auto mb-2 h-20 w-20 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No free items issued in this period</div>
+                      <p className="text-xs text-slate-400 mt-1">Subsidized and free item issues will appear here.</p>
+                    </td>
                   </tr>
                 ) : (
                   freeItems.map((r) => (
@@ -744,7 +768,15 @@ export default function InventoryReportsPage() {
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {filteredReplacements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">No replacement logs found in this period.</td>
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No replacements"
+                        className="mx-auto mb-2 h-20 w-20 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No replacement logs found in this period</div>
+                      <p className="text-xs text-slate-400 mt-1">Item replacement requests will be displayed here.</p>
+                    </td>
                   </tr>
                 ) : (
                   filteredReplacements.map((r) => (

@@ -772,8 +772,12 @@ export default function DailyCashRegisterPage() {
               ) : filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <AlertCircle className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="font-medium text-slate-600 dark:text-slate-400">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No cash receipts"
+                      className="mx-auto mb-2 h-20 w-20 object-contain"
+                    />
+                    <p className="font-medium text-slate-700 dark:text-slate-300">
                       No cash receipts found for this date
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
@@ -887,8 +891,12 @@ export default function DailyCashRegisterPage() {
               ) : filteredOutflows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <TrendingDown className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="font-medium text-slate-600 dark:text-slate-400">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No manual adjustments"
+                      className="mx-auto mb-2 h-20 w-20 object-contain"
+                    />
+                    <p className="font-medium text-slate-700 dark:text-slate-300">
                       No manual cash adjustments recorded for this date
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">

@@ -252,52 +252,214 @@ export interface LibraryStudent {
 
 export interface LibraryStaff { id: number; name: string; category: string }
 
-export async function getLibraryStaff(): Promise<LibraryStaff[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}staff-borrowers/`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Unable to load staff borrowers.");
-  return response.json();
+// ─── High-Performance Client Library Memory Cache ──────────────────────────────
+interface LibraryCacheRecord<T> {
+  data: T;
+  timestamp: number;
+}
+
+const clientLibraryCache = new Map<string, LibraryCacheRecord<any>>();
+const LIBRARY_CLIENT_CACHE_TTL = 60 * 1000; // 60 seconds
+
+function getPersistentCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(`sms_lib_${key}`) || sessionStorage.getItem(`sms_lib_${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+      if (Array.isArray(parsed.data) && parsed.data.length === 0) {
+        return null;
+      }
+      return parsed.data;
+    }
+  } catch {}
+  return null;
+}
+
+function setPersistentCache<T>(key: string, data: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload = JSON.stringify({ data, timestamp: Date.now() });
+    localStorage.setItem(`sms_lib_${key}`, payload);
+    sessionStorage.setItem(`sms_lib_${key}`, payload);
+  } catch {}
+}
+
+export function getStoredLibraryList<T>(key: string): T[] {
+  const cached = getPersistentCache<T[]>(key);
+  return Array.isArray(cached) ? cached : [];
+}
+
+export function invalidateLibraryClientCache(prefix?: string) {
+  clientLibraryCache.clear();
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(DASHBOARD_SUMMARY_STORAGE_KEY);
+      const cleanKeys = (storage: Storage) => {
+        for (let i = storage.length - 1; i >= 0; i--) {
+          const k = storage.key(i);
+          if (k && k.startsWith("sms_lib_")) {
+            storage.removeItem(k);
+          }
+        }
+      };
+      cleanKeys(localStorage);
+      cleanKeys(sessionStorage);
+    } catch {}
+  }
+}
+
+export interface LibraryDashboardSummary {
+  titles: number;
+  total_physical_copies: number;
+  available_copies: number;
+  active_loans_count: number;
+  overdue_count: number;
+  overdue_loans_sample?: {
+    id: number;
+    book_title: string;
+    student_name?: string | null;
+    staff_name?: string | null;
+    student_gr_no?: string;
+    due_date: string;
+  }[];
+  waiting_reservations_count: number;
+  available_holds_count: number;
+  available_holds_sample?: {
+    id: number;
+    book_title: string;
+    student_name: string;
+  }[];
+  lost_damaged_count: number;
+  total_fines_due: string;
+  total_fines_settled: string;
+  pending_clearance_count: number;
+  recent_transactions?: {
+    id: number;
+    book_title: string;
+    borrower_name: string;
+    student_name?: string | null;
+    staff_name?: string | null;
+    student_gr_no?: string;
+    borrower_type: string;
+    status: string;
+    book_issued_date: string;
+    due_date: string;
+    actual_return_date?: string | null;
+    fine_paid_amount: string;
+    total_fine: string;
+    is_fine_paid?: boolean;
+  }[];
+  most_borrowed_sample?: {
+    book_id: number;
+    title: string;
+    author: string;
+    times_issued: number;
+  }[];
+  category_trends_sample?: {
+    category: string;
+    total_books: number;
+  }[];
+  inventory_audit_overview?: {
+    total_copies: number;
+    available: number;
+    under_repair: number;
+    lost: number;
+    damaged: number;
+    total_value: string;
+  };
+}
+
+export const DASHBOARD_SUMMARY_STORAGE_KEY = "sms_librarian_dashboard_summary";
+
+export function getStoredDashboardSummary(): LibraryDashboardSummary | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DASHBOARD_SUMMARY_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredDashboardSummary(summary: LibraryDashboardSummary): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DASHBOARD_SUMMARY_STORAGE_KEY, JSON.stringify(summary));
+  } catch {}
+}
+
+async function getOrFetchLibrary<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl = LIBRARY_CLIENT_CACHE_TTL,
+  forceFresh = false
+): Promise<T> {
+  if (!forceFresh) {
+    const entry = clientLibraryCache.get(key);
+    if (entry && Date.now() - entry.timestamp < ttl) {
+      return entry.data;
+    }
+  }
+  const result = await fetcher();
+  clientLibraryCache.set(key, { data: result, timestamp: Date.now() });
+  if (!Array.isArray(result) || result.length > 0) {
+    setPersistentCache(key, result);
+  }
+  return result;
+}
+
+export async function getLibraryStaff(forceFresh = false): Promise<LibraryStaff[]> {
+  return getOrFetchLibrary("library_staff", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}staff-borrowers/`);
+    if (!response.ok) throw new Error("Unable to load staff borrowers.");
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 // ---------------- BOOK CATALOG ---------------- //
 
-export async function getBooks(params?: { author?: string; category?: string; search?: string }): Promise<Book[]> {
-  let url = `${API_BASE_URL}${API_ENDPOINTS.BOOKS_MANAGE}`;
-  if (params) {
-    const sp = new URLSearchParams();
-    if (params.author) sp.append("author", params.author);
-    if (params.category) sp.append("category", params.category);
-    if (params.search) sp.append("search", params.search);
-    const qs = sp.toString();
+export async function getBooks(params?: { author?: string; category?: string; search?: string }, forceFresh = false): Promise<Book[]> {
+  const sp = new URLSearchParams();
+  if (params?.author) sp.append("author", params.author);
+  if (params?.category) sp.append("category", params.category);
+  if (params?.search) sp.append("search", params.search);
+  const qs = sp.toString();
+  const cacheKey = `books_${qs}`;
+
+  return getOrFetchLibrary(cacheKey, async () => {
+    let url = `${API_BASE_URL}${API_ENDPOINTS.BOOKS_MANAGE}`;
     if (qs) url += `?${qs}`;
-  }
-  const response = await fetchWithAuth(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+    const response = await fetchWithAuth(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch library books catalog.");
-  }
+    if (!response.ok) {
+      throw new Error("Failed to fetch library books catalog.");
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
+export async function getPublicBooks(forceFresh = false): Promise<Book[]> {
+  return getOrFetchLibrary("public_books", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BOOKS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
 
-export async function getPublicBooks(): Promise<Book[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BOOKS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+    if (!response.ok) {
+      throw new Error("Failed to fetch library books.");
+    }
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch library books.");
-  }
-
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 function extractApiErrorMessage(err: any, fallback: string): string {
@@ -337,6 +499,7 @@ export async function createBook(payload: CreateBookPayload): Promise<Book> {
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -356,6 +519,7 @@ export async function updateBook(id: number, payload: Partial<CreateBookPayload>
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -372,38 +536,44 @@ export async function deleteBook(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+
+  invalidateLibraryClientCache();
 }
 
 // ---------------- CIRCULATION OPERATIONS ---------------- //
 
-export async function getIssuedBooks(): Promise<BookIssued[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getIssuedBooks(forceFresh = false): Promise<BookIssued[]> {
+  return getOrFetchLibrary("issued_books", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOKS_ISSUED}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch issued books records.");
-  }
+    if (!response.ok) {
+      throw new Error("Failed to fetch issued books records.");
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getStudentMyBooks(): Promise<BookIssued[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_MY_BOOKS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getStudentMyBooks(forceFresh = false): Promise<BookIssued[]> {
+  return getOrFetchLibrary("student_my_books", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_MY_BOOKS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch your issued books.");
-  }
+    if (!response.ok) {
+      throw new Error("Failed to fetch your issued books.");
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function issueBook(payload: IssueBookPayload): Promise<BookIssued> {
@@ -425,6 +595,7 @@ export async function issueBook(payload: IssueBookPayload): Promise<BookIssued> 
     throw errObj;
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -451,6 +622,7 @@ export async function bulkIssueBooks(payload: BulkIssueBookPayload): Promise<Bul
     throw errObj;
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -484,6 +656,7 @@ export async function returnBookWithCondition(
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -515,6 +688,7 @@ export async function payBookFine(
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -549,6 +723,7 @@ export async function renewBookLoan(issuedId: number): Promise<BookIssued> {
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -568,6 +743,7 @@ export async function markBookLost(issuedId: number, remarks?: string): Promise<
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -586,27 +762,31 @@ export async function studentRenewLoan(issuedId: number): Promise<BookIssued> {
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
 // ---------------- BOOK COPIES & BARCODES ---------------- //
 
-export async function getBookCopies(bookId?: number): Promise<BookCopy[]> {
-  const url = bookId
-    ? `${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}?book=${bookId}`
-    : `${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}`;
-  const response = await fetchWithAuth(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getBookCopies(bookId?: number, forceFresh = false): Promise<BookCopy[]> {
+  const cacheKey = bookId ? `book_copies_${bookId}` : "book_copies_all";
+  return getOrFetchLibrary(cacheKey, async () => {
+    const url = bookId
+      ? `${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}?book=${bookId}`
+      : `${API_BASE_URL}${API_ENDPOINTS.BOOK_COPIES}`;
+    const response = await fetchWithAuth(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    return [];
-  }
+    if (!response.ok) {
+      return [];
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function generateBookCopies(payload: {
@@ -630,6 +810,7 @@ export async function generateBookCopies(payload: {
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -652,6 +833,7 @@ export async function transferBookCopy(
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -674,6 +856,7 @@ export async function changeBookCopyStatus(
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -690,23 +873,27 @@ export async function deleteBookCopy(copyId: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+
+  invalidateLibraryClientCache();
 }
 
 // ---------------- BOOK RESERVATIONS ---------------- //
 
-export async function getReservations(): Promise<BookReservation[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_RESERVATIONS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getReservations(forceFresh = false): Promise<BookReservation[]> {
+  return getOrFetchLibrary("book_reservations", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_RESERVATIONS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    return [];
-  }
+    if (!response.ok) {
+      return [];
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createReservation(bookId: number): Promise<BookReservation> {
@@ -725,6 +912,7 @@ export async function createReservation(bookId: number): Promise<BookReservation
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -737,6 +925,8 @@ export async function cancelReservation(reservationId: number): Promise<void> {
   if (!response.ok) {
     throw new Error("Failed to cancel reservation.");
   }
+
+  invalidateLibraryClientCache();
 }
 
 export async function checkReservationExpiries(): Promise<{ detail: string; expired_count: number }> {
@@ -754,20 +944,23 @@ export async function checkReservationExpiries(): Promise<{ detail: string; expi
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
 // ---------------- MASTERS (CATEGORIES, AUTHORS, PUBLISHERS, RACKS, SHELVES) ---------------- //
 
-export async function getCategories(): Promise<BookCategory[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_CATEGORIES}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+export async function getCategories(forceFresh = false): Promise<BookCategory[]> {
+  return getOrFetchLibrary("book_categories", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_CATEGORIES}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createCategory(payload: Partial<BookCategory>): Promise<BookCategory> {
@@ -784,6 +977,7 @@ export async function createCategory(payload: Partial<BookCategory>): Promise<Bo
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -801,6 +995,7 @@ export async function updateCategory(id: number, payload: Partial<BookCategory>)
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -816,6 +1011,7 @@ export async function deleteCategory(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
 }
 
 export async function toggleCategoryActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
@@ -831,18 +1027,21 @@ export async function toggleCategoryActive(id: number): Promise<{ id: number; is
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
-export async function getAuthors(): Promise<Author[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+export async function getAuthors(forceFresh = false): Promise<Author[]> {
+  return getOrFetchLibrary("book_authors", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_AUTHORS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createAuthor(payload: Partial<Author>): Promise<Author> {
@@ -859,6 +1058,7 @@ export async function createAuthor(payload: Partial<Author>): Promise<Author> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -876,6 +1076,7 @@ export async function updateAuthor(id: number, payload: Partial<Author>): Promis
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -891,6 +1092,7 @@ export async function deleteAuthor(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
 }
 
 export async function toggleAuthorActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
@@ -906,18 +1108,21 @@ export async function toggleAuthorActive(id: number): Promise<{ id: number; is_a
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
-export async function getPublishers(): Promise<Publisher[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_PUBLISHERS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+export async function getPublishers(forceFresh = false): Promise<Publisher[]> {
+  return getOrFetchLibrary("book_publishers", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.BOOK_PUBLISHERS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createPublisher(payload: Partial<Publisher>): Promise<Publisher> {
@@ -934,6 +1139,7 @@ export async function createPublisher(payload: Partial<Publisher>): Promise<Publ
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -951,6 +1157,7 @@ export async function updatePublisher(id: number, payload: Partial<Publisher>): 
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -966,6 +1173,7 @@ export async function deletePublisher(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
 }
 
 export async function togglePublisherActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
@@ -981,18 +1189,21 @@ export async function togglePublisherActive(id: number): Promise<{ id: number; i
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
-export async function getRacks(): Promise<Rack[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+export async function getRacks(forceFresh = false): Promise<Rack[]> {
+  return getOrFetchLibrary("book_racks", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_RACKS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createRack(payload: Partial<Rack>): Promise<Rack> {
@@ -1009,6 +1220,7 @@ export async function createRack(payload: Partial<Rack>): Promise<Rack> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -1026,6 +1238,7 @@ export async function updateRack(id: number, payload: Partial<Rack>): Promise<Ra
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -1041,6 +1254,7 @@ export async function deleteRack(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
 }
 
 export async function toggleRackActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
@@ -1056,19 +1270,23 @@ export async function toggleRackActive(id: number): Promise<{ id: number; is_act
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
-export async function getShelves(rackId?: number): Promise<Shelf[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SHELVES}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  const list = Array.isArray(data) ? data : data.results ?? [];
-  return rackId ? list.filter((s: Shelf) => s.rack === rackId) : list;
+export async function getShelves(rackId?: number, forceFresh = false): Promise<Shelf[]> {
+  const cacheKey = rackId ? `book_shelves_${rackId}` : "book_shelves_all";
+  return getOrFetchLibrary(cacheKey, async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SHELVES}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const list = Array.isArray(data) ? data : data.results ?? [];
+    return rackId ? list.filter((s: Shelf) => s.rack === rackId) : list;
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function createShelf(payload: Partial<Shelf>): Promise<Shelf> {
@@ -1085,6 +1303,7 @@ export async function createShelf(payload: Partial<Shelf>): Promise<Shelf> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -1102,6 +1321,7 @@ export async function updateShelf(id: number, payload: Partial<Shelf>): Promise<
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -1117,6 +1337,7 @@ export async function deleteShelf(id: number): Promise<void> {
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
 }
 
 export async function toggleShelfActive(id: number): Promise<{ id: number; is_active: boolean; message: string }> {
@@ -1132,23 +1353,26 @@ export async function toggleShelfActive(id: number): Promise<{ id: number; is_ac
     } catch {}
     throw new Error(String(errorMsg));
   }
+  invalidateLibraryClientCache();
   return response.json();
 }
 
 // ---------------- LIBRARY SETTINGS & RULES ---------------- //
 
-export async function getLibrarySettings(): Promise<LibrarySetting | null> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SETTINGS}my-setting/`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getLibrarySettings(forceFresh = false): Promise<LibrarySetting | null> {
+  return getOrFetchLibrary("library_settings", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_SETTINGS}my-setting/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    return null;
-  }
+    if (!response.ok) {
+      return null;
+    }
 
-  return response.json();
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 export async function updateLibrarySettings(payload: Partial<LibrarySetting>): Promise<LibrarySetting> {
@@ -1167,6 +1391,7 @@ export async function updateLibrarySettings(payload: Partial<LibrarySetting>): P
     throw new Error(String(errorMsg));
   }
 
+  invalidateLibraryClientCache();
   return response.json();
 }
 
@@ -1195,19 +1420,21 @@ export async function saveLateFeePolicy(policy: { id?: number; fees: number; gra
 
 // ---------------- STUDENTS LOOKUP ---------------- //
 
-export async function getLibraryStudents(): Promise<LibraryStudent[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getLibraryStudents(forceFresh = false): Promise<LibraryStudent[]> {
+  return getOrFetchLibrary("library_students", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    return [];
-  }
+    if (!response.ok) {
+      return [];
+    }
 
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 // ---------------- LIBRARY CLEARANCE (SECTION 22) ---------------- //
@@ -1250,43 +1477,48 @@ export interface PendingClearanceStudentSummary {
   status: "PENDING";
 }
 
-export async function getStudentClearance(studentId?: number): Promise<StudentClearanceData> {
-  const url = studentId
-    ? `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}?student_id=${studentId}`
-    : `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`;
-  const response = await fetchWithAuth(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getStudentClearance(studentId?: number, forceFresh = false): Promise<StudentClearanceData> {
+  const cacheKey = studentId ? `library_clearance_${studentId}` : "library_clearance_all";
+  return getOrFetchLibrary(cacheKey, async () => {
+    const url = studentId
+      ? `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}?student_id=${studentId}`
+      : `${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`;
+    const response = await fetchWithAuth(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    let errorMsg = "Failed to fetch student library clearance.";
-    try {
-      const err = await response.json();
-      errorMsg = err?.detail || err?.message || errorMsg;
-    } catch {}
-    throw new Error(String(errorMsg));
-  }
+    if (!response.ok) {
+      let errorMsg = "Failed to fetch student library clearance.";
+      try {
+        const err = await response.json();
+        errorMsg = err?.detail || err?.message || errorMsg;
+      } catch {}
+      throw new Error(String(errorMsg));
+    }
 
-  return response.json();
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getPendingClearanceStudents(): Promise<{
+export async function getPendingClearanceStudents(forceFresh = false): Promise<{
   pending_clearance_students_count: number;
   results: PendingClearanceStudentSummary[];
 }> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+  return getOrFetchLibrary("pending_clearance_students", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_CLEARANCE}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    return { pending_clearance_students_count: 0, results: [] };
-  }
+    if (!response.ok) {
+      return { pending_clearance_students_count: 0, results: [] };
+    }
 
-  return response.json();
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
 // ---------------- LIBRARY REPORTS & AUDIT (SECTION 20, 21, 23) ---------------- //
@@ -1307,74 +1539,105 @@ export interface InventoryAuditData {
   borrowers_with_pending_fines_count: number;
 }
 
-export async function getInventoryAudit(): Promise<InventoryAuditData> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}inventory-audit/`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getInventoryAudit(forceFresh = false): Promise<InventoryAuditData> {
+  return getOrFetchLibrary("inventory_audit", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}inventory-audit/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to load inventory audit data.");
-  }
+    if (!response.ok) {
+      throw new Error("Failed to load inventory audit data.");
+    }
 
-  return response.json();
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getMostBorrowedReport(limit: number = 10): Promise<any[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}most_borrowed/?limit=${limit}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getMostBorrowedReport(limit: number = 10, forceFresh = false): Promise<any[]> {
+  return getOrFetchLibrary(`report_most_borrowed_${limit}`, async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}most_borrowed/?limit=${limit}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getCategoryTrendsReport(): Promise<any[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}category_trends/`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getCategoryTrendsReport(forceFresh = false): Promise<any[]> {
+  return getOrFetchLibrary("report_category_trends", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}category_trends/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getOverdueAndLateReport(): Promise<any> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}overdue_and_late/`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getOverdueAndLateReport(forceFresh = false): Promise<any> {
+  return getOrFetchLibrary("report_overdue_and_late", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}overdue_and_late/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) return { currently_overdue: [], historical_late_rate: 0 };
-  return response.json();
+    if (!response.ok) return { currently_overdue: [], historical_late_rate: 0 };
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getFeeCollectionReport(): Promise<any> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}fee_collection/`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getFeeCollectionReport(forceFresh = false): Promise<any> {
+  return getOrFetchLibrary("report_fee_collection", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}fee_collection/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) return { total_fees_collected: "0", monthly_breakdown: [] };
-  return response.json();
+    if (!response.ok) return { total_fees_collected: "0", monthly_breakdown: [] };
+    return response.json();
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
 
-export async function getStudentActivityReport(limit: number = 20): Promise<any[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}student_activity/?limit=${limit}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
+export async function getStudentActivityReport(limit: number = 20, forceFresh = false): Promise<any[]> {
+  return getOrFetchLibrary(`report_student_activity_${limit}`, async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}student_activity/?limit=${limit}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? [];
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.results ?? [];
+  }, LIBRARY_CLIENT_CACHE_TTL, forceFresh);
 }
+
+export async function getLibraryDashboardSummary(forceFresh = false): Promise<LibraryDashboardSummary> {
+  return getOrFetchLibrary("library_dashboard_summary", async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.LIBRARY_REPORTS}dashboard-summary/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to load library dashboard summary.");
+    }
+
+    const data: LibraryDashboardSummary = await response.json();
+    setStoredDashboardSummary(data);
+    return data;
+  }, 30 * 1000, forceFresh);
+}
+

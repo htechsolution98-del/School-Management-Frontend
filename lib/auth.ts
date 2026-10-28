@@ -79,7 +79,16 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   });
 
   const isRefreshRequest = String(input).includes("/refresh");
-  if (!response.ok && response.status !== 401 && !isRefreshRequest) {
+  const method = (rest.method || "GET").toUpperCase();
+  const isGet = method === "GET";
+  const isSilent = Boolean((rest as any)?.silent);
+
+  // Data retrieval (GET) must never fire intrusive popup toasts across tabs
+  if (isGet || isSilent || isRefreshRequest || response.status === 401) {
+    return response;
+  }
+
+  if (!response.ok) {
     try {
       if (response.status >= 500) {
         toast.error(`Server Error (${response.status})`, {
@@ -90,11 +99,11 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
         const errData = await response.clone().json();
         const errorDesc = extractErrorMessage(errData, "Request failed");
         
-        if (!errorDesc.includes("Refresh token is required")) {
-          toast.error("Error", { id: API_ERROR_TOAST_ID, description: errorDesc });
+        if (!errorDesc.includes("Refresh token is required") && errorDesc.trim()) {
+          toast.error(errorDesc, { id: API_ERROR_TOAST_ID });
         }
       }
-    } catch (e) {
+    } catch {
       toast.error(`Request Failed (${response.status})`, { id: API_ERROR_TOAST_ID });
     }
   }
@@ -231,7 +240,6 @@ export function clearAuthSession(): void {
     localStorage.removeItem("username");
     localStorage.removeItem("current_user");
     localStorage.removeItem("announcement_notifications");
-    localStorage.removeItem("read_announcement_ids");
     localStorage.removeItem("announcement_notifications_unread_count");
     sessionStorage.clear();
   }

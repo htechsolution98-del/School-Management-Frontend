@@ -430,6 +430,28 @@ export async function getPayrollPayslips(params?: {
   return normalizeList<PayrollPayslip>(data);
 }
 
+const PAYSLIPS_CACHE_KEY = "sms_cached_my_payslips";
+
+export function getStoredMyPayslips(): PayrollPayslip[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PAYSLIPS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < 10 * 60 * 1000 && Array.isArray(parsed.data)) {
+      return parsed.data;
+    }
+  } catch {}
+  return [];
+}
+
+export function setStoredMyPayslips(data: PayrollPayslip[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PAYSLIPS_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {}
+}
+
 export async function getMyPayslips(salary_month?: string): Promise<PayrollPayslip[]> {
   const query = new URLSearchParams();
   query.set("mine", "true");
@@ -438,7 +460,11 @@ export async function getMyPayslips(salary_month?: string): Promise<PayrollPaysl
   const url = `${API_BASE_URL}${API_ENDPOINTS.PAYROLL_PAYSLIPS}?${query.toString()}`;
   const res = await fetchWithAuth(url);
   const data = await handleResponse<any>(res, "Failed to fetch your personal payslips.");
-  return normalizeList<PayrollPayslip>(data);
+  const list = normalizeList<PayrollPayslip>(data);
+  if (list.length > 0 && !salary_month) {
+    setStoredMyPayslips(list);
+  }
+  return list;
 }
 
 

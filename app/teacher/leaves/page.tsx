@@ -483,13 +483,14 @@ export default function MyLeavesPage() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={fetchData}
             disabled={isLoading}
-            className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs bg-background/80 backdrop-blur-xs"
+            className="h-10 w-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs bg-background/80 backdrop-blur-xs shrink-0"
+            title="Refresh leaves"
+            aria-label="Refresh leaves"
           >
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            Refresh
           </Button>
         </div>
       </div>

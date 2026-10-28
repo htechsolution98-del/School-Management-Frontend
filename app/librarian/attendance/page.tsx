@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   Clock,
   LogIn,
@@ -12,35 +13,51 @@ import {
   CheckCircle2,
   RefreshCw,
   MapPin,
-  Sparkles,
-  CalendarDays,
-  ShieldCheck,
-  Timer,
-  Check,
-  X,
+  ChevronLeft,
+  ChevronRight,
+  XCircle,
   History,
   Search,
-  ChevronRight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
+import {
+  MobileSelectDrawer,
+  MobileSelectTrigger,
+  MobileSelectOption,
+} from "@/components/ui/mobile-select-drawer";
 import {
   getTodayAttendance,
   markAttendance,
   getAttendanceHistory,
+  getStoredTodayAttendance,
+  getStoredAttendanceHistory,
 } from "@/lib/teacher/attendance";
-import type { TodayAttendance, AttendanceRecord } from "@/types/teacher";
+import { getLocationSettings } from "@/lib/clerk/location-settings";
+import type { TodayAttendance, AttendanceRecord, AttendanceLocationSettings } from "@/types/teacher";
 import { StaffBiometricCaptureDialog } from "@/components/attendance/StaffBiometricCaptureDialog";
+import { cn } from "@/lib/utils";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDeviceLocation(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error("Geolocation is not available in this browser."));
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by your browser."));
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      () => reject(new Error("Location access is required. Enable GPS permission and try again.")),
-      { timeout: 12000, enableHighAccuracy: true },
+      (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+      (err) => {
+        if (err.code === 1) {
+          reject(new Error("Location access denied. Please enable GPS in device settings."));
+        } else if (err.code === 2) {
+          reject(new Error("Position unavailable. Please ensure GPS has a clear signal."));
+        } else {
+          reject(new Error("Location request timed out. Please try again."));
+        }
+      },
+      { timeout: 12000, enableHighAccuracy: true }
     );
   });
 }
@@ -55,8 +72,8 @@ function fmtApiTime(timeStr: string | null | undefined): string {
       m = d.getMinutes();
     } else {
       const parts = timeStr.split(":");
-      h = parseInt(parts[0]);
-      m = parseInt(parts[1]);
+      h = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10);
     }
     const ampm = h >= 12 ? "PM" : "AM";
     return `${(h % 12 || 12).toString().padStart(2, "0")}:${m
@@ -67,53 +84,87 @@ function fmtApiTime(timeStr: string | null | undefined): string {
   }
 }
 
+function fmtClock(d: Date) {
+  return d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
+function fmtHeaderDate(d: Date) {
+  return d.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fmtHistoryDate(dateStr: string) {
+  try {
+    const d = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 function calcDuration(checkIn: string | null, checkOut: string | null): string {
   if (!checkIn) return "--h --m";
   try {
-    const inDate = checkIn.includes("T") ? new Date(checkIn) : new Date();
-    if (!checkIn.includes("T")) {
-      const [ih, im] = checkIn.split(":").map(Number);
-      inDate.setHours(ih, im, 0, 0);
+    let inMs: number, outMs: number;
+    if (checkIn.includes("T") || checkIn.includes("Z")) {
+      inMs = new Date(checkIn).getTime();
+      outMs = checkOut ? new Date(checkOut).getTime() : Date.now();
+    } else {
+      const base = new Date();
+      const [ih, im, is_] = checkIn.split(":").map(Number);
+      const inDate = new Date(base);
+      inDate.setHours(ih, im, is_ || 0, 0);
+      inMs = inDate.getTime();
+      if (checkOut) {
+        const [oh, om, os_] = checkOut.split(":").map(Number);
+        const outDate = new Date(base);
+        outDate.setHours(oh, om, os_ || 0, 0);
+        outMs = outDate.getTime();
+      } else {
+        outMs = Date.now();
+      }
     }
-    const outDate = checkOut
-      ? checkOut.includes("T")
-        ? new Date(checkOut)
-        : new Date()
-      : new Date();
-    if (checkOut && !checkOut.includes("T")) {
-      const [oh, om] = checkOut.split(":").map(Number);
-      outDate.setHours(oh, om, 0, 0);
-    }
-    const diffMs = outDate.getTime() - inDate.getTime();
+    const diffMs = outMs - inMs;
     if (diffMs <= 0) return "--h --m";
-    const totalMins = Math.floor(diffMs / 60000);
-    const hrs = Math.floor(totalMins / 60);
-    const mins = totalMins % 60;
-    return `${hrs}h ${mins}m`;
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m`;
   } catch {
     return "--h --m";
   }
 }
 
 export default function LibrarianAttendancePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"punch" | "history">("punch");
-  const [todayData, setTodayData] = useState<TodayAttendance | null>(null);
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [todayData, setTodayData] = useState<TodayAttendance | null>(() => getStoredTodayAttendance());
+  const [history, setHistory] = useState<AttendanceRecord[]>(() => getStoredAttendanceHistory());
+  const [locationSettings, setLocationSettings] = useState<AttendanceLocationSettings | null>(null);
+  const [loading, setLoading] = useState<boolean>(() => !getStoredTodayAttendance());
+  const [actionLoading, setActionLoading] = useState<"in" | "out" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [justDone, setJustDone] = useState<"in" | "out" | null>(null);
+  const [gpsPermission, setGpsPermission] = useState<"granted" | "denied" | "prompt">("prompt");
   const [showFaceModal, setShowFaceModal] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pendingAction, setPendingAction] = useState<"in" | "out" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [notification, setNotification] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  const showToast = useCallback((type: "success" | "error", message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4500);
-  }, []);
 
   // Clock tick
   useEffect(() => {
@@ -121,49 +172,149 @@ export default function LibrarianAttendancePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    const [todayResult, historyResult] = await Promise.allSettled([getTodayAttendance(), getAttendanceHistory()]);
-    if (todayResult.status === "fulfilled") setTodayData(todayResult.value);
-    else { setTodayData(null); showToast("error", todayResult.reason instanceof Error ? todayResult.reason.message : "Could not load today's attendance status."); }
-    if (historyResult.status === "fulfilled") setHistory(historyResult.value);
-    else { setHistory([]); showToast("error", historyResult.reason instanceof Error ? historyResult.reason.message : "Could not load attendance history."); }
-    setLoading(false);
-  }, [showToast]);
+  const loadData = useCallback(async (isManual = false) => {
+    if (isManual || !todayData) {
+      setLoading(true);
+    }
+    try {
+      const [todayResult, historyResult, locResult] = await Promise.allSettled([
+        getTodayAttendance(isManual),
+        getAttendanceHistory(undefined, isManual),
+        getLocationSettings(),
+      ]);
+
+      if (todayResult.status === "fulfilled") {
+        setTodayData(todayResult.value);
+      }
+      if (historyResult.status === "fulfilled" && Array.isArray(historyResult.value)) {
+        setHistory(historyResult.value);
+      }
+      if (locResult.status === "fulfilled" && locResult.value) {
+        const loc = locResult.value;
+        setLocationSettings({
+          latitude: String(loc.latitude),
+          longitude: String(loc.longitude),
+          radius: String(loc.radius),
+          school_name: loc.school_name || "Campus Geofence",
+          start_time: loc.start_time,
+          end_time: loc.end_time,
+          half_day_time: loc.half_day_time,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [todayData]);
 
   useEffect(() => {
-    loadData();
+    loadData(false);
   }, [loadData]);
 
-  const handlePunch = async () => {
-    setActionLoading(true);
+  const checkedIn = !!todayData?.checked_in;
+  const checkedOut = !!todayData?.checked_out;
+
+  const workPolicyStr =
+    locationSettings?.start_time && locationSettings?.end_time
+      ? `${fmtApiTime(locationSettings.start_time)} – ${fmtApiTime(locationSettings.end_time)}`
+      : "9:00 AM – 6:00 PM";
+
+  const duration = calcDuration(
+    todayData?.check_in ?? null,
+    todayData?.check_out ?? null
+  );
+
+  // Compute Weekly Statistics from history
+  const weeklyStats = useMemo(() => {
+    const todayDate = new Date();
+    const dayOfWeek = todayDate.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const startOfWeek = new Date(todayDate);
+    startOfWeek.setDate(todayDate.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    let present = 0;
+    let late = 0;
+    let absent = 0;
+
+    const thisWeekRecords = history.filter((rec) => {
+      if (!rec.attendance_date) return false;
+      const recDate = new Date(
+        rec.attendance_date.includes("T")
+          ? rec.attendance_date
+          : `${rec.attendance_date}T12:00:00`
+      );
+      return recDate >= startOfWeek && recDate <= endOfWeek;
+    });
+
+    if (thisWeekRecords.length > 0) {
+      thisWeekRecords.forEach((rec) => {
+        if (rec.is_present || rec.status === "PRESENT" || rec.status === "HALF_DAY") {
+          present += 1;
+        } else if (rec.status?.toLowerCase() === "absent") {
+          absent += 1;
+        }
+        if (rec.is_late) {
+          late += 1;
+        }
+      });
+    } else if (checkedIn) {
+      present = 1;
+    }
+
+    return {
+      presentDays: present,
+      lateCount: late,
+      absentCount: absent,
+    };
+  }, [history, checkedIn]);
+
+  // Recent 5 history items sorted descending
+  const recentHistory = useMemo(() => {
+    if (!history || history.length === 0) return [];
+    const sorted = [...history].sort((a, b) => {
+      const dateA = new Date(a.attendance_date || a.date_time || 0).getTime();
+      const dateB = new Date(b.attendance_date || b.date_time || 0).getTime();
+      return dateB - dateA;
+    });
+    return sorted.slice(0, 5);
+  }, [history]);
+
+  // Primary Check-In / Check-Out Action Handler
+  const handleAction = async (type: "in" | "out") => {
+    setActionError(null);
+    setActionLoading(type);
     try {
       const coords = await getDeviceLocation();
-      const action = todayData?.checked_in ? "out" : "in";
+      setGpsPermission("granted");
+
       if (todayData?.biometric_required) {
         setPendingCoords(coords);
-        setPendingAction(action);
+        setPendingAction(type);
         setShowFaceModal(true);
         return;
       }
+
       await markAttendance(coords);
-      showToast("success", todayData?.checked_in ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
-      await loadData();
+      setJustDone(type);
+      setTimeout(() => setJustDone(null), 3500);
+      await loadData(true);
     } catch (err: unknown) {
-      showToast("error", err instanceof Error ? err.message : "Failed to mark attendance.");
-    } finally { setActionLoading(false); }
+      if (err instanceof Error) {
+        if (err.message.includes("denied")) {
+          setGpsPermission("denied");
+        }
+        setActionError(err.message);
+      } else {
+        setActionError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setActionLoading(null);
+    }
   };
-
-  const isCheckedIn = !!todayData?.checked_in;
-  const isCheckedOut = !!todayData?.checked_out;
-
-  // Monthly stats
-  const stats = useMemo(() => {
-    const totalDays = history.length;
-    const presentDays = history.filter((h) => h.status === "PRESENT" || h.status === "HALF_DAY").length;
-    const rate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 100;
-    return { totalDays, presentDays, rate };
-  }, [history]);
 
   // Attendance History search & pagination
   const [historySearch, setHistorySearch] = useState("");
@@ -171,6 +322,13 @@ export default function LibrarianAttendancePage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(10);
   const [selectedMobileRecord, setSelectedMobileRecord] = useState<AttendanceRecord | null>(null);
+  const [activeSelectDrawer, setActiveSelectDrawer] = useState<{
+    title: string;
+    subtitle?: string;
+    options: MobileSelectOption[];
+    selectedValue: string | number;
+    onSelect: (val: any) => void;
+  } | null>(null);
 
   const filteredHistory = useMemo(() => {
     return history.filter((r) => {
@@ -197,245 +355,532 @@ export default function LibrarianAttendancePage() {
   }, [historySearch, historyStatusFilter]);
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
-      {/* Toast */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white font-medium ${
-              notification.type === "success"
-                ? "bg-emerald-600 shadow-emerald-500/20"
-                : "bg-rose-600 shadow-rose-500/20"
-            }`}
+    <div className="w-full max-w-lg lg:max-w-5xl xl:max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 lg:py-6 space-y-3.5 sm:space-y-5 pb-3 sm:pb-5 lg:pb-8 font-['Sora',sans-serif]">
+      {/* ── Sub-header: Role Pill + Headings + Date Selector & Refresh Button ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-2.5"
+      >
+        <div className="flex items-center justify-between gap-2">
+          {/* Back Button & LIBRARIAN ATTENDANCE Pill */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors cursor-pointer group"
           >
-            {notification.type === "success" ? (
-              <CheckCircle2 className="h-5 w-5" />
-            ) : (
-              <AlertCircle className="h-5 w-5" />
-            )}
-            <span>{notification.message}</span>
+            <ChevronLeft className="w-3.5 h-3.5 text-[#2563EB] group-hover:-translate-x-0.5 transition-transform" />
+            <span className="text-[11px] font-extrabold tracking-wider uppercase">
+              LIBRARIAN ATTENDANCE
+            </span>
+          </button>
+
+          {/* Right Header Controls: Date Pill + Perfectly Placed Single Icon Refresh Button */}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E5EAF4] shadow-xs text-xs font-bold text-[#142044]">
+              <Calendar className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+              <span className="truncate">{fmtHeaderDate(currentTime)}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => loadData(true)}
+              disabled={loading}
+              className="p-2 h-8 w-8 rounded-xl bg-white border border-[#E5EAF4] hover:bg-slate-50 text-[#142044] shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-50"
+              title="Refresh attendance"
+              aria-label="Refresh attendance"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5 text-[#2563EB]", loading && "animate-spin")} />
+            </button>
+          </div>
+        </div>
+
+        {/* Heading & Subtitle */}
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[#142044] tracking-tight leading-tight">
+            Attendance &amp; Duty
+          </h1>
+          <p className="text-xs sm:text-[13px] text-[#7183A6] mt-0.5 font-normal">
+            Track your daily check-in, check-out, working hours, and duty history.
+          </p>
+        </div>
+      </motion.div>
+
+      {/* ── Action Notifications ── */}
+      <AnimatePresence>
+        {actionError && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <p className="text-xs text-red-600 font-semibold flex-1">
+                {actionError}
+              </p>
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                className="text-red-400 hover:text-red-700 text-base leading-none p-1 cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#121B34] p-3.5 sm:p-5 text-white shadow-sm border border-[#1A2648]">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-          <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#182346] text-[#93C5FD] text-[10px] font-bold tracking-wider uppercase border border-[#233366]">
-              <Sparkles className="h-3 w-3 text-[#93C5FD]" /> Staff Duty & Attendance Panel
-            </div>
-            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight truncate">Librarian Attendance</h1>
-            <p className="text-white/70 text-[11px] sm:text-xs leading-relaxed line-clamp-2 max-w-md">
-              Daily check-in / check-out, geofenced duty confirmation, working hours tracking, and monthly attendance history.
-            </p>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={loadData}
-            disabled={loading}
-            className="border-white/15 bg-white/10 text-white hover:bg-white/15 text-xs h-8 px-3 rounded-xl self-start md:self-auto cursor-pointer"
+      <AnimatePresence>
+        {justDone && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
           >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
-        <button
-          onClick={() => setActiveTab("punch")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-            activeTab === "punch"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-          }`}
-        >
-          <Clock className="h-4 w-4" /> Daily Punch Desk
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-            activeTab === "history"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-          }`}
-        >
-          <History className="h-4 w-4" /> Monthly Log & History ({history.length})
-        </button>
-      </div>
-
-      {/* TAB 1: DAILY PUNCH */}
-      {activeTab === "punch" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-4">
-          {/* Main Punch Clock Card */}
-          <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-3.5 sm:p-6 shadow-2xs flex flex-col justify-between space-y-4 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-                  Duty Session
-                </span>
-                <h2 className="text-2xl font-black text-gray-900 mt-0.5">
-                  {currentTime.toLocaleDateString("en-IN", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </h2>
-              </div>
-              <div className="px-4 py-2 rounded-2xl bg-indigo-50 border border-indigo-100 font-mono text-xl font-bold text-indigo-700 text-center sm:text-right">
-                {currentTime.toLocaleTimeString("en-IN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: true,
-                })}
-              </div>
-            </div>
-
-            {/* Status Visualizer */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <span className="text-xs text-gray-400 font-medium flex items-center gap-1.5">
-                  <LogIn className="h-3.5 w-3.5 text-emerald-600" /> Punch In Time
-                </span>
-                <div className="text-lg font-bold text-gray-900">
-                  {todayData?.checked_in ? fmtApiTime(todayData.check_in) : "--:-- --"}
-                </div>
-                <div className="text-[11px] text-gray-400">
-                  {todayData?.checked_in ? "Recorded at desk" : "Not punched in yet"}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <span className="text-xs text-gray-400 font-medium flex items-center gap-1.5">
-                  <LogOut className="h-3.5 w-3.5 text-rose-600" /> Punch Out Time
-                </span>
-                <div className="text-lg font-bold text-gray-900">
-                  {todayData?.checked_out ? fmtApiTime(todayData.check_out) : "--:-- --"}
-                </div>
-                <div className="text-[11px] text-gray-400">
-                  {todayData?.checked_out ? "Shift closed" : "Pending checkout"}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                <span className="text-xs text-gray-400 font-medium flex items-center gap-1.5">
-                  <Timer className="h-3.5 w-3.5 text-indigo-600" /> Total Duty Hours
-                </span>
-                <div className="text-lg font-bold text-indigo-700">
-                  {calcDuration(todayData?.check_in || null, todayData?.check_out || null)}
-                </div>
-                <div className="text-[11px] text-gray-400">Working duration</div>
-              </div>
-            </div>
-
-            {/* Action Button */}
-            <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <MapPin className="h-4 w-4 text-indigo-600" />
-                <span>Geofenced location is captured automatically upon action.</span>
-              </div>
-
-              {isCheckedOut ? (
-                <div className="px-5 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" /> Duty Completed for Today
-                </div>
-              ) : (
-                <Button
-                  size="lg"
-                  onClick={handlePunch}
-                  disabled={actionLoading}
-                  className={`w-full sm:w-auto px-8 font-bold shadow-lg text-white ${
-                    !isCheckedIn
-                      ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
-                      : "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
-                  }`}
-                >
-                  {actionLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  ) : !isCheckedIn ? (
-                    <LogIn className="h-5 w-5 mr-2" />
-                  ) : (
-                    <LogOut className="h-5 w-5 mr-2" />
-                  )}
-                  {!isCheckedIn ? "Punch In (Check In)" : "Punch Out (Check Out)"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Side Summary Card */}
-          <div className="space-y-3 sm:space-y-4">
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
-              <h3 className="font-bold text-gray-900 text-base">Monthly Overview</h3>
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-500">Days Logged</span>
-                  <span className="font-bold text-gray-900">{stats.totalDays} days</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-500">Present Shifts</span>
-                  <span className="font-bold text-emerald-600">{stats.presentDays} shifts</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-500">Attendance Rate</span>
-                  <span className="font-bold text-indigo-600">{stats.rate}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl border border-indigo-100 p-6 space-y-2 text-indigo-900">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <ShieldCheck className="h-4 w-4 text-indigo-600" /> Library Shift Policy
-              </div>
-              <p className="text-xs text-indigo-700/80 leading-relaxed">
-                Library operations are active between standard institutional hours. Please ensure punch-in before the circulation desk opening time.
+            <div
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${
+                justDone === "in"
+                  ? "bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]"
+                  : "bg-[#EFF6FF] border-[#BFDBFE] text-[#2563EB]"
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <p className="text-xs font-bold flex-1">
+                {justDone === "in"
+                  ? "Check-in successfully recorded!"
+                  : "Check-out successfully recorded!"}
               </p>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-[#E5EAF4] pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("punch")}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === "punch"
+              ? "bg-[#2563EB] text-white shadow-sm shadow-[#2563EB]/25"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <Clock className="h-3.5 w-3.5" /> Daily Punch Desk
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("history")}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === "history"
+              ? "bg-[#2563EB] text-white shadow-sm shadow-[#2563EB]/25"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <History className="h-3.5 w-3.5" /> Monthly Log & History ({history.length})
+        </button>
+      </div>
+
+      {/* ── TAB 1: DAILY PUNCH DESK (Teacher Attendance Style) ── */}
+      {activeTab === "punch" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 items-start">
+          {/* Left Column (7 Cols on Desktop): Main Attendance Card */}
+          <div className="lg:col-span-7 space-y-3.5 sm:space-y-5">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] overflow-hidden"
+            >
+              {/* Horizontal GPS & Current Time Blue Strip */}
+              <div className="bg-slate-50 px-3.5 sm:px-4 py-2.5 flex items-center justify-between border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-blue-100 shadow-xs shrink-0">
+                    <MapPin
+                      className={cn(
+                        "w-3.5 h-3.5",
+                        gpsPermission === "denied" ? "text-red-500" : "text-blue-600"
+                      )}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "text-xs font-bold tracking-tight",
+                        gpsPermission === "denied" ? "text-red-600" : "text-blue-600"
+                      )}
+                    >
+                      {gpsPermission === "denied" ? "GPS Disabled" : "GPS Ready"}
+                    </span>
+                    {gpsPermission !== "denied" && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#7183A6] shrink-0" />
+                  <span className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums tracking-tight">
+                    {fmtClock(currentTime)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Balanced Single-Row (2-Column) Check In & Check Out Section */}
+              <div className="p-2.5 sm:p-3.5 grid grid-cols-2 gap-2 sm:gap-3">
+                {/* Column 1: Check In */}
+                <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <LogIn className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-xs font-bold text-[#142044] truncate">Check In</span>
+                    </div>
+                    <div className="shrink-0">
+                      {checkedIn ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          In
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="py-0.5">
+                    <p className="text-[10px] text-[#7183A6] font-medium uppercase tracking-wider leading-none">
+                      {checkedIn ? "Recorded" : "Status"}
+                    </p>
+                    <p className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums mt-1 truncate">
+                      {checkedIn ? fmtApiTime(todayData?.check_in) : "Pending"}
+                    </p>
+                  </div>
+
+                  {/* Check In Action Button */}
+                  {!checkedIn && !checkedOut ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAction("in")}
+                      disabled={actionLoading !== null}
+                      className="w-full h-10 sm:h-11 bg-[#10B981] hover:bg-[#059669] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
+                    >
+                      {actionLoading === "in" ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span className="truncate">Verifying…</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogIn className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Check In Now</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-full h-10 sm:h-11 bg-emerald-50/80 border border-emerald-200/80 rounded-xl flex items-center justify-center gap-1 text-emerald-700 text-xs font-bold px-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="truncate">{fmtApiTime(todayData?.check_in)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Column 2: Check Out */}
+                <div className="p-2.5 sm:p-3 rounded-2xl bg-[#FBFBFE] border border-[#ECEEF5] flex flex-col justify-between space-y-2">
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <LogOut className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-xs font-bold text-[#142044] truncate">Check Out</span>
+                    </div>
+                    <div className="shrink-0">
+                      {checkedOut ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                          Done
+                        </span>
+                      ) : checkedIn ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Ready
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium border border-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Wait
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="py-0.5">
+                    <p className="text-[10px] text-[#7183A6] font-medium uppercase tracking-wider leading-none">
+                      {checkedOut ? "Recorded" : "Duration"}
+                    </p>
+                    <p className="text-xs sm:text-sm font-extrabold text-[#142044] tabular-nums mt-1 truncate">
+                      {checkedOut
+                        ? fmtApiTime(todayData?.check_out)
+                        : checkedIn
+                        ? duration !== "--h --m"
+                          ? duration
+                          : "In Progress"
+                        : "--:--"}
+                    </p>
+                  </div>
+
+                  {/* Check Out Action Button */}
+                  {checkedIn && !checkedOut ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAction("out")}
+                      disabled={actionLoading !== null}
+                      className="w-full h-10 sm:h-11 bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs disabled:opacity-70 px-1"
+                    >
+                      {actionLoading === "out" ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span className="truncate">Verifying…</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogOut className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Check Out Now</span>
+                        </>
+                      )}
+                    </button>
+                  ) : checkedOut ? (
+                    <div className="w-full h-10 sm:h-11 bg-blue-50/80 border border-blue-200/80 rounded-xl flex items-center justify-center gap-1 text-[#2563EB] text-xs font-bold px-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                      <span className="truncate">{fmtApiTime(todayData?.check_out)}</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full h-10 sm:h-11 bg-[#F1F5F9] text-[#94A3B8] font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#E2E8F0] text-xs px-1"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
+                      <span className="truncate">Check Out</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Information Chips */}
+              <div className="px-3.5 sm:px-4 py-2.5 bg-[#FAFBFD] border-t border-[#ECEEF5] grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                  <div className="min-w-0 truncate">
+                    <p className="text-[10px] text-[#7183A6] leading-none font-medium">
+                      Campus Zone
+                    </p>
+                    <p className="text-[11px] font-bold text-[#142044] truncate mt-0.5">
+                      {locationSettings?.school_name || "Campus Geofence"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                  <div className="min-w-0 truncate">
+                    <p className="text-[10px] text-[#7183A6] leading-none font-medium">
+                      Working Hours
+                    </p>
+                    <p className="text-[11px] font-bold text-[#142044] truncate mt-0.5">
+                      {workPolicyStr}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right Column (5 Cols on Desktop): Weekly Summary + Recent Attendance */}
+          <div className="lg:col-span-5 space-y-3.5 sm:space-y-4">
+            {/* Weekly Attendance Summary Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] p-3.5 sm:p-4"
+            >
+              <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#2563EB]" />
+                  <span className="text-xs sm:text-sm font-bold text-[#142044]">
+                    Weekly Summary
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-[#7183A6]">
+                  This Week
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 divide-x divide-[#F1F5F9] pt-2.5 text-center">
+                {/* Present */}
+                <div className="px-1">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>Present</span>
+                  </div>
+                  <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
+                    {weeklyStats.presentDays}{" "}
+                    <span className="text-[11px] font-normal text-[#7183A6]">
+                      {weeklyStats.presentDays === 1 ? "day" : "days"}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Late */}
+                <div className="px-1">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-amber-600">
+                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Late</span>
+                  </div>
+                  <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
+                    {weeklyStats.lateCount}
+                  </p>
+                </div>
+
+                {/* Absent */}
+                <div className="px-1">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-rose-600">
+                    <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span>Absent</span>
+                  </div>
+                  <p className="text-base sm:text-lg font-black text-[#142044] mt-0.5 tracking-tight">
+                    {weeklyStats.absentCount}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Recent Attendance Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-white rounded-2xl border border-[#E5EAF4] shadow-[0_4px_20px_rgba(20,32,68,0.04)] p-3.5 sm:p-4"
+            >
+              <div className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9]">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#2563EB]" />
+                  <h2 className="text-xs sm:text-sm font-bold text-[#142044]">
+                    Recent Attendance
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("history")}
+                  className="text-xs font-bold text-[#2563EB] hover:underline cursor-pointer"
+                >
+                  View All
+                </button>
+              </div>
+
+              <div className="divide-y divide-[#F1F5F9]">
+                {recentHistory.length > 0 ? (
+                  recentHistory.map((item, idx) => {
+                    const dateDisplay = fmtHistoryDate(
+                      item.attendance_date || item.date_time || ""
+                    );
+                    const isPresent = item.is_present || item.status === "PRESENT";
+                    const isLate = item.is_late;
+                    const isHalfDay = item.is_half_day || item.status === "HALF_DAY";
+
+                    let badgeText = "Present";
+                    let badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    let dotColor = "bg-emerald-500";
+
+                    if (isLate) {
+                      badgeText = "Late";
+                      badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                      dotColor = "bg-amber-500";
+                    } else if (isHalfDay) {
+                      badgeText = "Half Day";
+                      badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
+                      dotColor = "bg-blue-600";
+                    } else if (!isPresent && item.status === "ABSENT") {
+                      badgeText = "Absent";
+                      badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+                      dotColor = "bg-rose-500";
+                    }
+
+                    const inTime = fmtApiTime(item.check_in || item.date_time);
+                    const outTime = item.check_out ? fmtApiTime(item.check_out) : "--:--";
+
+                    return (
+                      <div
+                        key={item.id ?? idx}
+                        onClick={() => {
+                          setSelectedMobileRecord(item);
+                        }}
+                        className="py-2.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors px-1 rounded-xl cursor-pointer"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-[#142044] truncate">
+                            {dateDisplay}
+                          </p>
+                          <p className="text-[11px] text-[#7183A6] mt-0.5">
+                            In: {inTime} • Out: {outTime}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${badgeColor}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                            {badgeText}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8]" />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-8 text-center flex flex-col items-center justify-center">
+                    <img
+                      src="/images/empty-folder.png"
+                      alt="No records"
+                      className="w-16 h-auto object-contain mx-auto mb-2 filter drop-shadow-sm select-none pointer-events-none"
+                    />
+                    <p className="text-xs text-slate-500 font-medium">No recent attendance records recorded yet.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: HISTORY (SUPERADMIN UNIFIED TABLE CARD) */}
+      {/* ── TAB 2: MONTHLY LOG & HISTORY ── */}
       {activeTab === "history" && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="rounded-2xl sm:rounded-3xl border border-[#E5EAF4] bg-white shadow-xs overflow-hidden">
           {/* Header Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5EAF4] bg-slate-50/60 p-4 sm:p-5">
             <div>
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
-                  <Clock className="h-4 w-4" />
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB] shadow-2xs">
+                  <History className="h-4 w-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900">Attendance Log</h3>
-                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-[#2563EB] border border-blue-200/60">
                   {filteredHistory.length} {filteredHistory.length === 1 ? "Record" : "Records"}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
-                Personal attendance records, check-in timestamps, GPS coordinates, and shift durations
+                Personal attendance history, punch-in timestamps, GPS coordinates, and shift durations.
               </p>
             </div>
-
-            <Button
-              variant="outline"
-              onClick={loadData}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh Log
-            </Button>
           </div>
 
-          {/* Filter and Search Bar Directly on Top of Table Data */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+          {/* Filter and Search Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5EAF4] bg-slate-50/40 p-3.5 sm:p-4">
             {/* Search */}
-            <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+            <div className="relative min-w-[240px] flex-1 sm:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
@@ -445,25 +890,54 @@ export default function LibrarianAttendancePage() {
                   setHistoryPage(1);
                 }}
                 placeholder="Search history by date, status, or time…"
-                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/10 shadow-2xs"
               />
             </div>
 
             {/* Dropdown Filters */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full sm:w-auto">
               <select
                 value={historyStatusFilter}
                 onChange={(e) => {
                   setHistoryStatusFilter(e.target.value as "ALL" | "PRESENT" | "HALF_DAY" | "ABSENT");
                   setHistoryPage(1);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-[#2563EB] focus:outline-none shadow-2xs"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="PRESENT">Present Only</option>
                 <option value="HALF_DAY">Half Day Only</option>
                 <option value="ABSENT">Absent Only</option>
               </select>
+              <MobileSelectTrigger
+                label="Status"
+                valueLabel={
+                  historyStatusFilter === "ALL"
+                    ? "All Statuses"
+                    : historyStatusFilter === "PRESENT"
+                    ? "Present Only"
+                    : historyStatusFilter === "HALF_DAY"
+                    ? "Half Day Only"
+                    : "Absent Only"
+                }
+                onClick={() =>
+                  setActiveSelectDrawer({
+                    title: "Attendance Status",
+                    subtitle: "Filter records by status",
+                    options: [
+                      { label: "All Statuses", value: "ALL" },
+                      { label: "Present Only", value: "PRESENT" },
+                      { label: "Half Day Only", value: "HALF_DAY" },
+                      { label: "Absent Only", value: "ABSENT" },
+                    ],
+                    selectedValue: historyStatusFilter,
+                    onSelect: (val) => {
+                      setHistoryStatusFilter(val);
+                      setHistoryPage(1);
+                    },
+                  })
+                }
+              />
 
               <select
                 value={historyPageSize}
@@ -471,30 +945,57 @@ export default function LibrarianAttendancePage() {
                   setHistoryPageSize(Number(e.target.value));
                   setHistoryPage(1);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-[#2563EB] focus:outline-none shadow-2xs"
               >
                 <option value={5}>5 per page</option>
                 <option value={10}>10 per page</option>
                 <option value={20}>20 per page</option>
               </select>
+              <MobileSelectTrigger
+                valueLabel={`${historyPageSize} per page`}
+                onClick={() =>
+                  setActiveSelectDrawer({
+                    title: "Rows Per Page",
+                    subtitle: "Choose number of attendance records to display",
+                    options: [
+                      { label: "5 per page", value: 5 },
+                      { label: "10 per page", value: 10 },
+                      { label: "20 per page", value: 20 },
+                    ],
+                    selectedValue: historyPageSize,
+                    onSelect: (val) => {
+                      setHistoryPageSize(Number(val));
+                      setHistoryPage(1);
+                    },
+                  })
+                }
+              />
             </div>
           </div>
 
           {/* Table Content */}
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
               <p className="text-xs text-slate-400 mt-2 font-medium">Loading attendance history...</p>
             </div>
           ) : filteredHistory.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-xs">
-              {historySearch || historyStatusFilter !== "ALL"
-                ? "No attendance records match your search or filter criteria."
-                : "No previous attendance records found."}
+            <div className="text-center py-12 flex flex-col items-center justify-center">
+              <img
+                src="/images/empty-folder.png"
+                alt="No attendance records"
+                className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+              />
+              <p className="font-bold text-slate-700 text-sm">No attendance records found</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                {historySearch || historyStatusFilter !== "ALL"
+                  ? "No attendance records match your search or filter criteria."
+                  : "No previous attendance records found."}
+              </p>
             </div>
           ) : (
             <>
-              {/* Desktop Full Table (Single Row, Separate Columns) */}
+              {/* Desktop Full Table */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
@@ -559,7 +1060,7 @@ export default function LibrarianAttendancePage() {
                     className="p-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between gap-3 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                      <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 text-[#2563EB] flex items-center justify-center shrink-0">
                         <Calendar className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -589,7 +1090,7 @@ export default function LibrarianAttendancePage() {
                 ))}
               </div>
 
-              {/* Superadmin Style Bottom Pagination */}
+              {/* Bottom Pagination */}
               <TablePagination
                 currentPage={historyPage}
                 totalItems={filteredHistory.length}
@@ -668,20 +1169,47 @@ export default function LibrarianAttendancePage() {
         )}
       </MobileBottomDrawer>
 
+      {/* Biometric Face Modal */}
       <StaffBiometricCaptureDialog
         isOpen={showFaceModal}
         actionLabel={pendingAction === "out" ? "Check Out" : "Check In"}
-        onClose={() => { setShowFaceModal(false); setPendingCoords(null); setPendingAction(null); }}
-        onVerified={async (verificationToken) => {
-          if (!pendingCoords || !pendingAction) throw new Error("Attendance action expired. Please try again.");
-          await markAttendance({ ...pendingCoords, verification_token: verificationToken });
-          showToast("success", pendingAction === "out" ? "Punch Out recorded successfully!" : "Punch In recorded successfully!");
+        onClose={() => {
           setShowFaceModal(false);
           setPendingCoords(null);
           setPendingAction(null);
-          await loadData();
+        }}
+        onVerified={async (verificationToken) => {
+          if (!pendingCoords || !pendingAction) {
+            throw new Error("Attendance action expired. Please try again.");
+          }
+          await markAttendance({
+            ...pendingCoords,
+            verification_token: verificationToken,
+          });
+          setJustDone(pendingAction);
+          setTimeout(() => setJustDone(null), 3500);
+          setShowFaceModal(false);
+          setPendingCoords(null);
+          setPendingAction(null);
+          await loadData(true);
         }}
       />
+
+      {/* Mobile Select Bottom Drawer */}
+      {activeSelectDrawer && (
+        <MobileSelectDrawer
+          isOpen={!!activeSelectDrawer}
+          onClose={() => setActiveSelectDrawer(null)}
+          title={activeSelectDrawer.title}
+          subtitle={activeSelectDrawer.subtitle}
+          options={activeSelectDrawer.options}
+          selectedValue={activeSelectDrawer.selectedValue}
+          onSelect={(val) => {
+            activeSelectDrawer.onSelect(val);
+            setActiveSelectDrawer(null);
+          }}
+        />
+      )}
     </div>
   );
 }
