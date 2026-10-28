@@ -7,6 +7,7 @@ import {
   BookOpen,
   Plus,
   Search,
+  ArrowLeft,
   BookMarked,
   Clock,
   CheckCircle2,
@@ -58,6 +59,11 @@ import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
+import {
+  MobileSelectDrawer,
+  MobileSelectTrigger,
+  MobileSelectOption,
+} from "@/components/ui/mobile-select-drawer";
 import { toast } from "sonner";
 import {
   Book,
@@ -126,6 +132,10 @@ import {
   getFeeCollectionReport,
   getStudentActivityReport,
   InventoryAuditData,
+  getStoredDashboardSummary,
+  getStoredLibraryList,
+  LibraryDashboardSummary,
+  getLibraryDashboardSummary,
 } from "@/lib/library";
 import { getSchoolClasses } from "@/lib/clerk/classes";
 import { CategoryCombobox } from "@/components/library/CategoryCombobox";
@@ -134,6 +144,21 @@ import { ManageCopiesModal } from "@/components/library/ManageCopiesModal";
 import { PrintBarcodeStickerModal } from "@/components/library/PrintBarcodeStickerModal";
 import { BarcodeSvg } from "@/components/library/BarcodeSvg";
 import { LibraryFineReceiptModal } from "@/components/library/LibraryFineReceiptModal";
+
+function MetricValue({
+  value,
+  loading,
+  className = "",
+}: {
+  value: React.ReactNode;
+  loading: boolean;
+  className?: string;
+}) {
+  if (loading) {
+    return <span className={`inline-block h-5 w-12 bg-slate-200/80 animate-pulse rounded my-0.5 ${className}`} />;
+  }
+  return <span className={className}>{value}</span>;
+}
 
 function toTitleCase(str: string | undefined | null): string {
   if (!str) return "";
@@ -162,21 +187,22 @@ export default function LibrarianDashboard() {
     "catalog" | "circulation" | "clearance" | "reservations" | "reports" | "masters" | "settings" | "history"
   >("catalog");
 
-  // Data states
-  const [books, setBooks] = useState<Book[]>([]);
-  const [issuedRecords, setIssuedRecords] = useState<BookIssued[]>([]);
-  const [reservations, setReservations] = useState<BookReservation[]>([]);
-  const [categories, setCategories] = useState<BookCategory[]>([]);
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [racks, setRacks] = useState<Rack[]>([]);
-  const [shelves, setShelves] = useState<Shelf[]>([]);
-  const [students, setStudents] = useState<LibraryStudent[]>([]);
-  const [staffBorrowers, setStaffBorrowers] = useState<LibraryStaff[]>([]);
+  // Instant SWR Persistent Data states
+  const [summary, setSummary] = useState<LibraryDashboardSummary | null>(() => getStoredDashboardSummary());
+  const [books, setBooks] = useState<Book[]>(() => getStoredLibraryList<Book>("books_"));
+  const [issuedRecords, setIssuedRecords] = useState<BookIssued[]>(() => getStoredLibraryList<BookIssued>("issued_books"));
+  const [reservations, setReservations] = useState<BookReservation[]>(() => getStoredLibraryList<BookReservation>("reservations"));
+  const [categories, setCategories] = useState<BookCategory[]>(() => getStoredLibraryList<BookCategory>("book_categories"));
+  const [authors, setAuthors] = useState<Author[]>(() => getStoredLibraryList<Author>("book_authors"));
+  const [racks, setRacks] = useState<Rack[]>(() => getStoredLibraryList<Rack>("book_racks"));
+  const [shelves, setShelves] = useState<Shelf[]>(() => getStoredLibraryList<Shelf>("book_shelves"));
+  const [students, setStudents] = useState<LibraryStudent[]>(() => getStoredLibraryList<LibraryStudent>("library_students"));
+  const [staffBorrowers, setStaffBorrowers] = useState<LibraryStaff[]>(() => getStoredLibraryList<LibraryStaff>("library_staff"));
   const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
   const [librarySettings, setLibrarySettings] = useState<LibrarySetting | null>(null);
   const [schoolClasses, setSchoolClasses] = useState<string[]>([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !getStoredDashboardSummary() && getStoredLibraryList("books_").length === 0);
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -228,6 +254,16 @@ export default function LibrarianDashboard() {
   const [mastersPageSize, setMastersPageSize] = useState(10);
   const [mastersSearch, setMastersSearch] = useState("");
   const [selectedMobileMaster, setSelectedMobileMaster] = useState<any | null>(null);
+
+  // Active Mobile Select Drawer for bottom sheet selection
+  const [activeSelectDrawer, setActiveSelectDrawer] = useState<{
+    title: string;
+    subtitle?: string;
+    options: MobileSelectOption[];
+    selectedValue: string | number;
+    onSelect: (val: any) => void;
+  } | null>(null);
+
   const [circulationSearch, setCirculationSearch] = useState("");
   const [circulationBookFilter, setCirculationBookFilter] = useState("ALL");
   const [circulationCategoryFilter, setCirculationCategoryFilter] = useState("ALL");
@@ -307,8 +343,6 @@ export default function LibrarianDashboard() {
   const [masterErrors, setMasterErrors] = useState<Record<string, string>>({});
   const [finePaymentError, setFinePaymentError] = useState("");
 
-  // Notifications
-  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Modals & New Features State
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -457,108 +491,117 @@ export default function LibrarianDashboard() {
   });
 
   const showToast = (type: "success" | "error", message: string) => {
-    setNotification({ type, message });
     if (type === "success") {
       toast.success(message);
     } else {
       toast.error(message);
     }
-    setTimeout(() => setNotification(null), 4500);
   };
 
-  const loadAllData = useCallback(async () => {
-    setLoading(true);
+  const loadAllData = useCallback(async (options?: boolean | any) => {
+    const forceFresh = typeof options === "boolean" ? options : true;
     try {
-      const [
-        booksData,
-        issuedData,
-        reservationsData,
-        catsData,
-        authorsData,
-        racksData,
-        shelvesData,
-        studentsData,
-        staffData,
-        settingsData,
-        classesData,
-      ] = await Promise.all([
-        getBooks().catch(() => []),
-        getIssuedBooks().catch(() => []),
-        getReservations().catch(() => []),
-        getCategories().catch(() => []),
-        getAuthors().catch(() => []),
-        getRacks().catch(() => []),
-        getShelves().catch(() => []),
-        getLibraryStudents().catch(() => []),
-        getLibraryStaff().catch(() => []),
-        getLibrarySettings().catch(() => null),
-        getSchoolClasses().catch(() => []),
+      // Stage 1: Load essential telemetry & catalog data (<20ms via backend cache)
+      const [summaryData, booksData, issuedData, reservationsData] = await Promise.all([
+        getLibraryDashboardSummary(forceFresh).catch(() => null),
+        getBooks(undefined, forceFresh).catch(() => []),
+        getIssuedBooks(forceFresh).catch(() => []),
+        getReservations(forceFresh).catch(() => []),
       ]);
 
-      setBooks(
-        (booksData || []).map((b: Book) => ({
-          ...b,
-          title: toTitleCase(b.title),
-          author: toTitleCase(b.author),
-          category: toTitleCase(b.category),
-          edition: b.edition ? toTitleCase(b.edition) : "",
-        }))
-      );
-      const sortedIssued = (issuedData || []).slice().sort((a: any, b: any) => {
-        const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
-        const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
-        if (timeB !== timeA) return timeB - timeA;
-        return Number(b.id) - Number(a.id);
-      });
-      setIssuedRecords(sortedIssued);
-
-      const sortedReservations = (reservationsData || []).slice().sort((a: any, b: any) => {
-        const timeA = a.reservation_date ? new Date(a.reservation_date).getTime() : 0;
-        const timeB = b.reservation_date ? new Date(b.reservation_date).getTime() : 0;
-        if (timeB !== timeA) return timeB - timeA;
-        return Number(b.id) - Number(a.id);
-      });
-      setReservations(sortedReservations);
-      setCategories(catsData);
-      setAuthors(authorsData);
-      setRacks(racksData);
-      setShelves(shelvesData);
-
-      const normalizedStudents: LibraryStudent[] = (studentsData || []).map((s: any) => {
-        const clsName = (s.class_name || s.school_class_name || "").trim();
-        return {
-          ...s,
-          class_name: clsName,
-          school_class_name: clsName,
-          division: (s.division || "").trim(),
-        };
-      });
-      setStudents(normalizedStudents);
-
-      const classNamesFromApi = (classesData || [])
-        .map((c: any) => (c.school_class || c.name || "").trim())
-        .filter(Boolean);
-      setSchoolClasses(classNamesFromApi);
-
-      setStaffBorrowers(staffData);
-
-      if (settingsData) {
-        setLibrarySettings(settingsData);
-        setSettingsForm({
-          max_books_per_student: Number(settingsData.max_books_per_student) || 3,
-          issue_duration_days: Number(settingsData.issue_duration_days) || 14,
-          max_renewal_count: Number(settingsData.max_renewal_count) || 2,
-          fine_per_day: Number(settingsData.fine_per_day) || 2,
-          grace_period_days: Number(settingsData.grace_period_days) || 0,
-          lost_penalty: Number(settingsData.lost_penalty) || 100,
-          damage_penalty: Number(settingsData.damage_penalty) || 50,
-          allow_renewal_with_fine: Boolean(settingsData.allow_renewal_with_fine),
-          allow_issue_with_fine: Boolean(settingsData.allow_issue_with_fine),
-        });
+      if (summaryData) {
+        setSummary(summaryData);
       }
+
+      if (Array.isArray(booksData) && booksData.length > 0) {
+        setBooks(
+          booksData.map((b: Book) => ({
+            ...b,
+            title: toTitleCase(b.title),
+            author: toTitleCase(b.author),
+            category: toTitleCase(b.category),
+            edition: b.edition ? toTitleCase(b.edition) : "",
+          }))
+        );
+      }
+
+      if (Array.isArray(issuedData) && issuedData.length > 0) {
+        const sortedIssued = issuedData.slice().sort((a: any, b: any) => {
+          const timeA = a.actual_return_date ? new Date(a.actual_return_date).getTime() : (a.book_issued_date ? new Date(a.book_issued_date).getTime() : 0);
+          const timeB = b.actual_return_date ? new Date(b.actual_return_date).getTime() : (b.book_issued_date ? new Date(b.book_issued_date).getTime() : 0);
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id) - Number(a.id);
+        });
+        setIssuedRecords(sortedIssued);
+      }
+
+      if (Array.isArray(reservationsData) && reservationsData.length > 0) {
+        const sortedReservations = reservationsData.slice().sort((a: any, b: any) => {
+          const timeA = a.reservation_date ? new Date(a.reservation_date).getTime() : 0;
+          const timeB = b.reservation_date ? new Date(b.reservation_date).getTime() : 0;
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id) - Number(a.id);
+        });
+        setReservations(sortedReservations);
+      }
+
+      setLoading(false);
+
+      // Stage 2: Load ancillary master dropdowns quietly in the background
+      Promise.all([
+        getCategories(forceFresh).catch(() => []),
+        getAuthors(forceFresh).catch(() => []),
+        getRacks(forceFresh).catch(() => []),
+        getShelves(undefined, forceFresh).catch(() => []),
+        getLibraryStudents(forceFresh).catch(() => []),
+        getLibraryStaff(forceFresh).catch(() => []),
+        getLibrarySettings().catch(() => null),
+        getSchoolClasses().catch(() => []),
+      ]).then(([catsData, authorsData, racksData, shelvesData, studentsData, staffData, settingsData, classesData]) => {
+        if (Array.isArray(catsData) && catsData.length) setCategories(catsData);
+        if (Array.isArray(authorsData) && authorsData.length) setAuthors(authorsData);
+        if (Array.isArray(racksData) && racksData.length) setRacks(racksData);
+        if (Array.isArray(shelvesData) && shelvesData.length) setShelves(shelvesData);
+
+        if (Array.isArray(studentsData) && studentsData.length) {
+          const normalizedStudents: LibraryStudent[] = studentsData.map((s: any) => {
+            const clsName = (s.class_name || s.school_class_name || "").trim();
+            return {
+              ...s,
+              class_name: clsName,
+              school_class_name: clsName,
+              division: (s.division || "").trim(),
+            };
+          });
+          setStudents(normalizedStudents);
+        }
+
+        if (Array.isArray(classesData) && classesData.length) {
+          const classNamesFromApi = classesData
+            .map((c: any) => (c.school_class || c.name || "").trim())
+            .filter(Boolean);
+          setSchoolClasses(classNamesFromApi);
+        }
+
+        if (Array.isArray(staffData) && staffData.length) setStaffBorrowers(staffData);
+
+        if (settingsData) {
+          setLibrarySettings(settingsData);
+          setSettingsForm({
+            max_books_per_student: Number(settingsData.max_books_per_student) || 3,
+            issue_duration_days: Number(settingsData.issue_duration_days) || 14,
+            max_renewal_count: Number(settingsData.max_renewal_count) || 2,
+            fine_per_day: Number(settingsData.fine_per_day) || 2,
+            grace_period_days: Number(settingsData.grace_period_days) || 0,
+            lost_penalty: Number(settingsData.lost_penalty) || 100,
+            damage_penalty: Number(settingsData.damage_penalty) || 50,
+            allow_renewal_with_fine: Boolean(settingsData.allow_renewal_with_fine),
+            allow_issue_with_fine: Boolean(settingsData.allow_issue_with_fine),
+          });
+        }
+      });
     } catch {
       showToast("error", "Error loading library data.");
-    } finally {
       setLoading(false);
     }
   }, []);
@@ -567,40 +610,54 @@ export default function LibrarianDashboard() {
     loadAllData();
   }, [loadAllData]);
 
-  // Derived statistics
+  // Derived statistics (Live real-time computed from data or instant SWR summary)
   const stats = useMemo(() => {
-    const totalBooksCount = books.reduce((acc, b) => acc + (b.total_copies || 0), 0);
-    const availableCopies = books.reduce((acc, b) => acc + (b.available_copies || 0), 0);
-    const activeLoans = issuedRecords.filter((r) => r.status === "ISSUED");
-    const activeLoansCount = activeLoans.length;
+    if (books.length > 0 || issuedRecords.length > 0) {
+      const totalBooksCount = books.reduce((acc, b) => acc + (b.total_copies || 0), 0);
+      const availableCopies = books.reduce((acc, b) => acc + (b.available_copies || 0), 0);
+      const activeLoans = issuedRecords.filter((r) => r.status === "ISSUED");
+      const activeLoansCount = activeLoans.length;
 
-    const now = new Date();
-    const overdueCount = activeLoans.filter((r) => new Date(r.due_date) < now).length;
-    const totalFinesCollected = issuedRecords.reduce(
-      (acc, r) => acc + Number(r.fine_paid_amount || (r.status === "RETURNED" ? (r.total_fine || 0) : 0)),
-      0
-    );
-    const totalPendingDues = issuedRecords.reduce((acc, r) => {
-      const remaining = Number(r.total_fine || 0) - Number(r.fine_paid_amount || 0);
-      return acc + Math.max(0, remaining);
-    }, 0);
-    const lostDamagedCount = issuedRecords.filter(
-      (r) => r.status === "DAMAGED" || r.status === "LOST" || ["MINOR_DAMAGE", "MAJOR_DAMAGE", "LOST"].includes(r.condition_on_return || "")
-    ).length;
-    const waitingReservationsCount = reservations.filter((r) => r.status === "WAITING").length;
+      const now = new Date();
+      const overdueCount = activeLoans.filter((r) => new Date(r.due_date) < now).length;
+      const totalFinesCollected = issuedRecords.reduce(
+        (acc, r) => acc + Number(r.fine_paid_amount || (r.status === "RETURNED" ? (r.total_fine || 0) : 0)),
+        0
+      );
+      const totalPendingDues = issuedRecords.reduce((acc, r) => {
+        const remaining = Number(r.total_fine || 0) - Number(r.fine_paid_amount || 0);
+        return acc + Math.max(0, remaining);
+      }, 0);
+      const lostDamagedCount = issuedRecords.filter(
+        (r) => r.status === "DAMAGED" || r.status === "LOST" || ["MINOR_DAMAGE", "MAJOR_DAMAGE", "LOST"].includes(r.condition_on_return || "")
+      ).length;
+      const waitingReservationsCount = reservations.filter((r) => r.status === "WAITING").length;
+
+      return {
+        titlesCount: books.length,
+        totalBooksCount: totalBooksCount || summary?.total_physical_copies || 0,
+        availableCopies: availableCopies || summary?.available_copies || 0,
+        activeLoansCount: activeLoansCount || summary?.active_loans_count || 0,
+        overdueCount: overdueCount || summary?.overdue_count || 0,
+        totalFinesCollected: totalFinesCollected || Number(summary?.total_fines_settled || 0),
+        totalPendingDues: totalPendingDues || Number(summary?.total_fines_due || 0),
+        lostDamagedCount: lostDamagedCount || summary?.lost_damaged_count || 0,
+        waitingReservationsCount: waitingReservationsCount || summary?.waiting_reservations_count || 0,
+      };
+    }
 
     return {
-      titlesCount: books.length,
-      totalBooksCount,
-      availableCopies,
-      activeLoansCount,
-      overdueCount,
-      totalFinesCollected,
-      totalPendingDues,
-      lostDamagedCount,
-      waitingReservationsCount,
+      titlesCount: summary?.titles ?? 0,
+      totalBooksCount: summary?.total_physical_copies ?? 0,
+      availableCopies: summary?.available_copies ?? 0,
+      activeLoansCount: summary?.active_loans_count ?? 0,
+      overdueCount: summary?.overdue_count ?? 0,
+      totalFinesCollected: Number(summary?.total_fines_settled || 0),
+      totalPendingDues: Number(summary?.total_fines_due || 0),
+      lostDamagedCount: summary?.lost_damaged_count ?? 0,
+      waitingReservationsCount: summary?.waiting_reservations_count ?? 0,
     };
-  }, [books, issuedRecords, reservations]);
+  }, [books, issuedRecords, reservations, summary]);
 
   // Book categories list
   const categoryNames = useMemo(() => {
@@ -2214,92 +2271,77 @@ export default function LibrarianDashboard() {
 
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans text-slate-800">
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-5 right-5 z-[999999] flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white font-medium ${
-              notification.type === "success" ? "bg-emerald-600 shadow-emerald-500/20" : "bg-rose-600 shadow-rose-500/20"
-            }`}
-          >
-            {notification.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-            <span>{notification.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans text-slate-800">
       <div className="w-full space-y-3 sm:space-y-4">
-        {/* Sleek Top Header Bar */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-3.5 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
-              <BookOpen className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  Library Management
-                </h1>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  <Sparkles className="h-3 w-3 text-indigo-500" /> Live Operations
-                </span>
+        {/* Sleek Top Header Bar (Only displayed in Racks & Storage [masters] and Issue & Return [circulation]) */}
+        {(activeTab === "masters" || activeTab === "circulation") && (
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-3.5 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+                <BookOpen className="h-5 w-5" />
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Physical catalogue titles, accession barcodes, counter lending, student clearance & stock tracking
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                    Library Management
+                  </h1>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <Sparkles className="h-3 w-3 text-indigo-500" /> Live Operations
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Physical catalogue titles, accession barcodes, counter lending, student clearance & stock tracking
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center flex-wrap gap-2 shrink-0">
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingBook(null);
+                  setBookFormErrors({});
+                  setBookForm({
+                    title: "",
+                    subtitle: "",
+                    isbn: "",
+                    author: "",
+                    category: "",
+                    category_ref: "",
+                    author_ref: "",
+                    rack: "",
+                    shelf: "",
+                    edition: "",
+                    publication_year: new Date().getFullYear(),
+                    language: "English",
+                    pages: 200,
+                    price: 150,
+                    total_copies: 1,
+                    description: "",
+                  });
+                  setShowAddBookModal(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add New Book
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setIssueForm({ book: "", book_copy: "", student: "", due_date: "" });
+                  setIssueErrors({});
+                  setShowIssueModal(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" /> Issue Book
+              </Button>
             </div>
           </div>
+        )}
 
-          <div className="flex items-center flex-wrap gap-2 shrink-0">
-            <Button
-              type="button"
-              onClick={() => {
-                setEditingBook(null);
-                setBookFormErrors({});
-                setBookForm({
-                  title: "",
-                  subtitle: "",
-                  isbn: "",
-                  author: "",
-                  category: "",
-                  category_ref: "",
-                  author_ref: "",
-                  rack: "",
-                  shelf: "",
-                  edition: "",
-                  publication_year: new Date().getFullYear(),
-                  language: "English",
-                  pages: 200,
-                  price: 150,
-                  total_copies: 1,
-                  description: "",
-                });
-                setShowAddBookModal(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add New Book
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setIssueForm({ book: "", book_copy: "", student: "", due_date: "" });
-                setIssueErrors({});
-                setShowIssueModal(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5"
-            >
-              <ArrowRightLeft className="h-3.5 w-3.5" /> Issue Book
-            </Button>
-          </div>
-        </div>
-
-        {/* Eight Telemetry Statistics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 sm:gap-3">
+        {/* Eight Telemetry Statistics Cards (Desktop: All 8 pages; Mobile: Only 1st page - catalog) */}
+        <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3 ${activeTab !== "catalog" ? "hidden md:grid" : ""}`}>
           {/* Card 1: Total Titles */}
           <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1.5">
@@ -2309,10 +2351,14 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-slate-900">{stats.titlesCount}</div>
+              <div className="text-xl font-black text-slate-900">
+                <MetricValue value={stats.titlesCount} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-slate-500 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
-                <span>{stats.totalBooksCount} Copies</span>
+                <span>
+                  <MetricValue value={`${stats.totalBooksCount} Copies`} loading={loading && !summary && books.length === 0} />
+                </span>
               </div>
             </div>
           </div>
@@ -2326,7 +2372,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-emerald-600">{stats.availableCopies}</div>
+              <div className="text-xl font-black text-emerald-600">
+                <MetricValue value={stats.availableCopies} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-emerald-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <span>Ready to lend</span>
@@ -2343,7 +2391,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-blue-600">{stats.activeLoansCount}</div>
+              <div className="text-xl font-black text-blue-600">
+                <MetricValue value={stats.activeLoansCount} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-blue-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
                 <span>Circulating</span>
@@ -2360,7 +2410,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-rose-600">{stats.overdueCount}</div>
+              <div className="text-xl font-black text-rose-600">
+                <MetricValue value={stats.overdueCount} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-rose-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
                 <span>Past due</span>
@@ -2377,7 +2429,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-purple-600">{stats.waitingReservationsCount}</div>
+              <div className="text-xl font-black text-purple-600">
+                <MetricValue value={stats.waitingReservationsCount} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-purple-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
                 <span>Waitlist</span>
@@ -2394,7 +2448,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-red-600">{stats.lostDamagedCount}</div>
+              <div className="text-xl font-black text-red-600">
+                <MetricValue value={stats.lostDamagedCount} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-red-600 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
                 <span>Stock audit loss</span>
@@ -2411,7 +2467,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-amber-700">₹{stats.totalPendingDues.toLocaleString("en-IN")}</div>
+              <div className="text-xl font-black text-amber-700">
+                <MetricValue value={`₹${stats.totalPendingDues.toLocaleString("en-IN")}`} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-amber-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
                 <span>Unsettled fines</span>
@@ -2428,7 +2486,9 @@ export default function LibrarianDashboard() {
               </div>
             </div>
             <div className="mt-2">
-              <div className="text-xl font-black text-emerald-600">₹{stats.totalFinesCollected.toLocaleString("en-IN")}</div>
+              <div className="text-xl font-black text-emerald-600">
+                <MetricValue value={`₹${stats.totalFinesCollected.toLocaleString("en-IN")}`} loading={loading && !summary && books.length === 0} />
+              </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-medium text-emerald-700 truncate">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <span>Settled revenue</span>
@@ -2436,7 +2496,6 @@ export default function LibrarianDashboard() {
             </div>
           </div>
         </div>
-
 
         {/* MAIN WORKSPACE CONTENT AREA (FULL WIDTH - NO DUAL SIDEBAR) */}
         <div className="w-full min-w-0 space-y-4">
@@ -2538,31 +2597,57 @@ export default function LibrarianDashboard() {
               </div>
 
               {/* Filter and Search Bar Directly on Top of Table Data */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
-                {/* Search */}
-                <div className="relative min-w-[260px] flex-1 sm:max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setCatalogPage(1);
-                    }}
-                    placeholder="Search by book title, author, or ISBN barcode…"
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3 border-b border-slate-200 bg-slate-50/50 p-3 sm:p-4">
+                {/* Search & Mobile Page Size (Row 1 on mobile) */}
+                <div className="flex items-center gap-2 w-full md:flex-1 md:max-w-md">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setCatalogPage(1);
+                      }}
+                      placeholder="Search by book title, author, or ISBN barcode…"
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/10 shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Mobile Page Size Trigger (Next to search on mobile, hidden on desktop) */}
+                  <MobileSelectTrigger
+                    className="shrink-0"
+                    valueLabel={`${catalogPageSize} per page`}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Rows Per Page",
+                        subtitle: "Choose number of books to display per page",
+                        options: [
+                          { label: "5 per page", value: 5 },
+                          { label: "10 per page", value: 10 },
+                          { label: "20 per page", value: 20 },
+                          { label: "50 per page", value: 50 },
+                        ],
+                        selectedValue: catalogPageSize,
+                        onSelect: (val) => {
+                          setCatalogPageSize(Number(val));
+                          setCatalogPage(1);
+                        },
+                      })
+                    }
                   />
                 </div>
 
-                {/* Dropdown Filters */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Dropdown Filters (Row 2 on mobile: 2 equal-width columns) */}
+                <div className="grid grid-cols-2 md:flex md:flex-nowrap items-center gap-2 w-full md:w-auto">
+                  {/* Category Filter */}
                   <select
                     value={categoryFilter}
                     onChange={(e) => {
                       setCategoryFilter(e.target.value);
                       setCatalogPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                    className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs"
                   >
                     <option value="ALL">All Categories</option>
                     {categoryNames.filter((cat) => cat !== "ALL").map((cat) => (
@@ -2571,14 +2656,37 @@ export default function LibrarianDashboard() {
                       </option>
                     ))}
                   </select>
+                  <MobileSelectTrigger
+                    className="w-full"
+                    label="Category"
+                    valueLabel={categoryFilter === "ALL" ? "All Categories" : categoryFilter}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Book Category",
+                        subtitle: "Filter catalogue by category",
+                        options: [
+                          { label: "All Categories", value: "ALL" },
+                          ...categoryNames
+                            .filter((cat) => cat !== "ALL")
+                            .map((cat) => ({ label: cat, value: cat })),
+                        ],
+                        selectedValue: categoryFilter,
+                        onSelect: (val) => {
+                          setCategoryFilter(val);
+                          setCatalogPage(1);
+                        },
+                      })
+                    }
+                  />
 
+                  {/* Author Filter */}
                   <select
                     value={authorFilter}
                     onChange={(e) => {
                       setAuthorFilter(e.target.value);
                       setCatalogPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                    className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs"
                   >
                     <option value="ALL">All Authors</option>
                     {authorNames.filter((auth) => auth !== "ALL").map((auth) => (
@@ -2587,14 +2695,37 @@ export default function LibrarianDashboard() {
                       </option>
                     ))}
                   </select>
+                  <MobileSelectTrigger
+                    className="w-full"
+                    label="Author"
+                    valueLabel={authorFilter === "ALL" ? "All Authors" : authorFilter}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Book Author",
+                        subtitle: "Filter catalogue by author",
+                        options: [
+                          { label: "All Authors", value: "ALL" },
+                          ...authorNames
+                            .filter((auth) => auth !== "ALL")
+                            .map((auth) => ({ label: auth, value: auth })),
+                        ],
+                        selectedValue: authorFilter,
+                        onSelect: (val) => {
+                          setAuthorFilter(val);
+                          setCatalogPage(1);
+                        },
+                      })
+                    }
+                  />
 
+                  {/* Desktop Page Size */}
                   <select
                     value={catalogPageSize}
                     onChange={(e) => {
                       setCatalogPageSize(Number(e.target.value));
                       setCatalogPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                    className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs"
                   >
                     <option value={5}>5 per page</option>
                     <option value={10}>10 per page</option>
@@ -2611,10 +2742,22 @@ export default function LibrarianDashboard() {
                   <p className="text-xs text-slate-400 mt-2 font-medium">Loading library catalogue...</p>
                 </div>
               ) : filteredBooks.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs">
-                  {searchQuery || categoryFilter !== "ALL" || authorFilter !== "ALL"
-                    ? "No books match your search or filter criteria."
-                    : "No books registered in the catalogue."}
+                <div className="text-center py-12">
+                  <img
+                    src="/images/empty-folder.png"
+                    alt="No books"
+                    className="mx-auto mb-3 h-24 w-24 object-contain"
+                  />
+                  <p className="font-semibold text-slate-700 text-sm">
+                    {searchQuery || categoryFilter !== "ALL" || authorFilter !== "ALL"
+                      ? "No books match your search or filter criteria"
+                      : "No books registered in the catalogue"}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {searchQuery || categoryFilter !== "ALL" || authorFilter !== "ALL"
+                      ? "Try adjusting or clearing your search and filters."
+                      : "Add books to your catalogue using the Add Book button above."}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -2887,60 +3030,98 @@ export default function LibrarianDashboard() {
             </div>
 
             {/* Filter and Search Bar Directly on Top of Table Data */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
-              {/* Search */}
-              <div className="relative min-w-[260px] flex-1 sm:max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={circulationSearch}
-                  onChange={(e) => {
-                    setCirculationSearch(e.target.value);
-                    setCirculationPage(1);
-                  }}
-                  placeholder="Search borrower, book title, accession no, GR…"
-                  className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/10 shadow-2xs"
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3 border-b border-slate-200 bg-slate-50/50 p-3 sm:p-4">
+              {/* Search & Mobile Page Size (Row 1 on mobile) */}
+              <div className="flex items-center gap-2 w-full md:flex-1 md:max-w-md">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={circulationSearch}
+                    onChange={(e) => {
+                      setCirculationSearch(e.target.value);
+                      setCirculationPage(1);
+                    }}
+                    placeholder="Search borrower, book title, accession no, GR…"
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/10 shadow-2xs"
+                  />
+                </div>
+
+                {/* Mobile Page Size */}
+                <MobileSelectTrigger
+                  className="shrink-0"
+                  valueLabel={`${circulationPageSize} per page`}
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Rows Per Page",
+                      subtitle: "Choose number of circulation records to display",
+                      options: [
+                        { label: "5 per page", value: 5 },
+                        { label: "10 per page", value: 10 },
+                        { label: "20 per page", value: 20 },
+                        { label: "50 per page", value: 50 },
+                      ],
+                      selectedValue: circulationPageSize,
+                      onSelect: (val) => {
+                        setCirculationPageSize(Number(val));
+                        setCirculationPage(1);
+                      },
+                    })
+                  }
                 />
               </div>
 
-              {/* Dropdown Filters */}
-              <div className="flex flex-wrap items-center gap-2">
+              {/* Dropdown Filters (Row 2 on mobile: 2-column grid; on desktop: inline flex) */}
+              <div className="grid grid-cols-2 md:flex md:flex-nowrap items-center gap-2 w-full md:w-auto">
+                {/* Status Filter */}
                 <select
                   value={circulationStatusFilter}
                   onChange={(e) => {
                     setCirculationStatusFilter(e.target.value as "ALL" | "OVERDUE" | "DUE_SOON");
                     setCirculationPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="OVERDUE">Overdue Only</option>
                   <option value="DUE_SOON">Due Soon (≤3d)</option>
                 </select>
+                <MobileSelectTrigger
+                  className="w-full"
+                  label="Status"
+                  valueLabel={
+                    circulationStatusFilter === "ALL"
+                      ? "All Statuses"
+                      : circulationStatusFilter === "OVERDUE"
+                      ? "Overdue Only"
+                      : "Due Soon (≤3d)"
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Circulation Status",
+                      subtitle: "Filter active loans by loan status",
+                      options: [
+                        { label: "All Statuses", value: "ALL" },
+                        { label: "Overdue Only", value: "OVERDUE" },
+                        { label: "Due Soon (≤3d)", value: "DUE_SOON" },
+                      ],
+                      selectedValue: circulationStatusFilter,
+                      onSelect: (val) => {
+                        setCirculationStatusFilter(val);
+                        setCirculationPage(1);
+                      },
+                    })
+                  }
+                />
 
-                <select
-                  value={circulationBookFilter}
-                  onChange={(e) => {
-                    setCirculationBookFilter(e.target.value);
-                    setCirculationPage(1);
-                  }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[180px] truncate"
-                >
-                  <option value="ALL">All Books</option>
-                  {uniqueActiveLoanBooks.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title}
-                    </option>
-                  ))}
-                </select>
-
+                {/* Category Filter */}
                 <select
                   value={circulationCategoryFilter}
                   onChange={(e) => {
                     setCirculationCategoryFilter(e.target.value);
                     setCirculationPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
                 >
                   <option value="ALL">All Categories</option>
                   {uniqueActiveLoanCategories.map((c) => (
@@ -2949,14 +3130,76 @@ export default function LibrarianDashboard() {
                     </option>
                   ))}
                 </select>
+                <MobileSelectTrigger
+                  className="w-full"
+                  label="Category"
+                  valueLabel={circulationCategoryFilter === "ALL" ? "All Categories" : circulationCategoryFilter}
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Filter by Category",
+                      subtitle: "Show loans for a specific category",
+                      options: [
+                        { label: "All Categories", value: "ALL" },
+                        ...uniqueActiveLoanCategories.map((c) => ({ label: c.cat, value: c.cat })),
+                      ],
+                      selectedValue: circulationCategoryFilter,
+                      onSelect: (val) => {
+                        setCirculationCategoryFilter(val);
+                        setCirculationPage(1);
+                      },
+                    })
+                  }
+                />
 
+                {/* Book Filter */}
+                <select
+                  value={circulationBookFilter}
+                  onChange={(e) => {
+                    setCirculationBookFilter(e.target.value);
+                    setCirculationPage(1);
+                  }}
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs max-w-[180px] truncate"
+                >
+                  <option value="ALL">All Books</option>
+                  {uniqueActiveLoanBooks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
+                <MobileSelectTrigger
+                  className="col-span-2 md:col-auto w-full md:w-auto"
+                  label="Book"
+                  valueLabel={
+                    circulationBookFilter === "ALL"
+                      ? "All Books"
+                      : uniqueActiveLoanBooks.find((b) => String(b.id) === String(circulationBookFilter))?.title || "Selected Book"
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Filter by Book",
+                      subtitle: "Show loans for a specific book",
+                      options: [
+                        { label: "All Books", value: "ALL" },
+                        ...uniqueActiveLoanBooks.map((b) => ({ label: b.title, value: b.id })),
+                      ],
+                      selectedValue: circulationBookFilter,
+                      onSelect: (val) => {
+                        setCirculationBookFilter(val);
+                        setCirculationPage(1);
+                      },
+                    })
+                  }
+                />
+
+                {/* Desktop Page Size */}
                 <select
                   value={circulationPageSize}
                   onChange={(e) => {
                     setCirculationPageSize(Number(e.target.value));
                     setCirculationPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-600 focus:outline-none shadow-2xs"
                 >
                   <option value={5}>5 per page</option>
                   <option value={10}>10 per page</option>
@@ -2969,14 +3212,22 @@ export default function LibrarianDashboard() {
             {/* Table Content */}
             {activeLoans.length === 0 ? (
               <div className="text-center p-12">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                <p className="text-sm font-semibold text-slate-800 mt-2">All books are safely in the library!</p>
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No active loans"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-800">All books are safely in the library!</p>
                 <p className="text-xs text-slate-400 mt-1">No active loans outstanding.</p>
               </div>
             ) : filteredActiveLoans.length === 0 ? (
               <div className="text-center p-12">
-                <AlertCircle className="h-8 w-8 text-slate-300 mx-auto" />
-                <p className="text-sm font-semibold text-slate-800 mt-2">No active loans match the selected filters</p>
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No active loans"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-800">No active loans match the selected filters</p>
                 <p className="text-xs text-slate-400 mt-1">Try clearing or changing your search criteria.</p>
               </div>
             ) : (
@@ -3158,12 +3409,14 @@ export default function LibrarianDashboard() {
                 </div>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   onClick={loadPendingClearance}
                   disabled={clearanceLoading}
-                  className="text-xs gap-1.5 bg-white"
+                  className="h-8 w-8 rounded-lg bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shrink-0"
+                  title="Refresh Clearance List"
+                  aria-label="Refresh Clearance List"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${clearanceLoading ? "animate-spin" : ""}`} /> Refresh Clearance List
+                  <RefreshCw className={`h-3.5 w-3.5 ${clearanceLoading ? "animate-spin" : ""}`} />
                 </Button>
               </div>
 
@@ -3204,7 +3457,7 @@ export default function LibrarianDashboard() {
                         setClearanceSearchQuery("");
                         setSelectedStudentClearance(null);
                       }}
-                      className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-medium bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors shadow-2xs"
+                      className="hidden md:block w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-medium bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors shadow-2xs"
                     >
                       <option value="">-- All Classes ({availableClasses.length}) --</option>
                       {availableClasses.map((cls) => (
@@ -3213,6 +3466,28 @@ export default function LibrarianDashboard() {
                         </option>
                       ))}
                     </select>
+                    <MobileSelectTrigger
+                      className="w-full h-10 justify-between"
+                      label="Class"
+                      valueLabel={clearanceClassFilter ? `Class: ${clearanceClassFilter}` : "All Classes"}
+                      onClick={() =>
+                        setActiveSelectDrawer({
+                          title: "Filter by Class",
+                          subtitle: "Select class to inspect clearance records",
+                          options: [
+                            { label: `-- All Classes (${availableClasses.length}) --`, value: "" },
+                            ...availableClasses.map((cls) => ({ label: `Class: ${cls}`, value: cls })),
+                          ],
+                          selectedValue: clearanceClassFilter,
+                          onSelect: (newClass) => {
+                            setClearanceClassFilter(newClass);
+                            setClearanceDivisionFilter("");
+                            setClearanceSearchQuery("");
+                            setSelectedStudentClearance(null);
+                          },
+                        })
+                      }
+                    />
                   </div>
 
                   {/* 2. Division Filter */}
@@ -3228,7 +3503,7 @@ export default function LibrarianDashboard() {
                         setSelectedStudentClearance(null);
                       }}
                       disabled={!clearanceClassFilter}
-                      className={`w-full h-10 rounded-xl border px-3 text-xs sm:text-sm font-medium transition-colors shadow-2xs ${
+                      className={`hidden md:block w-full h-10 rounded-xl border px-3 text-xs sm:text-sm font-medium transition-colors shadow-2xs ${
                         !clearanceClassFilter
                           ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
                           : "bg-white border-slate-200 text-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
@@ -3249,6 +3524,37 @@ export default function LibrarianDashboard() {
                         </>
                       )}
                     </select>
+                    <MobileSelectTrigger
+                      className="w-full h-10 justify-between"
+                      label="Division"
+                      valueLabel={
+                        !clearanceClassFilter
+                          ? "Choose Class First"
+                          : clearanceDivisionFilter
+                          ? `Division ${clearanceDivisionFilter}`
+                          : "All Divisions"
+                      }
+                      onClick={() => {
+                        if (!clearanceClassFilter) {
+                          toast.info("Please select a class first");
+                          return;
+                        }
+                        setActiveSelectDrawer({
+                          title: `Filter Division (${clearanceClassFilter})`,
+                          subtitle: "Select division to filter students",
+                          options: [
+                            { label: `-- All Divisions (${clearanceDivisions.length}) --`, value: "" },
+                            ...clearanceDivisions.map((div) => ({ label: `Division ${div}`, value: div })),
+                          ],
+                          selectedValue: clearanceDivisionFilter,
+                          onSelect: (div) => {
+                            setClearanceDivisionFilter(div);
+                            setClearanceSearchQuery("");
+                            setSelectedStudentClearance(null);
+                          },
+                        });
+                      }}
+                    />
                   </div>
 
                   {/* 3. Search Student by Name / GR */}
@@ -3676,13 +3982,33 @@ export default function LibrarianDashboard() {
                       setClearancePageSize(Number(e.target.value));
                       setClearancePage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                    className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                   >
                     <option value={5}>5 per page</option>
                     <option value={10}>10 per page</option>
                     <option value={20}>20 per page</option>
                     <option value={50}>50 per page</option>
                   </select>
+                  <MobileSelectTrigger
+                    valueLabel={`${clearancePageSize} per page`}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Rows Per Page",
+                        subtitle: "Choose number of clearance records to display",
+                        options: [
+                          { label: "5 per page", value: 5 },
+                          { label: "10 per page", value: 10 },
+                          { label: "20 per page", value: 20 },
+                          { label: "50 per page", value: 50 },
+                        ],
+                        selectedValue: clearancePageSize,
+                        onSelect: (val) => {
+                          setClearancePageSize(Number(val));
+                          setClearancePage(1);
+                        },
+                      })
+                    }
+                  />
                 </div>
               </div>
 
@@ -3852,14 +4178,14 @@ export default function LibrarianDashboard() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full sm:w-auto">
                 <select
                   value={reservationsStatusFilter}
                   onChange={(e) => {
                     setReservationsStatusFilter(e.target.value);
                     setReservationsPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="WAITING">Waiting Queue</option>
@@ -3868,6 +4194,43 @@ export default function LibrarianDashboard() {
                   <option value="CANCELLED">Cancelled</option>
                   <option value="EXPIRED">Expired</option>
                 </select>
+                <MobileSelectTrigger
+                  label="Status"
+                  valueLabel={
+                    reservationsStatusFilter === "ALL"
+                      ? "All Statuses"
+                      : reservationsStatusFilter === "WAITING"
+                      ? "Waiting Queue"
+                      : reservationsStatusFilter === "AVAILABLE"
+                      ? "Available / Ready"
+                      : reservationsStatusFilter === "FULFILLED"
+                      ? "Fulfilled"
+                      : reservationsStatusFilter === "CANCELLED"
+                      ? "Cancelled"
+                      : reservationsStatusFilter === "EXPIRED"
+                      ? "Expired"
+                      : reservationsStatusFilter
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Reservation Status",
+                      subtitle: "Filter book reservations by status",
+                      options: [
+                        { label: "All Statuses", value: "ALL" },
+                        { label: "Waiting Queue", value: "WAITING" },
+                        { label: "Available / Ready", value: "AVAILABLE" },
+                        { label: "Fulfilled", value: "FULFILLED" },
+                        { label: "Cancelled", value: "CANCELLED" },
+                        { label: "Expired", value: "EXPIRED" },
+                      ],
+                      selectedValue: reservationsStatusFilter,
+                      onSelect: (val) => {
+                        setReservationsStatusFilter(val);
+                        setReservationsPage(1);
+                      },
+                    })
+                  }
+                />
 
                 <select
                   value={reservationsPageSize}
@@ -3875,24 +4238,54 @@ export default function LibrarianDashboard() {
                     setReservationsPageSize(Number(e.target.value));
                     setReservationsPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                 >
                   <option value={5}>5 per page</option>
                   <option value={10}>10 per page</option>
                   <option value={20}>20 per page</option>
                 </select>
+                <MobileSelectTrigger
+                  valueLabel={`${reservationsPageSize} per page`}
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Rows Per Page",
+                      subtitle: "Choose number of reservations to display per page",
+                      options: [
+                        { label: "5 per page", value: 5 },
+                        { label: "10 per page", value: 10 },
+                        { label: "20 per page", value: 20 },
+                      ],
+                      selectedValue: reservationsPageSize,
+                      onSelect: (val) => {
+                        setReservationsPageSize(Number(val));
+                        setReservationsPage(1);
+                      },
+                    })
+                  }
+                />
               </div>
             </div>
 
             {/* Table Content */}
             {reservations.length === 0 ? (
               <div className="text-center p-12">
-                <BookmarkPlus className="h-8 w-8 text-slate-300 mx-auto" />
-                <p className="text-sm font-semibold text-slate-700 mt-2">No active book reservations.</p>
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No reservations"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-700">No active book reservations</p>
+                <p className="text-xs text-slate-400 mt-1">Reservations made by students or staff will appear here.</p>
               </div>
             ) : filteredReservations.length === 0 ? (
-              <div className="text-center p-12 text-slate-400 text-xs">
-                No reservations match your search or filter criteria.
+              <div className="text-center p-12">
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No reservations found"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-700">No reservations match your search or filter criteria</p>
+                <p className="text-xs text-slate-400 mt-1">Try clearing or changing your search criteria.</p>
               </div>
             ) : (
               <>
@@ -4020,43 +4413,59 @@ export default function LibrarianDashboard() {
         {/* TAB: REPORTS & INVENTORY AUDIT (SECTION 20, 21, 23) */}
         {activeTab === "reports" && (
           <div className="space-y-6">
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+            <div
+              style={{
+                WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                backdropFilter: "blur(24px) saturate(180%)",
+              }}
+              className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/25 border border-slate-200/80 shadow-xs overflow-x-auto no-scrollbar scroll-smooth w-full"
+            >
               <button
                 onClick={() => setReportsSubTab("audit")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                  reportsSubTab === "audit" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  reportsSubTab === "audit"
+                    ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
                 <Archive className="h-3.5 w-3.5" /> Year-End Inventory Audit (Section 23)
               </button>
               <button
                 onClick={() => setReportsSubTab("borrowed")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                  reportsSubTab === "borrowed" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  reportsSubTab === "borrowed"
+                    ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
                 <TrendingUp className="h-3.5 w-3.5" /> Most Borrowed Titles (Section 21)
               </button>
               <button
                 onClick={() => setReportsSubTab("trends")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                  reportsSubTab === "trends" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  reportsSubTab === "trends"
+                    ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
                 <Layers className="h-3.5 w-3.5" /> Category Trends
               </button>
               <button
                 onClick={() => setReportsSubTab("overdue")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                  reportsSubTab === "overdue" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  reportsSubTab === "overdue"
+                    ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
                 <Clock className="h-3.5 w-3.5" /> Overdue Loans & Delays
               </button>
               <button
                 onClick={() => setReportsSubTab("fees")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                  reportsSubTab === "fees" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  reportsSubTab === "fees"
+                    ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
                 <DollarSign className="h-3.5 w-3.5" /> Fine Revenue & Dues
@@ -4182,30 +4591,32 @@ export default function LibrarianDashboard() {
                 {mostBorrowed.length === 0 ? (
                   <p className="text-xs text-slate-400 py-6 text-center">No borrowing data yet.</p>
                 ) : (
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
-                      <tr>
-                        <th className="px-4 py-3">Rank</th>
-                        <th className="px-4 py-3">Book Title</th>
-                        <th className="px-4 py-3">Author</th>
-                        <th className="px-4 py-3">Category</th>
-                        <th className="px-4 py-3 text-right">Times Issued</th>
-                        <th className="px-4 py-3 text-right">Available Copies</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {mostBorrowed.map((b, idx) => (
-                        <tr key={b.book_id || idx} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-bold text-indigo-600">#{idx + 1}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-900">{b.title}</td>
-                          <td className="px-4 py-3 text-slate-600">{b.author}</td>
-                          <td className="px-4 py-3 text-slate-500">{b.category}</td>
-                          <td className="px-4 py-3 text-right font-bold text-slate-900">{b.times_issued} times</td>
-                          <td className="px-4 py-3 text-right font-mono text-emerald-600">{b.available_copies} / {b.total_copies}</td>
+                  <div className="overflow-x-auto min-w-0">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
+                        <tr>
+                          <th className="px-4 py-3">Rank</th>
+                          <th className="px-4 py-3">Book Title</th>
+                          <th className="px-4 py-3">Author</th>
+                          <th className="px-4 py-3">Category</th>
+                          <th className="px-4 py-3 text-right">Times Issued</th>
+                          <th className="px-4 py-3 text-right">Available Copies</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {mostBorrowed.map((b, idx) => (
+                          <tr key={b.book_id || idx} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 font-bold text-indigo-600">#{idx + 1}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-900">{b.title}</td>
+                            <td className="px-4 py-3 text-slate-600">{b.author}</td>
+                            <td className="px-4 py-3 text-slate-500">{b.category}</td>
+                            <td className="px-4 py-3 text-right font-bold text-slate-900">{b.times_issued} times</td>
+                            <td className="px-4 py-3 text-right font-mono text-emerald-600">{b.available_copies} / {b.total_copies}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
@@ -4418,16 +4829,6 @@ export default function LibrarianDashboard() {
                         Monthly Trends &amp; Revenue Ledger
                       </button>
                     </div>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={loadReportsData}
-                      disabled={reportsLoading}
-                      className="text-xs h-8 bg-white border-slate-200"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 mr-1 ${reportsLoading ? "animate-spin" : ""}`} /> Refresh
-                    </Button>
                   </div>
 
                   {/* TABLE 1: Outstanding Due Penalties */}
@@ -4653,74 +5054,72 @@ export default function LibrarianDashboard() {
         {/* TAB 4: MASTERS SETUP */}
         {activeTab === "masters" && (
           <div className="space-y-4">
-            {/* Master Navigation & Sub Tabs */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMasterSubTab("categories");
-                    setMastersSearch("");
-                    setMastersPage(1);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
-                    masterSubTab === "categories"
-                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
-                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  }`}
-                >
-                  Categories ({categories.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMasterSubTab("authors");
-                    setMastersSearch("");
-                    setMastersPage(1);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
-                    masterSubTab === "authors"
-                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
-                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  }`}
-                >
-                  Authors ({authors.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMasterSubTab("racks");
-                    setMastersSearch("");
-                    setMastersPage(1);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
-                    masterSubTab === "racks"
-                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
-                      : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  }`}
-                >
-                  Racks & Shelves ({racks.length} Racks)
-                </button>
-              </div>
+            {/* Sub-Tabs: Categories vs Authors vs Racks */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMasterSubTab("categories");
+                  setMastersSearch("");
+                  setMastersPage(1);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                  masterSubTab === "categories"
+                    ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                    : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                }`}
+              >
+                Categories ({categories.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMasterSubTab("authors");
+                  setMastersSearch("");
+                  setMastersPage(1);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                  masterSubTab === "authors"
+                    ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                    : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                }`}
+              >
+                Authors ({authors.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMasterSubTab("racks");
+                  setMastersSearch("");
+                  setMastersPage(1);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                  masterSubTab === "racks"
+                    ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
+                    : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
+                }`}
+              >
+                Racks & Shelves ({racks.length} Racks)
+              </button>
             </div>
 
             {/* UNIFIED SUPERADMIN TABLE CARD */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               {/* Header Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs shrink-0">
                       {masterSubTab === "categories" && <Layers className="h-4 w-4" />}
                       {masterSubTab === "authors" && <Users className="h-4 w-4" />}
                       {masterSubTab === "racks" && <MapPin className="h-4 w-4" />}
                     </span>
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-base font-bold text-slate-900 truncate">
                       {masterSubTab === "categories" && "Book Categories Master"}
                       {masterSubTab === "authors" && "Book Authors Master"}
                       {masterSubTab === "racks" && "Racks & Shelves Master"}
                     </h3>
-                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60 shrink-0">
                       {masterSubTab === "categories" && `${filteredCategories.length} Categories`}
                       {masterSubTab === "authors" && `${filteredAuthors.length} Authors`}
                       {masterSubTab === "racks" && `${filteredRacks.length} Racks`}
@@ -4733,7 +5132,7 @@ export default function LibrarianDashboard() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"
                     onClick={() => {
@@ -4759,9 +5158,9 @@ export default function LibrarianDashboard() {
               </div>
 
               {/* Filter and Search Bar Directly on Top of Table Data */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/50 p-4">
                 {/* Search */}
-                <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
@@ -4776,20 +5175,40 @@ export default function LibrarianDashboard() {
                 </div>
 
                 {/* Dropdown Filters */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
                   <select
                     value={mastersPageSize}
                     onChange={(e) => {
                       setMastersPageSize(Number(e.target.value));
                       setMastersPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                    className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                   >
                     <option value={5}>5 per page</option>
                     <option value={10}>10 per page</option>
                     <option value={20}>20 per page</option>
                     <option value={50}>50 per page</option>
                   </select>
+                  <MobileSelectTrigger
+                    valueLabel={`${mastersPageSize} per page`}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Rows Per Page",
+                        subtitle: `Choose number of ${masterSubTab} to display per page`,
+                        options: [
+                          { label: "5 per page", value: 5 },
+                          { label: "10 per page", value: 10 },
+                          { label: "20 per page", value: 20 },
+                          { label: "50 per page", value: 50 },
+                        ],
+                        selectedValue: mastersPageSize,
+                        onSelect: (val) => {
+                          setMastersPageSize(Number(val));
+                          setMastersPage(1);
+                        },
+                      })
+                    }
+                  />
                 </div>
               </div>
 
@@ -5565,28 +5984,61 @@ export default function LibrarianDashboard() {
               </div>
 
               {/* Dropdown Filters */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                {/* Status Filter */}
                 <select
                   value={historyStatusFilter}
                   onChange={(e) => {
                     setHistoryStatusFilter(e.target.value);
                     setHistoryPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="RETURNED">Returned</option>
                   <option value="DAMAGED">Damaged</option>
                   <option value="LOST">Lost</option>
                 </select>
+                <MobileSelectTrigger
+                  label="Status"
+                  valueLabel={
+                    historyStatusFilter === "ALL"
+                      ? "All Statuses"
+                      : historyStatusFilter === "RETURNED"
+                      ? "Returned"
+                      : historyStatusFilter === "DAMAGED"
+                      ? "Damaged"
+                      : historyStatusFilter === "LOST"
+                      ? "Lost"
+                      : historyStatusFilter
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "History Status",
+                      subtitle: "Filter historical circulation by return status",
+                      options: [
+                        { label: "All Statuses", value: "ALL" },
+                        { label: "Returned", value: "RETURNED" },
+                        { label: "Damaged", value: "DAMAGED" },
+                        { label: "Lost", value: "LOST" },
+                      ],
+                      selectedValue: historyStatusFilter,
+                      onSelect: (val) => {
+                        setHistoryStatusFilter(val);
+                        setHistoryPage(1);
+                      },
+                    })
+                  }
+                />
 
+                {/* Payment Type Filter */}
                 <select
                   value={historyPaymentTypeFilter}
                   onChange={(e) => {
                     setHistoryPaymentTypeFilter(e.target.value);
                     setHistoryPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                 >
                   <option value="ALL">All Payments</option>
                   <option value="CASH">Cash Counter</option>
@@ -5594,14 +6046,49 @@ export default function LibrarianDashboard() {
                   <option value="UNPAID">Unpaid Dues</option>
                   <option value="NO_FINE">No Fine</option>
                 </select>
+                <MobileSelectTrigger
+                  label="Payment"
+                  valueLabel={
+                    historyPaymentTypeFilter === "ALL"
+                      ? "All Payments"
+                      : historyPaymentTypeFilter === "CASH"
+                      ? "Cash Counter"
+                      : historyPaymentTypeFilter === "ONLINE"
+                      ? "Online / UPI"
+                      : historyPaymentTypeFilter === "UNPAID"
+                      ? "Unpaid Dues"
+                      : historyPaymentTypeFilter === "NO_FINE"
+                      ? "No Fine"
+                      : historyPaymentTypeFilter
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Payment Type",
+                      subtitle: "Filter past transactions by fine settlement",
+                      options: [
+                        { label: "All Payments", value: "ALL" },
+                        { label: "Cash Counter", value: "CASH" },
+                        { label: "Online / UPI", value: "ONLINE" },
+                        { label: "Unpaid Dues", value: "UNPAID" },
+                        { label: "No Fine", value: "NO_FINE" },
+                      ],
+                      selectedValue: historyPaymentTypeFilter,
+                      onSelect: (val) => {
+                        setHistoryPaymentTypeFilter(val);
+                        setHistoryPage(1);
+                      },
+                    })
+                  }
+                />
 
+                {/* Category Filter */}
                 <select
                   value={historyCategoryFilter}
                   onChange={(e) => {
                     setHistoryCategoryFilter(e.target.value);
                     setHistoryPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs max-w-[160px] truncate"
                 >
                   <option value="ALL">All Categories</option>
                   {categoryNames.filter((c) => c !== "ALL").map((c) => (
@@ -5610,32 +6097,83 @@ export default function LibrarianDashboard() {
                     </option>
                   ))}
                 </select>
+                <MobileSelectTrigger
+                  label="Category"
+                  valueLabel={historyCategoryFilter === "ALL" ? "All Categories" : historyCategoryFilter}
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Book Category",
+                      subtitle: "Filter circulation history by category",
+                      options: [
+                        { label: "All Categories", value: "ALL" },
+                        ...categoryNames
+                          .filter((c) => c !== "ALL")
+                          .map((c) => ({ label: c, value: c })),
+                      ],
+                      selectedValue: historyCategoryFilter,
+                      onSelect: (val) => {
+                        setHistoryCategoryFilter(val);
+                        setHistoryPage(1);
+                      },
+                    })
+                  }
+                />
 
+                {/* Page Size */}
                 <select
                   value={historyPageSize}
                   onChange={(e) => {
                     setHistoryPageSize(Number(e.target.value));
                     setHistoryPage(1);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
+                  className="hidden md:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-indigo-600 focus:outline-none shadow-2xs"
                 >
                   <option value={5}>5 per page</option>
                   <option value={10}>10 per page</option>
                   <option value={20}>20 per page</option>
                   <option value={50}>50 per page</option>
                 </select>
+                <MobileSelectTrigger
+                  valueLabel={`${historyPageSize} per page`}
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Rows Per Page",
+                      subtitle: "Choose number of history rows to display per page",
+                      options: [
+                        { label: "5 per page", value: 5 },
+                        { label: "10 per page", value: 10 },
+                        { label: "20 per page", value: 20 },
+                        { label: "50 per page", value: 50 },
+                      ],
+                      selectedValue: historyPageSize,
+                      onSelect: (val) => {
+                        setHistoryPageSize(Number(val));
+                        setHistoryPage(1);
+                      },
+                    })
+                  }
+                />
               </div>
             </div>
 
             {historyLoans.length === 0 ? (
               <div className="text-center p-12">
-                <Clock className="h-8 w-8 text-slate-300 mx-auto" />
-                <p className="text-sm text-slate-500 mt-2">No circulation history yet.</p>
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No history"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-700">No circulation history yet</p>
+                <p className="text-xs text-slate-400 mt-1">Returned books and past loan activities will be listed here.</p>
               </div>
             ) : filteredHistoryLoans.length === 0 ? (
               <div className="text-center p-12">
-                <AlertCircle className="h-8 w-8 text-slate-300 mx-auto" />
-                <p className="text-sm font-semibold text-slate-800 mt-2">No history records match the selected filters</p>
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No history found"
+                  className="mx-auto mb-3 h-24 w-24 object-contain"
+                />
+                <p className="text-sm font-semibold text-slate-800">No history records match the selected filters</p>
                 <p className="text-xs text-slate-400 mt-1">Try clearing or changing your search criteria.</p>
                 <Button
                   size="sm"
@@ -5907,27 +6445,37 @@ export default function LibrarianDashboard() {
 
       {/* MODAL: ADD / EDIT BOOK */}
       {showAddBookModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-3xl lg:max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-white rounded-none sm:rounded-3xl max-w-3xl lg:max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col border-0 sm:border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Fixed Header */}
-            <div className="flex items-start justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-gradient-to-r from-slate-50 via-white to-indigo-50/20">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                    <BookOpen className="h-4 w-4" />
-                  </span>
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                    {editingBook ? "Edit Book Master" : "Add New Book Master"}
-                  </h2>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 shrink-0 bg-gradient-to-r from-slate-50 via-white to-blue-50/20">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAddBookModal(false)}
+                  className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="h-8 w-8 rounded-xl bg-blue-50 border border-blue-100 text-[#2563EB] flex items-center justify-center shrink-0">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <h2 className="text-base sm:text-xl font-bold text-slate-900 truncate">
+                      {editingBook ? "Edit Book Master" : "Add New Book Master"}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500 hidden sm:block pl-10">
+                    Configure book catalogue details, storage rack locations, and generate unique physical copy barcodes.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 pl-10">
-                  Configure book catalogue details, storage rack locations, and generate unique physical copy barcodes.
-                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddBookModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+                className="hidden sm:flex text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -6128,6 +6676,7 @@ export default function LibrarianDashboard() {
                       Rack Location <span className="text-rose-500">*</span>
                     </Label>
                     <div className="flex items-center gap-2">
+                      {/* Desktop native select */}
                       <select
                         value={bookForm.rack}
                         onChange={(e) => {
@@ -6149,10 +6698,10 @@ export default function LibrarianDashboard() {
                             };
                           });
                         }}
-                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs ${
+                        className={`hidden md:flex flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs ${
                           bookFormErrors.rack
                             ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
-                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                         }`}
                       >
                         <option value="">{racks.length === 0 ? "-- No Racks Configured --" : "-- Select Rack --"}</option>
@@ -6164,10 +6713,62 @@ export default function LibrarianDashboard() {
                             </option>
                           ))}
                       </select>
+
+                      {/* Mobile Trigger opening Bottom Drawer */}
+                      <MobileSelectTrigger
+                        className={`flex-1 min-w-0 h-10 md:hidden ${
+                          bookFormErrors.rack ? "border-rose-500 bg-rose-50/20" : ""
+                        }`}
+                        valueLabel={
+                          bookForm.rack
+                            ? (() => {
+                                const found = racks.find((r) => String(r.id) === String(bookForm.rack));
+                                return found ? `${found.rack_code} - ${found.rack_name}` : "-- Select Rack --";
+                              })()
+                            : racks.length === 0
+                            ? "-- No Racks Configured --"
+                            : "-- Select Rack --"
+                        }
+                        onClick={() =>
+                          setActiveSelectDrawer({
+                            title: "Select Rack Location",
+                            subtitle: "Choose rack to place this book",
+                            options: [
+                              { label: "-- Select Rack --", value: "" },
+                              ...racks
+                                .filter((r) => r.is_active !== false || String(r.id) === String(bookForm.rack))
+                                .map((r) => ({
+                                  label: `${r.rack_code} - ${r.rack_name}${r.is_active === false ? " (Deactivated)" : ""}`,
+                                  value: String(r.id),
+                                })),
+                            ],
+                            selectedValue: String(bookForm.rack || ""),
+                            onSelect: (val) => {
+                              const newRack = String(val);
+                              if (bookFormErrors.rack) {
+                                setBookFormErrors((prev) => ({ ...prev, rack: "" }));
+                              }
+                              setBookForm((prev) => {
+                                const isCurrentShelfInNewRack =
+                                  newRack && prev.shelf
+                                    ? shelves.some(
+                                        (s) => String(s.rack) === String(newRack) && String(s.id) === String(prev.shelf)
+                                      )
+                                    : false;
+                                return {
+                                  ...prev,
+                                  rack: newRack,
+                                  shelf: isCurrentShelfInNewRack ? prev.shelf : "",
+                                };
+                              });
+                            },
+                          })
+                        }
+                      />
                       <Button
                         type="button"
                         onClick={() => openAddMasterModal("rack")}
-                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all"
+                        className="h-10 px-3.5 shrink-0 bg-blue-50 hover:bg-blue-100 text-[#2563EB] border border-blue-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all cursor-pointer"
                         title="Add a new rack"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -6192,6 +6793,7 @@ export default function LibrarianDashboard() {
                       Shelf Location <span className="text-rose-500">*</span>
                     </Label>
                     <div className="flex items-center gap-2">
+                      {/* Desktop native select */}
                       <select
                         value={bookForm.shelf}
                         onChange={(e) => {
@@ -6201,10 +6803,10 @@ export default function LibrarianDashboard() {
                           }
                         }}
                         disabled={!bookForm.rack}
-                        className={`flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
+                        className={`hidden md:flex flex-1 min-w-0 h-10 rounded-xl border px-3 text-sm transition-colors bg-white shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
                           bookFormErrors.shelf
                             ? "border-rose-500 bg-rose-50/20 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20"
-                            : "border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                         }`}
                       >
                         {!bookForm.rack ? (
@@ -6230,11 +6832,59 @@ export default function LibrarianDashboard() {
                           </>
                         )}
                       </select>
+
+                      {/* Mobile Trigger opening Bottom Drawer */}
+                      <MobileSelectTrigger
+                        className={`flex-1 min-w-0 h-10 md:hidden ${
+                          bookFormErrors.shelf ? "border-rose-500 bg-rose-50/20" : ""
+                        } ${!bookForm.rack ? "opacity-60" : ""}`}
+                        valueLabel={
+                          !bookForm.rack
+                            ? "-- Select Rack First --"
+                            : bookForm.shelf
+                            ? (() => {
+                                const found = shelves.find((s) => String(s.id) === String(bookForm.shelf));
+                                return found ? `${found.shelf_code} (${found.shelf_name})` : "-- Select Shelf --";
+                              })()
+                            : shelves.filter((s) => String(s.rack) === String(bookForm.rack)).length === 0
+                            ? "-- No Shelves in this Rack --"
+                            : "-- Select Shelf --"
+                        }
+                        onClick={() => {
+                          if (!bookForm.rack) {
+                            showToast("error", "Please select a rack location first.");
+                            return;
+                          }
+                          const rackShelves = shelves.filter(
+                            (s) =>
+                              String(s.rack) === String(bookForm.rack) &&
+                              (s.is_active !== false || String(s.id) === String(bookForm.shelf))
+                          );
+                          setActiveSelectDrawer({
+                            title: "Select Shelf Location",
+                            subtitle: "Choose shelf for book placement",
+                            options: [
+                              { label: "-- Select Shelf --", value: "" },
+                              ...rackShelves.map((s) => ({
+                                label: `${s.shelf_code} (${s.shelf_name})${s.is_active === false ? " (Deactivated)" : ""}`,
+                                value: String(s.id),
+                              })),
+                            ],
+                            selectedValue: String(bookForm.shelf || ""),
+                            onSelect: (val) => {
+                              setBookForm((prev) => ({ ...prev, shelf: String(val) }));
+                              if (bookFormErrors.shelf) {
+                                setBookFormErrors((prev) => ({ ...prev, shelf: "" }));
+                              }
+                            },
+                          });
+                        }}
+                      />
                       <Button
                         type="button"
                         disabled={!bookForm.rack}
                         onClick={() => openAddMasterModal("shelf", Number(bookForm.rack))}
-                        className="h-10 px-3.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="h-10 px-3.5 shrink-0 bg-blue-50 hover:bg-blue-100 text-[#2563EB] border border-blue-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                         title={!bookForm.rack ? "Select a rack first" : "Add a new shelf to the selected rack"}
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -6320,7 +6970,7 @@ export default function LibrarianDashboard() {
                 <Button
                   type="submit"
                   disabled={actionLoading}
-                  className="h-10 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs transition-all gap-1.5"
+                  className="h-10 px-6 rounded-xl font-bold bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-blue-800 text-white shadow-xs transition-all gap-1.5 cursor-pointer"
                 >
                   {actionLoading ? (
                     <>
@@ -6340,24 +6990,38 @@ export default function LibrarianDashboard() {
       {/* MODAL: ISSUE BOOK */}
       {/* MODAL: ISSUE BOOK */}
       {showIssueModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full space-y-4 border border-slate-200 shadow-2xl overflow-y-auto max-h-[92vh]">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-2xl p-4 sm:p-6 max-w-2xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] space-y-4 border-0 sm:border border-slate-200 shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-indigo-600" />
-                  Issue Book to Borrower
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Lend physical copies to students or staff. Select multiple students at once if stock allows!
-                </p>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowIssueModal(false);
+                    setSelectedStudentIds([]);
+                  }}
+                  className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2 truncate">
+                    <BookOpen className="h-5 w-5 text-[#2563EB] shrink-0" />
+                    Issue Book to Borrower
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
+                    Lend physical copies to students or staff. Select multiple students at once if stock allows!
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setShowIssueModal(false);
                   setSelectedStudentIds([]);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+                className="hidden sm:flex text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -6415,7 +7079,7 @@ export default function LibrarianDashboard() {
                         setSelectedStudentIds([]);
                       }
                     }}
-                    className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold bg-white text-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors shadow-2xs"
+                    className="hidden md:block w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold bg-white text-slate-700 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors shadow-2xs"
                   >
                     <option value="ALL">All Categories</option>
                     {categoryNames
@@ -6426,6 +7090,36 @@ export default function LibrarianDashboard() {
                         </option>
                       ))}
                   </select>
+                  <MobileSelectTrigger
+                    className="w-full h-10 md:hidden"
+                    label="Category"
+                    valueLabel={issueCategoryFilter === "ALL" ? "All Categories" : issueCategoryFilter}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Book Category",
+                        subtitle: "Filter available books by category",
+                        options: [
+                          { label: "All Categories", value: "ALL" },
+                          ...categoryNames
+                            .filter((c) => c !== "ALL")
+                            .map((c) => ({ label: c, value: c })),
+                        ],
+                        selectedValue: issueCategoryFilter,
+                        onSelect: (val) => {
+                          const newCat = String(val);
+                          setIssueCategoryFilter(newCat);
+                          if (
+                            selectedIssueBook &&
+                            newCat !== "ALL" &&
+                            toTitleCase(selectedIssueBook.category) !== newCat
+                          ) {
+                            setIssueForm((prev) => ({ ...prev, book: "" }));
+                            setSelectedStudentIds([]);
+                          }
+                        },
+                      })
+                    }
+                  />
                 </div>
 
                 {/* Choose Book from Available Stock (Searchable Combobox) */}
@@ -6704,11 +7398,37 @@ export default function LibrarianDashboard() {
                       setIsStaffDropdownOpen(false);
                       if (issueErrors.student) setIssueErrors((prev) => ({ ...prev, student: "" }));
                     }}
-                    className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm font-medium"
+                    className="hidden md:block h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-medium bg-white"
                   >
                     <option value="student">Student</option>
                     <option value="staff">Staff / Faculty</option>
                   </select>
+                  <MobileSelectTrigger
+                    className="w-full h-10 md:hidden"
+                    label="Borrower Type"
+                    valueLabel={borrowerType === "student" ? "Student" : "Staff / Faculty"}
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Borrower Type",
+                        subtitle: "Select who is borrowing the book",
+                        options: [
+                          { label: "Student", value: "student" },
+                          { label: "Staff / Faculty", value: "staff" },
+                        ],
+                        selectedValue: borrowerType,
+                        onSelect: (val) => {
+                          setBorrowerType(val as "student" | "staff");
+                          setIssueForm({ ...issueForm, student: "" });
+                          setSelectedStudentIds([]);
+                          setStudentSearchQuery("");
+                          setStaffSearchQuery("");
+                          setIsStudentDropdownOpen(false);
+                          setIsStaffDropdownOpen(false);
+                          if (issueErrors.student) setIssueErrors((prev) => ({ ...prev, student: "" }));
+                        },
+                      })
+                    }
+                  />
                 </div>
 
                 {borrowerType === "student" ? (
@@ -6716,7 +7436,7 @@ export default function LibrarianDashboard() {
                     {/* Header with Stock Counter */}
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5 text-indigo-600" />
+                        <Users className="h-3.5 w-3.5 text-[#2563EB]" />
                         {selectedIssueBook && selectedIssueBook.available_copies > 1
                           ? `Select Students (Stock allows up to ${selectedIssueBook.available_copies} students)`
                           : "Select Student"}{" "}
@@ -6758,18 +7478,18 @@ export default function LibrarianDashboard() {
                             return (
                               <span
                                 key={sId}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold shadow-2xs animate-in zoom-in-95 duration-150"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2563EB] text-white text-xs font-semibold shadow-2xs animate-in zoom-in-95 duration-150"
                               >
                                 <span>
                                   {stud.name} {stud.surname || ""}
                                 </span>
-                                <span className="text-[10px] text-indigo-200 font-normal">
+                                <span className="text-[10px] text-blue-200 font-normal">
                                   ({stud.school_class_name || "Class"} {stud.division || ""})
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => setSelectedStudentIds((prev) => prev.filter((id) => id !== sId))}
-                                  className="ml-1 hover:bg-white/20 rounded p-0.5 text-white transition-colors"
+                                  className="ml-1 hover:bg-white/20 rounded p-0.5 text-white transition-colors cursor-pointer"
                                   title="Remove student"
                                 >
                                   <X className="h-3 w-3" />
@@ -6791,7 +7511,7 @@ export default function LibrarianDashboard() {
                             setIssueClassFilter(e.target.value);
                             setIssueDivisionFilter("");
                           }}
-                          className="w-full h-9 rounded-xl border border-slate-200 px-2.5 text-xs font-medium bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors"
+                          className="hidden md:block w-full h-9 rounded-xl border border-slate-200 px-2.5 text-xs font-medium bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                         >
                           <option value="">-- All Classes ({availableClasses.length}) --</option>
                           {availableClasses.map((cls) => (
@@ -6800,6 +7520,26 @@ export default function LibrarianDashboard() {
                             </option>
                           ))}
                         </select>
+                        <MobileSelectTrigger
+                          className="w-full h-9 md:hidden"
+                          label="Class"
+                          valueLabel={issueClassFilter ? `Class: ${issueClassFilter}` : "All Classes"}
+                          onClick={() =>
+                            setActiveSelectDrawer({
+                              title: "Filter by Class",
+                              subtitle: "Select class to filter students",
+                              options: [
+                                { label: "All Classes", value: "" },
+                                ...availableClasses.map((cls) => ({ label: `Class: ${cls}`, value: cls })),
+                              ],
+                              selectedValue: issueClassFilter,
+                              onSelect: (val) => {
+                                setIssueClassFilter(String(val));
+                                setIssueDivisionFilter("");
+                              },
+                            })
+                          }
+                        />
                       </div>
 
                       <div className="space-y-1">
@@ -6810,10 +7550,10 @@ export default function LibrarianDashboard() {
                           value={issueDivisionFilter}
                           onChange={(e) => setIssueDivisionFilter(e.target.value)}
                           disabled={!issueClassFilter}
-                          className={`w-full h-9 rounded-xl border px-2.5 text-xs font-medium transition-colors ${
+                          className={`hidden md:block w-full h-9 rounded-xl border px-2.5 text-xs font-medium transition-colors ${
                             !issueClassFilter
                               ? "bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed"
-                              : "bg-white border-slate-200 text-slate-700 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                              : "bg-white border-slate-200 text-slate-700 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                           }`}
                         >
                           {!issueClassFilter ? (
@@ -6831,18 +7571,45 @@ export default function LibrarianDashboard() {
                             </>
                           )}
                         </select>
+                        <MobileSelectTrigger
+                          className={`w-full h-9 md:hidden ${!issueClassFilter ? "opacity-60" : ""}`}
+                          label="Div"
+                          valueLabel={
+                            !issueClassFilter
+                              ? "Select Class"
+                              : issueDivisionFilter
+                              ? `Div: ${issueDivisionFilter}`
+                              : "All Divisions"
+                          }
+                          onClick={() => {
+                            if (!issueClassFilter) {
+                              showToast("error", "Please select a class first.");
+                              return;
+                            }
+                            setActiveSelectDrawer({
+                              title: `Divisions in Class ${issueClassFilter}`,
+                              subtitle: "Select division to filter students",
+                              options: [
+                                { label: "All Divisions", value: "" },
+                                ...availableDivisions.map((div) => ({ label: `Division ${div}`, value: div })),
+                              ],
+                              selectedValue: issueDivisionFilter,
+                              onSelect: (val) => setIssueDivisionFilter(String(val)),
+                            });
+                          }}
+                        />
                       </div>
                     </div>
 
                     {/* Student Direct Search Box */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-indigo-500" />
+                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-blue-500" />
                       <input
                         type="text"
                         value={studentSearchQuery}
                         onChange={(e) => setStudentSearchQuery(e.target.value)}
                         placeholder="Search student by name, GR No, or Roll No..."
-                        className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 bg-white"
+                        className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
                       />
                       {studentSearchQuery && (
                         <button
@@ -7194,7 +7961,7 @@ export default function LibrarianDashboard() {
                 <Button
                   type="submit"
                   disabled={actionLoading}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold cursor-pointer"
                 >
                   {actionLoading ? (
                     <>
@@ -7234,23 +8001,31 @@ export default function LibrarianDashboard() {
         const totalReturnFine = calculatedLateFee + assessedDamage + assessedLost;
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full space-y-4 border border-slate-200 shadow-2xl my-auto animate-in fade-in zoom-in-95 duration-150">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-none sm:rounded-3xl p-4 sm:p-6 max-w-lg w-full h-[100dvh] sm:h-auto sm:my-auto space-y-4 border-0 sm:border border-slate-200 shadow-2xl overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowReturnModal(null)}
+                    className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                    title="Back"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900">Return &amp; Physical Book Inspection</h2>
-                    <p className="text-xs text-slate-500">Counter verification, overdue analysis &amp; penalty settlement</p>
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Return &amp; Book Inspection</h2>
+                    <p className="text-xs text-slate-500 hidden sm:block">Counter verification, overdue analysis &amp; penalty settlement</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowReturnModal(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                  className="hidden sm:flex text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -7352,13 +8127,54 @@ export default function LibrarianDashboard() {
                         : 0,
                     }));
                   }}
-                  className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 shadow-2xs"
+                  className="hidden md:block w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-2xs"
                 >
                   <option value="GOOD">Good Condition (No Physical Damage)</option>
                   <option value="MINOR_DAMAGE">Minor Damage (Torn pages / marked / cover bent)</option>
                   <option value="MAJOR_DAMAGE">Major Damage (Water damaged / spine broken / unusable)</option>
                   <option value="LOST">Lost Book (Unreturned copy declared lost)</option>
                 </select>
+                <MobileSelectTrigger
+                  className="w-full h-10 md:hidden"
+                  label="Condition"
+                  valueLabel={
+                    returnForm.condition === "GOOD"
+                      ? "Good Condition (No Damage)"
+                      : returnForm.condition === "MINOR_DAMAGE"
+                      ? "Minor Damage (Torn/marked)"
+                      : returnForm.condition === "MAJOR_DAMAGE"
+                      ? "Major Damage (Unusable)"
+                      : returnForm.condition === "LOST"
+                      ? "Lost Book"
+                      : "Select Condition"
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Physical Book Condition",
+                      subtitle: "Select physical state of returned book",
+                      options: [
+                        { label: "Good Condition (No Physical Damage)", value: "GOOD" },
+                        { label: "Minor Damage (Torn pages / marked / cover bent)", value: "MINOR_DAMAGE" },
+                        { label: "Major Damage (Water damaged / spine broken / unusable)", value: "MAJOR_DAMAGE" },
+                        { label: "Lost Book (Unreturned copy declared lost)", value: "LOST" },
+                      ],
+                      selectedValue: returnForm.condition,
+                      onSelect: (val) => {
+                        const cond = String(val);
+                        setReturnForm((prev) => ({
+                          ...prev,
+                          condition: cond,
+                          damage_fee: cond === "MINOR_DAMAGE" || cond === "MAJOR_DAMAGE"
+                            ? (Number(prev.damage_fee) > 0 ? prev.damage_fee : Number(librarySettings?.damage_penalty || 50))
+                            : 0,
+                          lost_fee: cond === "LOST"
+                            ? (Number(prev.lost_fee) > 0 ? prev.lost_fee : Number(librarySettings?.lost_penalty || 100))
+                            : 0,
+                        }));
+                      },
+                    })
+                  }
+                />
               </div>
 
               {/* Condition Specific Damage / Lost Fee Inputs */}
@@ -7585,14 +8401,28 @@ export default function LibrarianDashboard() {
 
       {/* MODAL: ADD MASTER */}
       {showMasterModal && (
-        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 border border-slate-200 shadow-2xl">
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-2xl p-4 sm:p-6 max-w-sm w-full h-[100dvh] sm:h-auto space-y-4 border-0 sm:border border-slate-200 shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-base font-bold text-slate-900 capitalize">
-                {editingMaster ? "Edit" : "Add New"}{" "}
-                {showMasterModal === "rack" ? "Library Rack(s)" : showMasterModal === "shelf" ? "Rack Shelf / Shelves" : showMasterModal}
-              </h2>
-              <button onClick={() => setShowMasterModal(null)} className="text-slate-400 hover:text-slate-600">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowMasterModal(null)}
+                  className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <h2 className="text-base font-bold text-slate-900 capitalize truncate">
+                  {editingMaster ? "Edit" : "Add New"}{" "}
+                  {showMasterModal === "rack" ? "Library Rack(s)" : showMasterModal === "shelf" ? "Rack Shelf / Shelves" : showMasterModal}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMasterModal(null)}
+                className="hidden sm:flex text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -7607,7 +8437,7 @@ export default function LibrarianDashboard() {
                       setMasterForm({ ...masterForm, extra: e.target.value });
                       if (masterErrors.extra) setMasterErrors((prev) => ({ ...prev, extra: "" }));
                     }}
-                    className={`w-full h-9 rounded-md border text-xs px-2 transition-colors ${
+                    className={`hidden md:block w-full h-9 rounded-md border text-xs px-2 transition-colors ${
                       masterErrors.extra
                         ? "border-rose-500 bg-rose-50/40 text-slate-900 focus:border-rose-600 focus:ring-rose-200"
                         : "border-slate-200"
@@ -7620,6 +8450,33 @@ export default function LibrarianDashboard() {
                       </option>
                     ))}
                   </select>
+                  <MobileSelectTrigger
+                    className={`w-full h-9 md:hidden ${masterErrors.extra ? "border-rose-500 bg-rose-50/20" : ""}`}
+                    label="Rack"
+                    valueLabel={
+                      masterForm.extra
+                        ? (() => {
+                            const found = racks.find((r) => String(r.id) === String(masterForm.extra));
+                            return found ? `${found.rack_code} - ${found.rack_name}` : "-- Choose Rack --";
+                          })()
+                        : "-- Choose Rack --"
+                    }
+                    onClick={() =>
+                      setActiveSelectDrawer({
+                        title: "Parent Rack",
+                        subtitle: "Select rack for this shelf",
+                        options: [
+                          { label: "-- Choose Rack --", value: "" },
+                          ...racks.map((r) => ({ label: `${r.rack_code} - ${r.rack_name}`, value: String(r.id) })),
+                        ],
+                        selectedValue: String(masterForm.extra || ""),
+                        onSelect: (val) => {
+                          setMasterForm((prev) => ({ ...prev, extra: String(val) }));
+                          if (masterErrors.extra) setMasterErrors((prev) => ({ ...prev, extra: "" }));
+                        },
+                      })
+                    }
+                  />
                   {masterErrors.extra && (
                     <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
                       <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
@@ -7723,7 +8580,7 @@ export default function LibrarianDashboard() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowMasterModal(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
+                <Button type="submit" size="sm" disabled={actionLoading} className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium cursor-pointer">
                   {actionLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                   ) : editingMaster ? (
@@ -7755,23 +8612,31 @@ export default function LibrarianDashboard() {
           : Math.max(0, modalTotal - modalPaid);
 
         return (
-          <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-5 border border-slate-200 shadow-2xl relative my-auto">
+          <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-none sm:rounded-3xl p-4 sm:p-7 max-w-lg w-full h-[100dvh] sm:h-auto sm:my-auto space-y-4 sm:space-y-5 border-0 sm:border border-slate-200 shadow-2xl relative overflow-y-auto">
               {/* Header */}
-              <div className="flex items-start justify-between border-b border-slate-200/80 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs shrink-0">
-                    <Receipt className="h-5 w-5" />
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 sm:pb-4">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setFinePaymentModal(null)}
+                    className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                    title="Back"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div className="h-9 sm:h-10 w-9 sm:w-10 rounded-2xl bg-blue-50 border border-blue-100 text-[#2563EB] flex items-center justify-center shadow-xs shrink-0">
+                    <Receipt className="h-4 sm:h-5 w-4 sm:w-5" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Collect Library Fine</h2>
-                    <p className="text-xs text-slate-500">Record counter payment, clear student dues & issue digital receipt</p>
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">Collect Library Fine</h2>
+                    <p className="text-xs text-slate-500 hidden sm:block">Record counter payment, clear student dues & issue digital receipt</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setFinePaymentModal(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+                  className="hidden sm:flex text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -7920,10 +8785,10 @@ export default function LibrarianDashboard() {
                     <button
                       type="button"
                       onClick={() => setFinePaymentForm({ ...finePaymentForm, payment_method: "Online" })}
-                      className={`flex items-center justify-center gap-2 py-3 px-3.5 rounded-2xl border text-xs font-bold transition-all ${
+                      className={`flex items-center justify-center gap-2 py-3 px-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                         finePaymentForm.payment_method === "Online"
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/20"
-                          : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50"
+                          ? "bg-[#2563EB] text-white border-[#2563EB] shadow-sm ring-2 ring-blue-500/20"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50"
                       }`}
                     >
                       <CreditCard className="h-4 w-4" />
@@ -7937,14 +8802,14 @@ export default function LibrarianDashboard() {
                     type="button"
                     variant="outline"
                     onClick={() => setFinePaymentModal(null)}
-                    className="rounded-xl px-4 text-xs font-bold h-10 text-slate-600 border-slate-200 hover:bg-slate-50"
+                    className="rounded-xl px-4 text-xs font-bold h-10 text-slate-600 border-slate-200 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     disabled={actionLoading || Number(finePaymentForm.amount) <= 0}
-                    className="rounded-xl px-5 text-xs font-bold h-10 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-xs"
+                    className="rounded-xl px-5 text-xs font-bold h-10 bg-[#2563EB] hover:bg-[#1D4ED8] text-white gap-2 shadow-xs cursor-pointer"
                   >
                     {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
                     <span>Collect ₹{Number(finePaymentForm.amount || 0).toFixed(2)} & Print Receipt</span>
@@ -7965,14 +8830,28 @@ export default function LibrarianDashboard() {
 
       {/* MODAL: TRANSFER PHYSICAL COPY */}
       {transferCopyModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 border border-slate-200 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-2xl p-4 sm:p-6 max-w-sm w-full h-[100dvh] sm:h-auto space-y-4 border-0 sm:border border-slate-200 shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Transfer Book Copy</h2>
-                <p className="text-xs font-mono text-slate-500">Accession: {transferCopyModal.accession_no}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setTransferCopyModal(null)}
+                  className="sm:hidden p-1.5 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-slate-900 truncate">Transfer Book Copy</h2>
+                  <p className="text-xs font-mono text-slate-500 truncate">Accession: {transferCopyModal.accession_no}</p>
+                </div>
               </div>
-              <button onClick={() => setTransferCopyModal(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setTransferCopyModal(null)}
+                className="hidden sm:flex text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -7983,7 +8862,7 @@ export default function LibrarianDashboard() {
                 <select
                   value={transferForm.rack_id}
                   onChange={(e) => setTransferForm({ ...transferForm, rack_id: e.target.value, shelf_id: "" })}
-                  className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white"
+                  className="hidden md:block w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white"
                 >
                   <option value="">-- No Rack --</option>
                   {racks
@@ -7994,6 +8873,35 @@ export default function LibrarianDashboard() {
                       </option>
                     ))}
                 </select>
+                <MobileSelectTrigger
+                  className="w-full h-9 md:hidden"
+                  label="Rack"
+                  valueLabel={
+                    transferForm.rack_id
+                      ? (() => {
+                          const found = racks.find((r) => String(r.id) === String(transferForm.rack_id));
+                          return found ? `${found.rack_code} — ${found.rack_name}` : "-- No Rack --";
+                        })()
+                      : "-- No Rack --"
+                  }
+                  onClick={() =>
+                    setActiveSelectDrawer({
+                      title: "Target Rack",
+                      subtitle: "Select target rack location",
+                      options: [
+                        { label: "-- No Rack --", value: "" },
+                        ...racks
+                          .filter((r) => r.is_active !== false || String(r.id) === String(transferForm.rack_id))
+                          .map((r) => ({
+                            label: `${r.rack_code} — ${r.rack_name}${r.is_active === false ? " (Deactivated)" : ""}`,
+                            value: String(r.id),
+                          })),
+                      ],
+                      selectedValue: String(transferForm.rack_id || ""),
+                      onSelect: (val) => setTransferForm({ ...transferForm, rack_id: String(val), shelf_id: "" }),
+                    })
+                  }
+                />
               </div>
 
               <div className="space-y-1">
@@ -8002,7 +8910,7 @@ export default function LibrarianDashboard() {
                   value={transferForm.shelf_id}
                   onChange={(e) => setTransferForm({ ...transferForm, shelf_id: e.target.value })}
                   disabled={!transferForm.rack_id}
-                  className="w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  className="hidden md:block w-full h-9 rounded-md border border-slate-200 text-xs px-2 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                 >
                   {!transferForm.rack_id ? (
                     <option value="">-- Select Rack First --</option>
@@ -8023,13 +8931,51 @@ export default function LibrarianDashboard() {
                     </>
                   )}
                 </select>
+                <MobileSelectTrigger
+                  className={`w-full h-9 md:hidden ${!transferForm.rack_id ? "opacity-60" : ""}`}
+                  label="Shelf"
+                  valueLabel={
+                    !transferForm.rack_id
+                      ? "-- Select Rack First --"
+                      : transferForm.shelf_id
+                      ? (() => {
+                          const found = shelves.find((s) => String(s.id) === String(transferForm.shelf_id));
+                          return found ? `${found.shelf_code} (${found.shelf_name})` : "-- No Shelf --";
+                        })()
+                      : "-- No Shelf --"
+                  }
+                  onClick={() => {
+                    if (!transferForm.rack_id) {
+                      showToast("error", "Please select a target rack first.");
+                      return;
+                    }
+                    const rackShelves = shelves.filter(
+                      (s) =>
+                        String(s.rack) === String(transferForm.rack_id) &&
+                        (s.is_active !== false || String(s.id) === String(transferForm.shelf_id))
+                    );
+                    setActiveSelectDrawer({
+                      title: "Target Shelf",
+                      subtitle: "Select shelf in target rack",
+                      options: [
+                        { label: "-- No Shelf --", value: "" },
+                        ...rackShelves.map((s) => ({
+                          label: `${s.shelf_code} (${s.shelf_name})${s.is_active === false ? " (Deactivated)" : ""}`,
+                          value: String(s.id),
+                        })),
+                      ],
+                      selectedValue: String(transferForm.shelf_id || ""),
+                      onSelect: (val) => setTransferForm({ ...transferForm, shelf_id: String(val) }),
+                    });
+                  }}
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t">
-                <Button type="button" variant="outline" size="sm" onClick={() => setTransferCopyModal(null)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setTransferCopyModal(null)} className="cursor-pointer">
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button type="submit" size="sm" disabled={actionLoading} className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white cursor-pointer">
                   Transfer Location
                 </Button>
               </div>
@@ -8752,6 +9698,22 @@ export default function LibrarianDashboard() {
           </div>
         )}
       </MobileBottomDrawer>
+
+      {/* Mobile Select Bottom Drawer */}
+      {activeSelectDrawer && (
+        <MobileSelectDrawer
+          isOpen={!!activeSelectDrawer}
+          onClose={() => setActiveSelectDrawer(null)}
+          title={activeSelectDrawer.title}
+          subtitle={activeSelectDrawer.subtitle}
+          options={activeSelectDrawer.options}
+          selectedValue={activeSelectDrawer.selectedValue}
+          onSelect={(val) => {
+            activeSelectDrawer.onSelect(val);
+            setActiveSelectDrawer(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -34,6 +34,35 @@ export interface SchoolEventResponse {
   updated_at?: string;
 }
 
+const EVENTS_CACHE_KEY = "sms_cached_events";
+
+export function getStoredSchoolEvents(): SchoolEventResponse[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(EVENTS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < 10 * 60 * 1000 && Array.isArray(parsed.data)) {
+      return parsed.data;
+    }
+  } catch {}
+  return [];
+}
+
+export function setStoredSchoolEvents(data: SchoolEventResponse[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {}
+}
+
+export function invalidateEventsCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(EVENTS_CACHE_KEY);
+  } catch {}
+}
+
 export async function getSchoolEvents(params?: {
   year?: number | string;
   month?: number | string;
@@ -57,7 +86,11 @@ export async function getSchoolEvents(params?: {
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? data : data.results ?? data.data ?? [];
+  const list = Array.isArray(data) ? data : data.results ?? data.data ?? [];
+  if (list.length > 0 && !params?.event_type) {
+    setStoredSchoolEvents(list);
+  }
+  return list;
 }
 
 export async function createSchoolEvent(payload: SchoolEventPayload): Promise<SchoolEventResponse> {
@@ -76,6 +109,7 @@ export async function createSchoolEvent(payload: SchoolEventPayload): Promise<Sc
     throw new Error(message);
   }
 
+  invalidateEventsCache();
   return response.json();
 }
 
@@ -98,6 +132,7 @@ export async function updateSchoolEvent(
     throw new Error(message);
   }
 
+  invalidateEventsCache();
   return response.json();
 }
 
@@ -117,6 +152,7 @@ export async function seedDefaultSchoolHolidays(): Promise<{ message: string; ev
     throw new Error(message);
   }
 
+  invalidateEventsCache();
   return response.json();
 }
 
@@ -133,5 +169,7 @@ export async function deleteSchoolEvent(id: number): Promise<void> {
     } catch {}
     throw new Error(message);
   }
+
+  invalidateEventsCache();
 }
 

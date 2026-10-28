@@ -5,14 +5,81 @@ import type {
   AttendanceRecord,
 } from "@/types/teacher";
 
+interface AttendanceCacheRecord<T> {
+  data: T;
+  timestamp: number;
+}
+
+const attendanceMemoryCache = new Map<string, AttendanceCacheRecord<any>>();
+const ATTENDANCE_CACHE_TTL = 30 * 1000; // 30 seconds
+
+function getPersistentAttendanceCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(`sms_att_${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+      return parsed.data;
+    }
+  } catch {}
+  return null;
+}
+
+function setPersistentAttendanceCache<T>(key: string, data: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(`sms_att_${key}`, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {}
+}
+
+export function getStoredTodayAttendance(): TodayAttendance | null {
+  return getPersistentAttendanceCache<TodayAttendance>("today_attendance");
+}
+
+export function getStoredAttendanceHistory(): AttendanceRecord[] {
+  const cached = getPersistentAttendanceCache<AttendanceRecord[]>("attendance_history_");
+  return Array.isArray(cached) ? cached : [];
+}
+
+export function invalidateAttendanceCache() {
+  attendanceMemoryCache.clear();
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem("sms_att_today_attendance");
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith("sms_att_")) {
+          sessionStorage.removeItem(k);
+        }
+      }
+    } catch {}
+  }
+}
+
 // ─── Get today's attendance ───────────────────────────────────────────────────
 
-export async function getTodayAttendance(): Promise<TodayAttendance | null> {
+export async function getTodayAttendance(forceFresh = false): Promise<TodayAttendance | null> {
+  const cacheKey = "today_attendance";
+  if (!forceFresh) {
+    const entry = attendanceMemoryCache.get(cacheKey);
+    if (entry && Date.now() - entry.timestamp < ATTENDANCE_CACHE_TTL) {
+      return entry.data;
+    }
+    const persisted = getPersistentAttendanceCache<TodayAttendance>(cacheKey);
+    if (persisted !== null) {
+      attendanceMemoryCache.set(cacheKey, { data: persisted, timestamp: Date.now() });
+      return persisted;
+    }
+  }
+
   const url = `${API_BASE_URL}${API_ENDPOINTS.ATTENDANCE_TODAY}`;
   const response = await fetchWithAuth(url);
 
   if (response.status === 404) {
     // No record yet — fresh day, not an error
+    attendanceMemoryCache.set(cacheKey, { data: null, timestamp: Date.now() });
+    setPersistentAttendanceCache(cacheKey, null);
     return null;
   }
 
@@ -25,7 +92,10 @@ export async function getTodayAttendance(): Promise<TodayAttendance | null> {
     throw new Error(message);
   }
 
-  return response.json();
+  const data = await response.json();
+  attendanceMemoryCache.set(cacheKey, { data, timestamp: Date.now() });
+  setPersistentAttendanceCache(cacheKey, data);
+  return data;
 }
 
 // ─── Mark attendance (check-in OR check-out) ─────────────────────────────────
@@ -54,13 +124,28 @@ export async function markAttendance(payload: {
     } catch { }
     throw new Error(message);
   }
+
+  invalidateAttendanceCache();
 }
 
 // ─── Get all attendance records (history) ────────────────────────────────────
 
-export async function getAttendanceHistory(params?: { staff_id?: number }): Promise<AttendanceRecord[]> {
+export async function getAttendanceHistory(params?: { staff_id?: number }, forceFresh = false): Promise<AttendanceRecord[]> {
   const query = new URLSearchParams();
   if (params?.staff_id) query.set("staff_id", String(params.staff_id));
+  const cacheKey = `attendance_history_${query.toString()}`;
+  if (!forceFresh) {
+    const entry = attendanceMemoryCache.get(cacheKey);
+    if (entry && Date.now() - entry.timestamp < ATTENDANCE_CACHE_TTL) {
+      return entry.data;
+    }
+    const persisted = getPersistentAttendanceCache<AttendanceRecord[]>(cacheKey);
+    if (persisted) {
+      attendanceMemoryCache.set(cacheKey, { data: persisted, timestamp: Date.now() });
+      return persisted;
+    }
+  }
+
   const url = `${API_BASE_URL}/attendance/${query.toString() ? `?${query.toString()}` : ""}`;
   const response = await fetchWithAuth(url);
 
@@ -74,7 +159,10 @@ export async function getAttendanceHistory(params?: { staff_id?: number }): Prom
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+  const result = Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+  attendanceMemoryCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  setPersistentAttendanceCache(cacheKey, result);
+  return result;
 }
 
 export interface AttendanceCalendarStatus {

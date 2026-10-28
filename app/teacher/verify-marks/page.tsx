@@ -645,7 +645,7 @@ export default function VerifyMarksPage() {
   };
 
   return (
-    <div className="space-y-4 pb-28 lg:pb-12 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-4 pb-3 sm:pb-5 lg:pb-12 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
       {/* ── Compact Breadcrumb Header Bar ── */}
       <div className="bg-white dark:bg-zinc-900 px-3.5 sm:px-4 py-3 sm:py-3.5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -1434,8 +1434,14 @@ export default function VerifyMarksPage() {
                     <TableBody>
                       {students.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={25} className="text-center py-12 text-slate-400">
-                            No student records found matching your selection.
+                          <TableCell colSpan={25} className="text-center py-12">
+                            <img
+                              src="/images/empty-folder.png"
+                              alt="No records"
+                              className="mx-auto mb-2 h-20 w-20 object-contain"
+                            />
+                            <p className="font-semibold text-slate-700 text-sm">No student records found</p>
+                            <p className="text-xs text-slate-400 mt-1">Select class, division, and exam above to view and verify marks.</p>
                           </TableCell>
                         </TableRow>
                       ) : (

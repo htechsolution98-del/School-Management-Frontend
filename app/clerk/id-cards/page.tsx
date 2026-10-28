@@ -1141,8 +1141,14 @@ export default function IDCardManagementPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      No matching recipients found for the selected filters.
+                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No recipients found"
+                        className="mx-auto mb-3 h-24 w-24 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No matching recipients found</div>
+                      <p className="text-xs text-slate-400 mt-1">Try adjusting the class, division, or search query above.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1957,8 +1963,14 @@ export default function IDCardManagementPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      No cards have been issued yet. Use the Card Issuance Desk to issue cards.
+                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No issued cards"
+                        className="mx-auto mb-3 h-24 w-24 object-contain"
+                      />
+                      <div className="font-semibold text-slate-700 text-sm">No cards issued yet</div>
+                      <p className="text-xs text-slate-400 mt-1">Use the Card Issuance Desk above to generate and issue ID cards.</p>
                     </td>
                   </tr>
                 ) : (

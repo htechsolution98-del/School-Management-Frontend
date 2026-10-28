@@ -414,11 +414,11 @@ export function StaffAttendanceRegister({
           <button
             onClick={fetchAttendance}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition shadow-sm disabled:opacity-60"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition shadow-sm disabled:opacity-60 shrink-0"
             title="Refresh Attendance"
+            aria-label="Refresh Attendance"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
           </button>
           <button
             onClick={handleExportCSV}
@@ -664,10 +664,14 @@ export function StaffAttendanceRegister({
             </button>
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="p-16 text-center">
-            <FileSpreadsheet className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">No attendance entries found</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+          <div className="p-12 text-center flex flex-col items-center justify-center">
+            <img
+              src="/images/empty-folder.png"
+              alt="No attendance entries"
+              className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+            />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No attendance entries found</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
               No staff members match the selected filters for {selectedDate}. Staff punches may not have been logged yet.
             </p>
           </div>

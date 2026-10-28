@@ -538,13 +538,14 @@ export function ActivityLogHub({
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => loadLogs(false)}
               disabled={isRefreshing || loading}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm transition-all text-xs font-semibold"
+              className="h-9 w-9 bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm transition-all shrink-0"
+              title="Refresh activity logs"
+              aria-label="Refresh activity logs"
             >
-              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
             <Button
               size="sm"
@@ -789,10 +790,15 @@ export function ActivityLogHub({
                 <tr>
                   <td
                     colSpan={isSuperAdmin ? 8 : 7}
-                    className="px-5 py-14 text-center text-slate-500"
+                    className="px-5 py-10 text-center text-slate-500"
                   >
-                    <div>
-                      <p className="font-medium text-slate-600">No activity records found.</p>
+                    <div className="flex flex-col items-center justify-center">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No records"
+                        className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                      />
+                      <p className="font-bold text-slate-700">No activity records found.</p>
                       <p className="mt-1 text-xs text-slate-400">
                         {hasFilters
                           ? "No records match your active search or filters."

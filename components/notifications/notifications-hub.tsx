@@ -82,7 +82,7 @@ export function NotificationsHub({
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-24 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── Compact Header Action Bar ──────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
         <div className="flex items-center gap-3 min-w-0">
@@ -130,11 +130,11 @@ export function NotificationsHub({
             type="button"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] sm:text-xs font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+            className="inline-flex items-center justify-center h-8 sm:h-9 w-8 sm:w-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-60 shrink-0"
             title="Refresh notifications"
+            aria-label="Refresh notifications"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#2563EB]" : "text-slate-600"}`} />
-            <span>Refresh</span>
           </button>
 
           {notifications.length > 0 && (

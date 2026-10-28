@@ -332,7 +332,15 @@ export default function ClerkPersonalAttendancePage() {
         <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm space-y-4">
           <h3 className="text-base font-bold text-gray-900">Personal Attendance History</h3>
           {history.length === 0 ? (
-            <div className="text-center py-10 text-xs text-gray-400">No records found.</div>
+            <div className="text-center py-12">
+              <img
+                src="/images/empty-folder.png"
+                alt="No records found"
+                className="mx-auto mb-2 h-20 w-20 object-contain"
+              />
+              <p className="font-semibold text-slate-700 text-sm">No records found</p>
+              <p className="text-xs text-slate-400 mt-1">Your attendance punch logs will appear here.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">

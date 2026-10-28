@@ -370,7 +370,7 @@ export default function StudyMaterialsPage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 space-y-4 sm:space-y-6 pb-24 lg:pb-8 font-['Sora',sans-serif] min-w-0 overflow-x-hidden text-[#172447]">
+    <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 space-y-4 sm:space-y-6 pb-3 sm:pb-5 lg:pb-8 font-['Sora',sans-serif] min-w-0 overflow-x-hidden text-[#172447]">
       {/* ── 1. Header & Page Introduction (Mobile-First Compact Hero) ── */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">

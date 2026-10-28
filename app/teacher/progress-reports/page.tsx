@@ -934,7 +934,7 @@ export default function ProgressReportsPage() {
   }, [students, searchQuery]);
 
   return (
-    <div className="space-y-4 sm:space-y-5 pb-28 lg:pb-12 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-4 sm:space-y-5 pb-3 sm:pb-5 lg:pb-12 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
       {/* Print Media Stylesheet to print ONLY the report card */}
       <style jsx global>{`
         @media print {

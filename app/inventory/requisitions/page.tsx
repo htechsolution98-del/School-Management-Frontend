@@ -267,7 +267,7 @@ export default function InventoryRequisitionsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 pb-3 sm:pb-5 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div>
@@ -281,13 +281,14 @@ export default function InventoryRequisitionsPage() {
         </div>
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={fetchRequisitions}
           disabled={loading}
-          className="rounded-xl text-xs font-bold gap-2 border-zinc-200 dark:border-zinc-800 shrink-0"
+          className="h-9 w-9 rounded-xl border-zinc-200 dark:border-zinc-800 shrink-0"
+          title="Refresh requisitions"
+          aria-label="Refresh requisitions"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
@@ -420,8 +421,12 @@ export default function InventoryRequisitionsPage() {
                   </tr>
                 ) : filteredRequisitions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-14 text-center text-slate-500">
-                      <Package className="h-8 w-8 mx-auto text-slate-300 dark:text-zinc-700 mb-2" />
+                    <td colSpan={8} className="py-10 text-center text-slate-500">
+                      <img
+                        src="/images/empty-folder.png"
+                        alt="No requisitions found"
+                        className="w-20 sm:w-24 h-auto object-contain mx-auto mb-3 filter drop-shadow-sm select-none pointer-events-none"
+                      />
                       <p className="font-semibold text-slate-700 dark:text-zinc-300">No requisitions found</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         {searchQuery || statusFilter !== "ALL"
