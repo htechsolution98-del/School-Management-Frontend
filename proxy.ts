@@ -6,8 +6,27 @@ const ROLE_ROUTE_PREFIX_MAP: Record<string, string[]> = {
   "/principal": ["principal", "vice principal", "vice_principal", "super_admin", "superadmin"],
   "/trustee": ["admin(trustee)", "trustee", "super_admin", "superadmin"],
   "/clerk": ["clerk", "assistant clerk", "assistant_clerk", "fees_clerk"],
-  "/librarian": ["librarian"],
-  "/inventory": ["inventory"],
+  "/librarian": ["librarian", "library", "library_manager"],
+  "/inventory": [
+    "inventory",
+    "inventory manager",
+    "inventory_manager",
+    "inventory-manager",
+    "inventory staff",
+    "inventory_staff",
+    "storekeeper",
+    "store keeper",
+    "store_keeper",
+    "super_admin",
+    "superadmin",
+    "admin(trustee)",
+    "trustee",
+    "principal",
+    "vice principal",
+    "vice_principal",
+    "clerk",
+    "admin",
+  ],
   "/fees": ["fees management", "fees", "fees_clerk", "clerk", "assistant clerk", "assistant_clerk"],
   "/student": ["student"],
   "/parent": ["parents", "parent"],
@@ -36,19 +55,33 @@ function resolveDashboardRoute(roles: string[]): string {
   ) {
     return "/clerk";
   }
+  // Check inventory explicitly before generic 'staff'
+  if (
+    normalized.includes("inventory") ||
+    normalized.includes("inventory manager") ||
+    normalized.includes("inventory_manager") ||
+    normalized.includes("inventory-manager") ||
+    normalized.includes("inventory staff") ||
+    normalized.includes("inventory_staff") ||
+    normalized.includes("storekeeper") ||
+    normalized.includes("store keeper") ||
+    normalized.includes("store_keeper") ||
+    normalized.some((r) => r.includes("inventory") || r.includes("storekeeper"))
+  ) {
+    return "/inventory";
+  }
+  if (normalized.includes("librarian") || normalized.some((r) => r.includes("librar"))) return "/librarian";
+  if (normalized.includes("fees") || normalized.includes("fees management") || normalized.some((r) => r.includes("fee"))) return "/fees";
   if (
     normalized.includes("teacher") ||
-    normalized.includes("staff") ||
     normalized.includes("transportation") ||
     normalized.includes("transport")
   ) {
     return "/teacher";
   }
-  if (normalized.includes("librarian")) return "/librarian";
-  if (normalized.includes("inventory")) return "/inventory";
-  if (normalized.includes("fees") || normalized.includes("fees management")) return "/fees";
   if (normalized.includes("student")) return "/student";
   if (normalized.includes("parent") || normalized.includes("parents")) return "/parent";
+  if (normalized.includes("staff")) return "/teacher";
   return "/user";
 }
 
@@ -94,7 +127,13 @@ export function proxy(request: NextRequest) {
     if (roles.length > 0) {
       const allowedRoles = ROLE_ROUTE_PREFIX_MAP[matchedPrefix];
       if (allowedRoles) {
-        const hasAccess = allowedRoles.some((allowed) => roles.includes(allowed));
+        const isInventoryStaff = roles.some((r) => r.includes("inventory") || r.includes("storekeeper"));
+        const hasAccess =
+          allowedRoles.some((allowed) =>
+            roles.some((r) => r === allowed || r.includes(allowed))
+          ) ||
+          (matchedPrefix === "/inventory" && isInventoryStaff);
+
         if (!hasAccess) {
           const targetDashboard = resolveDashboardRoute(roles);
           // Only redirect if destination is distinct from current prefix

@@ -262,58 +262,60 @@ export default function ItemMasterPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Package className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 shrink-0" />
             Item Master Catalog
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
             Manage school articles (Uniforms, Footwear, Bags, Books, Stationery) and stock configurations.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleRefresh}
             disabled={refreshing || loading}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-xs disabled:opacity-50 shrink-0"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-xs disabled:opacity-50"
             title="Refresh item catalog data"
             aria-label="Refresh item catalog data"
           >
-            <RotateCw className={`w-4 h-4 text-slate-500 ${refreshing ? "animate-spin" : ""}`} />
+            <RotateCw className={`w-4 h-4 text-slate-500 shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
           </button>
           <button
             onClick={() => handleOpenModal()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" /> Add New Item
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Add New Item</span>
           </button>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div className="relative w-full max-w-md">
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 shadow-sm">
+        <div className="flex items-center gap-3 w-full sm:flex-1 sm:max-w-md">
+          <div className="relative w-full">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by item name, code, or category..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {/* Category Filter */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none truncate"
           >
             <option value="">All Categories</option>
             {categories.map((c) => (
@@ -325,7 +327,7 @@ export default function ItemMasterPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="all">All Status</option>
             <option value="active">Active Only</option>
@@ -347,18 +349,18 @@ export default function ItemMasterPage() {
             <p className="text-xs mt-1">Add your first item using the &quot;Add New Item&quot; button above.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3.5 px-4">Item Details</th>
-                  <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">Variants & Rules</th>
-                  <th className="py-3.5 px-4">Unit</th>
-                  <th className="py-3.5 px-4">Live Stock</th>
-                  <th className="py-3.5 px-4">Min Stock</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Item Details</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Category</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Variants & Rules</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Unit</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Live Stock</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Min Stock</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -493,10 +495,10 @@ export default function ItemMasterPage() {
 
       {/* Add / Edit Item Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-xl mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                 {editingItem ? "Edit Item Master" : "Create New Item Master"}
               </h2>
               <button
@@ -507,7 +509,7 @@ export default function ItemMasterPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4 max-h-[85vh] sm:max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -826,9 +828,9 @@ export default function ItemMasterPage() {
 
       {/* Quick Stock Adjustment Modal */}
       {quickAdjustItem && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-md mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
               <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-blue-600" />
                 Quick Stock Adjustment
@@ -841,7 +843,7 @@ export default function ItemMasterPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveQuickAdjust} noValidate className="p-6 space-y-4">
+            <form onSubmit={handleSaveQuickAdjust} noValidate className="p-4 sm:p-6 space-y-4">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
                 <div className="text-xs text-slate-500 font-medium">Item Details:</div>
                 <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">

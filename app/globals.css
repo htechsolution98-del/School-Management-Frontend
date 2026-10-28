@@ -247,14 +247,18 @@
 }
 
 /* Hide scrollbars utility while retaining scroll functionality */
-.no-scrollbar {
+.no-scrollbar,
+.hide-scrollbar,
+.scrollbar-none {
   scrollbar-width: none;
   /* Firefox */
   -ms-overflow-style: none;
   /* IE/Edge */
 }
 
-.no-scrollbar::-webkit-scrollbar {
+.no-scrollbar::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none;
   /* Chrome, Safari, and Opera */
 }
@@ -433,11 +437,74 @@ body:has(.app-workspace)::-webkit-scrollbar,
   z-index: 999999 !important;
 }
 
-/* Guard: Instantly hide any ghost/empty toast that has no text content */
-[data-sonner-toast]:empty,
-[data-sonner-toast]:not(:has([data-title]:not(:empty))):not(:has([data-description]:not(:empty))) {
-  display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  visibility: hidden !important;
+/* ── Global Print Styles for Fee Receipt & Single-Page Documents ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 4mm 6mm;
+  }
+
+  html,
+  body {
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely remove sidebars, headers, footers, overlays, toasts from print layout */
+  header,
+  nav,
+  aside,
+  footer,
+  #app-sidebar,
+  .sidebar,
+  .navbar,
+  [data-sonner-toaster],
+  .toaster,
+  .receipt-print-hide,
+  .no-print {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-receipt-modal,
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #printable-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 4px 6px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  /* Remove all browser scrollbars during printing */
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
 }

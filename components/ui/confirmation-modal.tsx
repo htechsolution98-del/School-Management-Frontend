@@ -95,7 +95,7 @@ export function ConfirmationModal({
         }
       }}
     >
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-[95%] sm:w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Top-right close button */}
         <button
           type="button"

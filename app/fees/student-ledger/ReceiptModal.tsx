@@ -76,45 +76,119 @@ export default function ReceiptModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div id="printable-receipt-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-receipt, #printable-receipt * { visibility: visible; }
-          #printable-receipt {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            padding: 24px;
-            background: white;
-            margin: 0;
-            z-index: 9999;
-            overflow: visible;
+          @page {
+            size: A4 portrait;
+            margin: 4mm 6mm;
           }
-          .receipt-print-hide { display: none !important; }
+          html, body {
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            background: #ffffff !important;
+            width: 100% !important;
+            min-height: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          header, nav, aside, footer, #app-sidebar, .sidebar, .navbar, .receipt-print-hide {
+            display: none !important;
+          }
+          body * {
+            visibility: hidden;
+          }
+          #printable-receipt-modal, #printable-receipt, #printable-receipt * {
+            visibility: visible;
+          }
+          #printable-receipt-modal {
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+          #printable-receipt-card {
+            position: static !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+          }
+          #printable-receipt-card > div {
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+            padding: 0 !important;
+          }
+          #printable-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 4px 6px !important;
+            background: white !important;
+            box-shadow: none !important;
+            border: none !important;
+            font-size: 10px !important;
+            line-height: 1.25 !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            page-break-before: avoid !important;
+          }
+          #printable-receipt .print-compact-gap {
+            gap: 4px !important;
+          }
+          #printable-receipt .print-compact-p {
+            padding: 4px 6px !important;
+          }
+          #printable-receipt .print-compact-py {
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+          }
+          #printable-receipt .print-compact-space {
+            margin-top: 4px !important;
+            margin-bottom: 4px !important;
+            padding-bottom: 4px !important;
+          }
+          #printable-receipt .print-compact-pt {
+            padding-top: 8px !important;
+          }
         }
       `}</style>
 
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm receipt-print-hide"
+        className="fixed inset-0 bg-black/75 backdrop-blur-md receipt-print-hide"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto flex flex-col">
+      <div id="printable-receipt-card" className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto flex flex-col">
         <div className="receipt-print-hide flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10 shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">
             {payments.length > 1 ? `Combined Fee Receipt (${payments.length} Items)` : "Fee Receipt"}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <X size={18} className="text-gray-500" />
           </button>
         </div>
 
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-6 print:p-2 flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-12">
               <Loader2 size={32} className="animate-spin text-blue-500" />
@@ -165,23 +239,61 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
     primaryPayment;
   const cashInfo = formatCashBreakdown(cashPayment);
 
+  const schoolName =
+    primaryPayment.school_name ||
+    (typeof window !== "undefined" ? localStorage.getItem("school_name") : null) ||
+    "JUJUTSU KAISEN";
+
+  const rawLogo =
+    primaryPayment.school_logo ||
+    (typeof window !== "undefined" ? localStorage.getItem("school_logo") : null);
+
+  const resolveLogoUrl = (url?: string | null) => {
+    if (!url) return null;
+    const clean = url.trim();
+    if (!clean) return null;
+    if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
+      return clean;
+    }
+    const base = API_BASE_URL.replace(/\/api\/?$/, "");
+    return `${base}${clean.startsWith("/") ? "" : "/"}${clean}`;
+  };
+
+  const schoolLogo = resolveLogoUrl(rawLogo);
+
   return (
-    <div id="printable-receipt" className="space-y-5 text-gray-900">
-      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {primaryPayment.school_name || "School"}
-          </p>
-          <h3 className="text-2xl font-bold mt-1">
-            {isMultiItem ? "Consolidated Fee Receipt" : "Fee Receipt"}
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Official student fee payment receipt
-          </p>
+    <div id="printable-receipt" className="space-y-4 text-gray-900">
+      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-3 print-compact-space">
+        <div className="flex items-center gap-3">
+          {schoolLogo ? (
+            <img
+              src={schoolLogo}
+              alt={schoolName}
+              className="w-14 h-14 object-contain rounded-xl border border-gray-200 bg-white p-1 shrink-0 print:w-11 print:h-11 shadow-xs"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0 font-black text-lg print:w-10 print:h-10">
+              {schoolName.charAt(0)}
+            </div>
+          )}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-900">
+              {schoolName}
+            </p>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight print:text-lg">
+              {isMultiItem ? "Consolidated Fee Receipt" : "Fee Receipt"}
+            </h3>
+            <p className="text-xs text-gray-500">
+              Official student fee payment receipt
+            </p>
+          </div>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <p className="text-xs text-gray-500">Receipt No.</p>
-          <p className="font-mono font-bold text-gray-900">
+          <p className="font-mono font-bold text-gray-900 text-sm">
             {primaryPayment.receipt_number || "-"}
           </p>
           <StatusPill label={paymentStatus.label} tone={paymentStatus.tone} />
@@ -189,10 +301,16 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
       </div>
 
       <SectionTitle icon={User} title="Student Details" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 print-compact-gap">
         <Info label="Full Name" value={primaryPayment.student_name || "-"} wide />
-        <Info label="Class" value={primaryPayment.student_class || "-"} />
-        <Info label="Division" value={primaryPayment.student_division || "-"} />
+        <Info
+          label="Class & Section"
+          value={
+            primaryPayment.student_class
+              ? `${primaryPayment.student_class}${primaryPayment.student_division ? ` - ${primaryPayment.student_division} Section` : ""}`
+              : (primaryPayment.student_division ? `${primaryPayment.student_division} Section` : "-")
+          }
+        />
         <Info label="GR No." value={primaryPayment.student_gr_no || "-"} />
       </div>
 
@@ -204,7 +322,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase font-semibold">
                 <tr>
                   <th className="p-3">#</th>
-                  <th className="p-3">Fee / Period</th>
+                  <th className="p-3">Fee / Particulars</th>
                   <th className="p-3 text-right">Base Fee</th>
                   <th className="p-3 text-right">Late Fee</th>
                   <th className="p-3 text-right">Discount</th>
@@ -217,7 +335,17 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
                     <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="p-3">
                       <p className="font-semibold text-gray-900">{p.feetype_name}</p>
-                      <p className="text-[11px] text-gray-500">
+                      {(() => {
+                        const particularText = p.fee_description || p.fee_discount_reference;
+                        if (!particularText || particularText.includes("[Cash Recd")) return null;
+                        return (
+                          <p className="text-[11px] font-medium text-amber-900 bg-amber-50 rounded px-1.5 py-0.5 mt-0.5 border border-amber-200 w-fit">
+                            <span className="font-bold uppercase text-[9px] mr-1 text-amber-800">Particulars:</span>
+                            {particularText}
+                          </p>
+                        );
+                      })()}
+                      <p className="text-[11px] text-gray-500 mt-0.5">
                         {formatBillingPeriod(p.fee_billing_period || "")} {p.is_rte_govt_claim ? "• 🏛️ RTE Claim" : ""}
                       </p>
                     </td>
@@ -247,8 +375,19 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
       ) : (
         <>
           <SectionTitle icon={GraduationCap} title="Fee Details" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Info label="Fee Type" value={primaryPayment.feetype_name || "-"} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 print-compact-gap">
+            <Info label="Fee Structure / Type" value={primaryPayment.feetype_name || "-"} />
+            {(() => {
+              const particularText = primaryPayment.fee_description || primaryPayment.fee_discount_reference;
+              if (!particularText || particularText.includes("[Cash Recd")) return null;
+              return (
+                <Info
+                  label="Particulars"
+                  value={particularText}
+                  wide
+                />
+              );
+            })()}
             <Info label="Billing Cycle" value={billingCycleLabel(primaryPayment.fee_billing_cycle)} />
             <Info
               label="Billing Period"
@@ -260,7 +399,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
             <Info label="Student Fee ID" value={String(primaryPayment.student_fee || "-")} />
             <Info label="Payment ID" value={String(primaryPayment.id)} />
             {primaryPayment.is_rte_govt_claim && (
-              <Info label="Fee Classification" value="RTE Govt Reimbursement Claim" />
+              <Info label="Fee Classification" value="RTE Govt Reimbursement Claim" wide />
             )}
           </div>
 
@@ -350,11 +489,11 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-8 pt-10 text-sm">
-        <div className="border-t border-gray-300 pt-2 text-gray-600">
+      <div className="grid grid-cols-2 gap-8 pt-6 print-compact-pt text-sm">
+        <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-xs">
           Receiver Signature
         </div>
-        <div className="border-t border-gray-300 pt-2 text-gray-600 text-right">
+        <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-right text-xs">
           Authorized Signature
         </div>
       </div>

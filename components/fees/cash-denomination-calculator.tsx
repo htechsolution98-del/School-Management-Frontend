@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Banknote, Coins, RotateCcw, CheckCircle2, AlertCircle, ArrowRightLeft } from "lucide-react";
+import { Banknote, Coins, RotateCcw, CheckCircle2, AlertCircle, ArrowRightLeft, Plus, Minus } from "lucide-react";
 
 export interface CashDenominationState {
   notes: {
@@ -261,29 +261,42 @@ export default function CashDenominationCalculator({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => updateNote(value, qty - 1)}
-                      className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center transition"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        updateNote(value, Math.max(0, (Number(qty) || 0) - 1));
+                      }}
+                      className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 flex items-center justify-center transition-colors cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                       disabled={qty <= 0}
+                      title={`Decrease ${label} count`}
                     >
-                      -
+                      <Minus size={14} className="stroke-[2.5]" />
                     </button>
                     <input
                       type="number"
                       min="0"
                       value={qty === 0 ? "" : qty}
                       placeholder="0"
-                      onChange={(e) => updateNote(value, parseInt(e.target.value, 10))}
-                      className="w-full h-6 px-1 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      onChange={(e) => {
+                        const parsed = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                        updateNote(value, isNaN(parsed) ? 0 : parsed);
+                      }}
+                      className="w-full h-8 px-1 text-center font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                       type="button"
-                      onClick={() => updateNote(value, qty + 1)}
-                      className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center transition"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        updateNote(value, (Number(qty) || 0) + 1);
+                      }}
+                      className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 flex items-center justify-center transition-colors cursor-pointer select-none shrink-0"
+                      title={`Increase ${label} count`}
                     >
-                      +
+                      <Plus size={14} className="stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
@@ -329,29 +342,42 @@ export default function CashDenominationCalculator({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => updateCoin(value, qty - 1)}
-                      className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        updateCoin(value, Math.max(0, (Number(qty) || 0) - 1));
+                      }}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 flex items-center justify-center transition-colors cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                       disabled={qty <= 0}
+                      title={`Decrease ₹${value} coin count`}
                     >
-                      -
+                      <Minus size={13} className="stroke-[2.5]" />
                     </button>
                     <input
                       type="number"
                       min="0"
                       value={qty === 0 ? "" : qty}
                       placeholder="0"
-                      onChange={(e) => updateCoin(value, parseInt(e.target.value, 10))}
-                      className="w-full h-5 px-0.5 text-center font-mono font-bold text-[11px] bg-slate-50 border border-slate-200 rounded focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      onChange={(e) => {
+                        const parsed = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                        updateCoin(value, isNaN(parsed) ? 0 : parsed);
+                      }}
+                      className="w-full h-7 sm:h-8 px-0.5 text-center font-mono font-bold text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                       type="button"
-                      onClick={() => updateCoin(value, qty + 1)}
-                      className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        updateCoin(value, (Number(qty) || 0) + 1);
+                      }}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 flex items-center justify-center transition-colors cursor-pointer select-none shrink-0"
+                      title={`Increase ₹${value} coin count`}
                     >
-                      +
+                      <Plus size={13} className="stroke-[2.5]" />
                     </button>
                   </div>
                 </div>

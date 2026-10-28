@@ -13,12 +13,25 @@ import {
   Calendar,
   Eye,
   FileDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
 import { toast } from "sonner";
 
 const isValidIndianMobileNumber = (value: string): boolean =>
   value === "" || /^[6-9][0-9]{9}$/.test(value);
+
+// Client-side cache for static dropdown reference data
+let cachedDropdowns: {
+  suppliers?: any[];
+  items?: any[];
+  sizes?: any[];
+  colors?: any[];
+  academicYears?: any[];
+  timestamp?: number;
+} | null = null;
+const DROPDOWN_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export default function PurchasesAndSuppliersPage() {
   const [activeTab, setActiveTab] = useState<"purchases" | "suppliers">("purchases");
@@ -29,7 +42,15 @@ export default function PurchasesAndSuppliersPage() {
   const [colors, setColors] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const [loadingDetailsId, setLoadingDetailsId] = useState<number | null>(null);
   const [downloadingPdfId, setDownloadingPdfId] = useState<number | null>(null);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 20;
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,14 +89,32 @@ export default function PurchasesAndSuppliersPage() {
   });
 
   useEffect(() => {
-    fetchInitialData();
+    fetchDropdownData();
   }, []);
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    fetchPurchases(1);
+  }, [fromDate, toDate]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPurchases(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchDropdownData = async (forceRefresh = false) => {
+    if (!forceRefresh && cachedDropdowns && Date.now() - (cachedDropdowns.timestamp || 0) < DROPDOWN_CACHE_TTL_MS) {
+      if (cachedDropdowns.suppliers) setSuppliers(cachedDropdowns.suppliers);
+      if (cachedDropdowns.items) setItems(cachedDropdowns.items);
+      if (cachedDropdowns.sizes) setSizes(cachedDropdowns.sizes);
+      if (cachedDropdowns.colors) setColors(cachedDropdowns.colors);
+      if (cachedDropdowns.academicYears) setAcademicYears(cachedDropdowns.academicYears);
+      return;
+    }
+
     try {
-      const [purchRes, suppRes, itemsRes, sizesRes, colorsRes, yearsRes] = await Promise.all([
-        inventoryApi.get("/purchases/"),
+      const [suppRes, itemsRes, sizesRes, colorsRes, yearsRes] = await Promise.all([
         inventoryApi.get("/suppliers/"),
         inventoryApi.get("/items/"),
         inventoryApi.get("/sizes/"),
@@ -83,23 +122,65 @@ export default function PurchasesAndSuppliersPage() {
         coreApi.get("/academic-year/").catch(() => ({ data: [] })),
       ]);
 
-      setPurchases(Array.isArray(purchRes.data) ? purchRes.data : purchRes.data.results || []);
       const supps = Array.isArray(suppRes.data) ? suppRes.data : suppRes.data.results || [];
-      setSuppliers(supps);
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || []);
-      setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
-      setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
-      const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
-      setAcademicYears(years);
+      const itms = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
+      const szs = Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || [];
+      const cols = Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || [];
+      const yrs = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
 
-      if (years.length > 0 && !purchaseForm.academic_year) {
-        setPurchaseForm(prev => ({ ...prev, academic_year: years[0].id }));
+      cachedDropdowns = {
+        suppliers: supps,
+        items: itms,
+        sizes: szs,
+        colors: cols,
+        academicYears: yrs,
+        timestamp: Date.now(),
+      };
+
+      setSuppliers(supps);
+      setItems(itms);
+      setSizes(szs);
+      setColors(cols);
+      setAcademicYears(yrs);
+
+      if (yrs.length > 0 && !purchaseForm.academic_year) {
+        setPurchaseForm(prev => ({ ...prev, academic_year: yrs[0].id }));
       }
     } catch (err) {
-      console.error("Error fetching purchases data:", err);
+      console.error("Error fetching dropdown data:", err);
+      showApiError(err, "Failed to load reference dropdown data.");
+    }
+  };
+
+  const fetchPurchases = async (targetPage = 1) => {
+    setLoading(true);
+    setLoadingPurchases(true);
+    try {
+      const params: any = { page: targetPage };
+      if (fromDate) params.from_date = fromDate;
+      if (toDate) params.to_date = toDate;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+
+      const purchRes = await inventoryApi.get("/purchases/", { params });
+      const data = purchRes.data;
+      if (data && typeof data === "object" && "results" in data) {
+        setPurchases(data.results || []);
+        const count = Number(data.count) || 0;
+        setTotalCount(count);
+        setTotalPages(Math.max(1, Math.ceil(count / pageSize)));
+      } else {
+        const list = Array.isArray(data) ? data : [];
+        setPurchases(list);
+        setTotalCount(list.length);
+        setTotalPages(Math.max(1, Math.ceil(list.length / pageSize)));
+      }
+      setPage(targetPage);
+    } catch (err) {
+      console.error("Error fetching purchases:", err);
       showApiError(err, "Failed to load purchases data.");
     } finally {
       setLoading(false);
+      setLoadingPurchases(false);
     }
   };
 
@@ -230,7 +311,7 @@ export default function PurchasesAndSuppliersPage() {
       await inventoryApi.post("/purchases/", payload);
       showSuccess("Purchase invoice confirmed & stock updated successfully");
       setIsPurchaseModalOpen(false);
-      fetchInitialData();
+      fetchPurchases(1);
     } catch (err: any) {
       showApiError(err, "Failed to create purchase invoice.");
     } finally {
@@ -294,7 +375,7 @@ export default function PurchasesAndSuppliersPage() {
         address: "",
         gst_number: "",
       });
-      fetchInitialData();
+      fetchDropdownData(true);
     } catch (err: any) {
       showApiError(err, "Failed to save supplier.");
     } finally {
@@ -303,60 +384,60 @@ export default function PurchasesAndSuppliersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Truck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Truck className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 shrink-0" />
             Purchases & Supplier Invoices
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
             Procure inventory batches from approved suppliers and automatically update physical stock.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => {
               setEditingSupplierId(null);
               setSupplierFormData({ supplier_name: "", contact_person: "", phone: "", email: "", address: "", gst_number: "" });
               setIsSupplierModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
           >
-            <Plus className="w-4 h-4 text-slate-500" /> Add Supplier
+            <Plus className="w-4 h-4 text-slate-500 shrink-0" /> Add Supplier
           </button>
           <button
             onClick={() => handleOpenPurchaseModal()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" /> New Purchase Order
+            <Plus className="w-4 h-4 shrink-0" /> New Purchase Order
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 flex-nowrap overflow-x-auto whitespace-nowrap hide-scrollbar scrollbar-none pb-0.5 sm:pb-0">
         <button
           onClick={() => setActiveTab("purchases")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "purchases"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <FileText className="w-4 h-4" /> Purchase Invoices ({filteredPurchases.length}{filteredPurchases.length !== purchases.length ? ` / ${purchases.length}` : ""})
+          <FileText className="w-4 h-4 shrink-0" /> Purchase Invoices ({filteredPurchases.length}{filteredPurchases.length !== purchases.length ? ` / ${purchases.length}` : ""})
         </button>
 
         <button
           onClick={() => setActiveTab("suppliers")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "suppliers"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Truck className="w-4 h-4" /> Supplier Directory ({suppliers.length})
+          <Truck className="w-4 h-4 shrink-0" /> Supplier Directory ({suppliers.length})
         </button>
       </div>
 
@@ -444,18 +525,18 @@ export default function PurchasesAndSuppliersPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
+                <table className="w-full min-w-[800px] text-left text-sm">
                   <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-3.5 px-4">Invoice #</th>
-                      <th className="py-3.5 px-4">Supplier</th>
-                      <th className="py-3.5 px-4">Date</th>
-                      <th className="py-3.5 px-4">Academic Year</th>
-                      <th className="py-3.5 px-4">Items Count</th>
-                      <th className="py-3.5 px-4">Grand Total</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4 text-right">Action</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Invoice #</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Supplier</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Date</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Academic Year</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Items Count</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Grand Total</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Status</th>
+                      <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 text-right whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -474,7 +555,7 @@ export default function PurchasesAndSuppliersPage() {
                           {p.academic_year_name}
                         </td>
                         <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-300">
-                          {p.items ? p.items.length : 0} items
+                          {p.items_count !== undefined ? p.items_count : (p.items ? p.items.length : 0)} items
                         </td>
                         <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                           ₹{Number(p.grand_total).toLocaleString()}
@@ -505,14 +586,32 @@ export default function PurchasesAndSuppliersPage() {
                               <span>PDF</span>
                             </button>
                             <button
-                              onClick={() => {
-                                setSelectedPurchase(p);
-                                setIsDetailsModalOpen(true);
+                              onClick={async () => {
+                                if (p.items && p.items.length > 0) {
+                                  setSelectedPurchase(p);
+                                  setIsDetailsModalOpen(true);
+                                  return;
+                                }
+                                setLoadingDetailsId(p.id);
+                                try {
+                                  const res = await inventoryApi.get(`/purchases/${p.id}/`);
+                                  setSelectedPurchase(res.data);
+                                } catch {
+                                  setSelectedPurchase(p);
+                                } finally {
+                                  setLoadingDetailsId(null);
+                                  setIsDetailsModalOpen(true);
+                                }
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm"
+                              disabled={loadingDetailsId === p.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm disabled:opacity-50"
                               title="View purchase breakdown"
                             >
-                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              {loadingDetailsId === p.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              )}
                               View
                             </button>
                           </div>
@@ -521,6 +620,36 @@ export default function PurchasesAndSuppliersPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
+                <div>
+                  Showing <strong>{(page - 1) * pageSize + 1}</strong> to{" "}
+                  <strong>{Math.min(page * pageSize, totalCount)}</strong> of{" "}
+                  <strong>{totalCount}</strong> records
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => fetchPurchases(page - 1)}
+                    disabled={page <= 1 || loadingPurchases}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                  </button>
+                  <div className="px-3 py-1.5 font-semibold text-slate-900 dark:text-white">
+                    Page {page} of {totalPages}
+                  </div>
+                  <button
+                    onClick={() => fetchPurchases(page + 1)}
+                    disabled={page >= totalPages || loadingPurchases}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -582,11 +711,11 @@ export default function PurchasesAndSuppliersPage() {
 
       {/* New Purchase Order Modal */}
       {isPurchaseModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Truck className="w-5 h-5 text-blue-600" />
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-3xl mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Truck className="w-5 h-5 text-blue-600 shrink-0" />
                 Create Purchase Invoice & Restock Inventory
               </h2>
               <button
@@ -597,7 +726,7 @@ export default function PurchasesAndSuppliersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSavePurchase} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSavePurchase} noValidate className="p-4 sm:p-6 space-y-4 max-h-[85vh] sm:max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -829,10 +958,10 @@ export default function PurchasesAndSuppliersPage() {
 
       {/* Supplier Add/Edit Modal */}
       {isSupplierModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingSupplierId !== null ? "Edit Supplier" : "Add New Supplier"}</h2>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-md mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{editingSupplierId !== null ? "Edit Supplier" : "Add New Supplier"}</h2>
               <button
                 onClick={() => { setIsSupplierModalOpen(false); setEditingSupplierId(null); }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -841,7 +970,7 @@ export default function PurchasesAndSuppliersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveSupplier} noValidate className="p-6 space-y-4">
+            <form onSubmit={handleSaveSupplier} noValidate className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Supplier / Vendor Name <span className="text-red-500">*</span>
@@ -929,13 +1058,13 @@ export default function PurchasesAndSuppliersPage() {
 
       {/* Purchase Invoice Details Modal */}
       {isDetailsModalOpen && selectedPurchase && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-2xl mx-auto max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
             {/* Modal Header */}
-            <div className="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-start justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                     Invoice #{selectedPurchase.invoice_number}
                   </h2>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
@@ -971,22 +1100,22 @@ export default function PurchasesAndSuppliersPage() {
             </div>
 
             {/* Modal Body: Line Items */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
               {selectedPurchase.notes && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
                   <span className="font-semibold text-slate-700 dark:text-slate-200">Notes:</span> {selectedPurchase.notes}
                 </div>
               )}
 
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-sm">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto hide-scrollbar scrollbar-none">
+                <table className="w-full min-w-[500px] text-left text-sm">
                   <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-2.5 px-3">Item Name</th>
-                      <th className="py-2.5 px-3">Variant</th>
-                      <th className="py-2.5 px-3 text-center">Qty</th>
-                      <th className="py-2.5 px-3 text-right">Unit Cost (₹)</th>
-                      <th className="py-2.5 px-3 text-right">Subtotal (₹)</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Item Name</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">Variant</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap">Qty</th>
+                      <th className="py-2.5 px-3 text-right whitespace-nowrap">Unit Cost (₹)</th>
+                      <th className="py-2.5 px-3 text-right whitespace-nowrap">Subtotal (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">

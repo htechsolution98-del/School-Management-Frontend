@@ -264,37 +264,37 @@ export default function PricingAndFeeMappingPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <BadgePercent className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <BadgePercent className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 shrink-0" />
             Pricing & Fee Integration Matrix
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
             Define Academic-Year purchase cost, student selling price, and mapped Fee Types (Included in Fees vs Separate vs Free).
           </p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap"
         >
-          <Plus className="w-4 h-4" /> Configure Item Pricing
+          <Plus className="w-4 h-4 shrink-0" /> Configure Item Pricing
         </button>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
-            <Calendar className="w-4 h-4 text-blue-500" />
-            Academic Year:
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium shrink-0">
+            <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>Academic Year:</span>
           </div>
           <select
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
-            className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-semibold text-slate-900 dark:text-white focus:outline-none"
+            className="flex-1 sm:flex-initial px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-semibold text-slate-900 dark:text-white focus:outline-none"
           >
             {academicYears.map((y) => (
               <option key={y.id} value={y.id}>{y.name}</option>
@@ -302,11 +302,11 @@ export default function PricingAndFeeMappingPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="w-full sm:w-auto">
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="all">All Charging Types</option>
             <option value="INCLUDED_IN_FEE">Included in Fees</option>
@@ -329,18 +329,18 @@ export default function PricingAndFeeMappingPage() {
             <p className="text-xs mt-1">Map items to fee structures or set individual selling prices above.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3.5 px-4">Item Name</th>
-                  <th className="py-3.5 px-4">Class Applicability</th>
-                  <th className="py-3.5 px-4">Charging Policy</th>
-                  <th className="py-3.5 px-4">Mapped Fee Type</th>
-                  <th className="py-3.5 px-4">Purchase Cost</th>
-                  <th className="py-3.5 px-4">Selling / Assigned Value</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Action</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Item Name</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Class Applicability</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Charging Policy</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Mapped Fee Type</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Purchase Cost</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Selling / Assigned Value</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -420,10 +420,10 @@ export default function PricingAndFeeMappingPage() {
 
       {/* Configure Pricing Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-[95%] sm:w-full max-w-xl mx-auto overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                 {editingId ? "Edit Item Pricing Configuration" : "Configure Item Pricing & Fee Mapping"}
               </h2>
               <button
@@ -434,7 +434,7 @@ export default function PricingAndFeeMappingPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4 max-h-[85vh] sm:max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">

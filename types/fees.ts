@@ -92,6 +92,10 @@ export interface StudentFee {
   rte_govt_balance_amount?: string;
   rte_govt_status?: "not_applicable" | "pending" | "partially_received" | "received" | string;
   class_name: string;
+  school_class?: number;
+  school_class_name?: string;
+  student_division?: string;
+  student_class_display?: string;
   billing_period: string;
   due_date: string;
   amount: string;
@@ -114,6 +118,10 @@ export interface Payment {
   id: number;
   school?: number;
   school_name?: string | null;
+  school_logo?: string | null;
+  school_address?: string | null;
+  school_email?: string | null;
+  school_phone?: string | null;
   student_fee?: number;
   student?: number;
   student_name?: string;
@@ -127,6 +135,8 @@ export interface Payment {
   fee_billing_cycle?: BillingCycle | string;
   fee_billing_period?: string | null;
   fee_due_date?: string | null;
+  fee_description?: string | null;
+  fee_discount_reference?: string | null;
   fee_amount?: string;
   fee_penalty?: string;
   fee_discount?: string;
@@ -203,7 +213,10 @@ export interface Student {
   mother_name: string;
   school_class: number | null;
   class_name?: string;
+  division?: string | null;
+  roll_number?: string | number | null;
   gr_no?: string | null;
+  gr_number?: string | null;
   is_rte?: boolean;
 }
 
