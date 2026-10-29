@@ -1,5 +1,7 @@
 "use client";
 
+import { StudentEmptyState } from "@/components/student/student-empty-state";
+
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Wallet,
@@ -16,6 +18,7 @@ import {
   ChevronRight,
   AlertCircle,
   Loader2,
+  X,
 } from "lucide-react";
 import {
   getMyFees,
@@ -107,51 +110,69 @@ function PartialPayModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-        <h3 className="text-lg font-bold text-gray-900 mb-1">Pay Fees</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          {billingPeriodToLabel(fee.billing_period)} — Balance:{" "}
-          <span className="font-semibold text-gray-800">
-            {formatINR(fee.balance_amount)}
-          </span>
-        </p>
-
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Amount to Pay
-        </label>
-        <input
-          type="text"
-          value={amount}
-          readOnly
-          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 cursor-not-allowed focus:outline-none mb-1"
-        />
-        <div className="flex gap-2 mb-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex sm:items-center sm:justify-center p-0 sm:p-4 overflow-hidden" onClick={onClose}>
+      <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900">Pay Fees</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {billingPeriodToLabel(fee.billing_period)} — Balance:{" "}
+              <span className="font-semibold text-gray-800">
+                {formatINR(fee.balance_amount)}
+              </span>
+            </p>
+          </div>
           <button
-            onClick={() => setAmount(String(fee.balance_amount ?? 0))}
-            className="text-xs text-purple-600 hover:underline"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
           >
-            Pay full balance
+            <X size={18} />
           </button>
         </div>
 
-        {error && (
-          <p className="text-xs text-red-500 flex items-center gap-1 mb-3">
-            <AlertCircle className="w-3 h-3" /> {error}
-          </p>
-        )}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">
+              Amount to Pay
+            </label>
+            <input
+              type="text"
+              value={amount}
+              readOnly
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-base font-black bg-gray-50 text-slate-900 cursor-not-allowed focus:outline-none mb-1 shadow-2xs"
+            />
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setAmount(String(fee.balance_amount ?? 0))}
+                className="text-xs text-blue-600 hover:underline font-bold cursor-pointer"
+              >
+                Pay full balance
+              </button>
+            </div>
+          </div>
 
-        <div className="flex gap-3">
+          {error && (
+            <p className="text-xs text-rose-600 flex items-center gap-1.5 p-3 bg-rose-50 rounded-2xl border border-rose-200 font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+            </p>
+          )}
+        </div>
+
+        {/* Fixed Bottom Single-Row Full-Width Buttons */}
+        <div className="p-4 sm:p-5 border-t border-slate-100 bg-white shrink-0 flex items-center gap-3 w-full">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex-1 py-3 px-4 rounded-2xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-98 transition-all text-center flex items-center justify-center cursor-pointer shadow-2xs"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handlePay}
             disabled={paying}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-bold shadow-md shadow-blue-500/20 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {paying ? "Processing…" : "Pay Now"}
@@ -171,6 +192,17 @@ function ReceiptModal({
   fee: MyStudentFee;
   onClose: () => void;
 }) {
+  const fmt = (d: string) =>
+    d
+      ? new Date(d).toLocaleString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "N/A";
+
   const handleDownload = async () => {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
@@ -343,136 +375,129 @@ function ReceiptModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
+    <div className="fixed inset-0 bg-black/60 z-50 flex sm:items-center sm:justify-center p-0 sm:p-4 overflow-hidden" onClick={onClose}>
+      <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">Payment Receipt</h3>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900">Payment Receipt</h3>
           </div>
-          <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
-            PAID
-          </span>
-        </div>
-
-        {/* Student & Fee Info */}
-        <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Student</span>
-            <span className="font-semibold text-gray-800">
-              {(fee as any).student_name}
+          <div className="flex items-center gap-2">
+            <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
+              PAID
             </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Class</span>
-            <span className="font-semibold text-gray-800">
-              {(fee as any).school_class_name}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Fee Type</span>
-            <span className="font-semibold text-gray-800">
-              {(fee as any).feetype_name}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Period</span>
-            <span className="font-semibold text-gray-800">
-              {billingPeriodToLabel(fee.billing_period)}
-            </span>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
 
-        {/* Amount Breakdown */}
-        <div className="border border-gray-100 rounded-xl p-4 mb-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Amount</span>
-            <span className="font-semibold text-gray-800">
-              {formatINR(fee.amount)}
-            </span>
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 no-scrollbar">
+          {/* Student & Fee Info */}
+          <div className="bg-gray-50 rounded-2xl p-4 space-y-2 border border-slate-100">
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Student</span>
+              <span className="font-semibold text-gray-800">
+                {(fee as any).student_name}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Class</span>
+              <span className="font-semibold text-gray-800">
+                {(fee as any).school_class_name}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Fee Type</span>
+              <span className="font-semibold text-gray-800">
+                {(fee as any).feetype_name}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Period</span>
+              <span className="font-semibold text-gray-800">
+                {billingPeriodToLabel(fee.billing_period)}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Discount</span>
-            <span className="font-semibold text-red-500">
-              -{formatINR(fee.discount_amount)}
-            </span>
+
+          {/* Amount Breakdown */}
+          <div className="border border-gray-100 rounded-2xl p-4 space-y-2 bg-white shadow-2xs">
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Amount</span>
+              <span className="font-semibold text-gray-800">
+                {formatINR(fee.amount)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Discount</span>
+              <span className="font-semibold text-gray-800">
+                {formatINR(fee.discount_amount)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Fine</span>
+              <span className="font-semibold text-red-600">
+                +{formatINR(fee.fine_amount)}
+              </span>
+            </div>
+            <div className="border-t border-gray-100 pt-2 flex justify-between text-xs sm:text-sm font-bold">
+              <span className="text-gray-800">Total Paid</span>
+              <span className="text-green-700">
+                {formatINR(fee.paid_amount)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs sm:text-sm">
+              <span className="text-gray-500">Balance</span>
+              <span className="font-bold text-gray-800">
+                {formatINR(fee.balance_amount)}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Fine</span>
-            <span className="font-semibold text-orange-500">
-              +{formatINR(fee.fine_amount)}
-            </span>
-          </div>
-          <div className="border-t border-dashed border-gray-200 pt-2 flex justify-between text-sm">
-            <span className="text-gray-500">Payable Amount</span>
-            <span className="font-bold text-gray-900">
-              {formatINR(fee.actual_payable_amount)}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Paid Amount</span>
-            <span className="font-bold text-green-600">
-              {formatINR(fee.paid_amount)}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Balance</span>
-            <span className="font-semibold text-gray-800">
-              {formatINR(fee.balance_amount)}
-            </span>
+
+          {/* Payment Details */}
+          <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-xs border border-slate-100">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Paid Date</span>
+              <span className="font-semibold text-gray-800">
+                {fmt((fee as any).paid_date)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Payment Mode</span>
+              <span className="font-semibold text-gray-800 capitalize">
+                {(fee as any).payment_mode ?? "Online"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Due Date</span>
+              <span className="font-semibold text-gray-800">
+                {(fee as any).due_date ?? "N/A"}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Transaction Info */}
-        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 mb-5 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Payment Mode</span>
-            <PaymentModeIcon
-              mode={((fee as any).payment_mode ?? "online") as PaymentMode}
-            />
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Transaction ID</span>
-            <span className="font-mono text-xs text-gray-700 break-all text-right max-w-[180px]">
-              {(fee as any).transaction_id ?? "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Paid At</span>
-            <span className="font-semibold text-gray-800">
-              {(fee as any).paid_at
-                ? new Date((fee as any).paid_at).toLocaleString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Due Date</span>
-            <span className="font-semibold text-gray-800">
-              {(fee as any).due_date ?? "N/A"}
-            </span>
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3">
+        {/* Fixed Bottom Single-Row Full-Width Buttons */}
+        <div className="p-4 sm:p-5 border-t border-slate-100 bg-white shrink-0 flex items-center gap-3 w-full">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex-1 py-3 px-4 rounded-2xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-98 transition-all text-center flex items-center justify-center cursor-pointer shadow-2xs"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleDownload}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             Download Receipt
@@ -482,6 +507,7 @@ function ReceiptModal({
     </div>
   );
 }
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const MONTHS = [
@@ -567,9 +593,9 @@ export default function PayFeesPage() {
       amount: formatINR(summary.totalFees),
       description: "Total amount to be paid",
       icon: Wallet,
-      iconBg: "bg-purple-100",
-      iconColor: "text-purple-600",
-      border: "border-purple-100",
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-600",
+      border: "border-blue-100",
     },
     {
       title: "Paid Amount",
@@ -707,7 +733,7 @@ export default function PayFeesPage() {
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
         >
           <option>All Months</option>
           {MONTHS.map((m) => (
@@ -718,7 +744,7 @@ export default function PayFeesPage() {
         <select
           value={selectedStatus}
           onChange={(e) => setSelectedStatus(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
         >
           <option>All Status</option>
           <option>Paid</option>
@@ -734,13 +760,13 @@ export default function PayFeesPage() {
             placeholder="Search fees..."
             value={searchFees}
             onChange={(e) => setSearchFees(e.target.value)}
-            className="w-full pl-8 sm:pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="w-full pl-8 sm:pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>
 
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ml-auto"
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ml-auto"
         >
           <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Export
@@ -754,7 +780,7 @@ export default function PayFeesPage() {
           <button
             onClick={() => fetchFees(true)}
             disabled={refreshing}
-            className="flex items-center gap-1 text-purple-600 hover:text-purple-700 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50"
           >
             <RefreshCw
               className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
@@ -773,9 +799,10 @@ export default function PayFeesPage() {
             ))}
           </div>
         ) : filteredFees.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400 shadow-sm">
-            No fees found for the selected filters.
-          </div>
+          <StudentEmptyState
+            title="No fee records found"
+            description="There are no pending or assessed fee dues matching the selected filters."
+          />
         ) : (
           <div className="flex flex-col gap-4">
             {filteredFees.map((fee) => (
@@ -786,9 +813,9 @@ export default function PayFeesPage() {
                 <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                   {/* Left: Icon + Title */}
                   <div className="flex items-start gap-3 w-full lg:w-auto min-w-0">
-                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
                       <svg
-                        className="w-6 h-6 text-purple-600"
+                        className="w-6 h-6 text-blue-600"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -893,7 +920,7 @@ export default function PayFeesPage() {
                     ) : (
                       <button
                         onClick={() => setPayingFee(fee)}
-                        className="flex-1 lg:w-full bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-center"
+                        className="flex-1 lg:w-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-center"
                       >
                         Pay Now
                       </button>
@@ -914,8 +941,8 @@ export default function PayFeesPage() {
       </div>
 
       {/* Info Banner */}
-      <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 mb-6 flex items-start gap-3 relative overflow-hidden">
-        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 flex items-start gap-3 relative overflow-hidden">
+        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
           <Info className="w-4 h-4 text-white" />
         </div>
         <div>
@@ -927,7 +954,7 @@ export default function PayFeesPage() {
           </p>
         </div>
         <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">
-          <div className="w-16 h-16 bg-purple-400 rounded-full" />
+          <div className="w-16 h-16 bg-blue-400 rounded-full" />
         </div>
       </div>
 
@@ -935,7 +962,7 @@ export default function PayFeesPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Payment History</h2>
-          <button className="text-sm text-purple-600 hover:text-purple-700 border border-purple-200 px-4 py-1.5 rounded-lg font-medium">
+          <button className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 px-4 py-1.5 rounded-lg font-medium">
             View All
           </button>
         </div>
@@ -943,9 +970,10 @@ export default function PayFeesPage() {
         {historyLoading ? (
           <div className="h-32 animate-pulse bg-gray-50 rounded-xl" />
         ) : pagedHistory.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">
-            No payments recorded yet.
-          </p>
+          <StudentEmptyState
+            title="No payment history yet"
+            description="Fee receipts and successful transactions will appear here once settled."
+          />
         ) : (
           <div className="overflow-x-auto w-full">
             <table className="w-full min-w-[620px] text-sm">
@@ -1013,7 +1041,7 @@ export default function PayFeesPage() {
                       </span>
                     </td>
                     <td className="py-3">
-                      <button className="text-gray-400 hover:text-purple-600 transition-colors">
+                      <button className="text-gray-400 hover:text-blue-600 transition-colors">
                         <Download className="w-4 h-4" />
                       </button>
                     </td>
@@ -1046,7 +1074,7 @@ export default function PayFeesPage() {
                 onClick={() => setHistoryPage(p)}
                 className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                   p === historyPage
-                    ? "bg-purple-600 text-white"
+                    ? "bg-blue-600 text-white"
                     : "border border-gray-200 text-gray-500 hover:bg-gray-50"
                 }`}
               >

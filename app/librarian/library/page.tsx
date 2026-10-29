@@ -2498,11 +2498,11 @@ export default function LibrarianDashboard() {
         </div>
 
         {/* MAIN WORKSPACE CONTENT AREA (FULL WIDTH - NO DUAL SIDEBAR) */}
-        <div className="w-full min-w-0 space-y-4">
+        <div className="w-full min-w-0 space-y-4 pb-24 sm:pb-12 lg:pb-8">
           {/* Contextual Active Step Header (Only for non-table tabs) */}
           {(activeTab === "reports" || activeTab === "settings") && (
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex items-start justify-between gap-3">
+              <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
                     {activeTab === "reports" && "Step 7 of 8"}
@@ -2513,11 +2513,13 @@ export default function LibrarianDashboard() {
                     {activeTab === "settings" && "Loan durations, limits & late fine policies"}
                   </span>
                 </div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
-                  {activeTab === "reports" && <BarChart3 className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "settings" && <Sliders className="h-5 w-5 text-indigo-600" />}
-                  {activeTab === "reports" && "Reports & Audit"}
-                  {activeTab === "settings" && "Rules & Policies"}
+                <h2 className="text-base sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  {activeTab === "reports" && <BarChart3 className="h-5 w-5 text-indigo-600 shrink-0" />}
+                  {activeTab === "settings" && <Sliders className="h-5 w-5 text-indigo-600 shrink-0" />}
+                  <span>
+                    {activeTab === "reports" && "Reports & Audit"}
+                    {activeTab === "settings" && "Rules & Policies"}
+                  </span>
                 </h2>
               </div>
               <Button
@@ -2525,7 +2527,7 @@ export default function LibrarianDashboard() {
                 variant="outline"
                 onClick={loadAllData}
                 disabled={loading}
-                className="text-xs border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
+                className="shrink-0 h-9 w-9 p-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 title="Reload current data"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -3927,23 +3929,23 @@ export default function LibrarianDashboard() {
             {/* List of All Students with Pending Dues across school (SUPERADMIN UNIFIED TABLE CARD) */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               {/* Header Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 shadow-2xs">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 shadow-2xs shrink-0">
                       <ShieldCheck className="h-4 w-4" />
                     </span>
                     <h3 className="text-base font-bold text-slate-900">Students with Outstanding Library Dues</h3>
-                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200/60">
+                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200/60 shrink-0">
                       {filteredPendingClearanceList.length} {filteredPendingClearanceList.length === 1 ? "Student" : "Students"}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Students with unreturned books or pending library fines requiring settlement
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
@@ -4422,27 +4424,31 @@ export default function LibrarianDashboard() {
             >
               <button
                 onClick={() => setReportsSubTab("audit")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                   reportsSubTab === "audit"
                     ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
-                <Archive className="h-3.5 w-3.5" /> Year-End Inventory Audit (Section 23)
+                <Archive className="h-3.5 w-3.5" />
+                <span className="sm:hidden">Inventory Audit</span>
+                <span className="hidden sm:inline">Year-End Inventory Audit (Section 23)</span>
               </button>
               <button
                 onClick={() => setReportsSubTab("borrowed")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                   reportsSubTab === "borrowed"
                     ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
-                <TrendingUp className="h-3.5 w-3.5" /> Most Borrowed Titles (Section 21)
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span className="sm:hidden">Most Borrowed</span>
+                <span className="hidden sm:inline">Most Borrowed Titles (Section 21)</span>
               </button>
               <button
                 onClick={() => setReportsSubTab("trends")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                   reportsSubTab === "trends"
                     ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
@@ -4452,23 +4458,25 @@ export default function LibrarianDashboard() {
               </button>
               <button
                 onClick={() => setReportsSubTab("overdue")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                   reportsSubTab === "overdue"
                     ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
-                <Clock className="h-3.5 w-3.5" /> Overdue Loans & Delays
+                <Clock className="h-3.5 w-3.5" />
+                <span className="sm:hidden">Overdue Loans</span>
+                <span className="hidden sm:inline">Overdue Loans &amp; Delays</span>
               </button>
               <button
                 onClick={() => setReportsSubTab("fees")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                   reportsSubTab === "fees"
                     ? "bg-white/40 text-slate-900 border border-slate-300 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/40 active:bg-white/60"
                 }`}
               >
-                <DollarSign className="h-3.5 w-3.5" /> Fine Revenue & Dues
+                <DollarSign className="h-3.5 w-3.5" /> Fine Revenue &amp; Dues
               </button>
             </div>
 
@@ -4583,7 +4591,7 @@ export default function LibrarianDashboard() {
 
             {/* Sub-tab 2: Most Borrowed Titles */}
             {reportsSubTab === "borrowed" && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-3">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 space-y-3">
                 <div>
                   <h3 className="font-bold text-slate-900">Most Borrowed Titles</h3>
                   <p className="text-xs text-slate-500">Ranks most popular library items across all historical loans</p>
@@ -4591,32 +4599,65 @@ export default function LibrarianDashboard() {
                 {mostBorrowed.length === 0 ? (
                   <p className="text-xs text-slate-400 py-6 text-center">No borrowing data yet.</p>
                 ) : (
-                  <div className="overflow-x-auto min-w-0">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
-                        <tr>
-                          <th className="px-4 py-3">Rank</th>
-                          <th className="px-4 py-3">Book Title</th>
-                          <th className="px-4 py-3">Author</th>
-                          <th className="px-4 py-3">Category</th>
-                          <th className="px-4 py-3 text-right">Times Issued</th>
-                          <th className="px-4 py-3 text-right">Available Copies</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {mostBorrowed.map((b, idx) => (
-                          <tr key={b.book_id || idx} className="hover:bg-slate-50/50">
-                            <td className="px-4 py-3 font-bold text-indigo-600">#{idx + 1}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-900">{b.title}</td>
-                            <td className="px-4 py-3 text-slate-600">{b.author}</td>
-                            <td className="px-4 py-3 text-slate-500">{b.category}</td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-900">{b.times_issued} times</td>
-                            <td className="px-4 py-3 text-right font-mono text-emerald-600">{b.available_copies} / {b.total_copies}</td>
+                  <>
+                    {/* Desktop Full Data Table */}
+                    <div className="hidden md:block overflow-x-auto min-w-0">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
+                          <tr>
+                            <th className="px-4 py-3">Rank</th>
+                            <th className="px-4 py-3">Book Title</th>
+                            <th className="px-4 py-3">Author</th>
+                            <th className="px-4 py-3">Category</th>
+                            <th className="px-4 py-3 text-right">Times Issued</th>
+                            <th className="px-4 py-3 text-right">Available Copies</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {mostBorrowed.map((b, idx) => (
+                            <tr key={b.book_id || idx} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 font-bold text-indigo-600">#{idx + 1}</td>
+                              <td className="px-4 py-3 font-semibold text-slate-900">{b.title}</td>
+                              <td className="px-4 py-3 text-slate-600">{b.author}</td>
+                              <td className="px-4 py-3 text-slate-500">{b.category}</td>
+                              <td className="px-4 py-3 text-right font-bold text-slate-900">{b.times_issued} times</td>
+                              <td className="px-4 py-3 text-right font-mono text-emerald-600">{b.available_copies} / {b.total_copies}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Non-Scrolling Card List View (Zero Horizontal Scroll) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {mostBorrowed.map((b, idx) => (
+                        <div key={b.book_id || idx} className="py-3 px-1 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-black text-indigo-700 border border-indigo-200 shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <span className="font-bold text-slate-900 text-sm break-words">
+                                {b.title}
+                              </span>
+                            </div>
+                            <span className="shrink-0 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                              {b.times_issued} {b.times_issued === 1 ? "time" : "times"}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 gap-1 pl-8">
+                            <div>
+                              <span className="text-slate-700 font-medium">{b.author}</span>
+                              {b.category && <span> • {b.category}</span>}
+                            </div>
+                            <div className="font-mono text-emerald-600 font-semibold">
+                              {b.available_copies} / {b.total_copies} available
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -4673,81 +4714,158 @@ export default function LibrarianDashboard() {
                     <p className="text-sm font-semibold text-slate-700 mt-2">Zero overdue loans!</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
-                        <tr>
-                          <th className="px-4 py-3">Book Title</th>
-                          <th className="px-4 py-3">Borrower</th>
-                          <th className="px-4 py-3">Due Date</th>
-                          <th className="px-4 py-3">Days Overdue</th>
-                          <th className="px-4 py-3">Accrued Due Penalty (₹)</th>
-                          <th className="px-4 py-3 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {overdueAndLate.currently_overdue.map((item: any) => {
-                          const matchingLoan = issuedRecords.find((r) => r.id === item.loan_id);
-                          const borrowerName =
-                            item.borrower_name ||
-                            item.student_name ||
-                            matchingLoan?.student_name ||
-                            matchingLoan?.staff_name ||
-                            (matchingLoan?.student_gr_no ? `GR: ${matchingLoan.student_gr_no}` : "") ||
-                            (item.student_id ? `Student #${item.student_id}` : "Borrower");
+                  <>
+                    {/* Desktop Full Data Table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b">
+                          <tr>
+                            <th className="px-4 py-3">Book Title</th>
+                            <th className="px-4 py-3">Borrower</th>
+                            <th className="px-4 py-3">Due Date</th>
+                            <th className="px-4 py-3">Days Overdue</th>
+                            <th className="px-4 py-3">Accrued Due Penalty (₹)</th>
+                            <th className="px-4 py-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {overdueAndLate.currently_overdue.map((item: any) => {
+                            const matchingLoan = issuedRecords.find((r) => r.id === item.loan_id);
+                            const borrowerName =
+                              item.borrower_name ||
+                              item.student_name ||
+                              matchingLoan?.student_name ||
+                              matchingLoan?.staff_name ||
+                              (matchingLoan?.student_gr_no ? `GR: ${matchingLoan.student_gr_no}` : "") ||
+                              (item.student_id ? `Student #${item.student_id}` : "Borrower");
 
-                          const accruedPenalty = item.due_penalty !== undefined && item.due_penalty !== null
-                            ? Number(item.due_penalty)
-                            : (Number(item.days_overdue || 0) * (Number(librarySettings?.fine_per_day) || 2));
+                            const accruedPenalty = item.due_penalty !== undefined && item.due_penalty !== null
+                              ? Number(item.due_penalty)
+                              : (Number(item.days_overdue || 0) * (Number(librarySettings?.fine_per_day) || 2));
 
-                          return (
-                            <tr key={item.loan_id} className="hover:bg-slate-50/50">
-                              <td className="px-4 py-3 font-semibold text-slate-900">{item.book_title}</td>
-                              <td className="px-4 py-3 text-slate-700 font-medium">
-                                <div>{toTitleCase(borrowerName)}</div>
-                                {(item.borrower_gr || item.borrower_class) && (
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    {item.borrower_gr ? `GR: ${item.borrower_gr}` : ""} {item.borrower_class ? `• ${item.borrower_class}` : ""}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-rose-600 font-mono">{new Date(item.due_date).toLocaleDateString()}</td>
-                              <td className="px-4 py-3 font-bold text-rose-700">+{item.days_overdue} days</td>
-                              <td className="px-4 py-3 font-mono">
-                                <span className="font-bold text-rose-700 text-sm">₹{accruedPenalty.toFixed(2)}</span>
-                                <span className="text-[10px] text-slate-400 block font-sans">
-                                  +{item.days_overdue}d @ ₹{item.per_day_fee || librarySettings?.fine_per_day || 2}/day
+                            return (
+                              <tr key={item.loan_id} className="hover:bg-slate-50/50">
+                                <td className="px-4 py-3 font-semibold text-slate-900">{item.book_title}</td>
+                                <td className="px-4 py-3 text-slate-700 font-medium">
+                                  <div>{toTitleCase(borrowerName)}</div>
+                                  {(item.borrower_gr || item.borrower_class) && (
+                                    <div className="text-[10px] text-slate-400 font-mono">
+                                      {item.borrower_gr ? `GR: ${item.borrower_gr}` : ""} {item.borrower_class ? `• ${item.borrower_class}` : ""}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-rose-600 font-mono">{new Date(item.due_date).toLocaleDateString()}</td>
+                                <td className="px-4 py-3 font-bold text-rose-700">+{item.days_overdue} days</td>
+                                <td className="px-4 py-3 font-mono">
+                                  <span className="font-bold text-rose-700 text-sm">₹{accruedPenalty.toFixed(2)}</span>
+                                  <span className="text-[10px] text-slate-400 block font-sans">
+                                    +{item.days_overdue}d @ ₹{item.per_day_fee || librarySettings?.fine_per_day || 2}/day
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      const loan = matchingLoan || issuedRecords.find((r) => r.id === item.loan_id);
+                                      if (loan) {
+                                        setReturnError("");
+                                        setShowReturnModal(loan);
+                                        setReturnForm({
+                                          condition: "GOOD",
+                                          remarks: "",
+                                          damage_fee: Number(librarySettings?.damage_penalty || 50),
+                                          lost_fee: Number(librarySettings?.lost_penalty || 100),
+                                          pay_now: true,
+                                          payment_method: "Cash",
+                                        });
+                                      }
+                                    }}
+                                    className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                                  >
+                                    Process Return
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Non-Scrolling Card List View (Zero Horizontal Scroll) */}
+                    <div className="divide-y divide-slate-100 block md:hidden">
+                      {overdueAndLate.currently_overdue.map((item: any) => {
+                        const matchingLoan = issuedRecords.find((r) => r.id === item.loan_id);
+                        const borrowerName =
+                          item.borrower_name ||
+                          item.student_name ||
+                          matchingLoan?.student_name ||
+                          matchingLoan?.staff_name ||
+                          (matchingLoan?.student_gr_no ? `GR: ${matchingLoan.student_gr_no}` : "") ||
+                          (item.student_id ? `Student #${item.student_id}` : "Borrower");
+
+                        const accruedPenalty = item.due_penalty !== undefined && item.due_penalty !== null
+                          ? Number(item.due_penalty)
+                          : (Number(item.days_overdue || 0) * (Number(librarySettings?.fine_per_day) || 2));
+
+                        return (
+                          <div key={item.loan_id} className="py-3.5 px-1 space-y-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-slate-900 text-sm block">
+                                  {item.book_title}
                                 </span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    const loan = matchingLoan || issuedRecords.find((r) => r.id === item.loan_id);
-                                    if (loan) {
-                                      setReturnError("");
-                                      setShowReturnModal(loan);
-                                      setReturnForm({
-                                        condition: "GOOD",
-                                        remarks: "",
-                                        damage_fee: Number(librarySettings?.damage_penalty || 50),
-                                        lost_fee: Number(librarySettings?.lost_penalty || 100),
-                                        pay_now: true,
-                                        payment_method: "Cash",
-                                      });
-                                    }
-                                  }}
-                                  className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
-                                >
-                                  Process Return
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                <div className="text-xs text-slate-600 font-medium mt-0.5">
+                                  {toTitleCase(borrowerName)}
+                                  {(item.borrower_gr || item.borrower_class) && (
+                                    <span className="text-[10px] text-slate-400 font-mono ml-1.5">
+                                      {item.borrower_gr ? `GR: ${item.borrower_gr}` : ""} {item.borrower_class ? `• ${item.borrower_class}` : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                +{item.days_overdue}d overdue
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
+                              <div>
+                                <span className="text-slate-400 text-[10px] uppercase font-semibold block">Due Date</span>
+                                <span className="font-mono text-rose-600 font-semibold">{new Date(item.due_date).toLocaleDateString()}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-slate-400 text-[10px] uppercase font-semibold block">Accrued Due</span>
+                                <span className="font-bold text-rose-700 text-sm font-mono">₹{accruedPenalty.toFixed(2)}</span>
+                              </div>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const loan = matchingLoan || issuedRecords.find((r) => r.id === item.loan_id);
+                                if (loan) {
+                                  setReturnError("");
+                                  setShowReturnModal(loan);
+                                  setReturnForm({
+                                    condition: "GOOD",
+                                    remarks: "",
+                                    damage_fee: Number(librarySettings?.damage_penalty || 50),
+                                    lost_fee: Number(librarySettings?.lost_penalty || 100),
+                                    pay_now: true,
+                                    payment_method: "Cash",
+                                  });
+                                }
+                              }}
+                              className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center justify-center gap-1.5"
+                            >
+                              Process Return
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -4793,12 +4911,12 @@ export default function LibrarianDashboard() {
                 {/* Main Unified Table Container with Organized Sub-Tab Switcher */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   {/* Sub-navigation buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4">
-                    <div className="flex items-center gap-2">
+                  <div className="border-b border-slate-200 bg-slate-50/80 p-3 sm:p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
                       <button
                         type="button"
                         onClick={() => setFeeReportSubView("dues")}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-2xs text-center ${
                           feeReportSubView === "dues"
                             ? "bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20"
                             : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
@@ -4809,7 +4927,7 @@ export default function LibrarianDashboard() {
                       <button
                         type="button"
                         onClick={() => setFeeReportSubView("damage")}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-2xs text-center ${
                           feeReportSubView === "damage"
                             ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20"
                             : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
@@ -4820,7 +4938,7 @@ export default function LibrarianDashboard() {
                       <button
                         type="button"
                         onClick={() => setFeeReportSubView("collected")}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-2xs text-center ${
                           feeReportSubView === "collected"
                             ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
                             : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
@@ -4841,62 +4959,126 @@ export default function LibrarianDashboard() {
                           <p className="text-xs text-slate-400 mt-0.5">All assessed library fines and damages have been settled.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
-                              <tr>
-                                <th className="px-4 py-3">#</th>
-                                <th className="px-4 py-3">Borrower Name</th>
-                                <th className="px-4 py-3">Role / Class</th>
-                                <th className="px-4 py-3">Book Title</th>
-                                <th className="px-4 py-3">Return Date</th>
-                                <th className="px-4 py-3">Late Penalty</th>
-                                <th className="px-4 py-3">Damage Cost</th>
-                                <th className="px-4 py-3">Lost Cost</th>
-                                <th className="px-4 py-3">Total Due</th>
-                                <th className="px-4 py-3 text-right">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {feeCollection.pending_dues.map((due: any, idx: number) => {
-                                const matchingLoan = issuedRecords.find((r) => r.id === due.id);
-                                return (
-                                  <tr key={due.id} className="hover:bg-slate-50/50">
-                                    <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
-                                    <td className="px-4 py-3 font-bold text-slate-900">{toTitleCase(due.borrower_name)}</td>
-                                    <td className="px-4 py-3 text-slate-600 font-mono">
-                                      {due.borrower_gr ? `GR: ${due.borrower_gr}` : ""} {due.borrower_class ? `(${due.borrower_class})` : ""}
-                                    </td>
-                                    <td className="px-4 py-3 font-semibold text-slate-800">{due.book_title}</td>
-                                    <td className="px-4 py-3 text-slate-500">
-                                      {due.return_date ? new Date(due.return_date).toLocaleDateString() : "—"}
-                                    </td>
-                                    <td className="px-4 py-3 font-mono text-slate-700">₹{Number(due.late_fees || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-3 font-mono text-amber-700">₹{Number(due.damage_fees || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-3 font-mono text-rose-700">₹{Number(due.lost_fees || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-3 font-mono font-bold text-rose-600">
-                                      <span className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200">
-                                        ₹{Number(due.fine_remaining || due.total_fine || 0).toFixed(2)}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => {
-                                          const rec = matchingLoan || due;
-                                          handleOpenPayFine(rec);
-                                        }}
-                                        className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
-                                      >
-                                        <CreditCard className="h-3 w-3" /> Collect Fine
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                        <>
+                          {/* Desktop Full Data Table */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                                <tr>
+                                  <th className="px-4 py-3">#</th>
+                                  <th className="px-4 py-3">Borrower Name</th>
+                                  <th className="px-4 py-3">Role / Class</th>
+                                  <th className="px-4 py-3">Book Title</th>
+                                  <th className="px-4 py-3">Return Date</th>
+                                  <th className="px-4 py-3">Late Penalty</th>
+                                  <th className="px-4 py-3">Damage Cost</th>
+                                  <th className="px-4 py-3">Lost Cost</th>
+                                  <th className="px-4 py-3">Total Due</th>
+                                  <th className="px-4 py-3 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {feeCollection.pending_dues.map((due: any, idx: number) => {
+                                  const matchingLoan = issuedRecords.find((r) => r.id === due.id);
+                                  return (
+                                    <tr key={due.id} className="hover:bg-slate-50/50">
+                                      <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
+                                      <td className="px-4 py-3 font-bold text-slate-900">{toTitleCase(due.borrower_name)}</td>
+                                      <td className="px-4 py-3 text-slate-600 font-mono">
+                                        {due.borrower_gr ? `GR: ${due.borrower_gr}` : ""} {due.borrower_class ? `(${due.borrower_class})` : ""}
+                                      </td>
+                                      <td className="px-4 py-3 font-semibold text-slate-800">{due.book_title}</td>
+                                      <td className="px-4 py-3 text-slate-500">
+                                        {due.return_date ? new Date(due.return_date).toLocaleDateString() : "—"}
+                                      </td>
+                                      <td className="px-4 py-3 font-mono text-slate-700">₹{Number(due.late_fees || 0).toFixed(2)}</td>
+                                      <td className="px-4 py-3 font-mono text-amber-700">₹{Number(due.damage_fees || 0).toFixed(2)}</td>
+                                      <td className="px-4 py-3 font-mono text-rose-700">₹{Number(due.lost_fees || 0).toFixed(2)}</td>
+                                      <td className="px-4 py-3 font-mono font-bold text-rose-600">
+                                        <span className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200">
+                                          ₹{Number(due.fine_remaining || due.total_fine || 0).toFixed(2)}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            const rec = matchingLoan || due;
+                                            handleOpenPayFine(rec);
+                                          }}
+                                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
+                                        >
+                                          <CreditCard className="h-3 w-3" /> Collect Fine
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Non-Scrolling Card List View (Zero Horizontal Scroll) */}
+                          <div className="divide-y divide-slate-100 block md:hidden p-3 space-y-3">
+                            {feeCollection.pending_dues.map((due: any, idx: number) => {
+                              const matchingLoan = issuedRecords.find((r) => r.id === due.id);
+                              return (
+                                <div key={due.id} className="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-2 shadow-2xs">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-400 font-mono text-xs">#{idx + 1}</span>
+                                        <span className="font-bold text-slate-900 text-sm truncate">{toTitleCase(due.borrower_name)}</span>
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 font-mono">
+                                        {due.borrower_gr ? `GR: ${due.borrower_gr}` : ""} {due.borrower_class ? `(${due.borrower_class})` : ""}
+                                      </div>
+                                    </div>
+                                    <span className="shrink-0 px-2 py-0.5 rounded-md text-xs font-bold font-mono bg-rose-50 text-rose-700 border border-rose-200">
+                                      ₹{Number(due.fine_remaining || due.total_fine || 0).toFixed(2)}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-xs text-slate-700 font-medium">
+                                    <span className="text-slate-400 text-[10px] block">Book Title:</span>
+                                    {due.book_title}
+                                  </div>
+
+                                  <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-50/80 rounded-lg p-2 border border-slate-100 text-[11px]">
+                                    <div>
+                                      <span className="text-slate-400 text-[10px] block">Late</span>
+                                      <span className="font-mono text-slate-700">₹{Number(due.late_fees || 0).toFixed(0)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-400 text-[10px] block">Damage</span>
+                                      <span className="font-mono text-amber-700">₹{Number(due.damage_fees || 0).toFixed(0)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-400 text-[10px] block">Lost</span>
+                                      <span className="font-mono text-rose-700">₹{Number(due.lost_fees || 0).toFixed(0)}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-1">
+                                    <span className="text-slate-400 text-[11px]">
+                                      Return: {due.return_date ? new Date(due.return_date).toLocaleDateString() : "—"}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        const rec = matchingLoan || due;
+                                        handleOpenPayFine(rec);
+                                      }}
+                                      className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1 rounded-lg"
+                                    >
+                                      <CreditCard className="h-3 w-3" /> Collect Fine
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -4911,54 +5093,139 @@ export default function LibrarianDashboard() {
                           <p className="text-xs text-slate-400 mt-0.5">All returned inventory books are in good condition.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
-                              <tr>
-                                <th className="px-4 py-3">#</th>
-                                <th className="px-4 py-3">Book Title</th>
-                                <th className="px-4 py-3">Accession No</th>
-                                <th className="px-4 py-3">Borrower</th>
-                                <th className="px-4 py-3">Condition on Return</th>
-                                <th className="px-4 py-3">Damage Cost (₹)</th>
-                                <th className="px-4 py-3">Lost Cost (₹)</th>
-                                <th className="px-4 py-3">Total Penalty (₹)</th>
-                                <th className="px-4 py-3">Payment Status</th>
-                                <th className="px-4 py-3 text-right">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {feeCollection.damage_records.map((rec: any, idx: number) => {
-                                const matchingLoan = issuedRecords.find((r) => r.id === rec.id);
-                                return (
-                                  <tr key={rec.id} className="hover:bg-slate-50/50">
-                                    <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
-                                    <td className="px-4 py-3 font-semibold text-slate-900">{rec.book_title}</td>
-                                    <td className="px-4 py-3 font-mono text-slate-600">{rec.accession_no || "—"}</td>
-                                    <td className="px-4 py-3 text-slate-700 font-medium">
-                                      {toTitleCase(rec.borrower_name)} {rec.borrower_gr ? `(GR: ${rec.borrower_gr})` : ""}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                          rec.condition === "LOST"
-                                            ? "bg-rose-50 text-rose-700 border-rose-200"
-                                            : "bg-amber-50 text-amber-700 border-amber-200"
-                                        }`}
-                                      >
-                                        {rec.condition}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 font-mono font-bold text-amber-700">
-                                      {Number(rec.damage_fees || 0) > 0 ? `₹${Number(rec.damage_fees).toFixed(2)}` : "—"}
-                                    </td>
-                                    <td className="px-4 py-3 font-mono font-bold text-rose-700">
-                                      {Number(rec.lost_fees || 0) > 0 ? `₹${Number(rec.lost_fees).toFixed(2)}` : "—"}
-                                    </td>
-                                    <td className="px-4 py-3 font-mono font-black text-slate-900">
-                                      ₹{Number(rec.total_fine || 0).toFixed(2)}
-                                    </td>
-                                    <td className="px-4 py-3">
+                        <>
+                          {/* Desktop Full Data Table */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                                <tr>
+                                  <th className="px-4 py-3">#</th>
+                                  <th className="px-4 py-3">Book Title</th>
+                                  <th className="px-4 py-3">Accession No</th>
+                                  <th className="px-4 py-3">Borrower</th>
+                                  <th className="px-4 py-3">Condition on Return</th>
+                                  <th className="px-4 py-3">Damage Cost (₹)</th>
+                                  <th className="px-4 py-3">Lost Cost (₹)</th>
+                                  <th className="px-4 py-3">Total Penalty (₹)</th>
+                                  <th className="px-4 py-3">Payment Status</th>
+                                  <th className="px-4 py-3 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {feeCollection.damage_records.map((rec: any, idx: number) => {
+                                  const matchingLoan = issuedRecords.find((r) => r.id === rec.id);
+                                  return (
+                                    <tr key={rec.id} className="hover:bg-slate-50/50">
+                                      <td className="px-4 py-3 text-slate-400 font-mono">{idx + 1}</td>
+                                      <td className="px-4 py-3 font-semibold text-slate-900">{rec.book_title}</td>
+                                      <td className="px-4 py-3 font-mono text-slate-600">{rec.accession_no || "—"}</td>
+                                      <td className="px-4 py-3 text-slate-700 font-medium">
+                                        {toTitleCase(rec.borrower_name)} {rec.borrower_gr ? `(GR: ${rec.borrower_gr})` : ""}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                            rec.condition === "LOST"
+                                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                                              : "bg-amber-50 text-amber-700 border-amber-200"
+                                          }`}
+                                        >
+                                          {rec.condition}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 font-mono font-bold text-amber-700">
+                                        {Number(rec.damage_fees || 0) > 0 ? `₹${Number(rec.damage_fees).toFixed(2)}` : "—"}
+                                      </td>
+                                      <td className="px-4 py-3 font-mono font-bold text-rose-700">
+                                        {Number(rec.lost_fees || 0) > 0 ? `₹${Number(rec.lost_fees).toFixed(2)}` : "—"}
+                                      </td>
+                                      <td className="px-4 py-3 font-mono font-black text-slate-900">
+                                        ₹{Number(rec.total_fine || 0).toFixed(2)}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {rec.is_fine_paid ? (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            Paid ({rec.payment_method || "Settled"})
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                            Due (Pending)
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        {!rec.is_fine_paid ? (
+                                          <Button
+                                            size="sm"
+                                            onClick={() => {
+                                              const l = matchingLoan || rec;
+                                              handleOpenPayFine(l);
+                                            }}
+                                            className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
+                                          >
+                                            <CreditCard className="h-3 w-3" /> Collect
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              const l = matchingLoan || rec;
+                                              setReceiptModal({
+                                                detail: "Library Book Damage / Fine Receipt",
+                                                receipt_no: l.payment_receipt_no || `LIB-RCP-${l.id}`,
+                                                amount_paid: String(l.fine_paid_amount || l.total_fine),
+                                                remaining_due: "0.00",
+                                                is_fine_paid: true,
+                                                record: l,
+                                              });
+                                            }}
+                                            className="h-7 text-xs border-slate-200 text-slate-700 font-semibold"
+                                          >
+                                            Receipt
+                                          </Button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Non-Scrolling Card List View (Zero Horizontal Scroll) */}
+                          <div className="divide-y divide-slate-100 block md:hidden p-3 space-y-3">
+                            {feeCollection.damage_records.map((rec: any, idx: number) => {
+                              const matchingLoan = issuedRecords.find((r) => r.id === rec.id);
+                              return (
+                                <div key={rec.id} className="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-2 shadow-2xs">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <span className="font-bold text-slate-900 text-sm block truncate">{rec.book_title}</span>
+                                      <span className="text-[11px] text-slate-500 font-mono">Acc: {rec.accession_no || "—"}</span>
+                                    </div>
+                                    <span
+                                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                        rec.condition === "LOST"
+                                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                                          : "bg-amber-50 text-amber-700 border-amber-200"
+                                      }`}
+                                    >
+                                      {rec.condition}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs text-slate-600">
+                                    <div>
+                                      Borrower: <span className="font-medium text-slate-800">{toTitleCase(rec.borrower_name)}</span>
+                                    </div>
+                                    <div className="font-mono font-bold text-slate-900">
+                                      Total: ₹{Number(rec.total_fine || 0).toFixed(2)}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                                    <div>
                                       {rec.is_fine_paid ? (
                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                           Paid ({rec.payment_method || "Settled"})
@@ -4968,46 +5235,44 @@ export default function LibrarianDashboard() {
                                           Due (Pending)
                                         </span>
                                       )}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      {!rec.is_fine_paid ? (
-                                        <Button
-                                          size="sm"
-                                          onClick={() => {
-                                            const l = matchingLoan || rec;
-                                            handleOpenPayFine(l);
-                                          }}
-                                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1"
-                                        >
-                                          <CreditCard className="h-3 w-3" /> Collect
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => {
-                                            const l = matchingLoan || rec;
-                                            setReceiptModal({
-                                              detail: "Library Book Damage / Fine Receipt",
-                                              receipt_no: l.payment_receipt_no || `LIB-RCP-${l.id}`,
-                                              amount_paid: String(l.fine_paid_amount || l.total_fine),
-                                              remaining_due: "0.00",
-                                              is_fine_paid: true,
-                                              record: l,
-                                            });
-                                          }}
-                                          className="h-7 text-xs border-slate-200 text-slate-700 font-semibold"
-                                        >
-                                          Receipt
-                                        </Button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                    </div>
+                                    {!rec.is_fine_paid ? (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          const l = matchingLoan || rec;
+                                          handleOpenPayFine(l);
+                                        }}
+                                        className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1 rounded-lg"
+                                      >
+                                        <CreditCard className="h-3 w-3" /> Collect
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const l = matchingLoan || rec;
+                                          setReceiptModal({
+                                            detail: "Library Book Damage / Fine Receipt",
+                                            receipt_no: l.payment_receipt_no || `LIB-RCP-${l.id}`,
+                                            amount_paid: String(l.fine_paid_amount || l.total_fine),
+                                            remaining_due: "0.00",
+                                            is_fine_paid: true,
+                                            record: l,
+                                          });
+                                        }}
+                                        className="h-7 text-xs border-slate-200 text-slate-700 font-semibold rounded-lg"
+                                      >
+                                        Receipt
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -5018,30 +5283,51 @@ export default function LibrarianDashboard() {
                       {(!feeCollection?.monthly_breakdown || feeCollection.monthly_breakdown.length === 0) ? (
                         <p className="text-xs text-slate-400 py-10 text-center">No fee breakdown records recorded yet.</p>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
-                              <tr>
-                                <th className="px-4 py-3">Month</th>
-                                <th className="px-4 py-3">Fined Returns Count</th>
-                                <th className="px-4 py-3">Damage Fees Collected (₹)</th>
-                                <th className="px-4 py-3">Late Penalties Collected (₹)</th>
-                                <th className="px-4 py-3 text-right font-bold">Total Revenue (₹)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 font-medium">
-                              {feeCollection.monthly_breakdown.map((row: any, i: number) => (
-                                <tr key={i} className="hover:bg-slate-50/50">
-                                  <td className="px-4 py-3 font-semibold text-slate-900">{row.month}</td>
-                                  <td className="px-4 py-3 text-slate-600">{row.fined_returns || row.late_returns} returns</td>
-                                  <td className="px-4 py-3 text-amber-700 font-mono">₹{Number(row.damage_fees || 0).toFixed(2)}</td>
-                                  <td className="px-4 py-3 text-indigo-700 font-mono">₹{Number(row.late_fees || 0).toFixed(2)}</td>
-                                  <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 text-sm">₹{row.total_fees}</td>
+                        <>
+                          {/* Desktop Full Data Table */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b text-[11px]">
+                                <tr>
+                                  <th className="px-4 py-3">Month</th>
+                                  <th className="px-4 py-3">Fined Returns Count</th>
+                                  <th className="px-4 py-3">Damage Fees Collected (₹)</th>
+                                  <th className="px-4 py-3">Late Penalties Collected (₹)</th>
+                                  <th className="px-4 py-3 text-right font-bold">Total Revenue (₹)</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium">
+                                {feeCollection.monthly_breakdown.map((row: any, i: number) => (
+                                  <tr key={i} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3 font-semibold text-slate-900">{row.month}</td>
+                                    <td className="px-4 py-3 text-slate-600">{row.fined_returns || row.late_returns} returns</td>
+                                    <td className="px-4 py-3 text-amber-700 font-mono">₹{Number(row.damage_fees || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-3 text-indigo-700 font-mono">₹{Number(row.late_fees || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 text-sm">₹{row.total_fees}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Non-Scrolling Card List View (Zero Horizontal Scroll) */}
+                          <div className="divide-y divide-slate-100 block md:hidden p-3 space-y-2.5">
+                            {feeCollection.monthly_breakdown.map((row: any, i: number) => (
+                              <div key={i} className="p-3 bg-white border border-slate-200/80 rounded-xl space-y-1.5 shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-900 text-sm">{row.month}</span>
+                                  <span className="font-mono font-bold text-emerald-700 text-sm">₹{row.total_fees}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs text-slate-500">
+                                  <span>{row.fined_returns || row.late_returns} returns settled</span>
+                                  <div className="font-mono text-[11px] text-slate-600">
+                                    Late: ₹{Number(row.late_fees || 0).toFixed(0)} • Damage: ₹{Number(row.damage_fees || 0).toFixed(0)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -5106,15 +5392,15 @@ export default function LibrarianDashboard() {
             {/* UNIFIED SUPERADMIN TABLE CARD */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               {/* Header Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs shrink-0">
                       {masterSubTab === "categories" && <Layers className="h-4 w-4" />}
                       {masterSubTab === "authors" && <Users className="h-4 w-4" />}
                       {masterSubTab === "racks" && <MapPin className="h-4 w-4" />}
                     </span>
-                    <h3 className="text-base font-bold text-slate-900 truncate">
+                    <h3 className="text-base font-bold text-slate-900">
                       {masterSubTab === "categories" && "Book Categories Master"}
                       {masterSubTab === "authors" && "Book Authors Master"}
                       {masterSubTab === "racks" && "Racks & Shelves Master"}
@@ -5125,14 +5411,14 @@ export default function LibrarianDashboard() {
                       {masterSubTab === "racks" && `${filteredRacks.length} Racks`}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     {masterSubTab === "categories" && "Define book genres and classification codes"}
                     {masterSubTab === "authors" && "Manage author profiles, biographies and publication credits"}
                     {masterSubTab === "racks" && "Configure physical racks, aisles and shelf locations for books"}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                   <Button
                     size="sm"
                     onClick={() => {
@@ -5140,7 +5426,7 @@ export default function LibrarianDashboard() {
                       else if (masterSubTab === "authors") openAddMasterModal("author");
                       else if (masterSubTab === "racks") openAddMasterModal("rack");
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add New {masterSubTab === "racks" ? "Rack" : masterSubTab === "categories" ? "Category" : "Author"}
                   </Button>
@@ -5149,7 +5435,7 @@ export default function LibrarianDashboard() {
                     variant="outline"
                     onClick={loadAllData}
                     disabled={loading}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                    className="shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
                     title="Reload data"
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -5938,18 +6224,18 @@ export default function LibrarianDashboard() {
         {activeTab === "history" && (
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             {/* Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shadow-2xs shrink-0">
                     <Clock className="h-4 w-4" />
                   </span>
                   <h3 className="text-base font-bold text-slate-900">Completed Circulation History</h3>
-                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60">
+                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/60 shrink-0">
                     {filteredHistoryLoans.length} {filteredHistoryLoans.length === 1 ? "Record" : "Records"}
                   </span>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500">
                   Historical archive of returned, damaged, or lost books with settled fines and receipts
                 </p>
               </div>
@@ -5959,7 +6245,7 @@ export default function LibrarianDashboard() {
                 variant="outline"
                 onClick={loadAllData}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                className="shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
                 title="Reload history"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -5984,7 +6270,7 @@ export default function LibrarianDashboard() {
               </div>
 
               {/* Dropdown Filters */}
-              <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full sm:w-auto">
+              <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:items-center">
                 {/* Status Filter */}
                 <select
                   value={historyStatusFilter}

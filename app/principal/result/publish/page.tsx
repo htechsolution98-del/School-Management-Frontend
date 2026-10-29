@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Award,
   Sparkles,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Globe,
   Printer,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,13 +43,14 @@ import {
   type ResultWeightageConfig,
 } from "@/lib/exam-api";
 
-export default function ResultProcessingPublishPage() {
+function PublishPageInner() {
+  const searchParams = useSearchParams();
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
 
   const [selectedYearId, setSelectedYearId] = useState<string>("");
-  const [selectedClassId, setSelectedClassId] = useState<string>("ALL");
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [selectedDivFilter, setSelectedDivFilter] = useState<string>("ALL");
 
   const [exams, setExams] = useState<any[]>([]);
@@ -116,12 +119,20 @@ export default function ResultProcessingPublishPage() {
       setClasses(classesData || []);
       setDivisions(divisionsData || []);
 
+      const paramYear = searchParams.get("academic_year") || searchParams.get("year_id");
+      const paramClass = searchParams.get("class_id") || searchParams.get("school_class");
+      const paramDivision = searchParams.get("division");
+
       let resolvedYearId = "";
-      if (yearsData && yearsData.length > 0) {
+      if (paramYear && yearsData.some((y: any) => String(y.id) === paramYear)) {
+        resolvedYearId = paramYear;
+      } else if (yearsData && yearsData.length > 0) {
         const activeYr = yearsData.find((y: any) => y.is_active) || yearsData[0];
         resolvedYearId = String(activeYr.id);
-        setSelectedYearId(resolvedYearId);
+      }
+      setSelectedYearId(resolvedYearId);
 
+      if (resolvedYearId) {
         const examsList = await getExamsFull({ academic_year: Number(resolvedYearId) });
         setExams(examsList || []);
 
@@ -131,10 +142,18 @@ export default function ResultProcessingPublishPage() {
           ).filter(Boolean)
         );
 
-        if (classesData && classesData.length > 0 && !selectedClassId) {
+        let resolvedClassId = "";
+        if (paramClass && classesData.some((c: any) => String(c.id) === paramClass)) {
+          resolvedClassId = paramClass;
+        } else if (classesData && classesData.length > 0) {
           const firstValidClass = classesData.find((c: any) => classIdsWithExams.has(String(c.id))) || classesData[0];
-          setSelectedClassId(String(firstValidClass.id));
+          resolvedClassId = String(firstValidClass.id);
         }
+        setSelectedClassId(resolvedClassId);
+      }
+
+      if (paramDivision && paramDivision !== "ALL") {
+        setSelectedDivFilter(paramDivision);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to load initial data.");
@@ -149,47 +168,40 @@ export default function ResultProcessingPublishPage() {
 
   const [resultsData, setResultsData] = useState<FinalStudentResult[]>([]);
 
-  useEffect(() => {
-    const fetchResultsData = async () => {
-      if (!selectedYearId || !selectedClassId) return;
-      setIsLoading(true);
-      try {
-        const configs = await getWeightageConfigs(Number(selectedYearId));
-        if (configs && configs.length > 0) {
-          setWeightageConfig(configs[0]);
-        } else {
-          setWeightageConfig(null);
-        }
-
-        // Fetch final results for the table
-        const fetched = await getFinalResults(
-          Number(selectedYearId), 
-          Number(selectedClassId), 
-          selectedDivFilter
-        );
-        setResultsData(fetched);
-      } catch (err) {
-        console.error("Failed to load setup for result processing", err);
-      } finally {
-        setIsLoading(false);
+  const fetchResultsData = useCallback(async () => {
+    if (!selectedYearId || !selectedClassId || selectedClassId === "ALL") return;
+    setIsLoading(true);
+    try {
+      const configs = await getWeightageConfigs(Number(selectedYearId));
+      if (configs && configs.length > 0) {
+        setWeightageConfig(configs[0]);
+      } else {
+        setWeightageConfig(null);
       }
-    };
-    if (selectedYearId && selectedClassId) {
-      fetchResultsData();
+
+      // Fetch final results for the table
+      const fetched = await getFinalResults(
+        Number(selectedYearId), 
+        Number(selectedClassId), 
+        selectedDivFilter
+      );
+      setResultsData(fetched);
+    } catch (err) {
+      console.error("Failed to load setup for result processing", err);
+    } finally {
+      setIsLoading(false);
     }
   }, [selectedYearId, selectedClassId, selectedDivFilter]);
 
+  useEffect(() => {
+    if (selectedYearId && selectedClassId && selectedClassId !== "ALL") {
+      fetchResultsData();
+    }
+  }, [selectedYearId, selectedClassId, selectedDivFilter, fetchResultsData]);
+
   // Run Dynamic Result Engine
   const handleCalculateResults = async () => {
-    if (!selectedYearId || !selectedClassId) return;
-
-    // Check if the current weightage config is 100% valid
-    const totalWeight = weightageConfig?.total_weightage ?? 0;
-    if (!weightageConfig || totalWeight !== 100) {
-      const remaining = 100 - totalWeight;
-      toast.error(`Cannot process results. Current weightage is ${totalWeight}%. You must adjust it by ${remaining}% to reach exactly 100%.`);
-      return;
-    }
+    if (!selectedYearId || !selectedClassId || selectedClassId === "ALL") return;
 
     setIsProcessing(true);
     try {
@@ -201,13 +213,7 @@ export default function ResultProcessingPublishPage() {
 
       if (res.success) {
         toast.success(`✨ Dynamic Result Engine processed ${res.processed_count} student results!`);
-        // Fetch calculated results by making custom fetch or API call
-        const fetched = await getFinalResults(
-          Number(selectedYearId), 
-          Number(selectedClassId), 
-          selectedDivFilter
-        );
-        setResultsData(fetched);
+        await fetchResultsData();
       } else {
         toast.error(res.reason || "Result engine failed.");
       }
@@ -220,7 +226,7 @@ export default function ResultProcessingPublishPage() {
 
   // Publish Results
   const handlePublish = async (action: "PUBLISH" | "UNPUBLISH") => {
-    if (!selectedYearId || !selectedClassId) return;
+    if (!selectedYearId || !selectedClassId || selectedClassId === "ALL") return;
 
     setIsPublishing(true);
     try {
@@ -232,6 +238,7 @@ export default function ResultProcessingPublishPage() {
       );
 
       toast.success(`🎉 ${res.message || "Result publication status updated!"}`);
+      await fetchResultsData();
     } catch (err: any) {
       toast.error(err?.message || "Failed to publish results.");
     } finally {
@@ -239,6 +246,17 @@ export default function ResultProcessingPublishPage() {
     }
   };
 
+  const filteredResults = useMemo(() => {
+    if (!searchQuery.trim()) return resultsData;
+    const q = searchQuery.toLowerCase();
+    return resultsData.filter((r) =>
+      (r.student_name || "").toLowerCase().includes(q) ||
+      (r.roll_no || "").toLowerCase().includes(q) ||
+      (r.gr_no || "").toLowerCase().includes(q)
+    );
+  }, [resultsData, searchQuery]);
+
+  const hasPublished = resultsData.some((r) => r.status === "PUBLISHED" || r.is_published);
   const currentClassObj = classes.find((c) => String(c.id) === selectedClassId);
 
   return (
@@ -266,23 +284,35 @@ export default function ResultProcessingPublishPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button
             onClick={handleCalculateResults}
-            disabled={isProcessing || !selectedClassId}
+            disabled={isProcessing || !selectedClassId || selectedClassId === "ALL"}
             className="rounded-xl text-xs gap-1.5 font-bold bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20 h-10 px-4"
           >
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Calculate Results
+            Re-Calculate Results
           </Button>
+
+          {hasPublished && (
+            <Button
+              variant="outline"
+              onClick={() => handlePublish("UNPUBLISH")}
+              disabled={isPublishing || !selectedClassId || selectedClassId === "ALL"}
+              className="rounded-xl text-xs gap-1.5 font-bold border-rose-200 text-rose-600 hover:bg-rose-50 h-10 px-4"
+            >
+              {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Unpublish Results
+            </Button>
+          )}
 
           <Button
             onClick={() => handlePublish("PUBLISH")}
-            disabled={isPublishing || !selectedClassId}
-            className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4"
+            disabled={isPublishing || !selectedClassId || selectedClassId === "ALL" || resultsData.length === 0}
+            className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-5"
           >
             {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
-            Publish Results
+            {hasPublished ? "Update Published Results" : "Publish Results"}
           </Button>
         </div>
       </div>
@@ -401,13 +431,30 @@ export default function ResultProcessingPublishPage() {
       <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
         <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-amber-600" />
-              Final Result Preview — {currentClassObj?.school_class || "Class"}
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-600" />
+                Final Result Preview — {currentClassObj?.school_class || "Class"}
+              </CardTitle>
+              <Badge variant="outline" className="text-xs font-semibold">
+                {resultsData.length} Students
+              </Badge>
+            </div>
             <CardDescription className="text-xs mt-0.5">
               Review computed percentages and grades before publishing to students and parents.
             </CardDescription>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search students..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800"
+              />
+            </div>
           </div>
         </CardHeader>
 
@@ -441,7 +488,7 @@ export default function ResultProcessingPublishPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resultsData.map((res, idx) => (
+                  {filteredResults.map((res, idx) => (
                     <TableRow key={res.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/50">
                       <TableCell className="text-center font-mono text-xs text-slate-500">{idx + 1}</TableCell>
                       <TableCell className="text-center font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{res.roll_no || "—"}</TableCell>
@@ -538,5 +585,20 @@ export default function ResultProcessingPublishPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ResultProcessingPublishPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[#5c28e8]" />
+          <p className="text-xs text-muted-foreground font-semibold">Loading result publishing workspace...</p>
+        </div>
+      }
+    >
+      <PublishPageInner />
+    </Suspense>
   );
 }

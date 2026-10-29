@@ -1,5 +1,7 @@
 "use client";
 
+import { StudentEmptyState } from "@/components/student/student-empty-state";
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -201,14 +203,14 @@ export default function StudentLibraryPage() {
       </AnimatePresence>
 
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-5 sm:p-8 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#2563eb] via-[#1d4ed8] to-[#361399] p-5 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-blue-200 text-xs font-semibold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" /> School Library Catalogue & Self-Service
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">Student Library & Loans</h1>
-            <p className="text-purple-100 max-w-xl text-sm md:text-base">
+            <p className="text-blue-100 max-w-xl text-sm md:text-base">
               Explore textbooks, check shelf locations, track your borrowed loans, and reserve out-of-stock books.
             </p>
           </div>
@@ -398,11 +400,10 @@ export default function StudentLibraryPage() {
               <p className="text-sm text-gray-500 mt-2">Loading library collection...</p>
             </div>
           ) : filteredBooks.length === 0 ? (
-            <div className="text-center p-12 bg-white rounded-2xl border border-gray-200">
-              <BookOpen className="h-12 w-12 text-gray-300 mx-auto" />
-              <h3 className="text-base font-semibold text-gray-800 mt-2">No matching books found</h3>
-              <p className="text-xs text-gray-400">Try searching for a different subject or title.</p>
-            </div>
+            <StudentEmptyState
+              title="No matching books found"
+              description="Try searching for a different subject, author, or book title in the catalogue."
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredBooks.map((book) => {
@@ -486,11 +487,10 @@ export default function StudentLibraryPage() {
             <p className="text-xs text-gray-500 mb-4">Books currently in your possession. Return before the due date to avoid fines.</p>
 
             {currentlyIssued.length === 0 ? (
-              <div className="text-center p-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <BookOpen className="h-8 w-8 text-gray-300 mx-auto" />
-                <p className="text-sm font-semibold text-gray-700 mt-2">You currently have no borrowed books.</p>
-                <p className="text-xs text-gray-400 mt-1">Visit the school library to borrow books.</p>
-              </div>
+              <StudentEmptyState
+                title="No borrowed books"
+                description="You currently have no books checked out from the school library."
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentlyIssued.map((loan) => {
@@ -560,7 +560,10 @@ export default function StudentLibraryPage() {
             <p className="text-xs text-gray-500 mb-4">Books you have returned, along with return conditions and fine settlement status.</p>
 
             {pastLoans.length === 0 ? (
-              <p className="text-xs text-gray-400">No past borrowing history recorded yet.</p>
+              <StudentEmptyState
+                title="No borrowing history"
+                description="Past returns and settled circulation records will be listed here."
+              />
             ) : (
               <div className="divide-y divide-gray-100">
                 {pastLoans.map((loan) => {
@@ -636,11 +639,10 @@ export default function StudentLibraryPage() {
           </div>
 
           {myReservations.length === 0 ? (
-            <div className="text-center p-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-              <BookmarkPlus className="h-8 w-8 text-gray-300 mx-auto" />
-              <p className="text-sm font-semibold text-gray-700 mt-2">No active book reservations.</p>
-              <p className="text-xs text-gray-400 mt-1">You can reserve any out-of-stock book directly from the catalogue.</p>
-            </div>
+            <StudentEmptyState
+              title="No active book reservations"
+              description="You can reserve any out-of-stock book directly from the catalogue."
+            />
           ) : (
             <div className="divide-y divide-gray-100">
               {myReservations.map((res) => (
@@ -689,12 +691,13 @@ export default function StudentLibraryPage() {
       {/* STUDENT CLEARANCE CERTIFICATE MODAL */}
       <AnimatePresence>
         {showCertificateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-hidden" onClick={() => setShowCertificateModal(false)}>
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 relative border border-gray-100"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border border-gray-100"
             >
               <button
                 onClick={() => setShowCertificateModal(false)}
@@ -767,16 +770,21 @@ export default function StudentLibraryPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 print:hidden">
-                <Button variant="outline" onClick={() => setShowCertificateModal(false)}>
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-white shrink-0 flex items-center gap-3 w-full print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowCertificateModal(false)}
+                  className="flex-1 py-3 px-4 rounded-2xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-98 transition-all text-center flex items-center justify-center cursor-pointer shadow-2xs"
+                >
                   Close
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
                   onClick={() => window.print()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-lg shadow-emerald-500/20"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Printer className="h-4 w-4" /> Print Certificate
-                </Button>
+                </button>
               </div>
             </motion.div>
           </div>
