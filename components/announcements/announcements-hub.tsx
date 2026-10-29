@@ -431,7 +431,7 @@ export function AnnouncementsHub({
     : "Stay updated with important announcements, circulars, and notices from school administration.";
 
   return (
-    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-4.5 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-3 sm:space-y-4 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-1 sm:py-4 pb-3 sm:pb-5 lg:pb-8 w-full min-w-0 overflow-x-hidden font-sans">
       {/* ─── TOP HEADER CARD (HERO BANNER) ─────────────────────────────────── */}
       <div className="relative overflow-hidden bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-[0_4px_25px_rgba(37, 99, 235,0.05)] p-4 sm:p-6 lg:p-7 w-full min-w-0">
         {/* Soft background blue glow behind right 3D illustration */}

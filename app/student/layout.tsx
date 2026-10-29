@@ -1,6 +1,19 @@
 "use client";
 
-import { LayoutDashboard, Users, CreditCard, BookOpen, BookMarked, CalendarRange, Trophy, Megaphone, CalendarDays, Settings, Award } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  BookOpen,
+  BookMarked,
+  CalendarRange,
+  Trophy,
+  Megaphone,
+  CalendarDays,
+  Settings,
+  Award,
+  Clock,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 const sidebarLinks = [
@@ -10,14 +23,9 @@ const sidebarLinks = [
     icon: LayoutDashboard,
   },
   {
-    title: "Announcements",
-    href: "/student/announcements",
-    icon: Megaphone,
-  },
-  {
-    title: "Events & Holidays",
-    href: "/student/events",
-    icon: CalendarDays,
+    title: "Class Timetable",
+    href: "/student/timetable",
+    icon: Clock,
   },
   {
     title: "Attendance",
@@ -25,14 +33,14 @@ const sidebarLinks = [
     icon: Users,
   },
   {
-    title: "Syllabus",
-    href: "/student/syllabus",
-    icon: BookMarked,
-  },
-  {
     title: "Homework",
     href: "/student/homework",
     icon: BookOpen,
+  },
+  {
+    title: "Syllabus",
+    href: "/student/syllabus",
+    icon: BookMarked,
   },
   {
     title: "Exam Timetable",
@@ -45,9 +53,9 @@ const sidebarLinks = [
     icon: Trophy,
   },
   {
-    title: "Certificates",
-    href: "/student/certificates",
-    icon: Award,
+    title: "Pay Fees",
+    href: "/student/pay-fees",
+    icon: CreditCard,
   },
   {
     title: "Library",
@@ -55,9 +63,19 @@ const sidebarLinks = [
     icon: BookOpen,
   },
   {
-    title: "Pay Fees",
-    href: "/student/pay-fees",
-    icon: CreditCard,
+    title: "Certificates",
+    href: "/student/certificates",
+    icon: Award,
+  },
+  {
+    title: "Announcements",
+    href: "/student/announcements",
+    icon: Megaphone,
+  },
+  {
+    title: "Events & Holidays",
+    href: "/student/events",
+    icon: CalendarDays,
   },
   {
     title: "Account Settings",
@@ -77,5 +95,3 @@ export default function StudentLayout({
     </DashboardLayout>
   );
 }
-
-

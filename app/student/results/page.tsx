@@ -1,5 +1,7 @@
 "use client";
 
+import { StudentEmptyState } from "@/components/student/student-empty-state";
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -225,7 +227,7 @@ export default function StudentResultsPage() {
 
   return (
     <div
-      className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col gap-6 overflow-x-hidden relative"
+      className="w-full min-h-full px-0 sm:px-2 lg:px-4 py-2 sm:py-6 flex flex-col gap-4 sm:gap-6 overflow-x-hidden relative"
       style={{ fontFamily: "'Outfit', sans-serif" }}
     >
       <style>{`
@@ -235,15 +237,15 @@ export default function StudentResultsPage() {
       `}</style>
 
       {/* Background Decorative Blur Blobs */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-200/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 z-10">
         <div>
-          <p className="text-[11px] font-bold text-[#5c28e8] uppercase tracking-widest">Academic Records</p>
+          <p className="text-[11px] font-bold text-[#2563eb] uppercase tracking-widest">Academic Records</p>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-            <Trophy className="text-[#5c28e8] h-8 w-8 animate-bounce-slow" />
+            <Trophy className="text-[#2563eb] h-8 w-8 animate-bounce-slow" />
             My Results
           </h1>
           <p className="text-slate-400 text-sm mt-1">
@@ -259,7 +261,7 @@ export default function StudentResultsPage() {
             className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 rounded-xl shadow-sm px-4 h-11 transition-all duration-300 font-semibold text-slate-600"
           >
             {isLoading ? (
-              <Loader2 size={16} className="animate-spin text-[#5c28e8]" />
+              <Loader2 size={16} className="animate-spin text-[#2563eb]" />
             ) : (
               <RefreshCw size={16} className="text-slate-500" />
             )}
@@ -269,7 +271,7 @@ export default function StudentResultsPage() {
           <Button
             onClick={handleDownloadReportCard}
             disabled={downloadingReport || results.length === 0}
-            className="flex items-center gap-2 bg-[#5c28e8] hover:bg-[#4d20cb] text-white rounded-xl shadow-md shadow-purple-500/20 px-5 h-11 font-bold transition-all duration-300"
+            className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-xl shadow-md shadow-blue-500/20 px-5 h-11 font-bold transition-all duration-300"
           >
             {downloadingReport ? (
               <Loader2 size={16} className="animate-spin text-white" />
@@ -340,13 +342,10 @@ export default function StudentResultsPage() {
           </Button>
         </Card>
       ) : filteredResults.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm z-10">
-          <Trophy className="h-14 w-14 text-slate-200 mb-3" />
-          <p className="text-base font-semibold">No published results found</p>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
-            There are currently no published exams or marks entries available. Contact your class teacher for details.
-          </p>
-        </div>
+        <StudentEmptyState
+          title="No examination results published"
+          description="There are currently no published exam marks or scorecard entries available. Results will appear here once declared."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 z-10">
           <AnimatePresence>
@@ -437,16 +436,21 @@ export default function StudentResultsPage() {
 
       {/* Leaderboard Modal */}
       {showLeaderboard && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white rounded-3xl max-w-md w-full shadow-xl border border-slate-100 overflow-hidden flex flex-col relative"
+        <div
+          className="fixed inset-0 z-50 bg-black/60 sm:bg-slate-900/60 backdrop-blur-xs flex sm:items-center sm:justify-center p-0 sm:p-4 overflow-hidden"
+          onClick={() => {
+            setShowLeaderboard(false);
+            setRankings([]);
+          }}
+        >
+          <div
+            className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[85vh] sm:max-w-md sm:rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div>
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
                   <Trophy size={20} className="text-amber-500" />
                   {leaderboardTitle} Leaderboard
                 </h3>
@@ -457,13 +461,13 @@ export default function StudentResultsPage() {
                   setShowLeaderboard(false);
                   setRankings([]);
                 }}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
               {leaderboardLoading ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-2">
                   <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
@@ -527,7 +531,21 @@ export default function StudentResultsPage() {
                 </div>
               )}
             </div>
-          </motion.div>
+
+            {/* Fixed Bottom Single-Row Full-Width Buttons */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-white shrink-0 flex items-center gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLeaderboard(false);
+                  setRankings([]);
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-98 transition-all text-white text-xs font-bold text-center flex items-center justify-center cursor-pointer shadow-md shadow-blue-500/20"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

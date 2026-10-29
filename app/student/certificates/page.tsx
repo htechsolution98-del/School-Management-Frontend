@@ -1,5 +1,7 @@
 "use client";
 
+import { StudentEmptyState } from "@/components/student/student-empty-state";
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Award,
@@ -148,7 +150,7 @@ export default function StudentCertificatesPage() {
   }, [requests]);
 
   return (
-    <div className="bg-slate-50/60 p-3 sm:p-6 lg:p-8 pb-3 lg:pb-8 font-sans w-full min-w-0 max-w-full overflow-x-hidden">
+    <div className="bg-slate-50/60 p-0 sm:p-4 lg:p-6 pb-3 lg:pb-8 font-sans w-full min-w-0 max-w-full overflow-x-hidden">
       {/* Top Banner / Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -272,21 +274,12 @@ export default function StudentCertificatesPage() {
             <p className="text-sm font-medium">Loading certificate requests...</p>
           </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="py-20 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
-              <Award className="w-7 h-7" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">No Certificate Requests</h3>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-5">
-              You haven't requested any certificates yet. Click the button below to submit a request.
-            </p>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" /> Request Certificate
-            </button>
-          </div>
+          <StudentEmptyState
+            title="No certificate requests found"
+            description="You haven't requested any certificates yet. Submit a new request whenever you need Bonafide, Leaving, or Character certificates."
+            actionLabel="Request Certificate"
+            onAction={() => setIsModalOpen(true)}
+          />
         ) : (
           <div className="overflow-x-auto w-full">
             <table className="w-full min-w-[650px] text-left border-collapse">
@@ -396,12 +389,12 @@ export default function StudentCertificatesPage() {
 
       {/* Request Certificate Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 sm:bg-slate-900/60 backdrop-blur-xs flex sm:items-center sm:justify-center p-0 sm:p-4 overflow-hidden" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
@@ -410,62 +403,65 @@ export default function StudentCertificatesPage() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleRequestSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Certificate Type *
-                </label>
-                <select
-                  value={selectedTypeId}
-                  onChange={(e) => setSelectedTypeId(Number(e.target.value))}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
-                >
-                  {uniqueTypes.map((t) => {
-                    const alreadyRequested = activeRequestedTypeIds.has(t.id);
-                    return (
-                      <option key={t.id} value={t.id} disabled={alreadyRequested}>
-                        {t.name} {alreadyRequested ? "(Already Submitted / Active)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Choose Bonafide, School Leaving / TC, Character, or No Dues.
-                </p>
+            <form onSubmit={handleRequestSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 no-scrollbar">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Certificate Type *
+                  </label>
+                  <select
+                    value={selectedTypeId}
+                    onChange={(e) => setSelectedTypeId(Number(e.target.value))}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                  >
+                    {uniqueTypes.map((t) => {
+                      const alreadyRequested = activeRequestedTypeIds.has(t.id);
+                      return (
+                        <option key={t.id} value={t.id} disabled={alreadyRequested}>
+                          {t.name} {alreadyRequested ? "(Already Submitted / Active)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Choose Bonafide, School Leaving / TC, Character, or No Dues.
+                  </p>
+                </div>
+
+                {/* Informational Notice */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Once submitted, the clerk desk will generate and approve your official certificate.
+                    Duplicate requests for an active or issued certificate are automatically prevented.
+                  </p>
+                </div>
               </div>
 
-              {/* Informational Notice */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Once submitted, the clerk desk will generate and approve your official certificate.
-                  Duplicate requests for an active or issued certificate are automatically prevented.
-                </p>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex items-center gap-3 pt-2">
+              {/* Fixed Bottom Single-Row Full-Width Buttons */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-white shrink-0 flex items-center gap-3 w-full">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   disabled={submitting}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-semibold text-xs transition-colors"
+                  className="flex-1 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs active:scale-98 transition-all text-center flex items-center justify-center cursor-pointer shadow-2xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-2 py-2.5 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? (
                     <>

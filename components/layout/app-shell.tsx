@@ -734,11 +734,22 @@ export function
 
       {/* Main Workspace Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden print:h-auto print:overflow-visible print:block">
-        {/* Top Header Bar: Premium blue-to-indigo gradient on mobile, clean surface on desktop */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-blue-700/30 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] lg:bg-none lg:bg-white text-white lg:text-[#142044] px-3.5 sm:px-6 shadow-sm z-20 print:hidden">
+        {/* Top Header Bar: Premium blue-purple gradient for Student, mobile gradient / desktop clean for others */}
+        <header className={cn(
+          "flex h-16 shrink-0 items-center justify-between gap-2 border-b px-3.5 sm:px-6 shadow-sm z-20 print:hidden",
+          roleTitle === "Student"
+            ? "border-blue-700/30 bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] text-white"
+            : "border-blue-700/30 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] lg:bg-none lg:bg-white text-white lg:text-[#142044]"
+        )}>
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
-              {!logoImgError && activeLogo ? (
+              {roleTitle === "Student" && profile?.avatar ? (
+                <img
+                  src={profile.avatar}
+                  alt={currentUserName}
+                  className="h-full w-full object-cover rounded-full"
+                />
+              ) : !logoImgError && activeLogo ? (
                 <img
                   src={activeLogo}
                   alt={currentSchoolDisplayName}
@@ -752,18 +763,27 @@ export function
               )}
             </span>
             <div className="min-w-0">
-              <span className="block truncate text-base sm:text-lg font-bold tracking-tight text-white lg:text-[#142044] leading-tight" title={currentSchoolDisplayName}>
-                {currentSchoolDisplayName}
+              <span className={cn(
+                "block truncate text-sm sm:text-base font-bold tracking-tight leading-tight",
+                roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
+              )} title={roleTitle === "Student" ? (currentUserName || currentSchoolDisplayName) : currentSchoolDisplayName}>
+                {roleTitle === "Student"
+                  ? (currentUserName ? currentUserName.split(" ").slice(0, 2).join(" ") : "Student")
+                  : currentSchoolDisplayName}
               </span>
-              <span className="block truncate text-xs text-white/80 lg:text-[#7183A6] font-normal leading-tight mt-0.5">
-                {roleTitle || "Teacher"}
+              <span className={cn(
+                "block truncate text-[11px] sm:text-xs leading-tight mt-0.5",
+                roleTitle === "Student" ? "text-indigo-100/90 font-medium" : "text-white/80 lg:text-[#7183A6] font-normal"
+              )}>
+                {roleTitle === "Student" ? "Student" : (roleTitle || "Teacher")}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3.5">
             {/* Page Tutorial Help Button */}
-            <PageTutorialDialog
+            {roleTitle !== "Student" && (
+              <PageTutorialDialog
               roleTitle={roleTitle}
               isSuperAdmin={
                 roleTitle === "Super Admin" ||
@@ -773,6 +793,7 @@ export function
                 )
               }
             />
+            )}
 
             {/* Notification Bell */}
             <div ref={notificationRef} className="relative z-50">
@@ -784,7 +805,7 @@ export function
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#FF4545] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                  <span className={cn("absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full text-[10px] font-black flex items-center justify-center shadow-xs", roleTitle === "Student" ? "bg-amber-400 text-amber-950" : "bg-[#FF4545] text-white")}>
                     {unreadCount}
                   </span>
                 )}
@@ -799,7 +820,12 @@ export function
                 }}
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
-                className="relative hidden lg:flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                className={cn(
+                  "relative hidden lg:flex h-9 w-9 items-center justify-center rounded-full transition-colors cursor-pointer",
+                  roleTitle === "Student"
+                    ? "text-white hover:bg-white/10"
+                    : "text-slate-600 hover:bg-slate-50"
+                )}
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
@@ -913,20 +939,35 @@ export function
               title="View my profile"
               className="flex items-center gap-2 pl-1 text-left transition-opacity hover:opacity-90 focus-visible:outline-none cursor-pointer"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1D4ED8] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#2563EB]">
-                {userInitials || "TE"}
+              <span className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-full font-bold text-xs sm:text-sm shadow-xs border border-white/25",
+                roleTitle === "Student"
+                  ? "bg-white/20 text-white"
+                  : "bg-[#1D4ED8] text-white lg:bg-[#2563EB]"
+              )}>
+                {userInitials || "ST"}
               </span>
-              <div className="text-left flex items-center gap-1">
+              <div className="text-left hidden sm:flex items-center gap-1">
                 <div>
-                  <span className="block max-w-[100px] truncate text-xs sm:text-sm font-semibold text-white lg:text-[#142044] leading-tight">
-                    {currentUserName || "teacher1"}
+                  <span className={cn(
+                    "block max-w-[100px] truncate text-xs sm:text-sm font-semibold leading-tight",
+                    roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
+                  )}>
+                    {currentUserName || "Student"}
                   </span>
-                  <span className="block truncate text-[11px] text-white/75 lg:text-[#7183A6] font-normal leading-tight">
-                    {profile?.role?.toLowerCase() || (roleTitle || "teacher").toLowerCase()}
+                  <span className={cn(
+                    "block truncate text-[11px] font-normal leading-tight",
+                    roleTitle === "Student" ? "text-white/80" : "text-white/75 lg:text-[#7183A6]"
+                  )}>
+                    {profile?.role?.toLowerCase() || (roleTitle || "student").toLowerCase()}
                   </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-white/80 lg:text-slate-400 shrink-0" />
+                <ChevronDown className={cn(
+                  "w-3.5 h-3.5 shrink-0",
+                  roleTitle === "Student" ? "text-white/80" : "text-white/80 lg:text-slate-400"
+                )} />
               </div>
+              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 sm:hidden", roleTitle === "Student" ? "text-white/80" : "text-white/80")} />
             </button>
           </div>
         </header>
@@ -942,7 +983,7 @@ export function
         <main
           className={cn(
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
-            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-4 sm:px-6 py-3.5 sm:py-5 pb-28 lg:pb-5",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-2 sm:px-6 py-2.5 sm:py-5 pb-28 lg:pb-5",
             mainClassName
           )}
         >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   CheckSquare,
   Calendar,
@@ -42,6 +42,7 @@ import {
 } from "@/lib/exam-api";
 
 function MarksVerificationInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -258,7 +259,14 @@ function MarksVerificationInner() {
         remarks: "Verified and approved by Principal",
       });
 
-      toast.success("✅ Class marks consolidated sheet successfully verified and locked!");
+      toast.success("✅ Class marks verified & student results generated successfully!", {
+        description: "Student result records are ready. Click below to proceed to the Publish Result page.",
+        action: {
+          label: "Go to Publish Results",
+          onClick: () => router.push(`/principal/result/publish?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${selectedDiv}`),
+        },
+        duration: 9000,
+      });
       await loadGrid();
     } catch (err: any) {
       toast.error(err?.message || "Failed to verify class marks.");
@@ -351,8 +359,41 @@ function MarksVerificationInner() {
             {isVerifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
             Verify & Approve Consolidated Sheet
           </Button>
+
+          <Button
+            variant="default"
+            onClick={() => router.push(`/principal/result/publish?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${selectedDiv}`)}
+            disabled={!selectedClassId}
+            className="rounded-xl text-xs gap-1.5 font-bold h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Proceed to Publish Results
+          </Button>
         </div>
       </div>
+
+      {/* Verification Status Banner */}
+      {gridData?.class_teacher_verification_status === "VERIFIED" && (
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                Class Marks Verified & Locked — Final Result Records Generated!
+              </p>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                Consolidated marks are verified and result calculations are complete. You can proceed directly to publish report cards.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => router.push(`/principal/result/publish?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${selectedDiv}`)}
+            className="rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shrink-0 h-9 px-4"
+          >
+            Go to Publish Results →
+          </Button>
+        </div>
+      )}
 
       {/* Control Filter Card */}
       <Card className="rounded-2xl border border-gray-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
