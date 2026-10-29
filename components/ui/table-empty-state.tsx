@@ -17,7 +17,7 @@ export function TableEmptyState({
   children,
 }: TableEmptyStateProps) {
   return (
-    <div className={cn("py-10 sm:py-14 text-center flex flex-col items-center justify-center", className)}>
+    <div className={cn("py-10 sm:py-14 text-center flex flex-col items-center justify-center select-none", className)}>
       <img
         src="/images/empty-folder.png"
         alt={title}
@@ -30,7 +30,7 @@ export function TableEmptyState({
         {title}
       </h3>
       {description && (
-        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
           {description}
         </p>
       )}
@@ -39,4 +39,5 @@ export function TableEmptyState({
   );
 }
 
+export { TableEmptyState as StudentEmptyState };
 export default TableEmptyState;
