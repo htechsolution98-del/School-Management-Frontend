@@ -14,9 +14,19 @@ import {
   ClipboardList,
   RotateCw,
   Filter,
-  AlertCircle
+  AlertCircle,
+  RotateCcw,
+  ArrowLeftRight,
+  CheckCircle2,
+  AlertTriangle,
+  Check
 } from "lucide-react";
 import { inventoryApi, coreApi, showApiError, showSuccess, showWarning } from "@/lib/inventory-client";
+import {
+  processReturnReplace,
+  type ProcessReturnReplacePayload,
+  formatChargingPolicy
+} from "@/lib/fees";
 
 export default function StudentItemIssuePage() {
   const [activeTab, setActiveTab] = useState<"single" | "bulk" | "entitlements" | "ledger">("single");
@@ -35,6 +45,18 @@ export default function StudentItemIssuePage() {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [ledgerClassFilter, setLedgerClassFilter] = useState("");
+
+  // Return & Replacement Modal State
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [selectedReturnRecord, setSelectedReturnRecord] = useState<any | null>(null);
+  const [returnActionType, setReturnActionType] = useState<"RETURN" | "REPLACEMENT">("RETURN");
+  const [returnCondition, setReturnCondition] = useState<"GOOD" | "DAMAGED">("GOOD");
+  const [returnQty, setReturnQty] = useState(1);
+  const [returnRemarks, setReturnRemarks] = useState("");
+  const [replacementSize, setReplacementSize] = useState("");
+  const [replacementColor, setReplacementColor] = useState("");
+  const [returnVariantMatrix, setReturnVariantMatrix] = useState<any[]>([]);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   // Single Issue Form
   const [singleStudentSearch, setSingleStudentSearch] = useState("");
@@ -777,6 +799,125 @@ export default function StudentItemIssuePage() {
     );
   });
 
+  const returnItemObj = useMemo(() => {
+    if (!selectedReturnRecord) return null;
+    return items.find((it) => it.id === selectedReturnRecord.item);
+  }, [selectedReturnRecord, items]);
+
+  const allowedSizesForReturn = useMemo(() => {
+    if (!returnItemObj || !returnItemObj.has_size) return [];
+    if (returnItemObj.allowed_sizes && returnItemObj.allowed_sizes.length > 0) {
+      const allowed = new Set(returnItemObj.allowed_sizes.map((s: any) => (typeof s === "object" ? s.id : s)));
+      return sizes.filter((s: any) => allowed.has(s.id));
+    }
+    return sizes;
+  }, [returnItemObj, sizes]);
+
+  const allowedColorsForReturn = useMemo(() => {
+    if (!returnItemObj || !returnItemObj.has_color) return [];
+    if (returnItemObj.allowed_colors && returnItemObj.allowed_colors.length > 0) {
+      const allowed = new Set(returnItemObj.allowed_colors.map((c: any) => (typeof c === "object" ? c.id : c)));
+      return colors.filter((c: any) => allowed.has(c.id));
+    }
+    return colors;
+  }, [returnItemObj, colors]);
+
+  const replacementAvailableStock = useMemo(() => {
+    if (!returnItemObj) return 0;
+    return getSelectedVariantStock(
+      returnVariantMatrix,
+      replacementSize,
+      replacementColor,
+      returnItemObj
+    );
+  }, [returnVariantMatrix, replacementSize, replacementColor, returnItemObj]);
+
+  const openReturnReplaceModal = async (rec: any) => {
+    setSelectedReturnRecord(rec);
+    setReturnActionType("RETURN");
+    setReturnCondition("GOOD");
+    setReturnQty(rec.quantity || 1);
+    setReturnRemarks("");
+    setReplacementSize(rec.size ? String(rec.size) : "");
+    setReplacementColor(rec.color ? String(rec.color) : "");
+    setIsReturnModalOpen(true);
+
+    if (rec.item) {
+      try {
+        const res = await inventoryApi.get(`/items/${rec.item}/variant-stock/`);
+        setReturnVariantMatrix(res.data?.variant_stock_matrix || []);
+      } catch {
+        const found = items.find((it) => it.id === Number(rec.item));
+        setReturnVariantMatrix(found?.variant_stock_matrix || []);
+      }
+    } else {
+      setReturnVariantMatrix([]);
+    }
+  };
+
+  const handleProcessReturnReplace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReturnRecord) return;
+
+    if (returnQty <= 0 || returnQty > selectedReturnRecord.quantity) {
+      showWarning(`Quantity must be between 1 and ${selectedReturnRecord.quantity}.`);
+      return;
+    }
+
+    if (returnActionType === "REPLACEMENT") {
+      if (returnItemObj?.has_size && !replacementSize) {
+        showWarning("Please select a replacement size.");
+        return;
+      }
+      if (returnItemObj?.has_color && !replacementColor) {
+        showWarning("Please select a replacement color.");
+        return;
+      }
+      if (replacementAvailableStock < returnQty) {
+        showWarning(
+          `Insufficient stock for replacement. Available: ${replacementAvailableStock}, Required: ${returnQty}.`
+        );
+        return;
+      }
+    }
+
+    setReturnSubmitting(true);
+    try {
+      const payload: ProcessReturnReplacePayload = {
+        action_type: returnActionType,
+        condition: returnCondition,
+        quantity: Number(returnQty),
+        remarks: returnRemarks.trim(),
+        replacement_size: replacementSize ? Number(replacementSize) : null,
+        replacement_color: replacementColor ? Number(replacementColor) : null,
+      };
+
+      const result = await processReturnReplace(selectedReturnRecord.id, payload);
+      if (result.success) {
+        showSuccess(
+          returnActionType === "REPLACEMENT"
+            ? `Replacement processed! 1 unit deducted from Main Stock and issued to ${selectedReturnRecord.student_name}.`
+            : `Return processed! Stock updated (${
+                returnCondition === "GOOD" ? "Main Stock +1" : "Logged to Scrap/Damaged ledger"
+              })${
+                selectedReturnRecord.charging_type === "SEPARATE_CHARGE"
+                  ? " & Fee liability reversed."
+                  : "."
+              }`
+        );
+        setIsReturnModalOpen(false);
+        setSelectedReturnRecord(null);
+        await fetchLedgerIssues();
+      } else {
+        showApiError(result.error || result.message || "Failed to process return/replacement.");
+      }
+    } catch (err: any) {
+      showApiError(err);
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
   const filteredLedger = ledgerIssues.filter((rec) => {
     if (ledgerClassFilter) {
       const cls = (rec.student_class || "").toLowerCase();
@@ -793,7 +934,7 @@ export default function StudentItemIssuePage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -824,49 +965,49 @@ export default function StudentItemIssuePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 flex-nowrap overflow-x-auto whitespace-nowrap hide-scrollbar pb-0.5 sm:pb-0">
         <button
           onClick={() => setActiveTab("single")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "single"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <UserCheck className="w-4 h-4" /> Individual Student Issue
+          <UserCheck className="w-4 h-4 shrink-0" /> Individual Student Issue
         </button>
 
         <button
           onClick={() => setActiveTab("bulk")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "bulk"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Users className="w-4 h-4" /> Bulk Class Distribution
+          <Users className="w-4 h-4 shrink-0" /> Bulk Class Distribution
         </button>
 
         <button
           onClick={() => setActiveTab("entitlements")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "entitlements"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Boxes className="w-4 h-4" /> Entitlement Registry ({entitlements.length})
+          <Boxes className="w-4 h-4 shrink-0" /> Entitlement Registry ({entitlements.length})
         </button>
 
         <button
           onClick={() => setActiveTab("ledger")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "ledger"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <ClipboardList className="w-4 h-4" /> Student Issue Ledger ({ledgerIssues.length})
+          <ClipboardList className="w-4 h-4 shrink-0" /> Student Issue Ledger ({ledgerIssues.length})
         </button>
       </div>
 
@@ -1007,7 +1148,7 @@ export default function StudentItemIssuePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Size Variant
@@ -1480,8 +1621,8 @@ export default function StudentItemIssuePage() {
               <p className="text-xs mt-1">Generate entitlements by class using the button in top-right.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="w-full overflow-x-auto hide-scrollbar">
+              <table className="w-full min-w-[700px] text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-3.5 px-4">Student</th>
@@ -1602,51 +1743,87 @@ export default function StudentItemIssuePage() {
                     <th className="py-3.5 px-4">Class & Div</th>
                     <th className="py-3.5 px-4">Item Issued</th>
                     <th className="py-3.5 px-4">Variant (Size/Color)</th>
+                    <th className="py-3.5 px-4">Charging Policy</th>
                     <th className="py-3.5 px-4">Quantity</th>
                     <th className="py-3.5 px-4">Issue Date</th>
                     <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {filteredLedger.map((rec) => (
-                    <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-white">
-                          {rec.student_name || "—"}
-                        </div>
-                        {rec.student_roll && (
-                          <div className="text-[11px] text-slate-400">Roll: {rec.student_roll}</div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium">
-                        {`${rec.student_class || "—"}${rec.student_division ? ` - ${rec.student_division}` : ""}`}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-medium text-slate-900 dark:text-white">
-                          {rec.item_name}
-                        </div>
-                        {rec.item_code && (
-                          <div className="text-[11px] text-slate-400 font-mono">{rec.item_code}</div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                        {rec.size_name || rec.color_name
-                          ? `${rec.size_name || "—"} / ${rec.color_name || "—"}`
-                          : "Standard / None"}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {rec.quantity} units
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-500">
-                        {rec.issue_date}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                          {rec.status || "ISSUED"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredLedger.map((rec) => {
+                    const policy = formatChargingPolicy(rec.charging_type);
+                    const isIssued = !rec.status || rec.status === "ISSUED";
+                    return (
+                      <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-900 dark:text-white">
+                            {rec.student_name || "—"}
+                          </div>
+                          {rec.student_roll && (
+                            <div className="text-[11px] text-slate-400">Roll: {rec.student_roll}</div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium">
+                          {`${rec.student_class || "—"}${rec.student_division ? ` - ${rec.student_division}` : ""}`}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {rec.item_name}
+                          </div>
+                          {rec.item_code && (
+                            <div className="text-[11px] text-slate-400 font-mono">{rec.item_code}</div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                          {rec.size_name || rec.color_name
+                            ? `${rec.size_name || "—"} / ${rec.color_name || "—"}`
+                            : "Standard / None"}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${policy.badgeClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${policy.dotClass}`} />
+                            {policy.label}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                          {rec.quantity} units
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-500">
+                          {rec.issue_date}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                              rec.status === "RETURNED"
+                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                                : rec.status === "REPLACED"
+                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                            }`}
+                          >
+                            {rec.status || "ISSUED"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          {isIssued ? (
+                            <button
+                              type="button"
+                              onClick={() => openReturnReplaceModal(rec)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Process Return/Replace
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium">
+                              {rec.status === "RETURNED" ? "Item Returned" : "Item Replaced"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1654,6 +1831,311 @@ export default function StudentItemIssuePage() {
         </div>
       )}
 
+
+      {/* Process Return / Replace Modal */}
+      {isReturnModalOpen && selectedReturnRecord && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-8">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Process Return / Replacement</h2>
+                  <p className="text-xs text-slate-500">Condition-based stock routing & fee synchronization</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReturnModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleProcessReturnReplace} className="p-6 space-y-5">
+              {/* Selected Item Summary Card */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Item Details</span>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                      {selectedReturnRecord.item_name}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {selectedReturnRecord.size_name || selectedReturnRecord.color_name
+                        ? `Variant: ${selectedReturnRecord.size_name || "—"} / ${selectedReturnRecord.color_name || "—"}`
+                        : "Standard (No variant)"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Student</span>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
+                      {selectedReturnRecord.student_name}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {selectedReturnRecord.student_class} {selectedReturnRecord.student_division ? `- ${selectedReturnRecord.student_division}` : ""}
+                      {selectedReturnRecord.student_roll ? ` (Roll: ${selectedReturnRecord.student_roll})` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Charging Policy:</span>
+                    {(() => {
+                      const pol = formatChargingPolicy(selectedReturnRecord.charging_type);
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${pol.badgeClass}`}>
+                          <span className={`w-1 h-1 rounded-full ${pol.dotClass}`} />
+                          {pol.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div className="text-slate-500">
+                    Issued Qty: <span className="font-bold text-slate-800 dark:text-slate-200">{selectedReturnRecord.quantity} units</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Action Type */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                  1. Action Type <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReturnActionType("RETURN")}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      returnActionType === "RETURN"
+                        ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 ring-2 ring-amber-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <RotateCcw className={`w-4 h-4 ${returnActionType === "RETURN" ? "text-amber-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Return Only</span>
+                      </div>
+                      {returnActionType === "RETURN" && <Check className="w-4 h-4 text-amber-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Item is returned back to inventory without issuing a replacement.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReturnActionType("REPLACEMENT")}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      returnActionType === "REPLACEMENT"
+                        ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 ring-2 ring-blue-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <ArrowLeftRight className={`w-4 h-4 ${returnActionType === "REPLACEMENT" ? "text-blue-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Replacement</span>
+                      </div>
+                      {returnActionType === "REPLACEMENT" && <Check className="w-4 h-4 text-blue-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Dispense another unit to student to replace the returned item.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Dynamic Policy & Fee Synchronization Badge */}
+                <div className="mt-2.5">
+                  {returnActionType === "RETURN" ? (
+                    selectedReturnRecord.charging_type === "SEPARATE_CHARGE" ? (
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <strong className="font-bold">Automatic Fee Synchronization:</strong> Because this item was issued with a Separate Charge, completing this return will automatically reverse/cancel the student's fee liability in the Fees module.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                        <div>
+                          <strong className="font-semibold">Fee Ledger:</strong> No fee adjustment needed (item was issued as {selectedReturnRecord.charging_type === "FREE" ? "Free" : "Included in Fee"}).
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div>
+                        <strong className="font-bold">Inventory & Fee Sync:</strong> A fresh unit will be deducted (-{returnQty}) from Main Stock. The fee ledger is NOT altered (original charge remains valid, replacement has no duplicate billing).
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Condition-Based Stock Routing */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                  2. Item Condition (Stock Routing) <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReturnCondition("GOOD")}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      returnCondition === "GOOD"
+                        ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className={`w-4 h-4 ${returnCondition === "GOOD" ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Good / Re-usable</span>
+                      </div>
+                      {returnCondition === "GOOD" && <Check className="w-4 h-4 text-emerald-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Item is reusable. Stock ledger will increment <strong>Main Stock (+{returnQty})</strong> for this variant.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReturnCondition("DAMAGED")}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      returnCondition === "DAMAGED"
+                        ? "border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 ring-2 ring-rose-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className={`w-4 h-4 ${returnCondition === "DAMAGED" ? "text-rose-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Damaged / Defective</span>
+                      </div>
+                      {returnCondition === "DAMAGED" && <Check className="w-4 h-4 text-rose-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Defective item. Does <strong>NOT</strong> increment Main Stock; logged to virtual Scrap/Damaged ledger.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Replacement Variant (When Replacement is selected) */}
+              {returnActionType === "REPLACEMENT" && (returnItemObj?.has_size || returnItemObj?.has_color) && (
+                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20">
+                  <div className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 mb-3 flex items-center justify-between">
+                    <span>3. Replacement Variant</span>
+                    <span className="text-xs font-normal text-slate-600 dark:text-slate-400">
+                      Available Stock: <strong className="text-slate-900 dark:text-white font-bold">{replacementAvailableStock} units</strong>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {returnItemObj?.has_size && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          Size <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={replacementSize}
+                          onChange={(e) => setReplacementSize(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                        >
+                          <option value="">Select Size</option>
+                          {allowedSizesForReturn.map((sz: any) => (
+                            <option key={sz.id} value={sz.id}>{sz.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {returnItemObj?.has_color && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          Color <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={replacementColor}
+                          onChange={(e) => setReplacementColor(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                        >
+                          <option value="">Select Color</option>
+                          {allowedColorsForReturn.map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Quantity & Remarks */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={selectedReturnRecord.quantity || 1}
+                    required
+                    value={returnQty}
+                    onChange={(e) => setReturnQty(Math.max(1, Number(e.target.value)))}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-[10px] text-slate-400">Max: {selectedReturnRecord.quantity}</span>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Remarks / Return Reason
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Defective zipper, incorrect size fitting, etc."
+                    value={returnRemarks}
+                    onChange={(e) => setReturnRemarks(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsReturnModalOpen(false)}
+                  disabled={returnSubmitting}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={returnSubmitting}
+                  className={`px-5 py-2 rounded-xl text-white text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-2 ${
+                    returnActionType === "RETURN"
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                      : "bg-[#5826df] hover:bg-[#4a1ec2] shadow-indigo-500/20"
+                  }`}
+                >
+                  {returnSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {returnActionType === "RETURN" ? "Confirm Return" : "Issue Replacement"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Generate Entitlement Modal */}
       {isEntitlementModalOpen && (

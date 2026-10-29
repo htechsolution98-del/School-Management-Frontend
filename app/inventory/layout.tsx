@@ -37,7 +37,7 @@ const sidebarLinks = [
 
 export default function InventoryLayout({ children }: { children: React.ReactNode }) {
   return (
-    <DashboardLayout roleTitle="Student Inventory" sidebarLinks={sidebarLinks}>
+    <DashboardLayout roleTitle="Inventory Management" sidebarLinks={sidebarLinks}>
       {children}
     </DashboardLayout>
   );

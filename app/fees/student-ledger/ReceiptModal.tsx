@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BadgeIndianRupee,
   CalendarDays,
@@ -31,6 +32,11 @@ export default function ReceiptModal({
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<Payment[]>(initialPayments || []);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadReceipt = useCallback(async () => {
     if (initialPayments && initialPayments.length > 0) {
@@ -73,34 +79,39 @@ export default function ReceiptModal({
     }
   }, [isOpen, receiptNumber, initialPayments, loadReceipt]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div id="printable-receipt-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 4mm 6mm;
+            margin: 5mm 8mm;
           }
           html, body {
-            height: 100vh !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
+            overflow: visible !important;
             background: #ffffff !important;
             width: 100% !important;
-            min-height: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           header, nav, aside, footer, #app-sidebar, .sidebar, .navbar, .receipt-print-hide {
             display: none !important;
           }
+          body > *:not(#printable-receipt-modal) {
+            display: none !important;
+          }
           body * {
             visibility: hidden;
           }
-          #printable-receipt-modal, #printable-receipt, #printable-receipt * {
+          #printable-receipt-modal,
+          #printable-receipt-modal * {
             visibility: visible;
           }
           #printable-receipt-modal {
@@ -133,25 +144,26 @@ export default function ReceiptModal({
             max-height: none !important;
             height: auto !important;
             padding: 0 !important;
+            margin: 0 !important;
           }
           #printable-receipt {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: relative !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 4px 6px !important;
+            padding: 0 !important;
             background: white !important;
             box-shadow: none !important;
             border: none !important;
-            font-size: 10px !important;
-            line-height: 1.25 !important;
             page-break-after: avoid !important;
             page-break-inside: avoid !important;
             page-break-before: avoid !important;
+            break-inside: avoid !important;
+            break-after: avoid !important;
           }
           #printable-receipt .print-compact-gap {
-            gap: 4px !important;
+            gap: 6px !important;
           }
           #printable-receipt .print-compact-p {
             padding: 4px 6px !important;
@@ -161,12 +173,17 @@ export default function ReceiptModal({
             padding-bottom: 2px !important;
           }
           #printable-receipt .print-compact-space {
-            margin-top: 4px !important;
-            margin-bottom: 4px !important;
+            margin-top: 2px !important;
+            margin-bottom: 2px !important;
             padding-bottom: 4px !important;
           }
           #printable-receipt .print-compact-pt {
-            padding-top: 8px !important;
+            padding-top: 6px !important;
+          }
+          .print\:break-inside-avoid,
+          [class*="print:break-inside-avoid"] {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
@@ -213,7 +230,8 @@ export default function ReceiptModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -262,38 +280,38 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
   const schoolLogo = resolveLogoUrl(rawLogo);
 
   return (
-    <div id="printable-receipt" className="space-y-4 text-gray-900">
-      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-3 print-compact-space">
-        <div className="flex items-center gap-3">
+    <div id="printable-receipt" className="space-y-4 print:space-y-2 text-gray-900 print:text-[12px] print:p-0">
+      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-3 print-compact-space print:pb-1.5 print:mb-1">
+        <div className="flex items-center gap-3 print:gap-2">
           {schoolLogo ? (
             <img
               src={schoolLogo}
               alt={schoolName}
-              className="w-14 h-14 object-contain rounded-xl border border-gray-200 bg-white p-1 shrink-0 print:w-11 print:h-11 shadow-xs"
+              className="w-14 h-14 object-contain rounded-xl border border-gray-200 bg-white p-1 shrink-0 print:w-10 print:h-10 print:p-0.5 shadow-xs"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = "none";
               }}
             />
           ) : (
-            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0 font-black text-lg print:w-10 print:h-10">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0 font-black text-lg print:w-9 print:h-9 print:text-base">
               {schoolName.charAt(0)}
             </div>
           )}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-900">
+            <p className="text-xs print:text-[10px] font-bold uppercase tracking-wider text-blue-900 leading-tight">
               {schoolName}
             </p>
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight print:text-lg">
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight print:text-base print:leading-tight">
               {isMultiItem ? "Consolidated Fee Receipt" : "Fee Receipt"}
             </h3>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs print:text-[10px] text-gray-500 leading-tight">
               Official student fee payment receipt
             </p>
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs text-gray-500">Receipt No.</p>
-          <p className="font-mono font-bold text-gray-900 text-sm">
+          <p className="text-xs print:text-[10px] text-gray-500 leading-tight">Receipt No.</p>
+          <p className="font-mono font-bold text-gray-900 text-sm print:text-xs">
             {primaryPayment.receipt_number || "-"}
           </p>
           <StatusPill label={paymentStatus.label} tone={paymentStatus.tone} />
@@ -301,7 +319,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
       </div>
 
       <SectionTitle icon={User} title="Student Details" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 print-compact-gap">
+      <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2.5 print:gap-1.5 print:gap-y-1.5 print-compact-gap">
         <Info label="Full Name" value={primaryPayment.student_name || "-"} wide />
         <Info
           label="Class & Section"
@@ -315,146 +333,151 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
       </div>
 
       {isMultiItem ? (
-        <>
+        <div className="print:break-inside-avoid">
           <SectionTitle icon={GraduationCap} title={`Fee Items Breakdown (${payments.length} Items)`} />
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="border border-gray-200 rounded-xl print:rounded-lg overflow-hidden shadow-sm print:shadow-none mt-1 print:mt-0.5">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase font-semibold">
                 <tr>
-                  <th className="p-3">#</th>
-                  <th className="p-3">Fee / Particulars</th>
-                  <th className="p-3 text-right">Base Fee</th>
-                  <th className="p-3 text-right">Late Fee</th>
-                  <th className="p-3 text-right">Discount</th>
-                  <th className="p-3 text-right">Amount Paid</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px]">#</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px]">Fee / Particulars</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px] text-right">Base Fee</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px] text-right">Late Fee</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px] text-right">Discount</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px] text-right">Amount Paid</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {payments.map((p, idx) => (
                   <tr key={p.id} className="hover:bg-gray-50/50">
-                    <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="p-3">
-                      <p className="font-semibold text-gray-900">{p.feetype_name}</p>
+                    <td className="p-3 print:p-1.5 text-gray-400 font-mono print:text-[10px]">{idx + 1}</td>
+                    <td className="p-3 print:p-1.5">
+                      <p className="font-semibold text-gray-900 print:text-xs">{p.feetype_name}</p>
                       {(() => {
                         const particularText = p.fee_description || p.fee_discount_reference;
                         if (!particularText || particularText.includes("[Cash Recd")) return null;
                         return (
-                          <p className="text-[11px] font-medium text-amber-900 bg-amber-50 rounded px-1.5 py-0.5 mt-0.5 border border-amber-200 w-fit">
+                          <p className="text-[11px] print:text-[9.5px] font-medium text-amber-900 bg-amber-50 rounded px-1.5 py-0.5 mt-0.5 border border-amber-200 w-fit">
                             <span className="font-bold uppercase text-[9px] mr-1 text-amber-800">Particulars:</span>
                             {particularText}
                           </p>
                         );
                       })()}
-                      <p className="text-[11px] text-gray-500 mt-0.5">
+                      <p className="text-[11px] print:text-[9.5px] text-gray-500 mt-0.5">
                         {formatBillingPeriod(p.fee_billing_period || "")} {p.is_rte_govt_claim ? "• 🏛️ RTE Claim" : ""}
                       </p>
                     </td>
-                    <td className="p-3 text-right text-gray-700">{formatCurrency(p.fee_amount || 0)}</td>
-                    <td className="p-3 text-right text-red-600">
+                    <td className="p-3 print:p-1.5 text-right text-gray-700 print:text-xs">{formatCurrency(p.fee_amount || 0)}</td>
+                    <td className="p-3 print:p-1.5 text-right text-red-600 print:text-xs">
                       {parseFloat(p.fee_penalty || "0") > 0 ? `+${formatCurrency(p.fee_penalty || "0")}` : "₹0"}
                     </td>
-                    <td className="p-3 text-right text-green-600">
+                    <td className="p-3 print:p-1.5 text-right text-green-600 print:text-xs">
                       {parseFloat(p.fee_discount || "0") > 0 ? `-${formatCurrency(p.fee_discount || "0")}` : "₹0"}
                     </td>
-                    <td className="p-3 text-right font-bold text-gray-900">{formatCurrency(p.amount || 0)}</td>
+                    <td className="p-3 print:p-1.5 text-right font-bold text-gray-900 print:text-xs">{formatCurrency(p.amount || 0)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot className="bg-gray-50 font-bold border-t border-gray-200 text-gray-900">
                 <tr>
-                  <td colSpan={2} className="p-3 text-right">Total Summary:</td>
-                  <td className="p-3 text-right">{formatCurrency(totalBase)}</td>
-                  <td className="p-3 text-right text-red-600">{formatCurrency(totalPenalty)}</td>
-                  <td className="p-3 text-right text-green-600">-{formatCurrency(totalDiscount)}</td>
-                  <td className="p-3 text-right text-blue-700 text-sm font-extrabold">{formatCurrency(totalReceived)}</td>
+                  <td colSpan={2} className="p-3 print:p-1.5 text-right print:text-xs">Total Summary:</td>
+                  <td className="p-3 print:p-1.5 text-right print:text-xs">{formatCurrency(totalBase)}</td>
+                  <td className="p-3 print:p-1.5 text-right text-red-600 print:text-xs">{formatCurrency(totalPenalty)}</td>
+                  <td className="p-3 print:p-1.5 text-right text-green-600 print:text-xs">-{formatCurrency(totalDiscount)}</td>
+                  <td className="p-3 print:p-1.5 text-right text-blue-700 text-sm print:text-xs font-extrabold">{formatCurrency(totalReceived)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-        </>
+        </div>
       ) : (
         <>
-          <SectionTitle icon={GraduationCap} title="Fee Details" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 print-compact-gap">
-            <Info label="Fee Structure / Type" value={primaryPayment.feetype_name || "-"} />
-            {(() => {
-              const particularText = primaryPayment.fee_description || primaryPayment.fee_discount_reference;
-              if (!particularText || particularText.includes("[Cash Recd")) return null;
-              return (
-                <Info
-                  label="Particulars"
-                  value={particularText}
-                  wide
-                />
-              );
-            })()}
-            <Info label="Billing Cycle" value={billingCycleLabel(primaryPayment.fee_billing_cycle)} />
-            <Info
-              label="Billing Period"
-              value={formatBillingPeriod(primaryPayment.fee_billing_period || "")}
-            />
-            <Info label="Academic Year" value={primaryPayment.academic_year_name || "-"} />
-            <Info label="Due Date" value={formatDate(primaryPayment.fee_due_date)} />
-            <Info label="Fee Status" value={getFeeStatusLabel(primaryPayment.fee_status)} />
-            <Info label="Student Fee ID" value={String(primaryPayment.student_fee || "-")} />
-            <Info label="Payment ID" value={String(primaryPayment.id)} />
-            {primaryPayment.is_rte_govt_claim && (
-              <Info label="Fee Classification" value="RTE Govt Reimbursement Claim" wide />
-            )}
+          <div>
+            <SectionTitle icon={GraduationCap} title="Fee Details" />
+            <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2.5 print:gap-1.5 print:gap-y-1.5 print-compact-gap mt-1 print:mt-0.5">
+              <Info label="Fee Structure / Type" value={primaryPayment.feetype_name || "-"} />
+              {(() => {
+                const particularText = primaryPayment.fee_description || primaryPayment.fee_discount_reference;
+                if (!particularText || particularText.includes("[Cash Recd")) return null;
+                return (
+                  <Info
+                    label="Particulars"
+                    value={particularText}
+                    wide
+                  />
+                );
+              })()}
+              <Info label="Billing Cycle" value={billingCycleLabel(primaryPayment.fee_billing_cycle)} />
+              <Info
+                label="Billing Period"
+                value={formatBillingPeriod(primaryPayment.fee_billing_period || "")}
+              />
+              <Info label="Academic Year" value={primaryPayment.academic_year_name || "-"} />
+              <Info label="Due Date" value={formatDate(primaryPayment.fee_due_date)} />
+              <Info label="Fee Status" value={getFeeStatusLabel(primaryPayment.fee_status)} />
+              <Info label="Student Fee ID" value={String(primaryPayment.student_fee || "-")} />
+              <Info label="Payment ID" value={String(primaryPayment.id)} />
+              {primaryPayment.is_rte_govt_claim && (
+                <Info label="Fee Classification" value="RTE Govt Reimbursement Claim" wide />
+              )}
+            </div>
           </div>
 
-          <SectionTitle icon={BadgeIndianRupee} title="Amount Breakup" />
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <AmountRow label="Base Fee Amount" value={primaryPayment.fee_amount} />
-            <AmountRow
-              label="Penalty / Late Fee"
-              value={primaryPayment.fee_penalty}
-              tone="red"
-              prefix="+"
-            />
-            <AmountRow
-              label="Discount"
-              value={primaryPayment.fee_discount}
-              tone="green"
-              prefix="-"
-            />
-            <AmountRow
-              label="Total Payable"
-              value={primaryPayment.fee_payable_amount}
-              strong
-            />
-            <AmountRow
-              label={primaryPayment.payer_type === "government" ? "Govt Claim Amount Received" : "Amount Received in This Receipt"}
-              value={primaryPayment.amount}
-              strong
-              tone="blue"
-            />
-            <AmountRow label="Total Paid Till Now" value={primaryPayment.fee_paid_amount} />
-            <AmountRow
-              label="Remaining Balance"
-              value={primaryPayment.fee_balance_amount || primaryPayment.balance_after_payment}
-              tone="red"
-              strong
-            />
+          <div className="print:break-inside-avoid">
+            <SectionTitle icon={BadgeIndianRupee} title="Amount Breakup" />
+            <div className="border border-gray-200 rounded-xl print:rounded-lg overflow-hidden mt-1 print:mt-0.5">
+              <AmountRow label="Base Fee Amount" value={primaryPayment.fee_amount} />
+              <AmountRow
+                label="Penalty / Late Fee"
+                value={primaryPayment.fee_penalty}
+                tone="red"
+                prefix="+"
+              />
+              <AmountRow
+                label="Discount"
+                value={primaryPayment.fee_discount}
+                tone="green"
+                prefix="-"
+              />
+              <AmountRow
+                label="Total Payable"
+                value={primaryPayment.fee_payable_amount}
+                strong
+              />
+              <AmountRow
+                label={primaryPayment.payer_type === "government" ? "Govt Claim Amount Received" : "Amount Received in This Receipt"}
+                value={primaryPayment.amount}
+                strong
+                tone="blue"
+              />
+              <AmountRow label="Total Paid Till Now" value={primaryPayment.fee_paid_amount} />
+              <AmountRow
+                label="Remaining Balance"
+                value={primaryPayment.fee_balance_amount || primaryPayment.balance_after_payment}
+                tone="red"
+                strong
+              />
+            </div>
           </div>
         </>
       )}
 
       {isMultiItem && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl print:rounded-lg p-4 print:p-2 flex items-center justify-between print:break-inside-avoid">
           <div>
-            <p className="text-xs text-blue-700 font-semibold uppercase tracking-wider">Grand Total Paid</p>
-            <p className="text-2xl font-black text-blue-900">{formatCurrency(totalReceived)}</p>
+            <p className="text-xs print:text-[10px] text-blue-700 font-semibold uppercase tracking-wider">Grand Total Paid</p>
+            <p className="text-2xl print:text-lg font-black text-blue-900">{formatCurrency(totalReceived)}</p>
           </div>
-          <div className="text-right text-xs text-blue-800">
+          <div className="text-right text-xs print:text-[10px] text-blue-800">
             <p>{payments.length} fee installments paid in full</p>
-            <p className="text-[11px] text-blue-600 mt-0.5">Receipt: {primaryPayment.receipt_number}</p>
+            <p className="text-[11px] print:text-[9.5px] text-blue-600 mt-0.5">Receipt: {primaryPayment.receipt_number}</p>
           </div>
         </div>
       )}
 
-      <SectionTitle icon={CalendarDays} title="Payment Details" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div>
+        <SectionTitle icon={CalendarDays} title="Payment Details" />
+        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-3 print:gap-1.5 print:gap-y-1.5 mt-1 print:mt-0.5">
         <Info label="Payment Date" value={formatDateTime(primaryPayment.payment_date)} />
         <Info label="Payer Type" value={primaryPayment.payer_type === "government" ? "Government (RTE Claim)" : "Student / Guardian"} />
         <Info label="Payment Mode" value={primaryPayment.payment_mode === "govt_rte" ? "Govt RTE Direct Credit" : capitalize(primaryPayment.payment_mode)} />
@@ -464,11 +487,12 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
         <Info label="Verified At" value={formatDateTime(primaryPayment.verified_at)} />
         <Info label="Clearance Status" value={paymentStatus.label} />
       </div>
+    </div>
 
       {(cashInfo.hasBreakdown || cashInfo.cleanNote) && (
-        <>
+        <div className="print:break-inside-avoid">
           <SectionTitle icon={FileText} title="Note" />
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-xs md:text-sm text-gray-800 space-y-1">
+          <div className="rounded-xl print:rounded-lg border border-gray-200 bg-gray-50 p-3.5 print:p-2 text-xs md:text-sm print:text-xs text-gray-800 space-y-1 print:space-y-0.5 mt-1 print:mt-0.5">
             {cashInfo.hasBreakdown && (
               <p className="font-semibold text-gray-900 tracking-tight">
                 {cashInfo.breakdown}
@@ -478,7 +502,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
               <p
                 className={
                   cashInfo.hasBreakdown
-                    ? "text-gray-600 text-xs italic pt-1 border-t border-gray-200/60"
+                    ? "text-gray-600 text-xs italic pt-1 print:pt-0.5 border-t border-gray-200/60"
                     : "text-gray-700"
                 }
               >
@@ -486,21 +510,22 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
               </p>
             )}
           </div>
-        </>
+        </div>
       )}
 
-      <div className="grid grid-cols-2 gap-8 pt-6 print-compact-pt text-sm">
-        <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-xs">
-          Receiver Signature
+      <div className="print:break-inside-avoid">
+        <div className="grid grid-cols-2 gap-8 print:gap-6 pt-5 print:pt-2.5 text-sm">
+          <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-xs print:text-[11px]">
+            Receiver Signature
+          </div>
+          <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-right text-xs print:text-[11px]">
+            Authorized Signature
+          </div>
         </div>
-        <div className="border-t border-gray-300 pt-1.5 text-gray-600 text-right text-xs">
-          Authorized Signature
-        </div>
+        <p className="text-center text-xs print:text-[9.5px] text-gray-400 pt-2 print:pt-1 print:m-0 print:p-0">
+          This receipt is system generated and valid subject to payment clearance.
+        </p>
       </div>
-
-      <p className="text-center text-xs text-gray-400 pt-2">
-        This receipt is system generated and valid subject to payment clearance.
-      </p>
     </div>
   );
 }
@@ -513,9 +538,9 @@ function SectionTitle({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-2 pt-1">
-      <Icon size={16} className="text-blue-600" />
-      <h4 className="text-sm font-bold uppercase tracking-wide text-gray-700">
+    <div className="flex items-center gap-1.5 print:gap-1 pt-1 print:pt-0">
+      <Icon size={16} className="text-blue-600 print:w-3.5 print:h-3.5 shrink-0" />
+      <h4 className="text-sm print:text-xs font-bold uppercase tracking-wide text-gray-700">
         {title}
       </h4>
     </div>
@@ -533,14 +558,14 @@ function Info({
 }) {
   return (
     <div
-      className={`rounded-xl border border-gray-200 bg-gray-50 p-3 min-w-0 ${
+      className={`rounded-xl print:rounded-lg border border-gray-200 bg-gray-50 p-3 print:p-1.5 min-w-0 ${
         wide ? "col-span-2" : ""
       }`}
     >
-      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+      <p className="text-[11px] print:text-[9.5px] font-medium uppercase tracking-wide text-gray-500 leading-tight">
         {label}
       </p>
-      <p className="text-sm font-semibold text-gray-900 mt-1 break-words">
+      <p className="text-sm print:text-[11.5px] font-semibold text-gray-900 mt-1 print:mt-0.5 break-words leading-snug">
         {value || "-"}
       </p>
     </div>
@@ -572,14 +597,14 @@ function AmountRow({
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 px-4 py-3 border-b border-gray-100 last:border-b-0 ${
+      className={`flex items-center justify-between gap-4 px-4 py-3 print:px-3 print:py-1 border-b border-gray-100 last:border-b-0 ${
         strong ? "bg-gray-50" : "bg-white"
       }`}
     >
-      <span className={`text-sm ${strong ? "font-bold" : "font-medium"}`}>
+      <span className={`text-sm print:text-xs ${strong ? "font-bold" : "font-medium"}`}>
         {label}
       </span>
-      <span className={`text-sm ${strong ? "font-bold" : "font-semibold"} ${color}`}>
+      <span className={`text-sm print:text-xs ${strong ? "font-bold" : "font-semibold"} ${color}`}>
         {prefix && parseFloat(String(value || 0)) > 0 ? `${prefix} ` : ""}
         {formatted}
       </span>
@@ -603,9 +628,9 @@ function StatusPill({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full border text-xs font-semibold ${className}`}
+      className={`inline-flex items-center gap-1 mt-2 print:mt-0.5 px-2 print:px-1.5 py-0.5 print:py-0 rounded-full border text-xs print:text-[10px] font-semibold ${className}`}
     >
-      <CheckCircle2 size={11} />
+      <CheckCircle2 size={11} className="print:w-2.5 print:h-2.5" />
       {label}
     </span>
   );

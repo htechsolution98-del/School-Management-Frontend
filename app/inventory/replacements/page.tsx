@@ -1,14 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   RefreshCw,
   RotateCcw,
   Loader2,
-  X
+  X,
+  ArrowLeftRight,
+  CheckCircle2,
+  AlertTriangle,
+  Check,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { inventoryApi, coreApi, showApiError, showSuccess } from "@/lib/inventory-client";
+import {
+  processReturnReplace,
+  type ProcessReturnReplacePayload,
+  formatChargingPolicy,
+  formatVariantLabel
+} from "@/lib/fees";
 
 export default function ReplacementsAndReturnsPage() {
   const [activeTab, setActiveTab] = useState<"replacements" | "returns">("replacements");
@@ -30,39 +41,33 @@ export default function ReplacementsAndReturnsPage() {
   const [adminRemarks, setAdminRemarks] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Replacement Request Modal State
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [submittingRequest, setSubmittingRequest] = useState(false);
-  const [studentIssuedItems, setStudentIssuedItems] = useState<any[]>([]);
-  const [loadingIssuedItems, setLoadingIssuedItems] = useState(false);
-  const [requestForm, setRequestForm] = useState<{
+  // Unified Process Return / Exchange Modal State
+  const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
+  const [submittingProcess, setSubmittingProcess] = useState(false);
+  const [studentIssuedRecords, setStudentIssuedRecords] = useState<any[]>([]);
+  const [loadingIssuedRecords, setLoadingIssuedRecords] = useState(false);
+  const [selectedIssueRecord, setSelectedIssueRecord] = useState<any | null>(null);
+  const [processForm, setProcessForm] = useState<{
     student: string;
-    item: string;
-    academic_year: string;
-    current_size: string;
-    requested_size: string;
-    current_color: string;
-    requested_color: string;
+    issue_id: string;
+    action_type: "RETURN" | "REPLACEMENT";
+    condition: "GOOD" | "DAMAGED";
     quantity: number | string;
     reason: string;
-    description: string;
+    remarks: string;
+    requested_size: string;
+    requested_color: string;
   }>({
-    student: "", item: "", academic_year: "", current_size: "", requested_size: "",
-    current_color: "", requested_color: "", quantity: 1, reason: "WRONG_SIZE", description: "",
-  });
-
-  // Return Modal State
-  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [returnForm, setReturnForm] = useState({
     student: "",
-    item: "",
-    size: "",
-    color: "",
-    quantity: 1,
+    issue_id: "",
+    action_type: "RETURN",
     condition: "GOOD",
-    reason: "Graduation / Uniform Return",
+    quantity: 1,
+    reason: "WRONG_SIZE",
+    remarks: "",
+    requested_size: "",
+    requested_color: "",
   });
-  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -85,22 +90,12 @@ export default function ReplacementsAndReturnsPage() {
       setReturns(Array.isArray(retRes.data) ? retRes.data : retRes.data.results || []);
       const its = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data.results || [];
       setItems(its);
-      const returnableItems = its.filter((item: { is_returnable?: boolean }) => item.is_returnable);
-      if (returnableItems.length > 0 && !returnForm.item) {
-        setReturnForm(prev => ({ ...prev, item: returnableItems[0].id }));
-      }
       setSizes(Array.isArray(sizesRes.data) ? sizesRes.data : sizesRes.data.results || []);
       setColors(Array.isArray(colorsRes.data) ? colorsRes.data : colorsRes.data.results || []);
       const st = Array.isArray(studsRes.data) ? studsRes.data : studsRes.data.results || [];
       setStudents(st);
-      if (st.length > 0 && !returnForm.student) {
-        setReturnForm(prev => ({ ...prev, student: st[0].id }));
-      }
       const years = Array.isArray(yearsRes.data) ? yearsRes.data : yearsRes.data.results || [];
       setAcademicYears(years);
-      if (years.length > 0 && !requestForm.academic_year) {
-        setRequestForm(prev => ({ ...prev, academic_year: String(years[0].id) }));
-      }
     } catch (err) {
       console.error("Error fetching replacements:", err);
       showApiError(err, "Failed to load replacement and return records.");
@@ -146,182 +141,177 @@ export default function ReplacementsAndReturnsPage() {
     }
   };
 
-  const handleSaveReturn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingReturn(true);
-    try {
-      const payload = {
-        student: Number(returnForm.student),
-        item: Number(returnForm.item),
-        size: returnForm.size ? Number(returnForm.size) : null,
-        color: returnForm.color ? Number(returnForm.color) : null,
-        quantity: Number(returnForm.quantity),
-        condition: returnForm.condition,
-        reason: returnForm.reason,
-      };
-
-      await inventoryApi.post("/returns/", payload);
-      showSuccess("Return Processed", returnForm.condition === "GOOD" ? "Item restocked into inventory." : "Item recorded as damaged.");
-      setIsReturnModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      showApiError(err, "Failed to record student return.");
-    } finally {
-      setSubmittingReturn(false);
-    }
-  };
-
-  const handleOpenRequestModal = () => {
-    setRequestForm({
+  const handleOpenProcessModal = () => {
+    setProcessForm({
       student: "",
-      item: "",
-      academic_year: academicYears.length > 0 ? String(academicYears[0].id) : "",
-      current_size: "",
-      requested_size: "",
-      current_color: "",
-      requested_color: "",
+      issue_id: "",
+      action_type: "RETURN",
+      condition: "GOOD",
       quantity: 1,
       reason: "WRONG_SIZE",
-      description: "",
+      remarks: "",
+      requested_size: "",
+      requested_color: "",
     });
-    setStudentIssuedItems([]);
-    setIsRequestModalOpen(true);
+    setStudentIssuedRecords([]);
+    setSelectedIssueRecord(null);
+    setIsProcessModalOpen(true);
   };
 
-  const handleStudentChange = async (studentId: string) => {
-    setRequestForm((prev) => ({
+  const handleStudentSelect = async (studentId: string) => {
+    setProcessForm((prev) => ({
       ...prev,
       student: studentId,
-      item: "",
-      current_size: "",
+      issue_id: "",
+      quantity: 1,
       requested_size: "",
-      current_color: "",
       requested_color: "",
     }));
+    setSelectedIssueRecord(null);
 
     if (!studentId) {
-      setStudentIssuedItems([]);
+      setStudentIssuedRecords([]);
       return;
     }
 
-    setLoadingIssuedItems(true);
+    setLoadingIssuedRecords(true);
     try {
       const res = await inventoryApi.get(`/issues/?student=${studentId}`);
-      const issuesData = Array.isArray(res.data) ? res.data : res.data?.results || [];
-
-      // Extract unique items issued to this specific student
-      const itemsMap = new Map<number, any>();
-      issuesData.forEach((issue: any) => {
-        const itId = typeof issue.item === "object" ? issue.item?.id : Number(issue.item);
-        if (!itId) return;
-        const qty = Number(issue.quantity || 0);
-        if (!itemsMap.has(itId)) {
-          const catalogItem = items.find((ci) => ci.id === itId);
-          itemsMap.set(itId, {
-            id: itId,
-            item_name: issue.item_name || catalogItem?.item_name || `Item #${itId}`,
-            item_code: issue.item_code || catalogItem?.item_code || "",
-            total_issued_qty: qty,
-            issues: [issue],
-          });
-        } else {
-          const existing = itemsMap.get(itId);
-          existing.total_issued_qty += qty;
-          existing.issues.push(issue);
-        }
-      });
-
-      setStudentIssuedItems(Array.from(itemsMap.values()));
+      const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const activeIssues = list.filter((iss: any) => !iss.status || iss.status === "ISSUED");
+      setStudentIssuedRecords(activeIssues.length > 0 ? activeIssues : list);
     } catch (err) {
-      console.error("Error fetching issued items for student:", err);
+      console.error("Error fetching student issued items:", err);
       toast.error("Failed to load student's issued items.");
-      setStudentIssuedItems([]);
+      setStudentIssuedRecords([]);
     } finally {
-      setLoadingIssuedItems(false);
+      setLoadingIssuedRecords(false);
     }
   };
 
-  const handleItemChange = (itemId: string) => {
-    const selectedIssued = studentIssuedItems.find((it) => String(it.id) === itemId);
-    let autoCurrentSize = "";
-    let autoCurrentColor = "";
+  const handleIssueSelect = (issueIdStr: string) => {
+    const found = studentIssuedRecords.find((rec) => String(rec.id) === issueIdStr);
+    setSelectedIssueRecord(found || null);
 
-    if (selectedIssued && selectedIssued.issues && selectedIssued.issues.length > 0) {
-      const latestIssue = selectedIssued.issues[0];
-      if (latestIssue.size) {
-        autoCurrentSize = String(typeof latestIssue.size === "object" ? latestIssue.size.id : latestIssue.size);
+    let defaultSize = "";
+    let defaultColor = "";
+    if (found) {
+      if (found.size) {
+        defaultSize = String(typeof found.size === "object" ? found.size.id : found.size);
       }
-      if (latestIssue.color) {
-        autoCurrentColor = String(typeof latestIssue.color === "object" ? latestIssue.color.id : latestIssue.color);
+      if (found.color) {
+        defaultColor = String(typeof found.color === "object" ? found.color.id : found.color);
       }
     }
 
-    const maxQty = selectedIssued ? selectedIssued.total_issued_qty || 1 : 1;
-
-    setRequestForm((prev) => ({
+    setProcessForm((prev) => ({
       ...prev,
-      item: itemId,
-      current_size: autoCurrentSize || prev.current_size,
-      current_color: autoCurrentColor || prev.current_color,
-      quantity: prev.quantity && prev.quantity > maxQty ? maxQty : prev.quantity || 1,
+      issue_id: issueIdStr,
+      quantity: 1,
+      requested_size: defaultSize,
+      requested_color: defaultColor,
     }));
   };
 
-  const selectedIssuedItem = studentIssuedItems.find((it) => String(it.id) === String(requestForm.item));
-  const maxAllowedQuantity = selectedIssuedItem ? (Number(selectedIssuedItem.total_issued_qty) || 1) : undefined;
-  const isQtyExceeded = maxAllowedQuantity !== undefined && Number(requestForm.quantity) > maxAllowedQuantity;
-  const isQtyInvalid = !requestForm.quantity || Number(requestForm.quantity) <= 0 || isQtyExceeded;
+  const selectedCatalogItem = useMemo(() => {
+    if (!selectedIssueRecord) return null;
+    const itId = typeof selectedIssueRecord.item === "object" ? selectedIssueRecord.item?.id : Number(selectedIssueRecord.item);
+    return items.find((ci) => ci.id === itId);
+  }, [selectedIssueRecord, items]);
 
-  const handleSaveRequest = async (e: React.FormEvent) => {
+  const allowedSizesForSelected = useMemo(() => {
+    if (!selectedCatalogItem || !selectedCatalogItem.has_size) return [];
+    if (selectedCatalogItem.allowed_sizes && selectedCatalogItem.allowed_sizes.length > 0) {
+      const allowed = new Set(selectedCatalogItem.allowed_sizes.map((s: any) => (typeof s === "object" ? s.id : s)));
+      return sizes.filter((s: any) => allowed.has(s.id));
+    }
+    return sizes;
+  }, [selectedCatalogItem, sizes]);
+
+  const allowedColorsForSelected = useMemo(() => {
+    if (!selectedCatalogItem || !selectedCatalogItem.has_color) return [];
+    if (selectedCatalogItem.allowed_colors && selectedCatalogItem.allowed_colors.length > 0) {
+      const allowed = new Set(selectedCatalogItem.allowed_colors.map((c: any) => (typeof c === "object" ? c.id : c)));
+      return colors.filter((c: any) => allowed.has(c.id));
+    }
+    return colors;
+  }, [selectedCatalogItem, colors]);
+
+  const handleProcessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestForm.student) {
+    if (!processForm.student) {
       toast.error("Please select a student.");
       return;
     }
-    if (!requestForm.academic_year) {
-      toast.error("Please select an academic year.");
+    if (!processForm.issue_id || !selectedIssueRecord) {
+      toast.error("Please select an issued item.");
       return;
     }
-    if (!requestForm.item) {
-      toast.error("Please select an item to replace.");
-      return;
-    }
-    if (isQtyExceeded) {
-      toast.error(`Quantity cannot exceed previously issued quantity of ${maxAllowedQuantity}.`);
-      return;
-    }
-    if (!requestForm.quantity || Number(requestForm.quantity) <= 0) {
+    const qty = Number(processForm.quantity);
+    if (!qty || qty <= 0) {
       toast.error("Quantity must be at least 1.");
       return;
     }
+    const maxQty = selectedIssueRecord.quantity || 1;
+    if (qty > maxQty) {
+      toast.error(`Quantity cannot exceed the issued quantity of ${maxQty}.`);
+      return;
+    }
 
-    setSubmittingRequest(true);
+    if (processForm.action_type === "REPLACEMENT") {
+      if (selectedCatalogItem?.has_size && !processForm.requested_size) {
+        toast.error("Please select a requested replacement size.");
+        return;
+      }
+      if (selectedCatalogItem?.has_color && !processForm.requested_color) {
+        toast.error("Please select a requested replacement color.");
+        return;
+      }
+    }
+
+    setSubmittingProcess(true);
     try {
-      await inventoryApi.post("/replacements/", {
-        ...requestForm,
-        student: Number(requestForm.student),
-        item: Number(requestForm.item),
-        academic_year: Number(requestForm.academic_year),
-        current_size: requestForm.current_size ? Number(requestForm.current_size) : null,
-        requested_size: requestForm.requested_size ? Number(requestForm.requested_size) : null,
-        current_color: requestForm.current_color ? Number(requestForm.current_color) : null,
-        requested_color: requestForm.requested_color ? Number(requestForm.requested_color) : null,
-        quantity: Number(requestForm.quantity),
-      });
-      showSuccess("Replacement request recorded", "It is now pending review.");
-      setIsRequestModalOpen(false);
-      fetchData();
+      const combinedRemarks = processForm.action_type === "REPLACEMENT"
+        ? `[Exchange: ${processForm.reason}] ${processForm.remarks}`.trim()
+        : processForm.remarks.trim();
+
+      const payload: ProcessReturnReplacePayload = {
+        action_type: processForm.action_type,
+        condition: processForm.condition,
+        quantity: qty,
+        remarks: combinedRemarks,
+        replacement_size: processForm.action_type === "REPLACEMENT" && processForm.requested_size ? Number(processForm.requested_size) : null,
+        replacement_color: processForm.action_type === "REPLACEMENT" && processForm.requested_color ? Number(processForm.requested_color) : null,
+      };
+
+      const res = await processReturnReplace(selectedIssueRecord.id, payload);
+      if (res.success) {
+        showSuccess(
+          processForm.action_type === "REPLACEMENT"
+            ? "Exchange / Replacement Processed"
+            : "Student Return Processed",
+          processForm.action_type === "REPLACEMENT"
+            ? "Replacement unit deducted from stock and issued to student."
+            : `Stock updated (${processForm.condition === "GOOD" ? "Restocked in Main Stock" : "Logged to Scrap/Damaged ledger"})${
+                selectedIssueRecord.charging_type === "SEPARATE_CHARGE"
+                  ? " & Fee liability reversed."
+                  : "."
+              }`
+        );
+        setIsProcessModalOpen(false);
+        fetchData();
+      } else {
+        showApiError(res.error || res.message, "Failed to process return/exchange.");
+      }
     } catch (err: any) {
-      showApiError(err, "Failed to record replacement request.");
+      showApiError(err, "Failed to process return/exchange.");
     } finally {
-      setSubmittingRequest(false);
+      setSubmittingProcess(false);
     }
   };
 
-  const selectedReturnItem = items.find((item) => item.id === Number(returnForm.item));
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -335,42 +325,36 @@ export default function ReplacementsAndReturnsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleOpenRequestModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold shadow-sm hover:bg-slate-50 transition-all"
-          >
-            <RefreshCw className="w-4 h-4 text-blue-600" /> New Replacement Request
-          </button>
-          <button
-            onClick={() => setIsReturnModalOpen(true)}
+            onClick={handleOpenProcessModal}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
           >
-            <RotateCcw className="w-4 h-4" /> Record Student Return
+            <RotateCcw className="w-4 h-4" /> Process Return / Exchange
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 flex-nowrap overflow-x-auto whitespace-nowrap hide-scrollbar pb-0.5 sm:pb-0">
         <button
           onClick={() => setActiveTab("replacements")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "replacements"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <RefreshCw className="w-4 h-4" /> Replacement Requests ({replacements.length})
+          <RefreshCw className="w-4 h-4 shrink-0" /> Replacement Requests ({replacements.length})
         </button>
 
         <button
           onClick={() => setActiveTab("returns")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "returns"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <RotateCcw className="w-4 h-4" /> Student Item Returns ({returns.length})
+          <RotateCcw className="w-4 h-4 shrink-0" /> Student Item Returns ({returns.length})
         </button>
       </div>
 
@@ -388,8 +372,8 @@ export default function ReplacementsAndReturnsPage() {
               <p className="text-xs mt-1">Student size exchanges or damaged replacement requests will appear here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="w-full overflow-x-auto hide-scrollbar">
+              <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-3.5 px-4">Student</th>
@@ -475,8 +459,8 @@ export default function ReplacementsAndReturnsPage() {
               <p className="text-xs mt-1">Returned blazers, sports kits, or library gear are tracked here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="w-full overflow-x-auto hide-scrollbar">
+              <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-3.5 px-4">Return Date</th>
@@ -515,285 +499,423 @@ export default function ReplacementsAndReturnsPage() {
         )}
       </div>
 
-      {isRequestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  Create Replacement Request
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Submit an exchange or replacement request for an item previously issued to a student.
-                </p>
+      {/* Unified Process Return / Exchange Modal */}
+      {isProcessModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-8">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Process Return / Exchange</h2>
+                  <p className="text-xs text-slate-500">Unified workflow with condition routing and fee synchronization</p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsRequestModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                onClick={() => setIsProcessModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRequest} noValidate className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Select Student */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Select Student <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={requestForm.student}
-                    onChange={(e) => handleStudentChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Select student</option>
-                    {students.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} {s.surname} {s.roll_no ? `· Roll: ${s.roll_no}` : s.gr_no ? `· GR: ${s.gr_no}` : ""}
-                      </option>
-                    ))}
-                  </select>
+            <form onSubmit={handleProcessSubmit} noValidate className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Step 1: Identify Student & Issued Item */}
+              <div className="space-y-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                  Step 1: Identify Student & Issued Item
                 </div>
 
-                {/* Academic Year */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Academic Year <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={requestForm.academic_year}
-                    onChange={(e) => setRequestForm({ ...requestForm, academic_year: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Select academic year</option>
-                    {academicYears.map((year) => (
-                      <option key={year.id} value={year.id}>{year.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Item to Replace - DYNAMICALLY FILTERED BY ISSUED ITEMS */}
-                <div className="sm:col-span-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Item to Replace <span className="text-red-500">*</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Select Student */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Select Student <span className="text-red-500">*</span>
                     </label>
-                    {loadingIssuedItems && (
-                      <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching student's issued items...
-                      </span>
-                    )}
+                    <select
+                      required
+                      value={processForm.student}
+                      onChange={(e) => handleStudentSelect(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                    >
+                      <option value="">Select student</option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.surname} {s.roll_no ? `· Roll: ${s.roll_no}` : s.gr_no ? `· GR: ${s.gr_no}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <select
-                    required
-                    disabled={!requestForm.student || loadingIssuedItems || studentIssuedItems.length === 0}
-                    value={requestForm.item}
-                    onChange={(e) => handleItemChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {!requestForm.student ? (
-                      <option value="">-- Please select a student first --</option>
-                    ) : loadingIssuedItems ? (
-                      <option value="">Loading student's issued items...</option>
-                    ) : studentIssuedItems.length === 0 ? (
-                      <option value="">No items previously issued to this student</option>
-                    ) : (
-                      <>
-                        <option value="">-- Select an issued item --</option>
-                        {studentIssuedItems.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.item_name} {item.item_code ? `(${item.item_code})` : ""} · (Issued: {item.total_issued_qty || 1})
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                  {requestForm.student && !loadingIssuedItems && studentIssuedItems.length === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
-                      ⚠️ This student has no recorded item issuances in the system. Replacement requests can only be submitted for items previously issued to the student.
-                    </p>
-                  )}
-                  {requestForm.student && !loadingIssuedItems && studentIssuedItems.length > 0 && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                      Showing only items previously issued to this student ({studentIssuedItems.length} available).
-                    </p>
-                  )}
+
+                  {/* Select Issued Item */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Select Issued Item <span className="text-red-500">*</span>
+                      </label>
+                      {loadingIssuedRecords && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Loading...
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      required
+                      disabled={!processForm.student || loadingIssuedRecords || studentIssuedRecords.length === 0}
+                      value={processForm.issue_id}
+                      onChange={(e) => handleIssueSelect(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {!processForm.student ? (
+                        <option value="">-- Select a student first --</option>
+                      ) : loadingIssuedRecords ? (
+                        <option value="">Loading student's issued items...</option>
+                      ) : studentIssuedRecords.length === 0 ? (
+                        <option value="">No items issued to this student</option>
+                      ) : (
+                        <>
+                          <option value="">-- Select issued item --</option>
+                          {studentIssuedRecords.map((iss) => {
+                            const vLabel = formatVariantLabel(iss);
+                            const policy = formatChargingPolicy(iss.charging_type);
+                            return (
+                              <option key={iss.id} value={iss.id}>
+                                {iss.item_name} {vLabel ? `(${vLabel})` : ""} · Qty: {iss.quantity} ({policy.shortLabel})
+                              </option>
+                            );
+                          })}
+                        </>
+                      )}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Replacement Reason */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Replacement Reason <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={requestForm.reason}
-                    onChange={(e) => setRequestForm({ ...requestForm, reason: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="WRONG_SIZE">Wrong Size</option>
-                    <option value="DAMAGED">Damaged</option>
-                    <option value="LOST">Lost</option>
-                    <option value="DEFECTIVE">Defective</option>
-                    <option value="WORN_OUT">Worn Out</option>
-                    <option value="OTHER">Other Reason</option>
-                  </select>
-                </div>
-
-                {/* Quantity */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Quantity <span className="text-red-500">*</span>
-                    </label>
-                    {maxAllowedQuantity !== undefined && (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                        Max Issued: <span className="font-bold text-slate-700 dark:text-slate-200">{maxAllowedQuantity}</span>
-                      </span>
-                    )}
+                {/* Selected Issue Preview Card */}
+                {selectedIssueRecord && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm">
+                          {selectedIssueRecord.item_name}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {selectedIssueRecord.size_name || selectedIssueRecord.color_name
+                            ? `Variant: ${selectedIssueRecord.size_name || "—"} / ${selectedIssueRecord.color_name || "—"}`
+                            : "Standard / No Variant"}
+                          {selectedIssueRecord.item_code ? ` · Code: ${selectedIssueRecord.item_code}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {(() => {
+                          const pol = formatChargingPolicy(selectedIssueRecord.charging_type);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${pol.badgeClass}`}>
+                              <span className={`w-1 h-1 rounded-full ${pol.dotClass}`} />
+                              {pol.label}
+                            </span>
+                          );
+                        })()}
+                        <div className="text-xs text-slate-500 mt-1">
+                          Issued: <strong className="text-slate-800 dark:text-slate-200">{selectedIssueRecord.quantity} units</strong> on {selectedIssueRecord.issue_date}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxAllowedQuantity}
-                    required
-                    value={requestForm.quantity}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setRequestForm({
-                        ...requestForm,
-                        quantity: val === "" ? ("" as any) : Number(val),
-                      });
-                    }}
-                    className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none transition-all ${
-                      isQtyExceeded
-                        ? "border-red-500 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                        : "border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df]"
+                )}
+              </div>
+
+              {/* Step 2: Returned Condition */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                  Step 2: Returned Condition (Stock Routing) <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setProcessForm({ ...processForm, condition: "GOOD" })}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      processForm.condition === "GOOD"
+                        ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                     }`}
-                    placeholder="Quantity"
-                  />
-                  {isQtyExceeded && (
-                    <p className="text-xs text-red-600 dark:text-red-400 font-medium mt-1.5 flex items-center gap-1 animate-in fade-in">
-                      <span>⚠️</span> Cannot exceed previously issued quantity of {maxAllowedQuantity}.
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className={`w-4 h-4 ${processForm.condition === "GOOD" ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Good / Restock</span>
+                      </div>
+                      {processForm.condition === "GOOD" && <Check className="w-4 h-4 text-emerald-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Item is reusable. Restocks (+{processForm.quantity || 1}) into Main Available Stock.
                     </p>
-                  )}
-                  {requestForm.quantity !== "" && Number(requestForm.quantity) <= 0 && (
-                    <p className="text-xs text-red-600 dark:text-red-400 font-medium mt-1.5 flex items-center gap-1 animate-in fade-in">
-                      <span>⚠️</span> Quantity must be greater than zero.
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProcessForm({ ...processForm, condition: "DAMAGED" })}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      processForm.condition === "DAMAGED"
+                        ? "border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 ring-2 ring-rose-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className={`w-4 h-4 ${processForm.condition === "DAMAGED" ? "text-rose-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Damaged / Scrap</span>
+                      </div>
+                      {processForm.condition === "DAMAGED" && <Check className="w-4 h-4 text-rose-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Defective item. Does NOT increment Main Stock; logged to virtual Scrap/Damaged ledger.
                     </p>
-                  )}
-                </div>
-
-                {/* Current Size */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Current Size
-                  </label>
-                  <select
-                    value={requestForm.current_size}
-                    onChange={(e) => setRequestForm({ ...requestForm, current_size: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Current size (optional)</option>
-                    {sizes.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Requested Size */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Requested Size
-                  </label>
-                  <select
-                    value={requestForm.requested_size}
-                    onChange={(e) => setRequestForm({ ...requestForm, requested_size: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Requested size (optional)</option>
-                    {sizes.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Current Color */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Current Color
-                  </label>
-                  <select
-                    value={requestForm.current_color}
-                    onChange={(e) => setRequestForm({ ...requestForm, current_color: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Current color (optional)</option>
-                    {colors.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Requested Color */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Requested Color
-                  </label>
-                  <select
-                    value={requestForm.requested_color}
-                    onChange={(e) => setRequestForm({ ...requestForm, requested_color: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                  >
-                    <option value="">Requested color (optional)</option>
-                    {colors.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Request Details / Description */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Request Details / Description
-                  </label>
-                  <textarea
-                    value={requestForm.description}
-                    onChange={(e) => setRequestForm({ ...requestForm, description: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
-                    rows={3}
-                    placeholder="Provide additional context or details about this replacement request..."
-                  />
+                  </button>
                 </div>
               </div>
+
+              {/* Step 3: Action Type */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                  Step 3: Action Needed <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setProcessForm({ ...processForm, action_type: "RETURN" })}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      processForm.action_type === "RETURN"
+                        ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 ring-2 ring-amber-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <RotateCcw className={`w-4 h-4 ${processForm.action_type === "RETURN" ? "text-amber-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Return Only (Refund/Cancel Fee)</span>
+                      </div>
+                      {processForm.action_type === "RETURN" && <Check className="w-4 h-4 text-amber-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Return item to inventory without issuing a replacement.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProcessForm({ ...processForm, action_type: "REPLACEMENT" })}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      processForm.action_type === "REPLACEMENT"
+                        ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 ring-2 ring-blue-500/20"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <ArrowLeftRight className={`w-4 h-4 ${processForm.action_type === "REPLACEMENT" ? "text-blue-600" : "text-slate-400"}`} />
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">Exchange / Replace Item</span>
+                      </div>
+                      {processForm.action_type === "REPLACEMENT" && <Check className="w-4 h-4 text-blue-600" />}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Dispense a replacement item to the student.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Contextual Fee / Stock Synchronization Notice */}
+                <div className="mt-2.5">
+                  {processForm.action_type === "RETURN" ? (
+                    selectedIssueRecord?.charging_type === "SEPARATE_CHARGE" ? (
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <strong className="font-bold">Automatic Fee Synchronization:</strong> Because this item had a Separate Charge policy, confirming this return will automatically reverse/cancel the student's fee liability in the Fees module.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                        <div>
+                          <strong className="font-semibold">Fee Ledger:</strong> No fee adjustment needed (item was issued as {selectedIssueRecord?.charging_type === "FREE" ? "Free" : "Included in Fee"}).
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div>
+                        <strong className="font-bold">Inventory & Fee Sync:</strong> A fresh unit will be deducted (-{processForm.quantity || 1}) from Main Stock. The fee ledger is NOT altered (original charge remains valid with no duplicate charge).
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 4: Conditional Fields (Smart UI) */}
+              {processForm.action_type === "REPLACEMENT" ? (
+                <div className="space-y-4 p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/10">
+                  <div className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                    Replacement Details
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Replacement Reason */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Replacement Reason <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={processForm.reason}
+                        onChange={(e) => setProcessForm({ ...processForm, reason: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                      >
+                        <option value="WRONG_SIZE">Wrong Size Fitting</option>
+                        <option value="DEFECTIVE">Manufacturing Defect / Torn</option>
+                        <option value="COLOR_EXCHANGE">Color Exchange</option>
+                        <option value="DAMAGED">Damaged / Broken</option>
+                        <option value="OTHER">Other Exchange Reason</option>
+                      </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Quantity to Exchange <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={selectedIssueRecord ? selectedIssueRecord.quantity || 1 : 1}
+                        required
+                        value={processForm.quantity}
+                        onChange={(e) => setProcessForm({ ...processForm, quantity: Math.max(1, Number(e.target.value)) })}
+                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                      />
+                      {selectedIssueRecord && (
+                        <span className="text-[11px] text-slate-400">Max: {selectedIssueRecord.quantity} units</span>
+                      )}
+                    </div>
+
+                    {/* Requested Size */}
+                    {selectedCatalogItem?.has_size && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                          Requested Size <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={processForm.requested_size}
+                          onChange={(e) => setProcessForm({ ...processForm, requested_size: e.target.value })}
+                          className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                        >
+                          <option value="">Select requested size</option>
+                          {allowedSizesForSelected.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Requested Color */}
+                    {selectedCatalogItem?.has_color && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                          Requested Color <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={processForm.requested_color}
+                          onChange={(e) => setProcessForm({ ...processForm, requested_color: e.target.value })}
+                          className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                        >
+                          <option value="">Select requested color</option>
+                          {allowedColorsForSelected.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Remarks / Description */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Exchange Remarks / Notes
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Size M too tight, exchanged for Size L"
+                        value={processForm.remarks}
+                        onChange={(e) => setProcessForm({ ...processForm, remarks: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Quantity to Return <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedIssueRecord ? selectedIssueRecord.quantity || 1 : 1}
+                      required
+                      value={processForm.quantity}
+                      onChange={(e) => setProcessForm({ ...processForm, quantity: Math.max(1, Number(e.target.value)) })}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                    />
+                    {selectedIssueRecord && (
+                      <span className="text-[11px] text-slate-400">Max: {selectedIssueRecord.quantity} units</span>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Return Reason / Remarks
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Completed school term, uniform returned, etc."
+                      value={processForm.remarks}
+                      onChange={(e) => setProcessForm({ ...processForm, remarks: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5826df]/20 focus:border-[#5826df] transition-all"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsRequestModalOpen(false)}
+                  onClick={() => setIsProcessModalOpen(false)}
+                  disabled={submittingProcess}
                   className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    submittingRequest ||
-                    !requestForm.student ||
-                    !requestForm.item ||
-                    loadingIssuedItems ||
-                    isQtyInvalid
-                  }
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  disabled={submittingProcess || !processForm.student || !processForm.issue_id}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                    processForm.action_type === "RETURN"
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                      : "bg-[#5826df] hover:bg-[#4a1ec2] shadow-indigo-500/20"
+                  }`}
                 >
-                  {submittingRequest && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {submittingRequest ? "Submitting..." : "Submit Request"}
+                  {submittingProcess && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {submittingProcess
+                    ? "Processing..."
+                    : processForm.action_type === "RETURN"
+                    ? "Confirm Return"
+                    : "Confirm Exchange"}
                 </button>
               </div>
             </form>
@@ -908,118 +1030,6 @@ export default function ReplacementsAndReturnsPage() {
         </div>
       )}
 
-      {/* Record Return Modal */}
-      {isReturnModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Record Student Return</h2>
-              <button onClick={() => setIsReturnModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveReturn} noValidate className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Student <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={returnForm.student}
-                  onChange={(e) => setReturnForm({ ...returnForm, student: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
-                >
-                  <option value="">Select Student</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} {s.surname} (Roll #{s.roll_no || "—"})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Item Returned <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={returnForm.item}
-                  onChange={(e) => setReturnForm({ ...returnForm, item: e.target.value, size: "", color: "" })}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
-                >
-                  <option value="">Select Item</option>
-                  {items.filter((it) => it.is_returnable).map((it) => (
-                    <option key={it.id} value={it.id}>{it.item_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedReturnItem?.has_size && (
-                <select required value={returnForm.size} onChange={(e) => setReturnForm({ ...returnForm, size: e.target.value })} className="w-full rounded-lg border p-2">
-                  <option value="">Select returned size</option>{sizes.filter((size) => size.is_active).map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
-                </select>
-              )}
-              {selectedReturnItem?.has_color && (
-                <select required value={returnForm.color} onChange={(e) => setReturnForm({ ...returnForm, color: e.target.value })} className="w-full rounded-lg border p-2">
-                  <option value="">Select returned color</option>{colors.filter((color) => color.is_active).map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
-                </select>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Returned Condition <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={returnForm.condition}
-                    onChange={(e) => setReturnForm({ ...returnForm, condition: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-semibold"
-                  >
-                    <option value="GOOD">Good (Restock In Inventory)</option>
-                    <option value="DAMAGED">Damaged (Do Not Restock)</option>
-                    <option value="UNUSABLE">Unusable / Discard</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={returnForm.quantity}
-                    onChange={(e) => setReturnForm({ ...returnForm, quantity: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Reason / Remarks
-                </label>
-                <input
-                  type="text"
-                  value={returnForm.reason}
-                  onChange={(e) => setReturnForm({ ...returnForm, reason: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                <button type="button" onClick={() => setIsReturnModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
-                  Cancel
-                </button>
-                <button type="submit" disabled={submittingReturn} className="px-5 py-2 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all">
-                  {submittingReturn ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Accept Return
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

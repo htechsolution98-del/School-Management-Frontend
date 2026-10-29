@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Banknote,
+  Boxes,
   Bell,
   BookOpen,
   CalendarCheck,
@@ -26,6 +27,7 @@ import {
   Menu,
   School,
   Users,
+  UserCheck,
   X,
 } from "lucide-react";
 import { logoutUser, getDashboardRoute } from "@/lib/auth";
@@ -623,6 +625,15 @@ export function
   // Derive role-aware mobile bottom navigation items (5 items: 4 core + More)
   const mobileNavItems = (() => {
     const role = (roleTitle || "").toLowerCase();
+
+    if (role.includes("inventory")) {
+      return [
+        { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
+        { title: "Stock", href: "/inventory/stock", icon: Boxes },
+        { title: "Issues", href: "/inventory/issue", icon: UserCheck },
+        { title: "Requisitions", href: "/inventory/requisitions", icon: ClipboardList },
+      ];
+    }
 
     if (role.includes("teacher")) {
       return [

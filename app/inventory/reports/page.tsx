@@ -559,8 +559,8 @@ export default function InventoryReportsPage() {
 
         {/* Tab 2: Sales & Issues Register */}
         {activeTab === "sales" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[720px] text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Date</th>
@@ -642,8 +642,8 @@ export default function InventoryReportsPage() {
 
         {/* Tab 3: Purchases Register */}
         {activeTab === "purchases" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[720px] text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">PO Number</th>
@@ -706,8 +706,8 @@ export default function InventoryReportsPage() {
 
         {/* Tab 4: Free Items */}
         {activeTab === "free" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[720px] text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Date</th>
@@ -752,8 +752,8 @@ export default function InventoryReportsPage() {
 
         {/* Tab 5: Replacements Summary */}
         {activeTab === "replacements" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[720px] text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Date</th>

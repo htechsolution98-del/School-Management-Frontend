@@ -280,7 +280,7 @@ export default function StockAndLedgerPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -292,13 +292,13 @@ export default function StockAndLedgerPage() {
             Monitor real-time item balances, enter opening balances, adjust stock variances, and inspect the movement ledger.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               if (items.length > 0) setAdjustForm(prev => ({ ...prev, item: items[0].id }));
               setIsAdjustModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
           >
             <Sliders className="w-4 h-4 text-slate-500" /> Stock Adjustment
           </button>
@@ -307,7 +307,7 @@ export default function StockAndLedgerPage() {
               if (items.length > 0) setOpeningForm(prev => ({ ...prev, item: items[0].id }));
               setIsOpeningModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap"
           >
             <Plus className="w-4 h-4" /> Add Opening Stock
           </button>
@@ -315,35 +315,35 @@ export default function StockAndLedgerPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 flex-nowrap overflow-x-auto whitespace-nowrap hide-scrollbar pb-0.5 sm:pb-0">
         <button
           onClick={() => setActiveTab("balances")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "balances"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <Boxes className="w-4 h-4" /> Live Stock Balances ({items.length})
+          <Boxes className="w-4 h-4 shrink-0" /> Live Stock Balances ({items.length})
         </button>
 
         <button
           onClick={() => setActiveTab("ledger")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "ledger"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <History className="w-4 h-4" /> Movement Ledger ({transactions.length})
+          <History className="w-4 h-4 shrink-0" /> Movement Ledger ({transactions.length})
         </button>
         <button
           onClick={() => setActiveTab("audit")}
-          className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${
             activeTab === "audit" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          <History className="w-4 h-4" /> Audit Trail ({auditLogs.length})
+          <History className="w-4 h-4 shrink-0" /> Audit Trail ({auditLogs.length})
         </button>
       </div>
 
@@ -386,8 +386,8 @@ export default function StockAndLedgerPage() {
             <Loader2 className="w-8 h-8 animate-spin mr-2" /> Loading stock records...
           </div>
         ) : activeTab === "balances" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[700px] text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4">Item Name & Code</th>
@@ -446,8 +446,8 @@ export default function StockAndLedgerPage() {
           </div>
         ) : activeTab === "ledger" ? (
           /* Ledger Table */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[750px] text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4">Date</th>
@@ -499,8 +499,8 @@ export default function StockAndLedgerPage() {
             </table>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[650px] text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr><th className="py-3.5 px-4">Date</th><th className="py-3.5 px-4">User</th><th className="py-3.5 px-4">Action</th><th className="py-3.5 px-4">Entity</th><th className="py-3.5 px-4">Details</th></tr>
               </thead>

@@ -267,16 +267,16 @@ export default function InventoryRequisitionsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-3 sm:pb-5 lg:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 pb-24 sm:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
-        <div>
-          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
-            <ClipboardList className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Staff Supply Requisitions Approval
+      <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2 sm:gap-2.5">
+            <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="truncate sm:whitespace-normal">Staff Supply Requisitions</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Review and approve teaching consumable and asset requisitions requested by teachers and school staff.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 sm:mt-1 line-clamp-2 sm:line-clamp-none">
+            Review and approve teaching consumable and asset requisitions requested by teachers and staff.
           </p>
         </div>
         <Button
@@ -395,8 +395,8 @@ export default function InventoryRequisitionsPage() {
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="overflow-x-auto w-full">
-            <table className="w-full min-w-[780px] text-left text-xs">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[780px] text-left text-xs whitespace-nowrap">
               <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
                 <tr>
                   <th className="px-4 py-3.5 w-12 text-center">#</th>
