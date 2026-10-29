@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Banknote,
+  Boxes,
   Bell,
   BookOpen,
   CalendarCheck,
@@ -26,6 +27,7 @@ import {
   Menu,
   School,
   Users,
+  UserCheck,
   X,
 } from "lucide-react";
 import { logoutUser, getDashboardRoute } from "@/lib/auth";
@@ -624,6 +626,15 @@ export function
   const mobileNavItems = (() => {
     const role = (roleTitle || "").toLowerCase();
 
+    if (role.includes("inventory")) {
+      return [
+        { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
+        { title: "Stock", href: "/inventory/stock", icon: Boxes },
+        { title: "Issues", href: "/inventory/issue", icon: UserCheck },
+        { title: "Requisitions", href: "/inventory/requisitions", icon: ClipboardList },
+      ];
+    }
+
     if (role.includes("teacher")) {
       return [
         { title: "Dashboard", href: "/teacher", icon: Home },
@@ -916,7 +927,7 @@ export function
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1D4ED8] text-white font-bold text-xs sm:text-sm shadow-xs border border-white/25 lg:bg-[#2563EB]">
                 {userInitials || "TE"}
               </span>
-              <div className="text-left flex items-center gap-1">
+              <div className="text-left hidden sm:flex items-center gap-1">
                 <div>
                   <span className="block max-w-[100px] truncate text-xs sm:text-sm font-semibold text-white lg:text-[#142044] leading-tight">
                     {currentUserName || "teacher1"}

@@ -39,6 +39,7 @@ import {
   Printer,
   Receipt,
   FileText,
+  Package,
 } from "lucide-react";
 import {
   fetchStudents,
@@ -59,6 +60,11 @@ import {
   type StudentFee,
   type AcademicYear,
   type FeeWiseClass,
+  fetchStudentInventoryIssues,
+  formatVariantLabel,
+  formatItemWithVariant,
+  formatChargingPolicy,
+  type StudentInventoryIssueRecord,
 } from "@/lib/fees";
 import type { Payment } from "@/types/fees";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
@@ -1909,6 +1915,16 @@ export default function StudentLedgerPage() {
   const [activeAcademicYearId, setActiveAcademicYearId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
+  // Tab Navigation: Fee Ledger vs Inventory Issued
+  const [activeLedgerTab, setActiveLedgerTab] = useState<"fees" | "inventory">("fees");
+
+  // Inventory Issuance History State
+  const [inventoryIssues, setInventoryIssues] = useState<StudentInventoryIssueRecord[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryPolicyFilter, setInventoryPolicyFilter] = useState("ALL");
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
   // Multi-selection state
   const [selectedFeeKeys, setSelectedFeeKeys] = useState<string[]>([]);
   const [isCollectMultipleModalOpen, setIsCollectMultipleModalOpen] = useState(false);
@@ -1965,6 +1981,73 @@ export default function StudentLedgerPage() {
   useEffect(() => {
     loadLedgerData();
   }, [loadLedgerData]);
+
+  const loadInventoryData = useCallback(async () => {
+    if (!selectedLedgerStudent) {
+      setInventoryIssues([]);
+      return;
+    }
+    setInventoryLoading(true);
+    setInventoryError(null);
+    try {
+      const res = await fetchStudentInventoryIssues(selectedLedgerStudent.id);
+      if (res.success && res.data) {
+        setInventoryIssues(res.data);
+      } else {
+        setInventoryError(res.error || "Failed to load inventory issuance records");
+      }
+    } catch (err: any) {
+      setInventoryError(err?.message || "Failed to load inventory records");
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [selectedLedgerStudent]);
+
+  useEffect(() => {
+    loadInventoryData();
+  }, [loadInventoryData]);
+
+  const filteredInventoryIssues = useMemo(() => {
+    return inventoryIssues.filter((issue) => {
+      if (inventoryPolicyFilter !== "ALL") {
+        const p = (issue.charging_type || "").toUpperCase();
+        if (inventoryPolicyFilter === "FREE" && p !== "FREE") return false;
+        if (
+          inventoryPolicyFilter === "INCLUDED_IN_FEE" &&
+          p !== "INCLUDED_IN_FEE" &&
+          p !== "INCLUDED"
+        )
+          return false;
+        if (
+          inventoryPolicyFilter === "SEPARATE_CHARGE" &&
+          p !== "SEPARATE_CHARGE" &&
+          p !== "SEPARATE"
+        )
+          return false;
+      }
+
+      if (inventorySearch.trim()) {
+        const query = inventorySearch.toLowerCase();
+        const itemName = (issue.item_name || "").toLowerCase();
+        const itemCode = (issue.item_code || "").toLowerCase();
+        const size = (issue.size_name || "").toLowerCase();
+        const color = (issue.color_name || "").toLowerCase();
+        const policy = (issue.charging_type || "").toLowerCase();
+        const remarks = (issue.remarks || "").toLowerCase();
+
+        return (
+          itemName.includes(query) ||
+          itemCode.includes(query) ||
+          size.includes(query) ||
+          color.includes(query) ||
+          policy.includes(query) ||
+          remarks.includes(query)
+        );
+      }
+
+      return true;
+    });
+  }, [inventoryIssues, inventoryPolicyFilter, inventorySearch]);
 
   // Helper to get unique key for fee item
   const getFeeKey = (fee: StudentFee): string => String(fee.id);
@@ -2188,6 +2271,15 @@ export default function StudentLedgerPage() {
                       Roll No: {selectedLedgerStudent.roll_number}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveLedgerTab("inventory")}
+                    className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100/70 rounded-md px-2.5 py-0.5 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="View Inventory Issued History"
+                  >
+                    <Package size={13} className="text-purple-600" />
+                    <span>Items Issued: {inventoryLoading ? "..." : inventoryIssues.length}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -2196,6 +2288,8 @@ export default function StudentLedgerPage() {
                 onClick={() => {
                   setSelectedLedgerStudent(null);
                   setLedgerFees([]);
+                  setInventoryIssues([]);
+                  setActiveLedgerTab("fees");
                 }}
                 className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
               >
@@ -2356,8 +2450,48 @@ export default function StudentLedgerPage() {
              );
            })()}
 
-           {/* Ledger Table / Cards */}
-           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white mb-20">
+           {/* Ledger Tab Navigation */}
+           <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
+             <button
+               type="button"
+               onClick={() => setActiveLedgerTab("fees")}
+               className={`flex items-center gap-2 pb-3 px-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                 activeLedgerTab === "fees"
+                   ? "border-blue-600 text-blue-600"
+                   : "border-transparent text-gray-500 hover:text-gray-900"
+               }`}
+             >
+               <Receipt size={16} />
+               <span>Fee Ledger</span>
+               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                 activeLedgerTab === "fees" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"
+               }`}>
+                 {ledgerFees.length}
+               </span>
+             </button>
+
+             <button
+               type="button"
+               onClick={() => setActiveLedgerTab("inventory")}
+               className={`flex items-center gap-2 pb-3 px-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                 activeLedgerTab === "inventory"
+                   ? "border-blue-600 text-blue-600"
+                   : "border-transparent text-gray-500 hover:text-gray-900"
+               }`}
+             >
+               <Package size={16} />
+               <span>Inventory Issued</span>
+               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                 activeLedgerTab === "inventory" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"
+               }`}>
+                 {inventoryIssues.length}
+               </span>
+             </button>
+           </div>
+
+           {activeLedgerTab === "fees" ? (
+           /* Ledger Table / Cards */
+           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white mb-20 animate-in fade-in duration-200">
              <div className="bg-gray-50 px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                    {selectableFees.length > 0 && (
@@ -2750,9 +2884,253 @@ export default function StudentLedgerPage() {
                 </div>
              )}
            </div>
+           ) : (
+            /* Dedicated Inventory Issued / Items History View */
+            <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white mb-20 animate-in fade-in duration-300">
+              {/* Header with Search and Policy Filter */}
+              <div className="bg-gray-50 px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <Package size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Inventory Issued History
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Complete audit trail of all items physically received by this student
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Search Filter */}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter items, variant, policy..."
+                      value={inventorySearch}
+                      onChange={(e) => setInventorySearch(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-56"
+                    />
+                    {inventorySearch && (
+                      <button
+                        onClick={() => setInventorySearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Charging Policy Filter Dropdown */}
+                  <select
+                    value={inventoryPolicyFilter}
+                    onChange={(e) => setInventoryPolicyFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Charging Policies</option>
+                    <option value="FREE">Free</option>
+                    <option value="INCLUDED_IN_FEE">Included in Fee</option>
+                    <option value="SEPARATE_CHARGE">Separate Charge</option>
+                  </select>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={loadInventoryData}
+                    disabled={inventoryLoading}
+                    className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 bg-white cursor-pointer"
+                    title="Refresh Inventory Records"
+                  >
+                    <RefreshCw size={14} className={inventoryLoading ? "animate-spin" : ""} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Statistics Banner */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gradient-to-r from-blue-50/40 via-purple-50/20 to-slate-50 border-b border-gray-100 text-xs">
+                <div className="bg-white p-3 rounded-xl border border-blue-100/80 shadow-2xs">
+                  <p className="text-[10px] uppercase font-bold text-gray-500">Total Items Issued</p>
+                  <p className="text-base font-bold text-gray-900 mt-0.5">
+                    {inventoryIssues.reduce((sum, item) => sum + (item.quantity || 1), 0)} Units ({inventoryIssues.length} Records)
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-emerald-100/80 shadow-2xs">
+                  <p className="text-[10px] uppercase font-bold text-emerald-700">Free Items</p>
+                  <p className="text-base font-bold text-emerald-800 mt-0.5">
+                    {inventoryIssues.filter((i) => i.charging_type === "FREE").length} Records
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-blue-100/80 shadow-2xs">
+                  <p className="text-[10px] uppercase font-bold text-blue-700">Included in Fee</p>
+                  <p className="text-base font-bold text-blue-800 mt-0.5">
+                    {inventoryIssues.filter((i) => i.charging_type === "INCLUDED_IN_FEE" || i.charging_type === "INCLUDED").length} Records
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-amber-100/80 shadow-2xs">
+                  <p className="text-[10px] uppercase font-bold text-amber-700">Separate Charge</p>
+                  <p className="text-base font-bold text-amber-800 mt-0.5">
+                    {inventoryIssues.filter((i) => i.charging_type === "SEPARATE_CHARGE" || i.charging_type === "SEPARATE").length} Records
+                  </p>
+                </div>
+              </div>
+
+              {/* Inventory Table */}
+              {inventoryLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                  <Loader2 size={32} className="animate-spin text-blue-500 mb-2" />
+                  <p className="text-sm font-medium">Fetching inventory issuance records...</p>
+                </div>
+              ) : filteredInventoryIssues.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <Package size={40} className="mb-2 opacity-40 text-gray-400" />
+                  <p className="text-sm font-bold text-gray-700">
+                    {inventoryIssues.length === 0
+                      ? "No inventory items issued to this student"
+                      : "No records match your filter criteria"}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1 max-w-sm text-center">
+                    {inventoryIssues.length === 0
+                      ? "When items (Free, Included in Fee, or Separate Charge) are issued to this student via the Inventory module, they will appear in this audit log."
+                      : "Try adjusting your search query or charging policy filter."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                        <th className="py-3.5 px-4">Issue Date</th>
+                        <th className="py-3.5 px-4">Item Name (Variant)</th>
+                        <th className="py-3.5 px-4 text-center">Quantity</th>
+                        <th className="py-3.5 px-4 text-center">Charging Policy</th>
+                        <th className="py-3.5 px-4 text-right">Charged Amount</th>
+                        <th className="py-3.5 px-4">Reason / Notes</th>
+                        <th className="py-3.5 px-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-sm">
+                      {filteredInventoryIssues.map((issue) => {
+                        const policy = formatChargingPolicy(issue.charging_type);
+                        const variant = formatVariantLabel(issue);
+                        const chargedNum = parseFloat(String(issue.charged_amount || "0"));
+
+                        return (
+                          <tr key={issue.id} className="hover:bg-blue-50/30 transition-colors">
+                            {/* 1. Issue Date */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <CalendarDays size={14} className="text-gray-400" />
+                                <div>
+                                  <p className="font-semibold text-gray-900 text-xs">
+                                    {formatDisplayDate(issue.issue_date)}
+                                  </p>
+                                  {issue.academic_year_name && (
+                                    <p className="text-[10px] text-gray-500 font-medium">
+                                      {issue.academic_year_name}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 2. Item Name (Variant) */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-gray-900 text-sm">
+                                    {issue.item_name}
+                                  </span>
+                                  {issue.item_code && (
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                                      {issue.item_code}
+                                    </span>
+                                  )}
+                                </div>
+                                {variant ? (
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                      <span>Variant:</span>
+                                      <span className="font-semibold">{variant}</span>
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-gray-400 italic mt-0.5">Standard (No variant)</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 3. Quantity */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                                {issue.quantity} {issue.quantity === 1 ? "Unit" : "Units"}
+                              </span>
+                            </td>
+
+                            {/* 4. Charging Policy */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${policy.badgeClass}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${policy.dotClass}`} />
+                                {policy.label}
+                              </span>
+                            </td>
+
+                            {/* 5. Charged Amount */}
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              {policy.shortLabel === "Free" ? (
+                                <span className="text-xs font-semibold text-emerald-600">₹0.00 (Free)</span>
+                              ) : policy.shortLabel === "Included" ? (
+                                <span className="text-xs font-medium text-blue-600">Included in Fee</span>
+                              ) : (
+                                <span className="text-xs font-bold text-gray-900">
+                                  ₹{chargedNum.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 6. Reason / Remarks */}
+                            <td className="py-3.5 px-4 text-xs text-gray-600">
+                              <div className="max-w-xs">
+                                <p className="font-medium text-gray-800">
+                                  {issue.issue_reason ? issue.issue_reason.replace(/_/g, " ") : "Initial Issue"}
+                                </p>
+                                {issue.remarks && (
+                                  <p className="text-gray-500 italic mt-0.5 truncate" title={issue.remarks}>
+                                    {issue.remarks}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 7. Status */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <span
+                                className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                                  issue.status === "RETURNED"
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : issue.status === "REPLACED"
+                                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                }`}
+                              >
+                                {issue.status || "ISSUED"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+           )}
 
            {/* Floating Bottom Action Bar for Multi-Fee Selection */}
-           {selectedFeeKeys.length > 0 && (
+           {activeLedgerTab === "fees" && selectedFeeKeys.length > 0 && (
              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-3xl bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-700 flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-6 duration-300">
                <div className="flex items-center gap-4">
                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">

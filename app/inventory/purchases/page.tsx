@@ -384,7 +384,7 @@ export default function PurchasesAndSuppliersPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
+    <div className="w-full max-w-full space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
@@ -525,8 +525,8 @@ export default function PurchasesAndSuppliersPage() {
                 </button>
               </div>
             ) : (
-              <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
-                <table className="w-full min-w-[800px] text-left text-sm">
+              <div className="w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[700px] text-left text-sm">
                   <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                     <tr>
                       <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Invoice #</th>

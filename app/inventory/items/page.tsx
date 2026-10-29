@@ -262,7 +262,7 @@ export default function ItemMasterPage() {
   });
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
+    <div className="w-full max-w-full space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
@@ -349,8 +349,8 @@ export default function ItemMasterPage() {
             <p className="text-xs mt-1">Add your first item using the &quot;Add New Item&quot; button above.</p>
           </div>
         ) : (
-          <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
-            <table className="w-full min-w-[760px] text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4 whitespace-nowrap">Item Details</th>
@@ -377,7 +377,7 @@ export default function ItemMasterPage() {
                     </td>
 
                     {/* Category */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium">
                         <Tag className="w-3 h-3 text-slate-400" />
                         {item.category_name || "Unassigned"}

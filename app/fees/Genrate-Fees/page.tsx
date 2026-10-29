@@ -36,6 +36,7 @@ import {
   UserX,
   Layers,
   ExternalLink,
+  Package,
 } from "lucide-react";
 import {
   fetchStudents,
@@ -57,6 +58,9 @@ import {
   type StudentFee,
   type AcademicYear,
   type FeeWiseClass,
+  fetchStudentInventoryIssues,
+  formatInventoryReceivedSummary,
+  type StudentInventoryIssueRecord,
 } from "@/lib/fees";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
 import ReceiptModal, { formatCashBreakdown } from "../student-ledger/ReceiptModal";
@@ -1767,6 +1771,7 @@ const StudentFeesSlideOut = ({
   onViewFee,
   onCollectFee,
   onDiscountFee,
+  academicYears,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -1774,7 +1779,55 @@ const StudentFeesSlideOut = ({
   onViewFee: (fee: StudentFee) => void;
   onCollectFee: (fee: StudentFee) => void;
   onDiscountFee: (fee: StudentFee) => void;
+  academicYears?: AcademicYear[];
 }) => {
+  const [inventoryIssues, setInventoryIssues] = useState<StudentInventoryIssueRecord[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !group?.student_id) {
+      setInventoryIssues([]);
+      return;
+    }
+    let isCancelled = false;
+    setInventoryLoading(true);
+
+    async function loadInventory() {
+      try {
+        const res = await fetchStudentInventoryIssues(group!.student_id);
+        if (!isCancelled && res.success && res.data) {
+          setInventoryIssues(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load student inventory in slide-out:', err);
+      } finally {
+        if (!isCancelled) {
+          setInventoryLoading(false);
+        }
+      }
+    }
+
+    loadInventory();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, group?.student_id]);
+
+  const targetYearId =
+    group?.fees?.[0]?.academic_year ||
+    academicYears?.find((y) => y.is_active || y.status === 'Active')?.id;
+
+  const thisYearIssues = useMemo(() => {
+    if (!inventoryIssues || inventoryIssues.length === 0) return [];
+    if (!targetYearId) return inventoryIssues;
+    const filtered = inventoryIssues.filter((i) => i.academic_year === targetYearId);
+    return filtered.length > 0 ? filtered : inventoryIssues;
+  }, [inventoryIssues, targetYearId]);
+
+  const inventorySummary = useMemo(() => {
+    return formatInventoryReceivedSummary(thisYearIssues);
+  }, [thisYearIssues]);
+
   if (!isOpen || !group) return null;
 
   return (
@@ -1928,6 +1981,32 @@ const StudentFeesSlideOut = ({
                 </div>
               );
             })}
+
+            {/* Quick Summary: Inventory Received (This Year) */}
+            <div className="mt-4 p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Package size={14} className="text-blue-600 shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Inventory Received (This Year)
+                  </span>
+                </div>
+                {inventoryLoading && (
+                  <Loader2 size={12} className="animate-spin text-gray-400" />
+                )}
+              </div>
+              {inventoryLoading ? (
+                <p className="text-xs text-gray-400 animate-pulse">Checking issued inventory...</p>
+              ) : inventorySummary ? (
+                <p className="text-xs font-medium text-gray-800 leading-relaxed">
+                  {inventorySummary}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 italic">
+                  No inventory items recorded for this student this year.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -3059,6 +3138,7 @@ export default function GenerateFeesPage() {
           setSlideOutGroup(null);
         }}
         group={slideOutGroup}
+        academicYears={academicYears}
         onViewFee={(f) => {
           setSelectedFee(f);
           setViewModalOpen(true);

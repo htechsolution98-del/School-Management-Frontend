@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BadgePercent,
   Plus,
@@ -31,6 +31,7 @@ export default function PricingAndFeeMappingPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [costLoading, setCostLoading] = useState(false);
+  const isFetchingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     item: "",
@@ -54,6 +55,8 @@ export default function PricingAndFeeMappingPage() {
   }, [yearFilter, typeFilter]);
 
   const fetchInitialData = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const [itemsRes, yearsRes, feesRes, classRes] = await Promise.all([
         inventoryApi.get("/items/"),
@@ -73,6 +76,8 @@ export default function PricingAndFeeMappingPage() {
     } catch (err) {
       console.error("Error fetching dependencies:", err);
       showApiError(err, "Failed to load pricing dependencies.");
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
@@ -264,7 +269,7 @@ export default function PricingAndFeeMappingPage() {
   });
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-3 md:px-6">
+    <div className="w-full max-w-full space-y-4 sm:space-y-6 px-3 md:px-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 sm:gap-4">
         <div>
@@ -329,8 +334,8 @@ export default function PricingAndFeeMappingPage() {
             <p className="text-xs mt-1">Map items to fee structures or set individual selling prices above.</p>
           </div>
         ) : (
-          <div className="w-full overflow-x-auto hide-scrollbar scrollbar-none">
-            <table className="w-full min-w-[800px] text-left text-sm">
+          <div className="w-full overflow-x-auto hide-scrollbar">
+            <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 whitespace-nowrap">Item Name</th>
@@ -346,15 +351,15 @@ export default function PricingAndFeeMappingPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {filteredPricings.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                       {p.item_name}
                     </td>
 
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                       {p.school_class_name || "All Classes"}
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                         p.charging_type === "INCLUDED_IN_FEE"
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
@@ -366,7 +371,7 @@ export default function PricingAndFeeMappingPage() {
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       {p.included_fee_type_name ? (
                         <span className="font-medium text-slate-800 dark:text-slate-200">
                           {p.included_fee_type_name}
@@ -376,15 +381,15 @@ export default function PricingAndFeeMappingPage() {
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
+                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
                       ₹{Number(p.purchase_cost).toLocaleString()}
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">
                       ₹{Number(p.selling_price).toLocaleString()}
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
                         p.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-slate-100 text-slate-500"
                       }`}>
@@ -392,7 +397,7 @@ export default function PricingAndFeeMappingPage() {
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleOpenModal(p)}
@@ -578,7 +583,7 @@ export default function PricingAndFeeMappingPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      School Purchase Cost (₹) <span className="text-red-500">*</span>
+                      School Purchase Cost (₹) <span className="text-slate-400 font-normal">(Audit Value)</span>
                     </label>
                     {costLoading && (
                       <span className="text-[10px] text-blue-500 flex items-center gap-1 font-medium">
@@ -590,13 +595,13 @@ export default function PricingAndFeeMappingPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    required
-                    placeholder="e.g. 600.00"
+                    readOnly
+                    disabled
+                    placeholder="0.00"
                     value={formData.purchase_cost}
-                    onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 cursor-not-allowed focus:outline-none select-none"
                   />
-                  <span className="text-[10px] text-slate-400">Auto-filled from purchase history or pricing. Adjustable if needed.</span>
+                  <span className="text-[10px] text-slate-400">Informational audit value fetched from actual purchase invoices. Read-only.</span>
                 </div>
 
                 <div>
