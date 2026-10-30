@@ -102,6 +102,7 @@ export interface StudentResult {
   is_absent: boolean;
   grade: string;
   remarks: string;
+  report_template?: "classic" | "modern" | "compact" | "watermark";
 }
 
 export interface RankingEntry {

@@ -5,10 +5,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   CalendarRange, ChevronLeft, ChevronRight, BookOpen, Users, Clock, Award,
   CheckCircle2, AlertCircle, Loader2, RefreshCw, X, TrendingUp, FileText,
-  GraduationCap, ArrowLeft, Calendar, BarChart3,
+  GraduationCap, ArrowLeft, Calendar, BarChart3, Eye, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getSchoolExams, getExamRoster } from "@/lib/teacher";
+import { fetchWithAuth } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/config";
+import { getSavedResultTemplate, type ResultTemplateId } from "@/lib/result-template";
+import { ResultTemplatePicker } from "@/components/results/result-template-picker";
+import { ResultCardPreview } from "@/components/results/result-card-preview";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { writePrintableResultCards } from "@/lib/result-report-print";
 import type { SchoolExam, SchoolExamStudent } from "@/types/teacher";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +64,89 @@ interface ModalProps {
 
 function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
   const [q, setQ] = useState("");
+  const [previewStudent, setPreviewStudent] = useState<SchoolExamStudent | null>(null);
+  const [schoolProfile, setSchoolProfile] = useState<any>({});
+
+  const openStudentPreview = async (student: SchoolExamStudent) => {
+    setPreviewStudent(student);
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/me/`);
+      if (response.ok) {
+        const profile = await response.json();
+        setSchoolProfile(profile.school && typeof profile.school === "object" ? profile.school : profile);
+      }
+    } catch { /* School details are optional for the preview. */ }
+  };
+
+  const downloadStudentPreview = () => {
+    if (!previewStudent) return;
+    const maximum = previewStudent.max_marks ?? (exam as any).max_marks ?? 0;
+    const obtained = previewStudent.is_absent ? 0 : Number(previewStudent.marks_obtained || 0);
+    const rawLogo = schoolProfile.logo || localStorage.getItem("school_logo") || "";
+    const logo = rawLogo && !String(rawLogo).startsWith("http") ? `${API_BASE_URL.replace(/\/api\/?$/, "")}${String(rawLogo).startsWith("/") ? rawLogo : `/${rawLogo}`}` : rawLogo;
+    const printWindow = window.open("", "_blank", "popup,width=1000,height=800");
+    if (!printWindow) { toast.error("Allow pop-ups to download the marksheet."); return; }
+    void writePrintableResultCards({ printWindow, students: [{ studentId: previewStudent.student_id, name: previewStudent.student_name, admissionNumber: previewStudent.gr_no, className: exam.class_group_name, subjects: [{ subject: exam.subject_name || exam.title, maximum, obtained: previewStudent.is_absent ? "Absent" : previewStudent.marks_obtained ?? "—", grade: previewStudent.grade, remarks: previewStudent.remarks, absent: previewStudent.is_absent }], totalMaximum: maximum, totalObtained: obtained, percentage: maximum ? Number(((obtained / Number(maximum)) * 100).toFixed(2)) : 0, overallGrade: previewStudent.grade, remarks: previewStudent.remarks || "" }], school: { name: schoolProfile.name || localStorage.getItem("school_name") || "School", logo, address: [schoolProfile.address, schoolProfile.city, schoolProfile.state, schoolProfile.pincode].filter(Boolean).join(", "), phone: schoolProfile.phone || "", email: schoolProfile.email || "" }, title: exam.title, academicYear: schoolProfile.academic_year_name || schoolProfile.academic_year?.name || "", template: previewStudent.report_template || getSavedResultTemplate() });
+  };
+
+  const printPublishedClass = async () => {
+    const publishedRows = (exam.students || []).filter((student) => student.is_published);
+    if (!publishedRows.length) {
+      toast.error("There are no published student results to print.");
+      return;
+    }
+    const printWindow = window.open("", "_blank", "popup,width=1000,height=800");
+    if (!printWindow) { toast.error("Allow pop-ups to download class marksheets."); return; }
+    printWindow.document.write("<!doctype html><html><body style='font:14px Arial;padding:32px;color:#334155'>Preparing published class marksheets…</body></html>");
+    const template = publishedRows.find((student) => student.report_template)?.report_template || getSavedResultTemplate();
+    let school: any = {};
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/me/`);
+      if (response.ok) {
+        const profile = await response.json();
+        school = profile.school && typeof profile.school === "object" ? profile.school : profile;
+      }
+    } catch { /* use the school profile already saved in the browser */ }
+    const rawLogo = school.logo || localStorage.getItem("school_logo") || "";
+    const logo = rawLogo && !String(rawLogo).startsWith("http")
+      ? `${API_BASE_URL.replace(/\/api\/?$/, "")}${String(rawLogo).startsWith("/") ? rawLogo : `/${rawLogo}`}`
+      : rawLogo;
+    const schoolName = school.name || localStorage.getItem("school_name") || "School";
+    const studentReports = publishedRows.map((student) => {
+      const maximum = student.max_marks ?? (exam as any).max_marks ?? 0;
+      const obtained = student.is_absent ? 0 : Number(student.marks_obtained || 0);
+      const percentage = student.percentage ?? (Number(maximum) > 0 ? Number(((obtained / Number(maximum)) * 100).toFixed(2)) : 0);
+      return {
+        studentId: student.student_id,
+        name: student.student_name,
+        rollNumber: (student as any).roll_no,
+        admissionNumber: student.gr_no,
+        className: exam.class_group_name,
+        division: (student as any).division || "",
+        photo: (student as any).photo || (student as any).profile_photo,
+        subjects: [{ subject: exam.subject_name || exam.title, maximum, obtained: student.is_absent ? "Absent" : student.marks_obtained ?? "—", grade: student.grade, remarks: student.remarks, absent: student.is_absent }],
+        totalMaximum: maximum,
+        totalObtained: student.is_absent ? "Absent" : obtained,
+        percentage,
+        overallGrade: student.grade,
+        remarks: student.remarks || "",
+      };
+    });
+    await writePrintableResultCards({
+      printWindow,
+      students: studentReports,
+      school: {
+        name: schoolName,
+        logo,
+        address: [school.address, school.city, school.state, school.pincode].filter(Boolean).join(", "),
+        phone: school.phone || school.contact_number || "",
+        email: school.email || "",
+      },
+      title: exam.title,
+      academicYear: school.academic_year_name || school.academic_year?.name || "",
+      template,
+    });
+  };
 
   const rows = useMemo(() => {
     const lq = q.toLowerCase();
@@ -191,7 +281,7 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
                 <tr>
-                  {["#", "Student Name", "GR No.", "Absent", "Marks", "Max", "%", "Grade", "Remarks", "Status"].map((h) => (
+                  {["#", "Student Name", "GR No.", "Absent", "Marks", "Max", "%", "Grade", "Remarks", "Status", "Marksheet"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-black text-[9px] uppercase tracking-widest text-indigo-600 whitespace-nowrap">
                       {h}
                     </th>
@@ -239,6 +329,9 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
                           <span className="flex items-center gap-1 text-slate-400 font-bold text-[9px]"><AlertCircle size={10} />Pending</span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {s.is_published && <button onClick={() => void openStudentPreview(s)} className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-2.5 py-1.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50"><Eye size={12} />View</button>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -248,13 +341,26 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-          <p className="text-xs text-slate-400 font-semibold">{rows.length} of {exam.students?.length || 0} students shown</p>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-xs text-slate-400 font-semibold">{rows.length} of {exam.students?.length || 0} students shown</p><p className="mt-1 text-[10px] text-slate-500">Class marksheets include published results only.</p></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><div className="w-full sm:w-[360px]"><ResultTemplatePicker compact /></div><button disabled={rosterLoading || !exam.students?.some((student) => student.is_published)} onClick={printPublishedClass} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"><FileText size={14} />Download Class Marksheet PDF</button>
           <button onClick={onClose} className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
             Close
           </button>
+          </div>
         </div>
       </motion.div>
+      <Dialog open={!!previewStudent} onOpenChange={(open) => { if (!open) setPreviewStudent(null); }}>
+        <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-slate-50 p-0 sm:left-1/2 sm:top-1/2 sm:h-[92dvh] sm:w-[94vw] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl" onClick={(event) => event.stopPropagation()}>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
+            {previewStudent && <ResultCardPreview title={exam.title} template={previewStudent.report_template || "classic"} school={{ name: schoolProfile.name || (typeof window !== "undefined" ? localStorage.getItem("school_name") || "School" : "School"), logo: schoolProfile.logo || (typeof window !== "undefined" ? localStorage.getItem("school_logo") || "" : ""), address: [schoolProfile.address, schoolProfile.city, schoolProfile.state, schoolProfile.pincode].filter(Boolean).join(", "), phone: schoolProfile.phone, email: schoolProfile.email, academicYear: schoolProfile.academic_year_name || schoolProfile.academic_year?.name }} student={{ id: previewStudent.student_id, name: previewStudent.student_name, admissionNumber: previewStudent.gr_no, className: exam.class_group_name }} subjects={[{ subject: exam.subject_name || exam.title, maximum: previewStudent.max_marks ?? (exam as any).max_marks ?? 0, obtained: previewStudent.is_absent ? "Absent" : previewStudent.marks_obtained ?? "—", grade: previewStudent.grade, remarks: previewStudent.remarks, absent: previewStudent.is_absent }]} totals={{ maximum: previewStudent.max_marks ?? (exam as any).max_marks ?? 0, obtained: previewStudent.is_absent ? "Absent" : previewStudent.marks_obtained ?? 0, percentage: previewStudent.percentage ?? 0, grade: previewStudent.grade }} remarks={previewStudent.remarks} />}
+          </div>
+          <DialogFooter className="flex shrink-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+            <Button variant="outline" onClick={() => setPreviewStudent(null)} className="rounded-xl">Cancel</Button>
+            <Button onClick={downloadStudentPreview} className="gap-2 rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700"><Download size={15} />Download PDF</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -328,6 +434,7 @@ export default function ClassTeacherExamsPage() {
           is_published: r.is_published === true || r.is_published === "True",
           percentage: r.percentage !== undefined ? r.percentage : pct,
           grade: r.grade !== undefined ? r.grade : grade,
+          report_template: r.report_template,
         };
       });
 
