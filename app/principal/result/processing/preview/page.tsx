@@ -23,6 +23,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -44,7 +45,10 @@ import {
   getWeightageConfigs,
   getResultReadiness,
   getExamsFull,
+  getExamResultPreview,
+  saveSubjectMarks,
   type FinalStudentResult,
+  type ExamResultPreview,
   type ResultWeightageConfig,
 } from "@/lib/exam-api";
 
@@ -70,6 +74,16 @@ export default function ResultProcessingPreviewPage() {
   const [previewStudent, setPreviewStudent] = useState<FinalStudentResult | null>(null);
 
   const [exams, setExams] = useState<any[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState("");
+  const [examResultPreview, setExamResultPreview] = useState<ExamResultPreview | null>(null);
+  const [isSavingExamMarks, setIsSavingExamMarks] = useState(false);
+  const [editedExamStudentIds, setEditedExamStudentIds] = useState<Set<number>>(new Set());
+  const [editingExamStudentId, setEditingExamStudentId] = useState<number | null>(null);
+
+  const classExams = useMemo(() => exams.filter((exam: any) => {
+    const classId = typeof exam.class_group === "object" && exam.class_group !== null ? exam.class_group.id : exam.class_group;
+    return String(classId) === String(selectedClassId) && (!exam.division || exam.division === "ALL" || selectedDivFilter === "ALL" || exam.division === selectedDivFilter);
+  }), [exams, selectedClassId, selectedDivFilter]);
 
   const classesWithExams = useMemo(() => {
     if (!exams || exams.length === 0) return classes;
@@ -130,9 +144,15 @@ export default function ResultProcessingPreviewPage() {
 
       let resolvedYearId = "";
       if (yearsData && yearsData.length > 0) {
-        const activeYr = yearsData.find((y: any) => y.is_active) || yearsData[0];
+        const params = new URLSearchParams(window.location.search);
+        const requestedYearId = params.get("academic_year");
+        const activeYr = yearsData.find((y: any) => String(y.id) === requestedYearId) || yearsData.find((y: any) => y.is_active) || yearsData[0];
         resolvedYearId = String(activeYr.id);
         setSelectedYearId(resolvedYearId);
+        const requestedClassId = params.get("class_id");
+        const requestedExamId = params.get("exam_id");
+        const requestedDivision = params.get("division");
+        if (requestedDivision) setSelectedDivFilter(requestedDivision);
 
         const examsList = await getExamsFull({ academic_year: Number(resolvedYearId) });
         setExams(examsList || []);
@@ -143,9 +163,17 @@ export default function ResultProcessingPreviewPage() {
           ).filter(Boolean)
         );
 
-        if (classesData && classesData.length > 0 && !selectedClassId) {
-          const firstValidClass = classesData.find((c: any) => classIdsWithExams.has(String(c.id))) || classesData[0];
+        if (classesData && classesData.length > 0) {
+          const examClassId: any = examsList?.find((exam: any) => String(exam.id) === requestedExamId)?.class_group;
+          const normalizedExamClassId = typeof examClassId === "object" && examClassId !== null ? String(examClassId.id) : String(examClassId || "");
+          const requestedTargetClassId = requestedClassId || normalizedExamClassId;
+          const firstValidClass = classesData.find((c: any) => String(c.id) === requestedTargetClassId)
+            || classesData.find((c: any) => classIdsWithExams.has(String(c.id)))
+            || classesData[0];
           setSelectedClassId(String(firstValidClass.id));
+        }
+        if (requestedExamId && examsList?.some((exam: any) => String(exam.id) === requestedExamId)) {
+          setSelectedExamId(requestedExamId);
         }
       }
     } catch (err: any) {
@@ -158,6 +186,13 @@ export default function ResultProcessingPreviewPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!selectedYearId) return;
+    getExamsFull({ academic_year: Number(selectedYearId) })
+      .then((items) => setExams(items || []))
+      .catch((err: any) => toast.error(err?.message || "Could not load exams for this academic year."));
+  }, [selectedYearId]);
 
   const fetchResultsAndReadiness = async () => {
     if (!selectedYearId || !selectedClassId) return;
@@ -202,6 +237,67 @@ export default function ResultProcessingPreviewPage() {
       fetchResultsAndReadiness();
     }
   }, [selectedYearId, selectedClassId, selectedDivFilter]);
+
+  useEffect(() => {
+    if (classExams.length && !classExams.some((exam: any) => String(exam.id) === selectedExamId)) {
+      setSelectedExamId(String(classExams[0].id));
+    } else if (!classExams.length) {
+      setSelectedExamId("");
+      setExamResultPreview(null);
+    }
+  }, [classExams, selectedExamId]);
+
+  useEffect(() => {
+    if (!selectedExamId) return;
+    setEditedExamStudentIds(new Set());
+    setEditingExamStudentId(null);
+    getExamResultPreview(Number(selectedExamId), selectedDivFilter)
+      .then(setExamResultPreview)
+      .catch((err: any) => {
+        setExamResultPreview(null);
+        toast.error(err?.message || "Could not load exam marks.");
+      });
+  }, [selectedExamId, selectedDivFilter]);
+
+  const updateExamStudent = (studentId: number, updates: Partial<ExamResultPreview["students"][number]>) => {
+    setExamResultPreview((current) => current ? {
+      ...current,
+      students: current.students.map((student) => student.student === studentId ? { ...student, ...updates } : student),
+    } : current);
+    setEditedExamStudentIds((current) => new Set(current).add(studentId));
+  };
+
+  const handleSaveExamMarks = async () => {
+    if (!selectedExamId || !examResultPreview || editingExamStudentId === null) return;
+    const editedRows = examResultPreview.students.filter((student) => student.student === editingExamStudentId && editedExamStudentIds.has(student.student));
+    if (editedRows.some((student) => !student.is_absent && student.marks_obtained !== null && student.marks_obtained !== "" && (Number(student.marks_obtained) < 0 || Number(student.marks_obtained) > Number(student.max_marks)))) {
+      toast.error("Marks must be between zero and the exam maximum.");
+      return;
+    }
+    const rowsToSave = editedRows.filter((student) => student.is_absent || (student.marks_obtained !== null && student.marks_obtained !== ""));
+    if (rowsToSave.length === 0) {
+      toast.error("Enter marks or mark a student absent. Blank entries are left unchanged.");
+      return;
+    }
+
+    setIsSavingExamMarks(true);
+    try {
+      const response = await saveSubjectMarks(Number(selectedExamId), rowsToSave.map((student) => ({
+        student_id: student.student,
+        marks_obtained: student.is_absent ? null : Number(student.marks_obtained),
+        is_absent: student.is_absent,
+        status: "DRAFT",
+      })));
+      toast.success(response?.message || "Marks saved. Verify them before publishing.");
+      setEditedExamStudentIds(new Set());
+      setEditingExamStudentId(null);
+      setExamResultPreview(await getExamResultPreview(Number(selectedExamId), selectedDivFilter));
+    } catch (err: any) {
+      toast.error(err?.message || "Could not save exam marks.");
+    } finally {
+      setIsSavingExamMarks(false);
+    }
+  };
 
   // Run Dynamic Result Engine
   const handleCalculateResults = async () => {
@@ -261,7 +357,7 @@ export default function ResultProcessingPreviewPage() {
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                Pre-flight checklist & live component contribution preview (Term 1 (40%) + Term 2 (40%) + Attendance (10%) + Teacher Assessment (10%)).
+                Review and publish a completed exam now. Final academic results are calculated separately after required terms are complete.
               </p>
             </div>
           </div>
@@ -277,7 +373,7 @@ export default function ResultProcessingPreviewPage() {
             Run / Recalculate Engine
           </Button>
 
-          <Link href="/principal/result/processing/verification">
+          <Link href={selectedExamId ? `/principal/result/processing/verification?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${encodeURIComponent(selectedDivFilter)}&exam_id=${selectedExamId}` : "/principal/result/processing/verification"}>
             <Button
               variant="outline"
               className="rounded-xl text-xs gap-1.5 font-bold border-gray-200 h-10 px-4"
@@ -296,7 +392,26 @@ export default function ResultProcessingPreviewPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Exam:</label>
+              <Select value={selectedExamId} onValueChange={(val) => { if (val) setSelectedExamId(val); }}>
+                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
+                  <SelectValue placeholder="Select Exam...">
+                    {classExams.find((exam: any) => String(exam.id) === selectedExamId)
+                      ? `${classExams.find((exam: any) => String(exam.id) === selectedExamId).title || "Exam"} — ${classExams.find((exam: any) => String(exam.id) === selectedExamId).subject_name || "Subject"}`
+                      : "Select Exam..."}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {classExams.map((exam: any) => (
+                    <SelectItem key={exam.id} value={String(exam.id)}>
+                      {exam.title || exam.term_name || `Exam #${exam.id}`}{exam.subject_name ? ` — ${exam.subject_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Academic Year:</label>
               <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
@@ -367,6 +482,41 @@ export default function ResultProcessingPreviewPage() {
               </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border border-indigo-200/80 dark:border-indigo-900 bg-white dark:bg-zinc-900 shadow-sm">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base font-bold">Single Exam Result{examResultPreview ? ` — ${examResultPreview.exam_title}` : ""}</CardTitle>
+            <CardDescription className="text-xs mt-1">
+              {examResultPreview ? `${examResultPreview.term_name} · ${examResultPreview.subject_name} · ${examResultPreview.class_name}` : "Select an exam with entered marks to review its actual student results."}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+          {examResultPreview?.complete && <Link href={`/principal/result/processing/verification?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${encodeURIComponent(selectedDivFilter)}&exam_id=${selectedExamId}`}>
+            <Button className="gap-2"><ShieldCheck className="h-4 w-4" /> Verify Results</Button>
+          </Link>}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!classExams.length ? <p className="py-8 text-center text-sm text-muted-foreground">No exams are configured for this class and filter.</p> : !examResultPreview ? <p className="py-8 text-center text-sm text-muted-foreground">Loading exam marks…</p> : <>
+            <p className={`mb-3 text-xs font-semibold ${examResultPreview.complete ? "text-emerald-700" : "text-amber-700"}`}>
+              {examResultPreview.complete ? "Marks are verified. Review each student result and approve it for publication." : "Every student needs verified marks or an absent entry before principal verification."}
+            </p>
+            <div className="overflow-x-auto rounded-xl border">
+              <Table>
+                <TableHeader><TableRow><TableHead>Roll</TableHead><TableHead>GR No.</TableHead><TableHead>Student</TableHead><TableHead>Marks</TableHead><TableHead>Grade</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                <TableBody>{examResultPreview.students.map((student) => <TableRow key={student.student}>
+                  <TableCell>{student.roll_no || "—"}</TableCell><TableCell>{student.gr_no || "—"}</TableCell><TableCell className="font-semibold">{student.student_name || `Student #${student.student}`}</TableCell>
+                  <TableCell>{editingExamStudentId === student.student ? <div className="flex items-center gap-2"><Input type="number" min="0" max={student.max_marks} step="0.01" value={student.is_absent ? "" : student.marks_obtained ?? ""} disabled={student.is_absent} placeholder="Enter marks" className="h-8 min-w-28" onChange={(event) => updateExamStudent(student.student, { marks_obtained: event.target.value, status: "DRAFT" })} /><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={student.is_absent} onChange={(event) => updateExamStudent(student.student, { is_absent: event.target.checked, marks_obtained: event.target.checked ? null : student.marks_obtained, status: "DRAFT" })} />Absent</label></div> : student.is_absent ? "Absent" : student.marks_obtained === null ? "—" : `${student.marks_obtained} / ${student.max_marks}`}</TableCell>
+                  <TableCell>{editedExamStudentIds.has(student.student) ? "—" : student.grade || "—"}</TableCell>
+                  <TableCell><Badge variant="outline">{student.is_published ? "PUBLISHED" : student.status}</Badge></TableCell>
+                  <TableCell>{editingExamStudentId === student.student ? <div className="flex gap-1"><Button size="xs" onClick={handleSaveExamMarks} disabled={isSavingExamMarks || !editedExamStudentIds.has(student.student)}>{isSavingExamMarks ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Save</Button><Button size="xs" variant="ghost" disabled={isSavingExamMarks} onClick={async () => { setEditingExamStudentId(null); setEditedExamStudentIds(new Set()); setExamResultPreview(await getExamResultPreview(Number(selectedExamId), selectedDivFilter)); }}>Cancel</Button></div> : <Button size="xs" variant="outline" onClick={() => { setEditingExamStudentId(student.student); setEditedExamStudentIds(new Set()); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>}</TableCell>
+                </TableRow>)}</TableBody>
+              </Table>
+            </div>
+          </>}
         </CardContent>
       </Card>
 

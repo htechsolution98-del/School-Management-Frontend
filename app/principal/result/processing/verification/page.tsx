@@ -35,6 +35,9 @@ import { getDivisions } from "@/lib/clerk/divisions";
 import {
   getFinalResults,
   getExamsFull,
+  getExamResultPreview,
+  approveExamStudent,
+  type ExamResultPreview,
   type FinalStudentResult,
 } from "@/lib/exam-api";
 
@@ -61,6 +64,9 @@ export default function ResultVerificationPage() {
   const [previewStudent, setPreviewStudent] = useState<FinalStudentResult | null>(null);
 
   const [exams, setExams] = useState<any[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState("");
+  const [examResultPreview, setExamResultPreview] = useState<ExamResultPreview | null>(null);
+  const [approvingStudentId, setApprovingStudentId] = useState<number | null>(null);
 
   const classesWithExams = useMemo(() => {
     if (!exams || exams.length === 0) return classes;
@@ -121,9 +127,15 @@ export default function ResultVerificationPage() {
 
       let resolvedYearId = "";
       if (yearsData && yearsData.length > 0) {
-        const activeYr = yearsData.find((y: any) => y.is_active) || yearsData[0];
+        const params = new URLSearchParams(window.location.search);
+        const paramYear = params.get("academic_year");
+        const paramClass = params.get("class_id");
+        const paramDivision = params.get("division");
+        const paramExam = params.get("exam_id");
+        const activeYr = yearsData.find((y: any) => String(y.id) === paramYear) || yearsData.find((y: any) => y.is_active) || yearsData[0];
         resolvedYearId = String(activeYr.id);
         setSelectedYearId(resolvedYearId);
+        if (paramDivision) setSelectedDivFilter(paramDivision);
 
         const examsList = await getExamsFull({ academic_year: Number(resolvedYearId) });
         setExams(examsList || []);
@@ -134,10 +146,16 @@ export default function ResultVerificationPage() {
           ).filter(Boolean)
         );
 
-        if (classesData && classesData.length > 0 && !selectedClassId) {
-          const firstValidClass = classesData.find((c: any) => classIdsWithExams.has(String(c.id))) || classesData[0];
+        if (classesData && classesData.length > 0) {
+          const examClass: any = examsList?.find((exam: any) => String(exam.id) === paramExam)?.class_group;
+          const examClassId = typeof examClass === "object" && examClass !== null ? String(examClass.id) : String(examClass || "");
+          const targetClassId = paramClass || examClassId;
+          const firstValidClass = classesData.find((c: any) => String(c.id) === targetClassId)
+            || classesData.find((c: any) => classIdsWithExams.has(String(c.id)))
+            || classesData[0];
           setSelectedClassId(String(firstValidClass.id));
         }
+        if (paramExam && examsList?.some((exam: any) => String(exam.id) === paramExam)) setSelectedExamId(paramExam);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to load initial data.");
@@ -154,6 +172,12 @@ export default function ResultVerificationPage() {
     if (!selectedYearId || !selectedClassId) return;
     setIsLoading(true);
     try {
+      if (selectedExamId) {
+        const preview = await getExamResultPreview(Number(selectedExamId), selectedDivFilter);
+        setExamResultPreview(preview);
+        setResultsData([]);
+        return;
+      }
       const results = await getFinalResults(
         Number(selectedYearId),
         Number(selectedClassId),
@@ -171,7 +195,35 @@ export default function ResultVerificationPage() {
     if (selectedYearId && selectedClassId) {
       fetchResults();
     }
-  }, [selectedYearId, selectedClassId, selectedDivFilter]);
+  }, [selectedYearId, selectedClassId, selectedDivFilter, selectedExamId]);
+
+  useEffect(() => {
+    if (!selectedYearId) return;
+    getExamsFull({ academic_year: Number(selectedYearId) }).then(setExams).catch(() => setExams([]));
+  }, [selectedYearId]);
+
+  const filteredExamRows = useMemo(() => {
+    const students = examResultPreview?.students || [];
+    if (!searchQuery.trim()) return students;
+    const query = searchQuery.toLowerCase();
+    return students.filter((student) => student.student_name.toLowerCase().includes(query) || (student.roll_no || "").toLowerCase().includes(query) || (student.gr_no || "").toLowerCase().includes(query));
+  }, [examResultPreview, searchQuery]);
+
+  const handleApproveExamStudent = async (studentId: number) => {
+    if (!selectedExamId) return;
+    setApprovingStudentId(studentId);
+    try {
+      await approveExamStudent(Number(selectedExamId), studentId);
+      toast.success("Student result approved for publication.");
+      await fetchResults();
+    } catch (err: any) {
+      toast.error(err?.message || "Could not verify this student result.");
+    } finally {
+      setApprovingStudentId(null);
+    }
+  };
+
+  const allExamRowsApproved = Boolean(examResultPreview?.students.length) && examResultPreview!.students.every((student) => student.status === "APPROVED");
 
   const handleApproveAll = async () => {
     setIsActionSubmitting(true);
@@ -246,22 +298,22 @@ export default function ResultVerificationPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
+          {!selectedExamId && <Button
             onClick={handleApproveAll}
             disabled={isActionSubmitting || resultsData.length === 0}
             className="rounded-xl text-xs gap-1.5 font-bold bg-[#5c28e8] hover:bg-[#4d20cb] text-white shadow-md shadow-purple-500/20 h-10 px-4"
           >
             {isActionSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Approve & Authorize All
-          </Button>
+          </Button>}
 
-          <Link href="/principal/result/publish">
-            <Button
-              className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4"
-            >
-              Go to Publish <Send className="h-3.5 w-3.5" />
-            </Button>
-          </Link>
+          {selectedExamId ? allExamRowsApproved ? (
+            <Link href={`/principal/result/publish?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${encodeURIComponent(selectedDivFilter)}&exam_id=${selectedExamId}`}>
+              <Button className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4">Go to Publish <Send className="h-3.5 w-3.5" /></Button>
+            </Link>
+          ) : <Button disabled className="rounded-xl text-xs h-10 px-4">Approve every student to publish</Button> : (
+            <Link href="/principal/result/publish"><Button className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-4">Go to Publish <Send className="h-3.5 w-3.5" /></Button></Link>
+          )}
         </div>
       </div>
 
@@ -273,10 +325,24 @@ export default function ResultVerificationPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Exam:</label>
+              <Select value={selectedExamId} onValueChange={(val) => setSelectedExamId(!val || val === "ALL" ? "" : val)}>
+                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
+                  <SelectValue placeholder="All Final Results">
+                    {selectedExamId ? (() => { const exam = exams.find((item: any) => String(item.id) === selectedExamId); return exam ? `${exam.title || "Exam"} — ${exam.subject_name || "Subject"}` : "Select Exam"; })() : "Final Academic Results"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Final Academic Results</SelectItem>
+                  {exams.filter((exam: any) => String(typeof exam.class_group === "object" ? exam.class_group?.id : exam.class_group) === selectedClassId).map((exam: any) => <SelectItem key={exam.id} value={String(exam.id)}>{exam.title || `Exam ${exam.id}`} — {exam.subject_name || "Subject"}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Academic Year:</label>
-              <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
+              <Select value={selectedYearId} onValueChange={(val) => { if (val) { setSelectedYearId(val); setSelectedExamId(""); } }}>
                 <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
                   <SelectValue placeholder="Select Academic Year">
                     {academicYears.find((y) => String(y.id) === selectedYearId)
@@ -307,6 +373,7 @@ export default function ResultVerificationPage() {
                   if (val) {
                     setSelectedClassId(val);
                     setSelectedDivFilter("ALL");
+                    setSelectedExamId("");
                   }
                 }}
               >
@@ -347,6 +414,30 @@ export default function ResultVerificationPage() {
         </CardContent>
       </Card>
 
+      {selectedExamId && (
+        <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+          <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-bold">Verify {examResultPreview?.exam_title || "Exam"} — {examResultPreview?.subject_name}</CardTitle>
+              <CardDescription>Approve each class teacher verified student result individually. These same marks will appear in Result Publish.</CardDescription>
+            </div>
+            <Input placeholder="Search student, roll, or GR..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-9 sm:w-64" />
+          </CardHeader>
+          {!examResultPreview ? <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading selected exam results…</CardContent> : <CardContent className="p-0">
+            <div className="overflow-x-auto"><Table>
+              <TableHeader><TableRow><TableHead>Roll</TableHead><TableHead>GR No.</TableHead><TableHead>Student</TableHead><TableHead>Marks</TableHead><TableHead>Grade</TableHead><TableHead>Marks Verification</TableHead><TableHead>Principal Verification</TableHead></TableRow></TableHeader>
+              <TableBody>{filteredExamRows.map((student) => <TableRow key={student.student}>
+                <TableCell>{student.roll_no || "—"}</TableCell><TableCell>{student.gr_no || "—"}</TableCell><TableCell className="font-semibold">{student.student_name || `Student #${student.student}`}</TableCell>
+                <TableCell>{student.is_absent ? "Absent" : student.marks_obtained === null ? "—" : `${student.marks_obtained} / ${student.max_marks}`}</TableCell><TableCell>{student.grade || "—"}</TableCell>
+                <TableCell><Badge variant="outline">{student.status === "VERIFIED" || student.status === "APPROVED" ? "VERIFIED" : student.status}</Badge></TableCell>
+                <TableCell>{student.status === "APPROVED" ? <Badge className="bg-emerald-100 text-emerald-800">APPROVED</Badge> : <Button size="sm" onClick={() => handleApproveExamStudent(student.student)} disabled={student.status !== "VERIFIED" || approvingStudentId === student.student}>{approvingStudentId === student.student ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Verify this result</Button>}</TableCell>
+              </TableRow>)}</TableBody>
+            </Table></div>
+          </CardContent>}
+        </Card>
+      )}
+
+      {!selectedExamId && <>
       {/* Verification Ledger */}
       <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
         <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -449,6 +540,7 @@ export default function ResultVerificationPage() {
           </CardContent>
         )}
       </Card>
+      </>}
 
       {/* Send Back Modal */}
       <Dialog open={sendBackModalOpen} onOpenChange={setSendBackModalOpen}>

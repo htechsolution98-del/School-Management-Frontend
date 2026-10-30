@@ -130,6 +130,7 @@ export interface SchoolExamStudent {
   is_published: boolean;
   percentage: number | null;
   grade: string | null;
+  report_template?: "classic" | "modern" | "compact" | "watermark";
 }
 
 export interface SchoolExam {

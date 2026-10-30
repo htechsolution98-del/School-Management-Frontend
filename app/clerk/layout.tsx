@@ -28,12 +28,14 @@ import {
   Boxes,
   Banknote,
   Contact,
+  FileCheck2,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import "./clerk-workspace.css";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/clerk", icon: LayoutDashboard },
+  { title: "Marksheet Templates", href: "/clerk/result-templates", icon: FileCheck2 },
   {
     title: "ID Card Management",
     href: "/clerk/id-cards",

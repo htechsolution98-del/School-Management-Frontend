@@ -109,7 +109,7 @@ interface StudentReportData {
   className: string;
   divisionName: string;
   reportMonth: string; // e.g. "April 2026", "March 2026"
-  attendancePct: number;
+  attendancePct: number | null;
   behavior: BehaviorEvaluations;
   academics: AcademicMark[];
   teacherRemarks: string;
@@ -436,7 +436,7 @@ function ClassicReportCardModal({
                         Attendance Rate
                       </td>
                       <td className="px-4 py-2 font-bold font-mono text-center text-emerald-700">
-                        {report.attendancePct}%
+                        {report.attendancePct === null ? "—" : `${report.attendancePct}%`}
                       </td>
                     </tr>
                   </tbody>
@@ -676,7 +676,7 @@ export default function ProgressReportsPage() {
               st.name ||
               st.surname ||
               `Student ${st.id}`,
-            gr_no: st.gr_no || `GR-${st.id}`,
+            gr_no: st.gr_no || "",
             school_class_name: st.school_class_name || currentDiv?.className || "Class 8",
             division_name: st.division_name || currentDiv?.divisionName || "A",
             roll_no: st.roll_no || "",
@@ -722,11 +722,7 @@ export default function ProgressReportsPage() {
           return isMonthMatch && isClassMatch && isDivMatch;
         });
 
-        // Fallback: If no exams strictly match both class and month, match exams by month or class
-        const targetExams = monthExams.length > 0 ? monthExams : allExams.filter((ex) => {
-          const exMonth = formatMonthYear(ex.exam_date);
-          return exMonth === selectedMonthYear;
-        });
+        const targetExams = monthExams;
 
         // D. Fetch real database marks for each matching exam
         const examMarksByExamId: Record<number, any[]> = {};
@@ -754,23 +750,6 @@ export default function ProgressReportsPage() {
             });
           }
         });
-
-        // Add any remaining subjects from fetchedSubjects
-        fetchedSubjects.forEach((sub) => {
-          if (sub.name && !distinctSubjectMap.has(sub.name)) {
-            distinctSubjectMap.set(sub.name, {
-              subjectId: sub.id,
-              maxMarks: 100,
-            });
-          }
-        });
-
-        // Default fallback subject names if none found
-        if (distinctSubjectMap.size === 0) {
-          ["Hindi", "Science", "Mathematics", "English", "Social Studies"].forEach((name) => {
-            distinctSubjectMap.set(name, { maxMarks: 100 });
-          });
-        }
 
         const existingStore = loadPublishedStore(selectedDivisionId, selectedMonthYear);
 
@@ -803,14 +782,6 @@ export default function ProgressReportsPage() {
             }
 
             // If not found in exam marks, check cached
-            if (score === null && Array.isArray(cached.academics)) {
-              const cachedSub = cached.academics.find((a: any) => a.subjectName === subjectName);
-              if (cachedSub && cachedSub.score !== null) {
-                score = cachedSub.score;
-                hasAnyMark = true;
-              }
-            }
-
             const maxM = meta.maxMarks || 100;
             const pct = score !== null && maxM > 0 ? (score / maxM) * 100 : score;
             const grade = isAbsent ? "ABS" : computeGrade(pct);
@@ -829,16 +800,16 @@ export default function ProgressReportsPage() {
           newMap[st.id] = {
             studentId: st.id,
             studentName: st.student_name,
-            grNo: st.gr_no || `GR-${1000 + st.id}`,
+            grNo: st.gr_no || "",
             className: st.school_class_name || currentDiv?.className || "Class 8",
             divisionName: st.division_name || currentDiv?.divisionName || "A",
             reportMonth: selectedMonthYear,
-            attendancePct: cached.attendancePct ?? 95,
+            attendancePct: cached.attendancePct ?? null,
             behavior: {
-              cooperative: cached.behavior?.cooperative || "A",
-              neatAndOrderly: cached.behavior?.neatAndOrderly || "A",
-              responsible: cached.behavior?.responsible || "A",
-              attendance: cached.behavior?.attendance || "95%",
+              cooperative: cached.behavior?.cooperative || "--",
+              neatAndOrderly: cached.behavior?.neatAndOrderly || "--",
+              responsible: cached.behavior?.responsible || "--",
+              attendance: cached.behavior?.attendance || "--",
             },
             academics: studentAcademics,
             teacherRemarks: cached.teacherRemarks || "",
