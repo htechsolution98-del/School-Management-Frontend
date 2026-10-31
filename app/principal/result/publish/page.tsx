@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Award,
   Sparkles,
@@ -29,6 +30,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ResultTemplatePicker } from "@/components/results/result-template-picker";
+import { getSavedResultTemplate } from "@/lib/result-template";
 
 import { getAcademicYearsForPrincipal } from "@/lib/principal/academic-year";
 import { getClasses } from "@/lib/clerk/classes";
@@ -39,7 +42,10 @@ import {
   publishResults,
   getWeightageConfigs,
   getExamsFull,
+  getExamResultPreview,
+  publishExamResults,
   type FinalStudentResult,
+  type ExamResultPreview,
   type ResultWeightageConfig,
 } from "@/lib/exam-api";
 
@@ -54,6 +60,9 @@ function PublishPageInner() {
   const [selectedDivFilter, setSelectedDivFilter] = useState<string>("ALL");
 
   const [exams, setExams] = useState<any[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState("");
+  const [examResultPreview, setExamResultPreview] = useState<ExamResultPreview | null>(null);
+  const [isPublishingExam, setIsPublishingExam] = useState(false);
 
   const classesWithExams = useMemo(() => {
     if (!exams || exams.length === 0) return classes;
@@ -101,6 +110,7 @@ function PublishPageInner() {
 
   // Detailed Modal view for student report card preview
   const [previewStudent, setPreviewStudent] = useState<FinalStudentResult | null>(null);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
 
   const loadInitialData = async () => {
     setIsLoading(true);
@@ -122,6 +132,7 @@ function PublishPageInner() {
       const paramYear = searchParams.get("academic_year") || searchParams.get("year_id");
       const paramClass = searchParams.get("class_id") || searchParams.get("school_class");
       const paramDivision = searchParams.get("division");
+      const paramExam = searchParams.get("exam_id");
 
       let resolvedYearId = "";
       if (paramYear && yearsData.some((y: any) => String(y.id) === paramYear)) {
@@ -135,6 +146,7 @@ function PublishPageInner() {
       if (resolvedYearId) {
         const examsList = await getExamsFull({ academic_year: Number(resolvedYearId) });
         setExams(examsList || []);
+        if (paramExam && examsList?.some((exam: any) => String(exam.id) === paramExam)) setSelectedExamId(paramExam);
 
         const classIdsWithExams = new Set(
           (examsList || []).map((e: any) =>
@@ -150,6 +162,10 @@ function PublishPageInner() {
           resolvedClassId = String(firstValidClass.id);
         }
         setSelectedClassId(resolvedClassId);
+        if (!paramExam) {
+          const firstClassExam = (examsList || []).find((exam: any) => String(typeof exam.class_group === "object" ? exam.class_group?.id : exam.class_group) === resolvedClassId);
+          if (firstClassExam) setSelectedExamId(String(firstClassExam.id));
+        }
       }
 
       if (paramDivision && paramDivision !== "ALL") {
@@ -165,6 +181,21 @@ function PublishPageInner() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!selectedYearId) return;
+    getExamsFull({ academic_year: Number(selectedYearId) }).then(setExams).catch(() => setExams([]));
+  }, [selectedYearId]);
+
+  useEffect(() => {
+    if (!selectedExamId) {
+      setExamResultPreview(null);
+      return;
+    }
+    getExamResultPreview(Number(selectedExamId), selectedDivFilter)
+      .then(setExamResultPreview)
+      .catch((err: any) => { setExamResultPreview(null); toast.error(err?.message || "Could not load selected exam results."); });
+  }, [selectedExamId, selectedDivFilter]);
 
   const [resultsData, setResultsData] = useState<FinalStudentResult[]>([]);
 
@@ -234,7 +265,8 @@ function PublishPageInner() {
         Number(selectedYearId),
         Number(selectedClassId),
         selectedDivFilter,
-        action
+        action,
+        getSavedResultTemplate(),
       );
 
       toast.success(`🎉 ${res.message || "Result publication status updated!"}`);
@@ -243,6 +275,20 @@ function PublishPageInner() {
       toast.error(err?.message || "Failed to publish results.");
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handlePublishExam = async () => {
+    if (!selectedExamId || !examResultPreview?.ready_to_publish) return;
+    setIsPublishingExam(true);
+    try {
+      const response = await publishExamResults(Number(selectedExamId), selectedDivFilter, getSavedResultTemplate());
+      toast.success(response?.detail || "Selected exam results published to students.");
+      setExamResultPreview(await getExamResultPreview(Number(selectedExamId), selectedDivFilter));
+    } catch (err: any) {
+      toast.error(err?.message || "Could not publish this exam result.");
+    } finally {
+      setIsPublishingExam(false);
     }
   };
 
@@ -285,6 +331,7 @@ function PublishPageInner() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {!selectedExamId && <>
           <Button
             onClick={handleCalculateResults}
             disabled={isProcessing || !selectedClassId || selectedClassId === "ALL"}
@@ -307,13 +354,18 @@ function PublishPageInner() {
           )}
 
           <Button
-            onClick={() => handlePublish("PUBLISH")}
+            onClick={() => setShowTemplateDialog(true)}
             disabled={isPublishing || !selectedClassId || selectedClassId === "ALL" || resultsData.length === 0}
             className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 h-10 px-5"
           >
             {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
             {hasPublished ? "Update Published Results" : "Publish Results"}
           </Button>
+          </>}
+          {selectedExamId && <Button onClick={() => setShowTemplateDialog(true)} disabled={!examResultPreview?.ready_to_publish || isPublishingExam || Boolean(examResultPreview?.students.length && examResultPreview.students.every((student) => student.is_published))} className="rounded-xl text-xs gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-5">
+            {isPublishingExam ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+            {examResultPreview?.students.length && examResultPreview.students.every((student) => student.is_published) ? "Published" : "Publish Verified Exam Results"}
+          </Button>}
         </div>
       </div>
 
@@ -325,10 +377,24 @@ function PublishPageInner() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Exam Result:</label>
+              <Select value={selectedExamId || "FINAL"} onValueChange={(val) => setSelectedExamId(!val || val === "FINAL" ? "" : val)}>
+                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
+                  <SelectValue placeholder="Final Academic Results">
+                    {selectedExamId ? (() => { const exam = exams.find((item: any) => String(item.id) === selectedExamId); return exam ? `${exam.title || "Exam"} — ${exam.subject_name || "Subject"}` : "Select Exam"; })() : "Final Academic Results"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FINAL">Final Academic Results</SelectItem>
+                  {exams.filter((exam: any) => String(typeof exam.class_group === "object" ? exam.class_group?.id : exam.class_group) === selectedClassId).map((exam: any) => <SelectItem key={exam.id} value={String(exam.id)}>{exam.title || `Exam ${exam.id}`} — {exam.subject_name || "Subject"}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Academic Year:</label>
-              <Select value={selectedYearId} onValueChange={(val) => { if (val) setSelectedYearId(val); }}>
+              <Select value={selectedYearId} onValueChange={(val) => { if (val) { setSelectedYearId(val); setSelectedExamId(""); } }}>
                 <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
                   <SelectValue placeholder="Select Academic Year">
                     {academicYears.find((y) => String(y.id) === selectedYearId)
@@ -359,6 +425,7 @@ function PublishPageInner() {
                   if (val) {
                     setSelectedClassId(val);
                     setSelectedDivFilter("ALL");
+                    setSelectedExamId("");
                   }
                 }}
               >
@@ -399,8 +466,34 @@ function PublishPageInner() {
         </CardContent>
       </Card>
 
-      {/* Active Weightage Info Card */}
-      {weightageConfig && (
+      {selectedExamId && (
+        <Card className="rounded-2xl border border-indigo-200/80 dark:border-indigo-900 bg-white dark:bg-zinc-900 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>Exam Result — {examResultPreview?.exam_title || "Selected Exam"}</CardTitle>
+              <CardDescription>{examResultPreview?.term_name} · {examResultPreview?.subject_name} · {examResultPreview?.class_name}</CardDescription>
+            </div>
+            <Link href={`/principal/result/processing/verification?academic_year=${selectedYearId}&class_id=${selectedClassId}&division=${encodeURIComponent(selectedDivFilter)}&exam_id=${selectedExamId}`}>
+              <Button variant="outline">Back to Verification</Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {!examResultPreview ? <p className="p-8 text-center text-sm text-muted-foreground">Loading selected exam results…</p> : <div className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Roll</TableHead><TableHead>GR No.</TableHead><TableHead>Student</TableHead><TableHead>Marks</TableHead><TableHead>Grade</TableHead><TableHead>Verification</TableHead><TableHead>Publication</TableHead></TableRow></TableHeader>
+                <TableBody>{examResultPreview.students.map((student) => <TableRow key={student.student}>
+                  <TableCell>{student.roll_no || "—"}</TableCell><TableCell>{student.gr_no || "—"}</TableCell><TableCell className="font-semibold">{student.student_name}</TableCell>
+                  <TableCell>{student.is_absent ? "Absent" : `${student.marks_obtained ?? "—"} / ${student.max_marks}`}</TableCell><TableCell>{student.grade || "—"}</TableCell>
+                  <TableCell><Badge variant="outline">{student.status}</Badge></TableCell><TableCell><Badge className={student.is_published ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}>{student.is_published ? "PUBLISHED" : "NOT PUBLISHED"}</Badge></TableCell>
+                </TableRow>)}</TableBody>
+              </Table>
+            </div>}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Final academic result uses the weighted, full-year calculation. */}
+      {!selectedExamId && weightageConfig && (
         <Card className={`rounded-2xl border shadow-2xs ${(weightageConfig.total_weightage ?? 0) === 100 ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-red-200 dark:border-red-800/60 bg-red-50/50 dark:bg-red-950/30'}`}>
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
             <div className="flex items-center gap-3">
@@ -428,7 +521,7 @@ function PublishPageInner() {
       )}
 
       {/* Result Preview List */}
-      <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+      {!selectedExamId && <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
         <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -531,9 +624,27 @@ function PublishPageInner() {
             </div>
           </CardContent>
         )}
-      </Card>
+      </Card>}
 
       {/* Student Component Breakdown Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="max-w-3xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Choose the marksheet template</DialogTitle>
+            <DialogDescription>This template will be used for the published student marksheets and class printout.</DialogDescription>
+          </DialogHeader>
+          <ResultTemplatePicker />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancel</Button>
+            <Button disabled={isPublishing || isPublishingExam} onClick={async () => {
+              setShowTemplateDialog(false);
+              if (selectedExamId) await handlePublishExam();
+              else await handlePublish("PUBLISH");
+            }}>{isPublishing || isPublishingExam ? "Publishing…" : "Publish with this template"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!previewStudent} onOpenChange={(open) => { if (!open) setPreviewStudent(null); }}>
         <DialogContent className="max-w-xl rounded-2xl">
           <DialogHeader>

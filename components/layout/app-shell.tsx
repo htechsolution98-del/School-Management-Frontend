@@ -750,7 +750,7 @@ export function
         <header className={cn(
           "flex h-16 shrink-0 items-center justify-between gap-2 border-b px-3.5 sm:px-6 shadow-sm z-20 print:hidden",
           roleTitle === "Student"
-            ? "border-blue-700/30 bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] text-white"
+            ? "border-blue-700/30 bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] text-white lg:border-[#E5EAF4] lg:bg-none lg:bg-white lg:text-[#142044]"
             : "border-blue-700/30 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] lg:bg-none lg:bg-white text-white lg:text-[#142044]"
         )}>
           <div className="flex min-w-0 items-center gap-2.5">
@@ -777,7 +777,7 @@ export function
             <div className="min-w-0">
               <span className={cn(
                 "block truncate text-sm sm:text-base font-bold tracking-tight leading-tight",
-                roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
+                roleTitle === "Student" ? "text-white lg:text-[#142044]" : "text-white lg:text-[#142044]"
               )} title={roleTitle === "Student" ? (currentUserName || currentSchoolDisplayName) : currentSchoolDisplayName}>
                 {roleTitle === "Student"
                   ? (currentUserName ? currentUserName.split(" ").slice(0, 2).join(" ") : "Student")
@@ -785,7 +785,7 @@ export function
               </span>
               <span className={cn(
                 "block truncate text-[11px] sm:text-xs leading-tight mt-0.5",
-                roleTitle === "Student" ? "text-indigo-100/90 font-medium" : "text-white/80 lg:text-[#7183A6] font-normal"
+                roleTitle === "Student" ? "text-indigo-100/90 font-medium lg:text-[#7183A6]" : "text-white/80 lg:text-[#7183A6] font-normal"
               )}>
                 {roleTitle === "Student" ? "Student" : (roleTitle || "Teacher")}
               </span>

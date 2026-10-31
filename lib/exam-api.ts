@@ -131,6 +131,7 @@ export interface FinalStudentResult {
   grade: string;
   status: "NOT_READY" | "PROCESSING" | "READY_FOR_REVIEW" | "APPROVED" | "PUBLISHED";
   is_published: boolean;
+  report_template?: "classic" | "modern" | "compact" | "watermark";
   published_at?: string;
 }
 
@@ -309,14 +310,65 @@ export async function calculateResults(academicYearId: number, classId: number, 
   });
 }
 
-export async function publishResults(academicYearId: number, classId: number, division?: string, action: "PUBLISH" | "UNPUBLISH" = "PUBLISH") {
+export interface ExamResultPreview {
+  exam: number;
+  exam_title: string;
+  term_name: string;
+  class_name: string;
+  subject_name: string;
+  division: string;
+  max_marks: string;
+  complete: boolean;
+  ready_to_publish: boolean;
+  students: Array<{
+    student: number;
+    student_name: string;
+    roll_no?: string;
+    gr_no?: string;
+    marks_obtained: string | null;
+    max_marks: string;
+    is_absent: boolean;
+    grade: string;
+    status: string;
+    is_published: boolean;
+    report_template?: "classic" | "modern" | "compact" | "watermark";
+  }>;
+}
+
+export type ResultTemplateId = "classic" | "modern" | "compact" | "watermark";
+
+export async function updatePublishedResultTemplate(payload: { scope: "exam" | "final"; template: ResultTemplateId; exam?: number; academic_year?: number; school_class?: number; division?: string }) {
+  return await apiFetch("/api/results/template/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function getExamResultPreview(examId: number, division?: string): Promise<ExamResultPreview> {
+  const divisionParam = division && division !== "ALL" ? `&division=${encodeURIComponent(division)}` : "";
+  return await apiFetch(`/api/result-process/?exam=${examId}${divisionParam}`);
+}
+
+export async function publishExamResults(examId: number, division?: string, template: ResultTemplateId = "classic") {
+  return await apiFetch("/api/results/publish/", {
+    method: "POST",
+    body: JSON.stringify({ exam: examId, division, template }),
+  });
+}
+
+export async function approveExamStudent(examId: number, studentId: number, action: "APPROVE_STUDENT" | "SEND_BACK_STUDENT" = "APPROVE_STUDENT") {
+  return await apiFetch("/api/result-process/", {
+    method: "POST",
+    body: JSON.stringify({ action, exam: examId, student: studentId }),
+  });
+}
+
+export async function publishResults(academicYearId: number, classId: number, division?: string, action: "PUBLISH" | "UNPUBLISH" = "PUBLISH", template: ResultTemplateId = "classic") {
   const response = await apiFetch("/api/result-publish/", {
     method: "POST",
     body: JSON.stringify({
       academic_year: academicYearId,
       school_class: classId,
       division: division,
-      action: action
+      action,
+      template,
     })
   });
   return response;
