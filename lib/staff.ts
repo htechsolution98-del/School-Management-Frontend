@@ -148,3 +148,45 @@ export async function createDepartment(name: string) {
 
   return response.json();
 }
+
+export async function updateDepartment(id: number, name: string) {
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.DEPARTMENTS}${id}/`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }
+  );
+
+  if (!response.ok) {
+    let message = "Failed to update department.";
+    try {
+      const error = await response.json();
+      const details = Object.values(error || {}).flat().filter((value): value is string => typeof value === "string");
+      message = error?.detail || error?.error || error?.name?.[0] || error?.message || details.join(" ") || message;
+    } catch { /* Keep the fallback for non-JSON responses. */ }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function deleteDepartment(id: number) {
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.DEPARTMENTS}${id}/`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  if (!response.ok) {
+    let message = "Failed to delete department.";
+    try {
+      const error = await response.json();
+      message = error?.error || error?.detail || error?.message || message;
+    } catch { /* Keep the fallback for non-JSON responses. */ }
+    throw new Error(message);
+  }
+}

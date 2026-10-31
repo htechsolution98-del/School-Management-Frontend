@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/components/providers/confirm-provider";
+import { SchoolProvider } from "@/context/school-context";
 
 export default function RootLayout({
   children,
@@ -39,7 +40,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased w-full max-w-full overflow-x-clip`}
       >
         <ConfirmProvider>
-          {children}
+          <SchoolProvider>
+            {children}
+          </SchoolProvider>
         </ConfirmProvider>
         <Toaster />
       </body>
