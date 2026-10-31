@@ -52,6 +52,18 @@ export async function toggleFormStatus(
   }
 }
 
+export async function getAdmissionFormById(
+  formId: number
+): Promise<AdmissionFormResponse> {
+  const response = await fetchWithAuth(`${FORMS_URL}${formId}/`);
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Failed to fetch form details."));
+  }
+
+  return response.json();
+}
+
 export async function deleteAdmissionForm(formId: number): Promise<void> {
   const response = await fetchWithAuth(`${FORMS_URL}${formId}/`, {
     method: "DELETE",

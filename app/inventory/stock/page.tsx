@@ -280,7 +280,7 @@ export default function StockAndLedgerPage() {
   })();
 
   return (
-    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
+    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-32 sm:pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -292,24 +292,24 @@ export default function StockAndLedgerPage() {
             Monitor real-time item balances, enter opening balances, adjust stock variances, and inspect the movement ledger.
           </p>
         </div>
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               if (items.length > 0) setAdjustForm(prev => ({ ...prev, item: items[0].id }));
               setIsAdjustModalOpen(true);
             }}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+            className="inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm active:scale-95 text-center"
           >
-            <Sliders className="w-4 h-4 text-slate-500" /> Stock Adjustment
+            <Sliders className="w-3.5 h-3.5 text-slate-500 shrink-0" /> <span className="truncate">Adjustment</span>
           </button>
           <button
             onClick={() => {
               if (items.length > 0) setOpeningForm(prev => ({ ...prev, item: items[0].id }));
               setIsOpeningModalOpen(true);
             }}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all whitespace-nowrap text-center"
           >
-            <Plus className="w-4 h-4" /> Add Opening Stock
+            <Plus className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Opening Stock</span>
           </button>
         </div>
       </div>
@@ -386,39 +386,28 @@ export default function StockAndLedgerPage() {
             <Loader2 className="w-8 h-8 animate-spin mr-2" /> Loading stock records...
           </div>
         ) : activeTab === "balances" ? (
-          <div className="w-full overflow-x-auto hide-scrollbar">
-            <table className="w-full min-w-[700px] text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4">Item Name & Code</th>
-                  <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">Current Stock</th>
-                  <th className="py-3.5 px-4">Min Alert Level</th>
-                  <th className="py-3.5 px-4">Stock Status</th>
-                  <th className="py-3.5 px-4 text-right">Quick Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          filteredItems.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <Boxes className="w-12 h-12 mx-auto mb-3 opacity-40" />
+              <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No stock items found</div>
+              <p className="text-xs mt-1">Try adjusting your search query.</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile Card View (< sm) */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3">
                 {filteredItems.map((it) => (
-                  <tr key={it.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-white">{it.item_name}</div>
-                      <div className="text-xs font-mono text-slate-400">{it.item_code}</div>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                      {it.category_name || "Unassigned"}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="text-base font-bold text-slate-900 dark:text-white">
-                        {it.current_stock}
-                      </span>{" "}
-                      <span className="text-xs text-slate-500">{it.unit}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-medium">
-                      {it.minimum_stock_level} {it.unit}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                  <div key={it.id} className="py-3.5 first:pt-1 last:pb-1 flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                          {it.item_name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          <span className="font-mono">{it.item_code}</span> • {it.category_name || "Unassigned"}
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                         it.stock_status === "OUT_OF_STOCK"
                           ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                           : it.stock_status === "LOW_STOCK"
@@ -427,108 +416,257 @@ export default function StockAndLedgerPage() {
                       }`}>
                         {it.stock_status.replace(/_/g, " ")}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-400 font-medium">Stock:</span>
+                        <span className="font-bold text-slate-900 dark:text-white text-sm">{it.current_stock}</span>
+                        <span className="text-slate-500 text-xs">{it.unit}</span>
+                        <span className="text-slate-300 dark:text-slate-700 mx-1">•</span>
+                        <span className="text-slate-400 font-medium">Min:</span>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">{it.minimum_stock_level}</span>
+                      </div>
+
                       <button
                         onClick={() => {
                           setAdjustForm(prev => ({ ...prev, item: it.id }));
                           setIsAdjustModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg active:scale-95 transition-all"
                       >
-                        <Sliders className="w-3.5 h-3.5" /> Adjust
+                        <Sliders className="w-3 h-3" /> Adjust
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[700px] text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Item Name & Code</th>
+                      <th className="py-3.5 px-4">Category</th>
+                      <th className="py-3.5 px-4">Current Stock</th>
+                      <th className="py-3.5 px-4">Min Alert Level</th>
+                      <th className="py-3.5 px-4">Stock Status</th>
+                      <th className="py-3.5 px-4 text-right">Quick Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredItems.map((it) => (
+                      <tr key={it.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-900 dark:text-white">{it.item_name}</div>
+                          <div className="text-xs font-mono text-slate-400">{it.item_code}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                          {it.category_name || "Unassigned"}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-base font-bold text-slate-900 dark:text-white">
+                            {it.current_stock}
+                          </span>{" "}
+                          <span className="text-xs text-slate-500">{it.unit}</span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                          {it.minimum_stock_level} {it.unit}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                            it.stock_status === "OUT_OF_STOCK"
+                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                              : it.stock_status === "LOW_STOCK"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                          }`}>
+                            {it.stock_status.replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setAdjustForm(prev => ({ ...prev, item: it.id }));
+                              setIsAdjustModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                          >
+                            <Sliders className="w-3.5 h-3.5" /> Adjust
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
         ) : activeTab === "ledger" ? (
-          /* Ledger Table */
-          <div className="w-full overflow-x-auto hide-scrollbar">
-            <table className="w-full min-w-[750px] text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Item & Variant</th>
-                  <th className="py-3.5 px-4">Movement Type</th>
-                  <th className="py-3.5 px-4">In / Out Qty</th>
-                  <th className="py-3.5 px-4">Unit Purchase Cost</th>
-                  <th className="py-3.5 px-4">Remarks / Ref</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          filteredTransactions.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <History className="w-12 h-12 mx-auto mb-3 opacity-40" />
+              <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No movement transactions found</div>
+              <p className="text-xs mt-1">Try adjusting your filters.</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile Card View (< sm) */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3">
                 {filteredTransactions.map((t) => {
                   const isInflow = t.quantity > 0;
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 text-xs">
-                        {t.transaction_date}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
-                        {t.item_name}
-                        {t.size_name ? ` (Size: ${t.size_name})` : ""}
-                        {t.color_name ? ` (${t.color_name})` : ""}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold ${
-                          isInflow
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                            : "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
-                        }`}>
-                          {isInflow ? <ArrowDownLeft className="w-3 h-3 text-emerald-500" /> : <ArrowUpRight className="w-3 h-3 text-purple-500" />}
-                          {t.transaction_type}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`font-bold ${isInflow ? "text-emerald-600 dark:text-emerald-400" : "text-purple-600 dark:text-purple-400"}`}>
-                          {isInflow ? `+${t.quantity}` : t.quantity}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        ₹{Number(t.unit_purchase_cost).toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-500">
-                        {t.remarks || t.reference_type || "N/A"}
-                      </td>
-                    </tr>
+                    <div key={t.id} className="py-3 first:pt-1 last:pb-1 flex flex-col gap-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-900 dark:text-white text-xs">
+                            {t.item_name}
+                            {t.size_name ? ` (Size: ${t.size_name})` : ""}
+                            {t.color_name ? ` (${t.color_name})` : ""}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {t.transaction_date} • {t.remarks || t.reference_type || "N/A"}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className={`font-bold text-xs ${isInflow ? "text-emerald-600 dark:text-emerald-400" : "text-purple-600 dark:text-purple-400"}`}>
+                            {isInflow ? `+${t.quantity}` : t.quantity}
+                          </div>
+                          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            isInflow
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                              : "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                          }`}>
+                            {t.transaction_type}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[750px] text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Date</th>
+                      <th className="py-3.5 px-4">Item & Variant</th>
+                      <th className="py-3.5 px-4">Movement Type</th>
+                      <th className="py-3.5 px-4">In / Out Qty</th>
+                      <th className="py-3.5 px-4">Unit Purchase Cost</th>
+                      <th className="py-3.5 px-4">Remarks / Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredTransactions.map((t) => {
+                      const isInflow = t.quantity > 0;
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 text-xs">
+                            {t.transaction_date}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+                            {t.item_name}
+                            {t.size_name ? ` (Size: ${t.size_name})` : ""}
+                            {t.color_name ? ` (${t.color_name})` : ""}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold ${
+                              isInflow
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                : "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                            }`}>
+                              {isInflow ? <ArrowDownLeft className="w-3 h-3 text-emerald-500" /> : <ArrowUpRight className="w-3 h-3 text-purple-500" />}
+                              {t.transaction_type}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`font-bold ${isInflow ? "text-emerald-600 dark:text-emerald-400" : "text-purple-600 dark:text-purple-400"}`}>
+                              {isInflow ? `+${t.quantity}` : t.quantity}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                            ₹{Number(t.unit_purchase_cost).toLocaleString()}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-500">
+                            {t.remarks || t.reference_type || "N/A"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
         ) : (
-          <div className="w-full overflow-x-auto hide-scrollbar">
-            <table className="w-full min-w-[650px] text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                <tr><th className="py-3.5 px-4">Date</th><th className="py-3.5 px-4">User</th><th className="py-3.5 px-4">Action</th><th className="py-3.5 px-4">Entity</th><th className="py-3.5 px-4">Details</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          filteredAuditLogs.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <History className="w-12 h-12 mx-auto mb-3 opacity-40" />
+              <div className="text-base font-semibold text-slate-700 dark:text-slate-300">No audit logs found</div>
+              <p className="text-xs mt-1">Try adjusting your filters.</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile Card View (< sm) */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3">
                 {filteredAuditLogs.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-400">
-                      {new Date(entry.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
-                      {entry.user_name || "System"}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                  <div key={entry.id} className="py-3 first:pt-1 last:pb-1 flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-xs text-slate-900 dark:text-white">
+                        {entry.user_name || "System"}
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
                         {entry.action}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                      {entry.entity_type} #{entry.entity_id}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-medium text-slate-700 dark:text-slate-300">
-                      {formatAuditDetails(entry.details || entry.new_values || entry.old_values)}
-                    </td>
-                  </tr>
+                    </div>
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                      {entry.entity_type} #{entry.entity_id} • {formatAuditDetails(entry.details || entry.new_values || entry.old_values)}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {new Date(entry.created_at).toLocaleString()}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[650px] text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr><th className="py-3.5 px-4">Date</th><th className="py-3.5 px-4">User</th><th className="py-3.5 px-4">Action</th><th className="py-3.5 px-4">Entity</th><th className="py-3.5 px-4">Details</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredAuditLogs.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-400">
+                          {new Date(entry.created_at).toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+                          {entry.user_name || "System"}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                            {entry.action}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                          {entry.entity_type} #{entry.entity_id}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+                          {formatAuditDetails(entry.details || entry.new_values || entry.old_values)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
         )}
       </div>
 

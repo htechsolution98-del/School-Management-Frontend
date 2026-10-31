@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   Settings2,
+  Lock,
   Trash2,
   School,
   FileText,
@@ -32,10 +33,14 @@ import {
 
 import {
   createAdmissionForm,
+  updateAdmissionForm,
+  getAdmissionFormById,
+  getAdmissionForms,
   getSchoolClasses,
   getMainAcademicYear,
   type SchoolClass,
 } from "@/lib/principal";
+import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/auth";
 import {
   createConfiguredField,
@@ -133,10 +138,58 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   textarea: "bg-blue-100 text-blue-700",
 };
 
+/**
+ * Absolute core admission fields that must remain strictly mandatory for system data integrity.
+ * These include Student Name, Date of Birth, Gender, Applying Class, and Father Name.
+ */
+export function isCoreField(field: ConfiguredField): boolean {
+  const normalizedKey = (field.key || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  const coreKeys = [
+    "studentname",
+    "studentfullname",
+    "name",
+    "dateofbirth",
+    "dob",
+    "gender",
+    "applyingforclass",
+    "applyingclass",
+    "schoolclass",
+    "fathername",
+    "fathersname",
+  ];
+
+  if (coreKeys.includes(normalizedKey)) {
+    return true;
+  }
+
+  const normalizedLabel = (field.label || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  const coreLabels = [
+    "studentname",
+    "studentfullname",
+    "dateofbirth",
+    "dob",
+    "gender",
+    "applyingforclass",
+    "applyingclass",
+    "fathername",
+    "fathersname",
+  ];
+
+  return coreLabels.includes(normalizedLabel);
+}
+
 function cloneField(field: ConfiguredField, index: number) {
+  const isCore = isCoreField(field);
   return {
     ...field,
-    lockedRequired: field.required,
+    required: isCore ? true : field.required,
+    lockedRequired: isCore,
     id: `${field.key}-${index}-${Math.random().toString(36).slice(2, 8)}`,
     options: field.options.map((option) => ({ ...option })),
   };
@@ -181,6 +234,7 @@ function createCustomField(
 }
 
 const STUDENT_FIELD_MAPPING: Record<string, string> = {
+  student_name: "name",
   student_full_name: "name",
   surname: "surname",
   father_name: "father_name",
@@ -195,7 +249,7 @@ function toPayloadFields(
   fields: ConfiguredField[],
 ): AdmissionFormFieldPayload[] {
   return fields
-    .filter((field): field is ConfiguredField => field.selected)
+    .filter((field): field is ConfiguredField => isCoreField(field) || Boolean(field.selected))
     .map((field, index) => {
       const isSelect = field.type === "select" || field.type === "radio";
       const validOptions = isSelect
@@ -209,11 +263,14 @@ function toPayloadFields(
           ? "text"
           : field.type;
 
+      const isCore = isCoreField(field);
+      const isRequired = isCore ? true : field.required;
+
       return {
         label: field.label.trim(),
         field_type: backendFieldType,
-        required: field.required,
-        is_required: field.required,
+        required: isRequired,
+        is_required: isRequired,
         order: index + 1,
         map_to_student_field: STUDENT_FIELD_MAPPING[field.key] || null,
         ...(field.key === "applying_for_class"
@@ -247,6 +304,8 @@ function FieldCard({
   const IconComponent = FIELD_ICONS[field.type] || FileText;
   const isDocumentField = section === "documents";
   const typeColor = FIELD_TYPE_COLORS[field.type] || "bg-slate-100 text-slate-600";
+  const isCore = isCoreField(field);
+  const isTypeLocked = !field.custom || field.key === "applying_for_class";
 
   const setOptionValue = (
     optionIndex: number,
@@ -295,59 +354,71 @@ function FieldCard({
         )}
 
         <div className="flex items-center gap-2.5 px-3 py-3 pl-4">
-          {/* Checkbox */}
+          {/* Checkbox — only locked for absolute core fields; optional standard fields stay toggleable */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
                   <Checkbox
-                    checked={field.selected}
-                    disabled={field.key === "applying_for_class" || field.lockedType}
-                    onCheckedChange={(checked) => onToggle(Boolean(checked))}
+                    checked={isCore ? true : field.selected}
+                    disabled={isCore}
+                    onCheckedChange={(checked) => {
+                      if (!isCore) onToggle(Boolean(checked));
+                    }}
                     className="h-4 w-4 rounded data-[state=checked]:bg-[#2563EB] data-[state=checked]:border-[#2563EB]"
                   />
                 </div>
               </TooltipTrigger>
-              {field.key === "applying_for_class" && (
+              {isCore && (
                 <TooltipContent side="right" className="text-xs">
-                  Mandatory field — cannot be deselected
+                  Core field — always required, cannot be deselected
                 </TooltipContent>
               )}
             </Tooltip>
           </TooltipProvider>
 
           {/* Icon */}
-          <div className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-            field.selected ? typeColor : "bg-slate-200 text-slate-600",
-          )}>
+          <div
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+              field.selected ? typeColor : "bg-slate-200 text-slate-600",
+            )}
+          >
             <IconComponent className="h-3.5 w-3.5" />
           </div>
 
           {/* Label & Meta */}
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={cn(
-                "text-sm font-semibold truncate leading-tight",
-                field.selected ? "text-slate-800" : "text-slate-700",
-              )}>
+              <span
+                className={cn(
+                  "text-sm font-semibold truncate leading-tight",
+                  field.selected ? "text-slate-800" : "text-slate-700",
+                )}
+              >
                 {field.label}
               </span>
-              {field.required && field.selected && (
-                <span className="inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-500 border border-red-100 whitespace-nowrap">
+              {isCore ? (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 border border-red-200 whitespace-nowrap">
+                  <Lock className="w-2.5 h-2.5" /> Core
+                </span>
+              ) : field.required && field.selected ? (
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 border border-blue-100 whitespace-nowrap">
                   Req
                 </span>
-              )}
+              ) : null}
               {field.custom && (
                 <span className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 border border-amber-200 whitespace-nowrap">
                   Custom
                 </span>
               )}
             </div>
-            <p className={cn(
-              "text-[11px] mt-0.5 font-mono truncate",
-              field.selected ? "text-slate-500" : "text-slate-400",
-            )}>
+            <p
+              className={cn(
+                "text-[11px] mt-0.5 font-mono truncate",
+                field.selected ? "text-slate-500" : "text-slate-400",
+              )}
+            >
               {field.key} · {field.key === "applying_for_class" ? "text" : field.type}
             </p>
           </div>
@@ -355,9 +426,16 @@ function FieldCard({
           {/* Actions — always visible */}
           <div className="flex items-center gap-0.5 shrink-0">
             <button
-              onClick={() => setIsExpanded(!isExpanded)}
+              type="button"
+              onClick={() => {
+                if (!field.selected && !isExpanded) {
+                  onToggle(true);
+                }
+                setIsExpanded(!isExpanded);
+              }}
+              title={isExpanded ? "Collapse settings" : "Customize field settings"}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
+                "flex h-7 w-7 items-center justify-center rounded-lg transition-colors cursor-pointer",
                 isExpanded
                   ? "bg-blue-50 text-[#2563EB]"
                   : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
@@ -365,10 +443,12 @@ function FieldCard({
             >
               <Settings2 className="h-3.5 w-3.5" />
             </button>
-            {onRemove && (
+            {onRemove && !isCore && (
               <button
+                type="button"
                 onClick={onRemove}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Remove custom field"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -378,7 +458,7 @@ function FieldCard({
 
         {/* Expanded config panel */}
         <AnimatePresence>
-          {field.selected && isExpanded && (
+          {isExpanded && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -389,7 +469,14 @@ function FieldCard({
               <div className="mx-2.5 mb-2.5 mt-1 rounded-lg border border-slate-100 bg-slate-50/80 p-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Label</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Label
+                      </Label>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Key: {field.key}
+                      </span>
+                    </div>
                     <Input
                       value={field.label}
                       onChange={(e) => onChange({ ...field, label: e.target.value })}
@@ -398,13 +485,27 @@ function FieldCard({
                     />
                   </div>
 
-                  {!isDocumentField && (
+                  {!isDocumentField ? (
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                          Type
+                        </Label>
+                        {isTypeLocked && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            <Lock className="w-2.5 h-2.5 text-slate-400" /> Standard Locked
+                          </span>
+                        )}
+                      </div>
                       <select
-                        className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-none outline-none focus:ring-2 focus:ring-[#2563EB] disabled:opacity-50"
+                        className={cn(
+                          "flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-none outline-none focus:ring-2 focus:ring-[#2563EB]",
+                          isTypeLocked
+                            ? "bg-slate-100/90 text-slate-500 cursor-not-allowed border-slate-200/80"
+                            : "text-slate-900 cursor-pointer"
+                        )}
                         value={field.type}
-                        disabled={field.key === "applying_for_class"}
+                        disabled={isTypeLocked}
                         onChange={(e) =>
                           onChange({
                             ...field,
@@ -416,43 +517,108 @@ function FieldCard({
                           })
                         }
                       >
-                        {FIELD_TYPE_OPTIONS.filter(option => option.value !== "file").map((option, index) => (
-                          <option key={option.value || `field-option-${index}`} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
+                        {FIELD_TYPE_OPTIONS.filter((option) => option.value !== "file").map(
+                          (option, index) => (
+                            <option
+                              key={option.value || `field-option-${index}`}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </option>
+                          ),
+                        )}
                       </select>
                     </div>
-                  )}
-
-                  {!field.lockedRequired && !isDocumentField && (
-                    <div className="col-span-full flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Required field</p>
-                        <p className="text-xs text-slate-400">Applicant must complete this</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                          Type
+                        </Label>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          <Lock className="w-2.5 h-2.5 text-slate-400" /> File Upload
+                        </span>
                       </div>
-                      <Switch
-                        checked={field.required}
-                        onCheckedChange={(checked) => onChange({ ...field, required: Boolean(checked) })}
-                        className="data-[state=checked]:bg-[#2563EB]"
+                      <input
+                        type="text"
+                        disabled
+                        value="File (PDF / Image)"
+                        className="flex h-9 w-full rounded-lg border border-slate-200/80 bg-slate-100/90 px-3 py-1.5 text-sm text-slate-500 cursor-not-allowed shadow-none outline-none"
                       />
                     </div>
                   )}
+
+                  <div className="col-span-full flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-slate-700">
+                          {isDocumentField ? "Mandatory upload" : "Required field"}
+                        </p>
+                        {isCore && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            <Lock className="w-2.5 h-2.5 text-amber-600" /> Core Field (Mandatory)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {isCore
+                          ? "Core admission field — locked to mandatory"
+                          : isDocumentField
+                          ? "Applicant must upload this document to submit application"
+                          : "Applicant must complete this field before submitting"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={isCore ? true : field.required}
+                      disabled={isCore}
+                      onCheckedChange={(checked) => {
+                        if (!isCore) {
+                          onChange({ ...field, required: Boolean(checked) });
+                        }
+                      }}
+                      className={cn(
+                        "data-[state=checked]:bg-[#2563EB]",
+                        isCore && "opacity-80 cursor-not-allowed"
+                      )}
+                    />
+                  </div>
                 </div>
 
                 {["select", "radio"].includes(field.type) && field.key !== "applying_for_class" && (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Options</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={addOption} className="h-7 text-xs text-[#2563EB] hover:bg-blue-50">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Options
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={addOption}
+                        className="h-7 text-xs text-[#2563EB] hover:bg-blue-50"
+                      >
                         <Plus className="mr-1 h-3 w-3" /> Add
                       </Button>
                     </div>
                     {field.options.map((option, index) => (
                       <div key={`${option.value || "option"}-${index}`} className="flex gap-2">
-                        <Input value={option.label} placeholder="Label" onChange={(e) => setOptionValue(index, "label", e.target.value)} className="h-8 rounded-lg text-sm focus-visible:ring-[#2563EB]" />
-                        <Input value={option.value} placeholder="Value" onChange={(e) => setOptionValue(index, "value", e.target.value)} className="h-8 rounded-lg text-sm focus-visible:ring-[#2563EB]" />
-                        <button onClick={() => removeOption(index)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                        <Input
+                          value={option.label}
+                          placeholder="Label"
+                          onChange={(e) => setOptionValue(index, "label", e.target.value)}
+                          className="h-8 rounded-lg text-sm focus-visible:ring-[#2563EB]"
+                        />
+                        <Input
+                          value={option.value}
+                          placeholder="Value"
+                          onChange={(e) => setOptionValue(index, "value", e.target.value)}
+                          className="h-8 rounded-lg text-sm focus-visible:ring-[#2563EB]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeOption(index)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                        >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -469,7 +635,7 @@ function FieldCard({
 }
 
 type Section = {
-  id: number;
+  id: number | string;
   title: string;
   order: number;
   fields: ConfiguredField[];
@@ -478,9 +644,16 @@ type Section = {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function PrincipalFormBuilder({
   onSuccess,
+  formId,
+  initialData,
+  onClose,
 }: {
   onSuccess?: (form: AdmissionFormResponse) => void;
+  formId?: number;
+  initialData?: AdmissionFormResponse | null;
+  onClose?: () => void;
 }) {
+  const isEditMode = Boolean(formId || initialData);
   const [currentStep, setCurrentStep] = useState(0);
   const [academicYearOptions, setAcademicYearOptions] = useState<{ id: number; name: string }[]>([]);
   const [academicYear, setAcademicYear] = useState("");
@@ -519,6 +692,23 @@ export default function PrincipalFormBuilder({
   const [submitError, setSubmitError] = useState("");
   const [createdForm, setCreatedForm] = useState<AdmissionFormResponse | null>(null);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [existingTitles, setExistingTitles] = useState<string[]>([]);
+
+  useEffect(() => {
+    getAdmissionForms()
+      .then((forms) => {
+        if (Array.isArray(forms)) {
+          const filtered = forms
+            .filter((f) => (formId ? f.id !== formId : true))
+            .map((f) => f.title)
+            .filter(Boolean);
+          setExistingTitles(filtered);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load existing forms for title uniqueness check:", err);
+      });
+  }, [formId]);
 
   useEffect(() => {
     async function fetchClasses() {
@@ -529,7 +719,9 @@ export default function PrincipalFormBuilder({
           setAcademicYearOptions(yearList);
           setAcademicYear(yearList[0].name);
           setAcademicYearId(yearList[0].id);
-          setTitle(`Student Admission Form ${yearList[0].name}`);
+          if (!formId && !initialData) {
+            setTitle(`Student Admission Form ${yearList[0].name}`);
+          }
 
         }
 
@@ -565,6 +757,232 @@ export default function PrincipalFormBuilder({
     fetchClasses();
   }, []);
 
+  // ─── Data Prefilling for Edit Mode ──────────────────────────────────────────
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const populateFormData = useCallback((formData: AdmissionFormResponse) => {
+      if (!formData) return;
+      if (formData.title) setTitle(formData.title);
+      if (formData.description) setDescription(formData.description);
+
+      if (formData.academic_year) {
+        setAcademicYearId(formData.academic_year);
+      }
+
+      setFeesEnabled(Boolean(formData.fees_enable));
+      setFeeType((formData.fee_type as "general" | "individual") || "general");
+      setFeesAmount(formData.fees ? String(formData.fees) : "");
+      if (formData.payment_mode) {
+        setPaymentMode(formData.payment_mode);
+      }
+
+      // Fee structures
+      if (formData.fee_structures && Array.isArray(formData.fee_structures)) {
+        const feeMap: Record<number, string> = {};
+        formData.fee_structures.forEach((fs: { class_name: number | string; fee_amount: number | string | null }) => {
+          if (fs.class_name) {
+            feeMap[Number(fs.class_name)] = String(fs.fee_amount || "");
+          }
+        });
+        setIndividualFees((prev) => ({ ...prev, ...feeMap }));
+      }
+
+      // Documents
+      if (formData.document_fields && Array.isArray(formData.document_fields)) {
+        const rawDocs = formData.document_fields;
+        const docList: { label: string; is_required: boolean }[] = rawDocs.map((d: any) => {
+          if (typeof d === "string") {
+            return { label: d, is_required: false };
+          }
+          return {
+            label: d.label || "",
+            is_required: Boolean(d.is_required),
+          };
+        });
+
+        setDocumentFields((prev) => {
+          const updatedTemplates = DOCUMENT_FIELD_TEMPLATES.map((tmpl, idx) => {
+            const matched = docList.find(
+              (d) => d.label.trim().toLowerCase() === tmpl.label.trim().toLowerCase()
+            );
+            const base = cloneField(createConfiguredField(tmpl), idx);
+            if (matched) {
+              return {
+                ...base,
+                selected: true,
+                required: matched.is_required,
+              };
+            }
+            return {
+              ...base,
+              selected: false,
+            };
+          });
+
+          const customDocs: ConfiguredField[] = docList
+            .filter(
+              (d) =>
+                !DOCUMENT_FIELD_TEMPLATES.some(
+                  (t) => t.label.trim().toLowerCase() === d.label.trim().toLowerCase()
+                )
+            )
+            .map((d, idx) => ({
+              id: `doc-custom-${idx}-${Date.now()}`,
+              key: slugify(d.label),
+              label: d.label,
+              type: "file" as BuilderFieldType,
+              required: d.is_required,
+              placeholder: "",
+              options: [],
+              selected: true,
+              custom: true,
+            }));
+
+          return [...updatedTemplates, ...customDocs];
+        });
+      }
+
+      // Sections & Fields
+      if (formData.sections && Array.isArray(formData.sections) && formData.sections.length > 0) {
+        const mappedSections: Section[] = formData.sections.map((sec, secIdx) => {
+          const rawFields = sec.fields || [];
+
+          if (secIdx === 0) {
+            const standardFields: ConfiguredField[] = PERSONAL_FIELD_TEMPLATES.map((tmpl, fIdx) => {
+              const rawMatch = rawFields.find(
+                (rf: any) =>
+                  (rf.map_to_student_field && (rf.map_to_student_field === tmpl.key || STUDENT_FIELD_MAPPING[tmpl.key] === rf.map_to_student_field)) ||
+                  (rf.key && rf.key === tmpl.key) ||
+                  (rf.label && rf.label.trim().toLowerCase() === tmpl.label.trim().toLowerCase())
+              );
+
+              const isApplyingClass = tmpl.key === "applying_for_class";
+              const options =
+                isApplyingClass && classes.length > 0
+                  ? classes.map((cls) => ({ label: cls.school_class, value: String(cls.id) }))
+                  : rawMatch?.options && Array.isArray(rawMatch.options) && rawMatch.options.length > 0
+                  ? rawMatch.options
+                  : tmpl.options || [];
+
+              const isCoreField = [
+                "student_name",
+                "date_of_birth",
+                "gender",
+                "applying_for_class",
+                "father_name",
+              ].includes(tmpl.key);
+
+              if (rawMatch) {
+                return {
+                  id: rawMatch.id ? String(rawMatch.id) : `${tmpl.key}-${fIdx}`,
+                  key: tmpl.key,
+                  label: rawMatch.label || tmpl.label,
+                  type: (rawMatch.field_type || rawMatch.type || tmpl.type) as BuilderFieldType,
+                  required: isCoreField ? true : Boolean(rawMatch.is_required ?? rawMatch.required),
+                  placeholder: tmpl.placeholder || "",
+                  options,
+                  selected: true,
+                  custom: false,
+                  lockedType: true,
+                  lockedRequired: isCoreField,
+                };
+              }
+
+              return {
+                id: `${tmpl.key}-${fIdx}`,
+                key: tmpl.key,
+                label: tmpl.label,
+                type: tmpl.type,
+                required: isCoreField ? true : Boolean(tmpl.required),
+                placeholder: tmpl.placeholder || "",
+                options,
+                selected: false,
+                custom: false,
+                lockedType: true,
+                lockedRequired: isCoreField,
+              };
+            });
+
+            const customFields: ConfiguredField[] = rawFields
+              .filter((rf: any) => {
+                const matchedTemplate = PERSONAL_FIELD_TEMPLATES.find(
+                  (tmpl) =>
+                    (rf.map_to_student_field && (rf.map_to_student_field === tmpl.key || STUDENT_FIELD_MAPPING[tmpl.key] === rf.map_to_student_field)) ||
+                    (rf.key && rf.key === tmpl.key) ||
+                    (rf.label && rf.label.trim().toLowerCase() === tmpl.label.trim().toLowerCase())
+                );
+                return !matchedTemplate;
+              })
+              .map((rf: any, fIdx: number) => ({
+                id: rf.id ? String(rf.id) : `custom-${fIdx}-${Date.now()}`,
+                key: rf.key || slugify(rf.label) || `custom_${fIdx}`,
+                label: rf.label,
+                type: (rf.field_type || rf.type || "text") as BuilderFieldType,
+                required: Boolean(rf.is_required ?? rf.required),
+                placeholder: "",
+                options: Array.isArray(rf.options) ? rf.options : [],
+                selected: true,
+                custom: true,
+                lockedType: false,
+                lockedRequired: false,
+              }));
+
+            return {
+              id: sec.id || Date.now(),
+              title: sec.title || "Student Information",
+              order: sec.order || 1,
+              fields: [...standardFields, ...customFields],
+            };
+          }
+
+          const fields: ConfiguredField[] = rawFields.map((rf: any, fIdx: number) => ({
+            id: rf.id ? String(rf.id) : `sec-${secIdx}-field-${fIdx}-${Date.now()}`,
+            key: rf.key || slugify(rf.label) || `field_${fIdx}`,
+            label: rf.label,
+            type: (rf.field_type || rf.type || "text") as BuilderFieldType,
+            required: Boolean(rf.is_required ?? rf.required),
+            placeholder: "",
+            options: Array.isArray(rf.options) ? rf.options : [],
+            selected: true,
+            custom: true,
+            lockedType: false,
+            lockedRequired: false,
+          }));
+
+          return {
+            id: sec.id || Date.now() + secIdx,
+            title: sec.title || `Section ${secIdx + 1}`,
+            order: sec.order || secIdx + 1,
+            fields,
+          };
+        });
+
+        setSections(mappedSections);
+      }
+  }, [classes]);
+
+  useEffect(() => {
+    if (!dataLoaded) {
+      if (initialData) {
+        populateFormData(initialData);
+        setDataLoaded(true);
+      }
+      if (formId) {
+        getAdmissionFormById(formId)
+          .then((fetched) => {
+            if (fetched) {
+              populateFormData(fetched);
+              setDataLoaded(true);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to fetch fresh admission form details:", err);
+          });
+      }
+    }
+  }, [formId, initialData, dataLoaded, classes]);
+
+
   const payload = useMemo<AdmissionFormCreatePayload>(() => {
     const document_fields = documentFields.filter((field) => field.selected).map((field) => field.label.trim());
     const defaultTitle = "Student Admission Form";
@@ -574,13 +992,13 @@ export default function PrincipalFormBuilder({
 
 
     return {
-      is_active: true,
+      is_active: isEditMode && initialData ? initialData.is_active : true,
       fees_enable: feesEnabled,
       fees: feesEnabled && feeType === "general" ? Number(feesAmount) || 0 : null,
       title: formTitle,
       academic_year: academicYearId,
       description: description.trim() || `Admission form for academic year ${academicYear}`,
-      unique_link: slugify(formTitle),
+      unique_link: initialData?.unique_link || slugify(formTitle),
       fee_type: feeType,
       payment_mode: feesEnabled ? paymentMode : null,
       sections: sections.map((section, index) => ({
@@ -598,7 +1016,23 @@ export default function PrincipalFormBuilder({
     };
   }, [academicYear, academicYearId, description, documentFields, feeType, feesAmount, feesEnabled, individualFees, paymentMode, sections, title]);
 
-  const getBuilderErrors = (step?: number) => validateAdmissionBuilder({ title, academicYearId, description, sections, documents: documentFields, feesEnabled, feeType, feesAmount, individualFees, classIds: classes.map(cls => cls.id) }, step);
+  const getBuilderErrors = (step?: number) =>
+    validateAdmissionBuilder(
+      {
+        title,
+        academicYearId,
+        description,
+        sections,
+        documents: documentFields,
+        feesEnabled,
+        feeType,
+        feesAmount,
+        individualFees,
+        classIds: classes.map((cls) => cls.id),
+        existingTitles,
+      },
+      step
+    );
   const validateStep = (step: number) => {
     const nextErrors = getBuilderErrors(step);
     setErrors(nextErrors);
@@ -606,7 +1040,14 @@ export default function PrincipalFormBuilder({
   };
 
   const nextStep = () => {
-    if (!validateStep(currentStep)) return;
+    const nextErrors = getBuilderErrors(currentStep);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      if (currentStep === 0 && nextErrors.title) {
+        toast.error(nextErrors.title);
+      }
+      return;
+    }
     setCurrentStep((value) => Math.min(value + 1, STEP_TITLES.length - 1));
   };
 
@@ -620,20 +1061,96 @@ export default function PrincipalFormBuilder({
     const allErrors = getBuilderErrors();
     if (Object.keys(allErrors).length) {
       const invalidStep = [0, 1, 2].find(step => Object.keys(getBuilderErrors(step)).length > 0) ?? 0;
-      setCurrentStep(invalidStep); setErrors(allErrors); return;
+      setCurrentStep(invalidStep);
+      setErrors(allErrors);
+      if (allErrors.title) {
+        toast.error(allErrors.title);
+      }
+      return;
     }
+
+    const cleanTitle = title.trim().toLowerCase();
+    if (cleanTitle && existingTitles.some(t => t.trim().toLowerCase() === cleanTitle)) {
+      const msg = "A form with this title already exists.";
+      setErrors((prev) => ({ ...prev, title: msg }));
+      setSubmitError(msg);
+      toast.error(msg);
+      setCurrentStep(0);
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
     try {
-      const response = await createAdmissionForm(payload);
+      const document_fields = documentFields
+        .filter((field) => field.selected)
+        .map((field) => field.label.trim());
+      const defaultTitle = "Student Admission Form";
+      const defaultSectionTitle = "Student Information";
+      const effectiveTitle = title.trim() || defaultTitle;
+      const formTitle = effectiveTitle;
+
+      const payloadToSend: AdmissionFormCreatePayload = {
+        is_active: isEditMode && initialData ? initialData.is_active : true,
+        fees_enable: feesEnabled,
+        fees: feesEnabled && feeType === "general" ? Number(feesAmount) || 0 : null,
+        title: formTitle,
+        academic_year: academicYearId,
+        description: description.trim() || `Admission form for academic year ${academicYear}`,
+        unique_link: initialData?.unique_link || slugify(formTitle),
+        fee_type: feeType,
+        payment_mode: feesEnabled ? paymentMode : null,
+        sections: sections.map((section, index) => ({
+          title: section.title.trim() || (index === 0 ? defaultSectionTitle : `Section ${index + 1}`),
+          order: index + 1,
+          fields: toPayloadFields(section.fields),
+        })),
+        document_fields,
+        document_fields_config: documentFields
+          .filter((field) => field.selected)
+          .map((field) => ({ label: field.label.trim(), is_required: field.required })),
+        fee_structures_input: feesEnabled && feeType === "individual"
+          ? Object.entries(individualFees)
+            .filter(([_, amt]) => amt && Number(amt) > 0)
+            .map(([id, amt]) => ({ class_name: Number(id), fee_amount: Number(amt).toFixed(2) }))
+          : [],
+      };
+
+      console.log("Submit Payload:", payloadToSend);
+
+      let response: AdmissionFormResponse;
+      if (formId) {
+        response = await updateAdmissionForm(formId, payloadToSend);
+        populateFormData(response);
+        toast.success("Admission form updated successfully!");
+      } else {
+        response = await createAdmissionForm(payloadToSend);
+        setExistingTitles((prev) => [...prev, payloadToSend.title]);
+        toast.success("Admission form published successfully!");
+      }
       setCreatedForm(response);
       onSuccess?.(response);
     } catch (error) {
-      setSubmitError(
+      const rawMsg =
         error instanceof Error
           ? error.message
-          : extractErrorMessage(error, "Failed to create admission form")
-      );
+          : extractErrorMessage(error, "Failed to create admission form");
+      const isDuplicateTitle =
+        /title already exists|duplicate title|a form with this title/i.test(rawMsg);
+      const displayMsg = isDuplicateTitle
+        ? "A form with this title already exists."
+        : rawMsg;
+
+      setSubmitError(displayMsg);
+      toast.error(displayMsg);
+
+      if (isDuplicateTitle) {
+        setErrors((prev) => ({
+          ...prev,
+          title: "A form with this title already exists.",
+        }));
+        setCurrentStep(0);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -643,10 +1160,10 @@ export default function PrincipalFormBuilder({
     setDocumentFields((current: ConfiguredField[]) => updater(current));
   };
 
-  const updateSectionFields = (sectionId: number, updater: (fields: ConfiguredField[]) => ConfiguredField[]) => {
+  const updateSectionFields = (sectionId: number | string, updater: (fields: ConfiguredField[]) => ConfiguredField[]) => {
     setSections((current) =>
       current.map((section) =>
-        section.id === sectionId ? { ...section, fields: updater(section.fields) } : section,
+        String(section.id) === String(sectionId) ? { ...section, fields: updater(section.fields) } : section,
       ),
     );
   };
@@ -680,7 +1197,7 @@ export default function PrincipalFormBuilder({
                   <ChevronRight className="h-3 w-3 text-blue-300" />
                   <span className="text-white font-semibold">Form Builder</span>
                 </div>
-                <h1 className="text-base font-bold text-white leading-tight drop-shadow-xs">Create Admission Form</h1>
+                <h1 className="text-base font-bold text-white leading-tight drop-shadow-xs">{isEditMode ? "Edit Admission Form" : "Create Admission Form"}</h1>
               </div>
             </div>
 
@@ -798,11 +1315,47 @@ export default function PrincipalFormBuilder({
                       <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Form Title</Label>
                       <Input
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
+                        onChange={(e) => {
+                          const newTitle = e.target.value;
+                          setTitle(newTitle);
+                          const clean = newTitle.trim().toLowerCase();
+                          if (
+                            clean &&
+                            existingTitles.some(
+                              (t) => t.trim().toLowerCase() === clean
+                            )
+                          ) {
+                            setErrors((prev) => ({
+                              ...prev,
+                              title: "A form with this title already exists.",
+                            }));
+                          } else if (errors.title) {
+                            setErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.title;
+                              return next;
+                            });
+                          }
+                          if (submitError) setSubmitError("");
+                        }}
+                        onBlur={() => {
+                          const clean = title.trim().toLowerCase();
+                          if (
+                            clean &&
+                            existingTitles.some(
+                              (t) => t.trim().toLowerCase() === clean
+                            )
+                          ) {
+                            setErrors((prev) => ({
+                              ...prev,
+                              title: "A form with this title already exists.",
+                            }));
+                          }
+                        }}
                         placeholder="Student Admission Form"
                         className={cn(
                           "h-10 rounded-xl border-slate-200 bg-slate-50/70 text-sm focus-visible:ring-[#2563EB] focus-visible:bg-white transition-colors",
-                          errors.title && "border-red-300 bg-red-50",
+                          errors.title && "border-red-300 bg-red-50 text-red-900",
                         )}
                       />
                       {errors.title && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.title}</p>}
@@ -901,7 +1454,7 @@ export default function PrincipalFormBuilder({
                             onToggle={(checked) =>
                               updateSectionFields(section.id, (fields) =>
                                 fields.map((item) =>
-                                  item.id === field.id
+                                  String(item.id) === String(field.id)
                                     ? { ...item, selected: item.key === "applying_for_class" ? true : checked }
                                     : item,
                                 ),
@@ -909,14 +1462,19 @@ export default function PrincipalFormBuilder({
                             }
                             onChange={(nextField) =>
                               updateSectionFields(section.id, (fields) =>
-                                fields.map((item) => (item.id === field.id ? nextField : item)),
+                                fields.map((item) => (String(item.id) === String(field.id) ? nextField : item)),
                               )
                             }
                             onRemove={
                               field.custom
                                 ? () =>
                                   updateSectionFields(section.id, (fields) =>
-                                    fields.filter((item) => item.id !== field.id),
+                                    fields.filter(
+                                      (item) =>
+                                        String(item.id) !== String(field.id) &&
+                                        item.key !== field.key &&
+                                        item.label.trim().toLowerCase() !== field.label.trim().toLowerCase()
+                                    ),
                                   )
                                 : undefined
                             }
@@ -1016,7 +1574,15 @@ export default function PrincipalFormBuilder({
                               }
                               onRemove={
                                 field.custom
-                                  ? () => updateFieldList((fields) => fields.filter((item) => item.id !== field.id))
+                                  ? () =>
+                                    updateFieldList((fields) =>
+                                      fields.filter(
+                                        (item) =>
+                                          String(item.id) !== String(field.id) &&
+                                          item.key !== field.key &&
+                                          item.label.trim().toLowerCase() !== field.label.trim().toLowerCase()
+                                      )
+                                    )
                                   : undefined
                               }
                             />
@@ -1260,17 +1826,17 @@ export default function PrincipalFormBuilder({
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Publishing...
+                  {isEditMode ? "Saving..." : "Publishing..."}
                 </>
               ) : createdForm ? (
                 <>
                   <Check className="h-4 w-4" />
-                  Published!
+                  {isEditMode ? "Saved!" : "Published!"}
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Publish Form
+                  {isEditMode ? "Save Changes" : "Publish Form"}
                 </>
               )}
             </Button>

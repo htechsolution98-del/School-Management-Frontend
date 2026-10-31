@@ -124,7 +124,7 @@ export default function InventoryDashboardPage() {
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
+    <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 pb-32 sm:pb-8">
       {/* 1. Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#4E39F6] via-[#5D46F7] to-[#2563EB] p-4 sm:p-5 lg:px-8 lg:py-5 text-white shadow-xl shadow-indigo-950/15">
         {/* Ambient Background Waves & Glow */}
@@ -183,9 +183,9 @@ export default function InventoryDashboardPage() {
       </div>
 
       {/* 2. Top Primary 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
         {/* Card 1: Registered Master Items */}
-        <div className="group relative bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
+        <div className="group relative bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
           <div className="pointer-events-none absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-blue-500/10 blur-xl group-hover:bg-blue-500/15 transition-colors" />
 
           <div className="flex items-center justify-between">
@@ -202,7 +202,7 @@ export default function InventoryDashboardPage() {
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {loading ? <Loader2 className="w-7 h-7 animate-spin text-slate-300" /> : stats.total_items}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-1">
@@ -212,7 +212,7 @@ export default function InventoryDashboardPage() {
         </div>
 
         {/* Card 2: Total Physical Stock Units */}
-        <div className="group relative bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
+        <div className="group relative bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
           <div className="pointer-events-none absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-xl group-hover:bg-emerald-500/15 transition-colors" />
 
           <div className="flex items-center justify-between">
@@ -229,7 +229,7 @@ export default function InventoryDashboardPage() {
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {loading ? <Loader2 className="w-7 h-7 animate-spin text-slate-300" /> : stats.total_stock_units}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-1">
@@ -239,7 +239,7 @@ export default function InventoryDashboardPage() {
         </div>
 
         {/* Card 3: Low Stock Items Requiring Reorder */}
-        <div className="group relative bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
+        <div className="group relative bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
           <div className="pointer-events-none absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-amber-500/10 blur-xl group-hover:bg-amber-500/15 transition-colors" />
 
           <div className="flex items-center justify-between">
@@ -252,7 +252,7 @@ export default function InventoryDashboardPage() {
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-black text-[#D97706] tracking-tight font-mono">
+            <div className="text-2xl sm:text-3xl font-extrabold text-[#D97706] tracking-tight">
               {loading ? <Loader2 className="w-7 h-7 animate-spin text-slate-300" /> : stats.low_stock_count}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-1">
@@ -262,7 +262,7 @@ export default function InventoryDashboardPage() {
         </div>
 
         {/* Card 4: Today's Revenue */}
-        <div className="group relative bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
+        <div className="group relative bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
           <div className="pointer-events-none absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-purple-500/10 blur-xl group-hover:bg-purple-500/15 transition-colors" />
 
           <div className="flex items-center justify-between">
@@ -279,7 +279,7 @@ export default function InventoryDashboardPage() {
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {loading ? <Loader2 className="w-7 h-7 animate-spin text-slate-300" /> : `₹${Number(stats.today_revenue).toLocaleString()}`}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-1">
@@ -290,7 +290,7 @@ export default function InventoryDashboardPage() {
       </div>
 
       {/* 3. Middle Summary Cards Row (3 Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5">
         {/* Monthly Purchases */}
         <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -345,7 +345,7 @@ export default function InventoryDashboardPage() {
             </div>
             <div className="min-w-0">
               <div className="text-xs text-amber-900/80 font-medium">Pending Replacement Requests</div>
-              <div className="text-xl sm:text-2xl font-black text-amber-950 tracking-tight font-mono mt-0.5">
+              <div className="text-lg sm:text-2xl font-bold text-amber-950 tracking-tight mt-0.5">
                 {stats.pending_replacements_count} requests
               </div>
             </div>
@@ -396,75 +396,123 @@ export default function InventoryDashboardPage() {
                 All inventory stock levels are healthy.
               </div>
             ) : (
-              <div className="w-full overflow-x-auto hide-scrollbar">
-                <table className="w-full text-left text-xs whitespace-nowrap">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="pb-3 px-3 text-center w-8">#</th>
-                      <th className="pb-3 px-3">Item</th>
-                      <th className="pb-3 px-3">Category</th>
-                      <th className="pb-3 px-3">Current Stock</th>
-                      <th className="pb-3 px-3">Min Level</th>
-                      <th className="pb-3 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {lowStockItems.map((item, idx) => {
-                      const IconComponent = getItemIcon(item.item_name, item.category_name);
-                      const isZero = item.current_stock === 0;
-                      return (
-                        <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3 px-3 text-center text-slate-400 font-mono text-xs">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center shrink-0">
-                                <IconComponent className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                                  {item.item_name}
-                                </div>
-                                <div className="text-[11px] text-slate-400 font-mono">
-                                  {item.item_code}
-                                </div>
-                              </div>
+              <>
+                {/* Mobile Card View (< sm) */}
+                <div className="sm:hidden divide-y divide-slate-100">
+                  {lowStockItems.map((item, idx) => {
+                    const IconComponent = getItemIcon(item.item_name, item.category_name);
+                    const isZero = item.current_stock === 0;
+                    return (
+                      <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                            <IconComponent className="w-4 h-4 stroke-[1.8]" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 text-xs truncate">
+                              {item.item_name}
                             </div>
-                          </td>
-                          <td className="py-3 px-3 text-slate-600 font-medium">
-                            {item.category_name || "N/A"}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                isZero
-                                  ? "bg-red-50 text-red-600 border border-red-200"
-                                  : item.current_stock <= 2
-                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                  : "bg-amber-50 text-amber-600 border border-amber-200"
-                              }`}
-                            >
-                              {item.current_stock} {item.unit || "Pcs"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-slate-700 font-semibold">
-                            {item.minimum_stock_level} {item.unit || "Pcs"}
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <Link
-                              href="/inventory/purchases"
-                              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                              + Reorder
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <div className="text-[10px] text-slate-400">
+                              {item.category_name || "N/A"} • <span className="font-mono">{item.item_code}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              isZero
+                                ? "bg-red-50 text-red-600 border border-red-200"
+                                : item.current_stock <= 2
+                                ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                : "bg-amber-50 text-amber-600 border border-amber-200"
+                            }`}
+                          >
+                            {item.current_stock} {item.unit || "Pcs"}
+                          </span>
+                          <Link
+                            href="/inventory/purchases"
+                            className="inline-flex items-center text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-lg"
+                          >
+                            Reorder
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (>= sm) */}
+                <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="pb-3 px-3 text-center w-8">#</th>
+                        <th className="pb-3 px-3">Item</th>
+                        <th className="pb-3 px-3">Category</th>
+                        <th className="pb-3 px-3">Current Stock</th>
+                        <th className="pb-3 px-3">Min Level</th>
+                        <th className="pb-3 px-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {lowStockItems.map((item, idx) => {
+                        const IconComponent = getItemIcon(item.item_name, item.category_name);
+                        const isZero = item.current_stock === 0;
+                        return (
+                          <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3 px-3 text-center text-slate-400 font-mono text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center shrink-0">
+                                  <IconComponent className="w-4 h-4 stroke-[1.8]" />
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900 text-xs sm:text-sm">
+                                    {item.item_name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-mono">
+                                    {item.item_code}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-slate-600 font-medium">
+                              {item.category_name || "N/A"}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  isZero
+                                    ? "bg-red-50 text-red-600 border border-red-200"
+                                    : item.current_stock <= 2
+                                    ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                    : "bg-amber-50 text-amber-600 border border-amber-200"
+                                }`}
+                              >
+                                {item.current_stock} {item.unit || "Pcs"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-slate-700 font-semibold">
+                              {item.minimum_stock_level} {item.unit || "Pcs"}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <Link
+                                href="/inventory/purchases"
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                + Reorder
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -500,95 +548,148 @@ export default function InventoryDashboardPage() {
                 No items issued recently.
               </div>
             ) : (
-              <div className="w-full overflow-x-auto hide-scrollbar">
-                <table className="w-full text-left text-xs whitespace-nowrap">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="pb-3 px-3 text-center w-8">#</th>
-                      <th className="pb-3 px-3">Student</th>
-                      <th className="pb-3 px-3">Item</th>
-                      <th className="pb-3 px-3 text-center">Qty</th>
-                      <th className="pb-3 px-3">Type</th>
-                      <th className="pb-3 px-3 text-right">Charge</th>
-                      <th className="pb-3 px-3 text-right">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {recentIssues.map((issue, idx) => {
-                      const isFree = issue.charging_type === "FREE";
-                      const isIncluded =
-                        issue.charging_type === "INCLUDED_IN_FEE" ||
-                        issue.charging_type === "INCLUDED";
-                      const badgeLabel = isIncluded
-                        ? "INCLUDED"
-                        : isFree
-                        ? "FREE"
-                        : "SEPARATE CHARGE";
+              <>
+                {/* Mobile Card View (< sm) */}
+                <div className="sm:hidden divide-y divide-slate-100">
+                  {recentIssues.map((issue, idx) => {
+                    const isFree = issue.charging_type === "FREE";
+                    const isIncluded =
+                      issue.charging_type === "INCLUDED_IN_FEE" ||
+                      issue.charging_type === "INCLUDED";
+                    const badgeLabel = isIncluded
+                      ? "INCLUDED"
+                      : isFree
+                      ? "FREE"
+                      : "SEPARATE CHARGE";
 
-                      return (
-                        <tr key={issue.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3 px-3 text-center text-slate-400 font-mono text-xs">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
-                                {getInitials(issue.student_name)}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                                  {issue.student_name}
-                                </div>
-                                <div className="text-[11px] text-slate-400">
-                                  {issue.student_class}{" "}
-                                  {issue.student_division ? `(${issue.student_division})` : ""}
-                                </div>
-                              </div>
+                    return (
+                      <div key={issue.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
+                            {getInitials(issue.student_name)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 text-xs truncate">
+                              {issue.student_name}
                             </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-slate-800 uppercase">
-                              {issue.item_name}
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {issue.item_name} (x{issue.quantity}) • {issue.student_class}
                             </div>
-                            {issue.size_name && (
-                              <div className="text-[10px] text-slate-400">
-                                Size {issue.size_name}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center font-bold text-slate-800 font-mono">
-                            {issue.quantity}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
-                                isIncluded
-                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                  : isFree
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : "bg-purple-50 text-purple-700 border border-purple-200"
-                              }`}
-                            >
-                              {badgeLabel}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-bold text-slate-900 font-mono">
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-xs font-bold text-slate-900">
                             ₹{Number(issue.charged_amount ?? 0).toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <div className="text-[11px] text-slate-600 font-medium">
-                              {formatIssueDate(issue.issue_date, issue.created_at)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {formatIssueTime(issue.created_at)}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                          <span
+                            className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                              isIncluded
+                                ? "bg-blue-50 text-blue-700"
+                                : isFree
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-purple-50 text-purple-700"
+                            }`}
+                          >
+                            {badgeLabel}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (>= sm) */}
+                <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="pb-3 px-3 text-center w-8">#</th>
+                        <th className="pb-3 px-3">Student</th>
+                        <th className="pb-3 px-3">Item</th>
+                        <th className="pb-3 px-3 text-center">Qty</th>
+                        <th className="pb-3 px-3">Type</th>
+                        <th className="pb-3 px-3 text-right">Charge</th>
+                        <th className="pb-3 px-3 text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {recentIssues.map((issue, idx) => {
+                        const isFree = issue.charging_type === "FREE";
+                        const isIncluded =
+                          issue.charging_type === "INCLUDED_IN_FEE" ||
+                          issue.charging_type === "INCLUDED";
+                        const badgeLabel = isIncluded
+                          ? "INCLUDED"
+                          : isFree
+                          ? "FREE"
+                          : "SEPARATE CHARGE";
+
+                        return (
+                          <tr key={issue.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3 px-3 text-center text-slate-400 font-mono text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
+                                  {getInitials(issue.student_name)}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900 text-xs sm:text-sm">
+                                    {issue.student_name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400">
+                                    {issue.student_class}{" "}
+                                    {issue.student_division ? `(${issue.student_division})` : ""}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-slate-800 uppercase">
+                                {issue.item_name}
+                              </div>
+                              {issue.size_name && (
+                                <div className="text-[10px] text-slate-400">
+                                  Size {issue.size_name}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center font-bold text-slate-800 font-mono">
+                              {issue.quantity}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
+                                  isIncluded
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : isFree
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-purple-50 text-purple-700 border border-purple-200"
+                                }`}
+                              >
+                                {badgeLabel}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right font-bold text-slate-900 font-mono">
+                              ₹{Number(issue.charged_amount ?? 0).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <div className="text-[11px] text-slate-600 font-medium">
+                                {formatIssueDate(issue.issue_date, issue.created_at)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {formatIssueTime(issue.created_at)}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>

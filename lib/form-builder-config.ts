@@ -39,6 +39,7 @@ export interface ConfiguredField {
 }
 
 export interface AdmissionFormFieldPayload {
+  id?: number | string
   key?: string
   type?: string
   label: string
@@ -65,6 +66,7 @@ export interface AdmissionFormCreatePayload {
   description: string | null
   unique_link: string
   fee_type: string
+  academic_year?: number | null
   sections: AdmissionFormSectionPayload[]
   document_fields: string[]
   document_fields_config?: { label: string; is_required: boolean }[]
@@ -76,6 +78,7 @@ export interface AdmissionFormResponse extends AdmissionFormCreatePayload {
   id: number
   unique_link: string
   is_active: boolean
+  fee_structures?: { class_name: number | string; fee_amount: number | string | null }[]
 }
 
 export interface PublicField {

@@ -16,6 +16,21 @@ export async function getErrorMessage(
 ): Promise<string> {
   try {
     const err = await response.json();
+    if (err && typeof err === "object") {
+      if (err.title) {
+        const titleMsg = Array.isArray(err.title) ? err.title.join(" ") : String(err.title);
+        if (/already exists/i.test(titleMsg)) {
+          return "A form with this title already exists.";
+        }
+        return titleMsg;
+      }
+      if (err.detail) {
+        const detailMsg = Array.isArray(err.detail) ? err.detail.join(" ") : String(err.detail);
+        if (/already exists/i.test(detailMsg)) {
+          return "A form with this title already exists.";
+        }
+      }
+    }
     return extractErrorMessage(err, fallback);
   } catch {
     return fallback;
