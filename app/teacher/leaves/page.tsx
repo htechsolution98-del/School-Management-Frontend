@@ -20,6 +20,7 @@ import {
   FileText,
   LayoutList,
   LayoutGrid,
+  ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -39,13 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import {
   Accordion,
   AccordionContent,
@@ -72,8 +67,8 @@ export default function MyLeavesPage() {
   const [history, setHistory] = useState<MyLeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("pending");
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [activeTab, setActiveTab] = useState("all");
+  const [viewMode, setViewMode] = useState<"table" | "grid">("grid");
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -443,57 +438,39 @@ export default function MyLeavesPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-3 lg:pb-8 w-full min-w-0 overflow-x-hidden">
-      {/* Page Header with Leave Hero Artwork on the Right */}
-      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-5 pt-1">
-        {/* Background Artwork on the Right with Smooth Gradient Effect */}
-        <div className="absolute inset-y-0 right-0 w-3/4 sm:w-3/5 md:w-1/2 pointer-events-none select-none overflow-hidden">
-          <img
-            src="/leave-hero-bg.jpg"
-            alt=""
-            className="w-full h-full object-cover object-right opacity-45 sm:opacity-60 dark:opacity-20"
-          />
-          {/* Horizontal fade from solid background into image */}
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent dark:from-background dark:via-background/80 dark:to-transparent" />
-          {/* Bottom fade to seamlessly blend with the border line */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-          {/* Top fade */}
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-transparent" />
-        </div>
-
-        <div className="relative z-10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <CalendarCheck className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-            </div>
-            My Leaves Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm md:text-base">
-            View leave balances, submit leave requests, and track your request history.
-          </p>
-        </div>
-        <div className="relative z-10 flex items-center gap-3">
+    <div className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 overflow-x-hidden px-3 py-4 pb-24 sm:space-y-5 sm:px-5 sm:py-5 lg:px-7 lg:pb-8">
+      <section className="relative isolate min-h-[230px] overflow-hidden rounded-[1.6rem] border border-blue-100 bg-gradient-to-r from-[#eaf6ff] via-[#e7f0ff] to-[#e9e3ff] p-5 shadow-[0_14px_40px_-24px_rgba(37,99,235,.5)] sm:min-h-[250px] sm:rounded-[2rem] sm:p-8 lg:min-h-[265px] lg:p-9">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_22%,rgba(96,165,250,.28),transparent_42%),linear-gradient(110deg,transparent_48%,rgba(129,140,248,.22))]" />
+        <img src="/images/leaves/leave-hero-illustration.png" alt="Calendar and clock illustration" className="pointer-events-none absolute -bottom-5 right-0 z-0 h-[150px] w-[190px] object-contain opacity-25 sm:right-[3%] sm:h-[210px] sm:w-[280px] sm:opacity-80 lg:right-[17%] lg:h-[235px] lg:w-[315px]" />
+        <div className="relative z-10 flex h-full flex-col justify-between gap-5 sm:flex-row sm:items-center">
+          <div className="max-w-[650px]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/70 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-blue-700 sm:text-xs"><CalendarCheck className="h-4 w-4" /> Leave Management</div>
+            <h1 className="mt-4 max-w-[620px] text-[1.8rem] font-black leading-[1.08] tracking-tight text-[#101d4a] sm:text-4xl lg:text-[2.7rem]">My Leaves <span className="text-blue-700">Dashboard</span></h1>
+            <p className="mt-3 max-w-[500px] text-sm leading-relaxed text-slate-600 sm:text-base">View leave balances, submit leave requests, and track your request history.</p>
+          </div>
+          <div className="relative z-10 flex shrink-0 items-center gap-2 self-start sm:self-center">
           <Button
             variant="default"
             onClick={handleOpenCreateDialog}
-            className="flex items-center gap-2 shadow-sm hover:shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98]"
+            className="h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 px-4 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-blue-800 sm:h-11 sm:px-5 sm:text-sm"
           >
             <Plus className="h-4 w-4" />
-            Apply For Leave
+            <span className="whitespace-nowrap">Apply for Leave</span>
           </Button>
           <Button
             variant="outline"
             size="icon"
             onClick={fetchData}
             disabled={isLoading}
-            className="h-10 w-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs bg-background/80 backdrop-blur-xs shrink-0"
+            className="h-10 w-10 rounded-full border-blue-100 bg-white/90 text-blue-700 shadow-sm hover:bg-blue-50 sm:h-11 sm:w-11"
             title="Refresh leaves"
             aria-label="Refresh leaves"
           >
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Error Alert */}
       {error && (
@@ -505,9 +482,9 @@ export default function MyLeavesPage() {
       )}
 
       {/* Leave Balance Grid */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-200">Remaining Balances</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="space-y-3 sm:space-y-4">
+        <h2 className="text-lg font-black tracking-tight text-[#142044] sm:text-xl">Remaining Balances</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {isLoading ? (
             [1, 2, 3, 4].map((i) => (
               <Card key={i} className="animate-pulse border border-zinc-250 bg-white dark:bg-zinc-900">
@@ -547,26 +524,26 @@ export default function MyLeavesPage() {
               return (
                 <Card key={bal.leave_type_id ?? (bal as any).id} className="relative overflow-hidden border border-zinc-200/80 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md shadow-xs hover:shadow-md transition-all duration-300 group">
                   <div className={cn("absolute top-0 inset-x-0 h-1 bg-gradient-to-r", accentColor)} />
-                  <CardContent className="pt-5 flex items-center justify-between">
-                    <div className="space-y-1">
+                  <CardContent className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:pb-4 sm:pt-5">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{typeLabel}</span>
+                        <span className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-xs">{typeLabel}</span>
                         {formattedTimeline && (
-                          <span className="text-[10px] text-muted-foreground/80 font-medium mt-0.5">
+                          <span className="mt-0.5 truncate text-[9px] font-medium text-muted-foreground/80 sm:text-[10px]">
                             Period: {formattedTimeline}
                           </span>
                         )}
                       </div>
                       <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">{remaining}</span>
-                        <span className="text-xs text-muted-foreground">/ {totalAllowed} left</span>
+                        <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 sm:text-3xl">{remaining}</span>
+                        <span className="text-[11px] text-muted-foreground sm:text-xs">/ {totalAllowed} left</span>
                       </div>
-                      <p className="text-xs text-muted-foreground pt-1">{used} days used</p>
+                      <p className="pt-0.5 text-[10px] text-muted-foreground sm:pt-1 sm:text-xs">{used} days used</p>
                     </div>
 
                     {/* Circular visual progress meter */}
-                    <div className="relative h-14 w-14 shrink-0 flex items-center justify-center">
-                      <svg className="absolute w-full h-full transform -rotate-90">
+                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14">
+                      <svg viewBox="0 0 56 56" className="absolute h-full w-full -rotate-90">
                         <circle cx="28" cy="28" r="23" className="stroke-zinc-100 dark:stroke-zinc-800 fill-none" strokeWidth="4" />
                         <circle
                           cx="28"
@@ -581,7 +558,7 @@ export default function MyLeavesPage() {
                           strokeDashoffset={2 * Math.PI * 23 * (1 - (remainingPct / 100))}
                         />
                       </svg>
-                      <span className="text-[10px] font-extrabold text-zinc-700 dark:text-zinc-300">
+                      <span className="text-[9px] font-extrabold text-zinc-700 dark:text-zinc-300 sm:text-[10px]">
                         {Math.round(remainingPct)}%
                       </span>
                     </div>
@@ -593,10 +570,21 @@ export default function MyLeavesPage() {
         </div>
       </div>
 
+      <section className="rounded-[1.6rem] border border-slate-100 bg-white p-4 shadow-sm sm:rounded-[1.8rem] sm:p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><FileText className="h-5 w-5" /></div>
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-[#142044] sm:text-lg">Leave Request History</h2>
+            <p className="text-xs text-slate-500 sm:text-sm">Track the status of your submitted leave requests.</p>
+          </div>
+        </div>
       {/* Leave History List */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col gap-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b pb-2 gap-4">
-          <TabsList className="bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl overflow-x-auto max-w-full no-scrollbar flex flex-nowrap shrink-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl bg-slate-50 p-1 sm:flex sm:w-fit sm:flex-wrap">
+            <TabsTrigger value="all" className="min-w-0 rounded-xl px-2 py-2 text-xs font-semibold sm:px-4 sm:text-sm">
+              All Requests <span className="ml-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{history.length}</span>
+            </TabsTrigger>
             <TabsTrigger value="pending" className="px-5 py-2 text-sm font-semibold flex items-center gap-2 rounded-lg transition-all">
               Pending
               {!isLoading && (
@@ -613,8 +601,8 @@ export default function MyLeavesPage() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="partial" className="px-5 py-2 text-sm font-semibold flex items-center gap-2 rounded-lg transition-all">
-              Partially Approved
+            <TabsTrigger value="partial" className="min-w-0 px-2 py-2 text-xs font-semibold flex items-center justify-center gap-1 rounded-xl transition-all sm:px-4 sm:text-sm sm:gap-2">
+              <span className="sm:hidden">Partial</span><span className="hidden sm:inline">Partially Approved</span>
               {!isLoading && (
                 <span className="ml-1 bg-sky-100 text-sky-800 text-xs font-bold px-2 py-0.5 rounded-full dark:bg-sky-950/60 dark:text-sky-300">
                   {history.filter((r) => getRequestStatus(r) === "PARTIAL").length}
@@ -631,7 +619,7 @@ export default function MyLeavesPage() {
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-3">
-            <div className="flex items-center border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 bg-white dark:bg-zinc-900 shadow-2xs">
+              <div className="hidden items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs sm:flex">
               <Button
                 size="sm"
                 variant={viewMode === "table" ? "secondary" : "ghost"}
@@ -680,13 +668,14 @@ export default function MyLeavesPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex flex-col items-center justify-center py-20 px-4 border rounded-2xl border-dashed bg-white/40 dark:bg-zinc-900/10"
+                  className="flex min-h-[250px] flex-col items-center justify-center rounded-2xl border border-dashed border-blue-100 bg-white/70 px-4 py-10 text-center sm:min-h-[280px] sm:py-12"
                 >
-                  <FileText className="h-14 w-14 text-muted-foreground/30 mb-4" />
-                  <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">No leave requests</h3>
-                  <p className="text-muted-foreground text-sm max-w-xs text-center mt-1.5">
-                    There are no leave requests under the "{activeTab}" status.
+                  <img src="/images/leaves/empty-folder-illustration.png" alt="" className="mb-2 h-20 w-20 object-contain sm:h-24 sm:w-24" />
+                  <h3 className="text-base font-black text-[#142044] sm:text-lg">No leave requests</h3>
+                  <p className="mt-1.5 max-w-xs text-sm text-slate-500">
+                    There are no leave requests under this category.
                   </p>
+                  <Button onClick={handleOpenCreateDialog} className="mt-4 h-10 rounded-full bg-blue-600 px-5 text-sm font-bold text-white shadow-md hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Apply for Leave</Button>
                 </motion.div>
               ) : viewMode === "table" ? (
                 <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden w-full">
@@ -921,10 +910,11 @@ export default function MyLeavesPage() {
           </TabsContent>
         )}
       </Tabs>
+      </section>
 
       {/* Apply / Edit Leave Dialog Form Modal */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-2xl p-6">
+        <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-2xl p-6 max-sm:place-content-center max-sm:gap-4 max-sm:px-5 max-sm:py-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <CalendarCheck className="h-5 w-5 text-primary" />
@@ -988,15 +978,10 @@ export default function MyLeavesPage() {
             {isHalfDay && (
               <div className="space-y-1.5 pl-6 pt-0.5">
                 <Label htmlFor="session-select" className="text-xs font-semibold">Half Day Session</Label>
-                <Select value={halfDaySession} onValueChange={(val: any) => setHalfDaySession(val)}>
-                  <SelectTrigger id="session-select" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
-                    <SelectValue placeholder="Select session" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIRST_HALF">First Half (Morning Session)</SelectItem>
-                    <SelectItem value="SECOND_HALF">Second Half (Afternoon Session)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <ResponsiveSelect id="session-select" drawerTitle="Half Day Session" value={halfDaySession} onChange={(event) => setHalfDaySession(event.target.value as any)} className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
+                  <option value="FIRST_HALF">First Half (Morning Session)</option>
+                  <option value="SECOND_HALF">Second Half (Afternoon Session)</option>
+                </ResponsiveSelect>
               </div>
             )}
 
@@ -1009,36 +994,28 @@ export default function MyLeavesPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="leave-type" className="text-xs font-semibold">Leave Type</Label>
-              <Select value={leaveTypeId} onValueChange={(val) => setLeaveTypeId(val || "")} required>
-                <SelectTrigger id="leave-type" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
-                  <SelectValue placeholder="Select leave category">
-                    {leaveTypeId ? (() => {
-                      const selectedBal = balances.find(
-                        (b) => String(b.leave_type_id ?? b.leave_type) === leaveTypeId
-                      );
-                      return selectedBal
-                        ? `${getLeaveTypeDisplay((selectedBal as any).leave_type_name ?? selectedBal.leave_type)} (Available: ${selectedBal.remaining ?? (selectedBal as any).remaining_leaves ?? 0} d)`
-                        : undefined;
-                    })() : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
+              <div className="relative">
+                <ResponsiveSelect
+                  id="leave-type"
+                  drawerTitle="Leave Type"
+                  value={leaveTypeId}
+                  onChange={(event) => setLeaveTypeId(event.target.value || "")}
+                  required
+                  className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-blue-950"
+                >
+                  <option value="" disabled>Select leave category</option>
                   {balances.map((bal) => {
                     const rem = Number(bal.remaining ?? (bal as any).remaining_leaves ?? 0);
                     const isPaid = bal.is_paid !== false;
                     return (
-                      <SelectItem key={bal.leave_type_id ?? bal.leave_type} value={String(bal.leave_type_id ?? bal.leave_type)}>
-                        <div className="flex items-center justify-between w-full gap-4">
-                          <span>{getLeaveTypeDisplay((bal as any).leave_type_name ?? bal.leave_type)}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-semibold ${rem > 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"}`}>
-                            {rem}d left {isPaid ? "" : "• LOP"}
-                          </span>
-                        </div>
-                      </SelectItem>
+                      <option key={bal.leave_type_id ?? bal.leave_type} value={String(bal.leave_type_id ?? bal.leave_type)}>
+                        {getLeaveTypeDisplay((bal as any).leave_type_name ?? bal.leave_type)} (Available: {rem}d{isPaid ? "" : " • LOP"})
+                      </option>
                     );
                   })}
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
+                <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-slate-500 md:block" />
+              </div>
             </div>
 
             {/* Dynamic Balance Preview Card */}
@@ -1068,7 +1045,7 @@ export default function MyLeavesPage() {
                   </div>
                   {isOverdraft && (
                     <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 pt-1">
-                      ⚠️ Insufficient balance ({totalDays} days requested, but only {rem} available).
+                      âš ï¸ Insufficient balance ({totalDays} days requested, but only {rem} available).
                     </p>
                   )}
                 </div>

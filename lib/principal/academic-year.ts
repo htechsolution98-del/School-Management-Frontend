@@ -28,7 +28,12 @@ export async function createAcademicYearForPrincipal(
 }
 
 export async function getAcademicYearsForPrincipal(): Promise<AcademicYear[]> {
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.ACADEMIC_YEAR}`);
+  let response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.ACADEMIC_YEAR}`);
+
+  // The read-only endpoint is a safe fallback if the legacy principal route is unavailable.
+  if (!response.ok) {
+    response = await fetchWithAuth(`${API_BASE_URL}/academic-year/`);
+  }
 
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, "Failed to fetch academic years."));

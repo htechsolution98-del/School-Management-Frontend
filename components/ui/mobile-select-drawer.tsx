@@ -9,6 +9,7 @@ export interface MobileSelectOption {
   value: string | number;
   count?: number;
   icon?: React.ElementType;
+  disabled?: boolean;
 }
 
 export interface MobileSelectDrawerProps {
@@ -45,11 +46,13 @@ export function MobileSelectDrawer({
             <button
               key={String(opt.value)}
               type="button"
+              disabled={opt.disabled}
               onClick={() => {
+                if (opt.disabled) return;
                 onSelect(opt.value);
                 onClose();
               }}
-              className={`flex w-full items-center justify-between p-3.5 rounded-2xl text-left font-semibold text-xs sm:text-sm transition-all cursor-pointer ${
+              className={`flex w-full items-center justify-between p-3.5 rounded-2xl text-left font-semibold text-xs sm:text-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                 isSelected
                   ? "bg-blue-50 border-2 border-blue-600 text-blue-700 shadow-xs"
                   : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 active:bg-slate-200"

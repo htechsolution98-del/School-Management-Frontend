@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -837,7 +839,7 @@ export default function TeacherExamsPage() {
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1 sm:flex-initial min-w-[160px]">
-                <select
+                <ResponsiveSelect
                   value={selectedClassFilter}
                   onChange={(e) => setSelectedClassFilter(e.target.value)}
                   className="w-full h-9 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
@@ -848,7 +850,7 @@ export default function TeacherExamsPage() {
                       {cls.school_class}
                     </option>
                   ))}
-                </select>
+                </ResponsiveSelect>
               </div>
 
               {(searchQuery || selectedClassFilter !== "all" || marksFilter !== "all") && (
@@ -886,7 +888,7 @@ export default function TeacherExamsPage() {
             </Card>
           ) : filteredExams.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-              <CalendarRange className="h-14 w-14 text-slate-200 dark:text-slate-700 mb-3" />
+              <img src="/images/empty-folder.png" alt="No exams found" className="mb-3 h-24 w-24 object-contain" />
               <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
                 {marksFilter === "marks-added"
                   ? "No exams with marks added yet"
@@ -1375,11 +1377,11 @@ export default function TeacherExamsPage() {
 
       {/* Schedule Exam Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-0 sm:p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col relative"
+            className="bg-white dark:bg-slate-900 rounded-none max-w-none w-full h-[100dvh] max-h-[100dvh] shadow-2xl border-0 overflow-y-auto flex flex-col relative sm:h-auto sm:max-h-[92vh] sm:max-w-lg sm:rounded-3xl sm:border"
           >
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
@@ -1444,7 +1446,7 @@ export default function TeacherExamsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Class Group</label>
-                  <select
+                  <ResponsiveSelect
                     value={formData.class_group}
                     onChange={(e) => handleClassChange(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
@@ -1455,12 +1457,12 @@ export default function TeacherExamsPage() {
                         {cls.school_class}
                       </option>
                     ))}
-                  </select>
+                  </ResponsiveSelect>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</label>
-                  <select
+                  <ResponsiveSelect
                     value={formData.subject}
                     onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
                     disabled={!formData.class_group || formSubjectsLoading}
@@ -1478,7 +1480,7 @@ export default function TeacherExamsPage() {
                         {sub.name}
                       </option>
                     ))}
-                  </select>
+                  </ResponsiveSelect>
                 </div>
               </div>
 

@@ -1,6 +1,70 @@
 import { API_BASE_URL } from "./config";
 import { fetchWithAuth } from "./auth";
 
+export const MAX_ASSET_SIZE_BYTES = 200 * 1024; // 204,800 bytes (200 KB)
+
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+];
+
+export const ALLOWED_FAVICON_MIME_TYPES = [
+  ...ALLOWED_IMAGE_MIME_TYPES,
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+];
+
+export const ALLOWED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+export const ALLOWED_FAVICON_EXTENSIONS = [...ALLOWED_IMAGE_EXTENSIONS, ".ico"];
+
+export interface AssetValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Validates file size and format before uploading.
+ * Max size: 200 KB (204,800 bytes).
+ * Formats: PNG, JPG, JPEG, WEBP (and ICO for favicons).
+ */
+export function validateAssetFile(
+  file: File,
+  isFavicon: boolean = false
+): AssetValidationResult {
+  if (!file) {
+    return { valid: false, error: "No file selected." };
+  }
+
+  // 1. Strict Size Check (200 KB = 204,800 bytes)
+  if (file.size > MAX_ASSET_SIZE_BYTES) {
+    return {
+      valid: false,
+      error: "File size exceeds 200 KB. Please compress and upload a smaller file.",
+    };
+  }
+
+  // 2. Format & MIME Restriction
+  const allowedMimes = isFavicon ? ALLOWED_FAVICON_MIME_TYPES : ALLOWED_IMAGE_MIME_TYPES;
+  const allowedExts = isFavicon ? ALLOWED_FAVICON_EXTENSIONS : ALLOWED_IMAGE_EXTENSIONS;
+
+  const fileName = file.name.toLowerCase();
+  const hasValidExt = allowedExts.some((ext) => fileName.endsWith(ext));
+  const hasValidMime = !file.type || allowedMimes.includes(file.type.toLowerCase());
+
+  if (!hasValidExt || !hasValidMime) {
+    return {
+      valid: false,
+      error: isFavicon
+        ? "Invalid image format. Allowed formats: PNG, JPG, WEBP, or ICO."
+        : "Invalid image format. Allowed formats: PNG, JPG, or WEBP.",
+    };
+  }
+
+  return { valid: true };
+}
+
 export interface CloudinaryUploadOptions {
   cloudName?: string;
   uploadPreset?: string;
@@ -18,19 +82,19 @@ export interface CloudinaryUploadResult {
  * Uploads an image file directly to Cloudinary using the unsigned upload preset REST API.
  * Automatically falls back to the backend authenticated upload endpoint if the
  * client-side unsigned preset is unconfigured or rejected by Cloudinary.
+ * Strictly enforces a 200 KB max limit and restricts formats to PNG, JPG, JPEG, WEBP (and ICO for favicons).
  */
 export async function uploadToCloudinary(
   file: File,
   options?: CloudinaryUploadOptions
 ): Promise<string> {
-  if (!file) {
-    throw new Error("No file provided for upload.");
-  }
+  const isFavicon =
+    options?.assetType === "favicon_url" ||
+    Boolean(options?.folder && options.folder.includes("favicon"));
 
-  // Validate file size (10 MB max)
-  const maxBytes = 10 * 1024 * 1024;
-  if (file.size > maxBytes) {
-    throw new Error("File size exceeds 10 MB limit.");
+  const validation = validateAssetFile(file, isFavicon);
+  if (!validation.valid) {
+    throw new Error(validation.error || "File validation failed.");
   }
 
   const cloudName =
@@ -97,7 +161,11 @@ export async function uploadToCloudinary(
       }
     } else {
       const errorPayload = await backendRes.json().catch(() => ({}));
+      const fileErr = Array.isArray(errorPayload.file)
+        ? errorPayload.file[0]
+        : errorPayload.file;
       const msg =
+        fileErr ||
         errorPayload.detail ||
         errorPayload.error ||
         errorPayload.message ||
@@ -110,4 +178,3 @@ export async function uploadToCloudinary(
 
   throw new Error("Unable to obtain secure image URL from Cloudinary.");
 }
-

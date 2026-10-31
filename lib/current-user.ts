@@ -35,8 +35,17 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
       localStorage.setItem("roles", JSON.stringify(normalizedRoles));
       setRoleCookies(normalizedRoles);
     }
-    if (profile.school?.name) {
-      localStorage.setItem("school_name", profile.school.name);
+    const shortName = profile.short_display_name || profile.school_short_name || profile.school?.short_name;
+    if (shortName) {
+      localStorage.setItem("school_short_name", shortName);
+    }
+    const fullName = profile.school_full_name || profile.school?.full_name || profile.school?.name;
+    if (fullName) {
+      localStorage.setItem("school_full_name", fullName);
+    }
+    const displayName = shortName || fullName || profile.school?.name;
+    if (displayName) {
+      localStorage.setItem("school_name", displayName);
     }
     if (profile.id) {
       localStorage.setItem("user_id", String(profile.id));

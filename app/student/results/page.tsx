@@ -23,11 +23,14 @@ import {
   CheckCircle,
   Printer,
   GraduationCap,
+  Info,
+  ArrowUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { getSchoolProfile } from "@/lib/school-profile";
 import { getStudentResults, getExamRankings, getStudentExams, getStudentAttendance } from "@/lib/student";
 import type { StudentResult, StudentExam, RankingEntry } from "@/types/student";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { ResultCardPreview } from "@/components/results/result-card-preview";
-import { writePrintableResultCards } from "@/lib/result-report-print";
-import { getSavedResultTemplate } from "@/lib/result-template";
+import { downloadResultPreviewPDF } from "@/lib/result-dom-pdf";
 
 const FONT_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap";
 
@@ -55,6 +57,36 @@ const DEFAULT_GRADE_STYLE = { bg: "bg-slate-50", text: "text-slate-600", border:
 
 function getGradeStyle(grade: string) {
   return GRADE_STYLES[grade?.toUpperCase?.()] || GRADE_STYLES[grade] || DEFAULT_GRADE_STYLE;
+}
+
+function getStudentProfileField(profile: any, field: "father" | "mother"): string {
+  const snakeKey = `${field}_name`;
+  const camelKey = `${field}Name`;
+  const directValues = [
+    profile?.[snakeKey],
+    profile?.[camelKey],
+    profile?.[field],
+    profile?.studentverify?.[snakeKey],
+    profile?.studentverify?.[camelKey],
+    profile?.extradata?.[snakeKey],
+    profile?.extradata?.[camelKey],
+  ];
+  const direct = directValues.find((value) => typeof value === "string" && value.trim());
+  if (direct) return direct.trim();
+
+  for (const section of profile?.sections || []) {
+    const match = (section.fields || []).find((item: any) =>
+      String(item.label || "").toLowerCase().includes(field) && String(item.value || "").trim()
+    );
+    if (match) return String(match.value).trim();
+  }
+
+  for (const extra of profile?.extra_details || []) {
+    const matchKey = Object.keys(extra || {}).find((key) => key.toLowerCase().replace(/[^a-z]/g, "") === `${field}name`);
+    if (matchKey && String(extra[matchKey] || "").trim()) return String(extra[matchKey]).trim();
+  }
+
+  return "";
 }
 
 // ─── QR Code SVG (simple static placeholder) ──────────────────────────────────
@@ -411,7 +443,6 @@ export default function StudentResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [downloadingReport, setDownloadingReport] = useState(false);
 
   // Leaderboard state
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -425,12 +456,13 @@ export default function StudentResultsPage() {
     setError(null);
 
     try {
-      const [resultsRes, examsRes, attendanceRes, profileRes, schoolRes] = await Promise.allSettled([
+      const [resultsRes, examsRes, attendanceRes, profileRes, schoolRes, brandingRes] = await Promise.allSettled([
         getStudentResults(),
         getStudentExams(),
         getStudentAttendance(),
         fetchWithAuth(`${API_BASE_URL}/studentget/me/`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         fetchWithAuth(`${API_BASE_URL}/me/`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        getSchoolProfile(),
       ]);
 
       if (resultsRes.status === "fulfilled") {
@@ -449,8 +481,12 @@ export default function StudentResultsPage() {
       } else if (attendanceRes.status === "fulfilled" && attendanceRes.value.length > 0) {
         setStudentId(attendanceRes.value[0].student);
       }
-      if (schoolRes.status === "fulfilled" && schoolRes.value)
-        setSchoolProfile(schoolRes.value.school || schoolRes.value);
+      if (schoolRes.status === "fulfilled" && schoolRes.value) {
+        setSchoolProfile({
+          ...(schoolRes.value.school || schoolRes.value),
+          ...(brandingRes.status === "fulfilled" ? brandingRes.value : {}),
+        });
+      }
     } catch (err: any) {
       setError(err?.message || "Something went wrong loading academic performance card.");
     } finally {
@@ -485,26 +521,25 @@ export default function StudentResultsPage() {
 
     let totalObtained = 0;
     let totalMax = 0;
-    let completed = 0;
+    const completedExams = new Set<string>();
 
     results.forEach((r) => {
       if (!r.is_absent) {
         totalObtained += parseFloat(r.marks_obtained || "0");
         totalMax += parseFloat(r.max_marks || "0");
-        completed++;
+        completedExams.add(r.exam_title);
       }
     });
 
     const avgPercentage = totalMax > 0 ? Math.round((totalObtained / totalMax) * 100) : 0;
-    return { avgPercentage, completed };
+    return { avgPercentage, completed: completedExams.size };
   }, [results]);
 
-  const findExamIdByTitle = (title: string): number | null => {
-    const matched = exams.find((e) => e.title.toLowerCase() === title.toLowerCase());
-    return matched ? matched.id : null;
+  const findExamIdsByTitle = (title: string): number[] => {
+    return exams.filter((exam) => exam.title?.toLowerCase() === title.toLowerCase()).map((exam) => Number(exam.id));
   };
 
-  const handleOpenLeaderboard = async (title: string, examId: number) => {
+  const handleOpenLeaderboard = async (title: string, examIds: number[]) => {
     setLeaderboardTitle(title);
     setShowLeaderboard(true);
     setLeaderboardLoading(true);
@@ -512,8 +547,22 @@ export default function StudentResultsPage() {
     setRankings([]);
 
     try {
-      const res = await getExamRankings(examId);
-      setRankings(res.ranking || []);
+      const responses = await Promise.all(examIds.map((examId) => getExamRankings(examId)));
+      const combined = new Map<number, RankingEntry>();
+      responses.forEach((response) => (response.ranking || []).forEach((entry) => {
+        const row = combined.get(entry.student) || { ...entry, marks_obtained: 0, max_marks: 0 };
+        row.marks_obtained += Number(entry.marks_obtained) || 0;
+        row.max_marks += Number(entry.max_marks) || 0;
+        combined.set(entry.student, row);
+      }));
+      const sorted = Array.from(combined.values()).map((entry) => ({
+        ...entry,
+        grade: (() => {
+          const percent = entry.max_marks ? (entry.marks_obtained / entry.max_marks) * 100 : 0;
+          return percent >= 90 ? "A+" : percent >= 75 ? "A" : percent >= 60 ? "B" : percent >= 40 ? "C" : "F";
+        })(),
+      })).sort((a, b) => (b.max_marks ? b.marks_obtained / b.max_marks : 0) - (a.max_marks ? a.marks_obtained / a.max_marks : 0));
+      setRankings(sorted.map((entry, index) => ({ ...entry, rank: index + 1 })));
     } catch (err: any) {
       setLeaderboardError(err?.message || "Failed to load ranking details.");
     } finally {
@@ -521,98 +570,24 @@ export default function StudentResultsPage() {
     }
   };
 
-  // Print report card
-  const handlePrint = () => {
-    if (!reportResults.length || !reportExamTitle) return;
-    const win = window.open("", "_blank", "popup,width=1000,height=850");
-    if (!win) { toast.error("Allow pop-ups to download your result."); return; }
-
-    const totalMaximum = reportResults.reduce((sum, result) => sum + Number(result.max_marks || 0), 0);
-    const totalObtained = reportResults.reduce((sum, result) => sum + (result.is_absent ? 0 : Number(result.marks_obtained || 0)), 0);
-    const rawLogo = schoolProfile?.logo || localStorage.getItem("school_logo") || "";
-    const logo = rawLogo && !String(rawLogo).startsWith("http") && !String(rawLogo).startsWith("data:")
-      ? `${API_BASE_URL.replace(/\/api\/?$/, "")}${String(rawLogo).startsWith("/") ? rawLogo : `/${rawLogo}`}`
-      : rawLogo;
+  const handlePrint = async () => {
+    const card = document.querySelector<HTMLElement>("[data-result-card-preview='true']");
+    if (!card || !reportExamTitle) return;
     const studentName = [studentProfile?.name, studentProfile?.surname].filter(Boolean).join(" ") || studentProfile?.student_name || "Student";
-    const admissionNumber = studentProfile?.gr_no || studentProfile?.gr_number || studentProfile?.admission_no || "";
-    const schoolAddress = [schoolProfile?.address, schoolProfile?.city, schoolProfile?.state, schoolProfile?.pincode].filter(Boolean).join(", ");
-
-    void writePrintableResultCards({
-      printWindow: win,
-      students: [{
-        studentId: studentProfile?.id || studentId || admissionNumber || "student",
-        name: studentName,
-        rollNumber: studentProfile?.roll_no || studentProfile?.roll_number,
-        admissionNumber,
-        className: [studentProfile?.school_class_name || studentProfile?.school_class?.school_class, studentProfile?.division_name || (typeof studentProfile?.division === "object" ? studentProfile?.division?.division : studentProfile?.division)].filter(Boolean).join(" - "),
-        dateOfBirth: studentProfile?.dob || studentProfile?.date_of_birth,
-        photo: studentProfile?.profile_photo || studentProfile?.photo,
-        subjects: reportResults.map((result) => ({ subject: result.subject || reportExamTitle, maximum: result.max_marks, obtained: result.is_absent ? "Absent" : result.marks_obtained, grade: result.grade, remarks: result.remarks, absent: result.is_absent })),
-        totalMaximum,
-        totalObtained,
-        percentage: totalMaximum ? ((totalObtained / totalMaximum) * 100).toFixed(2) : "0.00",
-        overallGrade: reportResults.find((result) => result.grade)?.grade,
-        remarks: reportResults.find((result) => result.remarks?.trim())?.remarks || "",
-      }],
-      school: { name: schoolProfile?.name || localStorage.getItem("school_name") || "School", logo, address: schoolAddress, phone: schoolProfile?.phone, email: schoolProfile?.email },
-      title: reportExamTitle,
-      academicYear: schoolProfile?.academic_year_name || schoolProfile?.academic_year?.name || "",
-      template: reportResults.find((result) => result.report_template)?.report_template || getSavedResultTemplate(),
-    }).catch((error) => {
-      win.close();
-      toast.error(error?.message || "Could not prepare the result PDF.");
-    });
-  };
-
-  const handleDownloadReportCard = async () => {
-    if (!studentId) {
-      try {
-        setDownloadingReport(true);
-        const attendance = await getStudentAttendance();
-        if (attendance.length > 0) {
-          const sId = attendance[0].student;
-          setStudentId(sId);
-          await downloadPDF(sId);
-        } else {
-          toast.error("Could not retrieve student ID for report card.");
-        }
-      } catch {
-        toast.error("Failed to determine student ID.");
-      } finally {
-        setDownloadingReport(false);
-      }
-      return;
-    }
-
-    setDownloadingReport(true);
+    const safeName = `${studentName}_${reportExamTitle}`.replace(/[^a-zA-Z0-9_-]+/g, "_");
     try {
-      await downloadPDF(studentId);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to download PDF report card.");
-    } finally {
-      setDownloadingReport(false);
+      await downloadResultPreviewPDF(card, `${safeName}_Report_Card.pdf`);
+      toast.success("Preview downloaded as PDF.");
+    } catch (error: any) {
+      toast.error(error?.message || "Could not create the PDF from this preview.");
     }
   };
 
-  const downloadPDF = async (sId: number, examId?: number) => {
-    const examQuery = examId ? `?exam_id=${examId}` : "";
-    const url = `${API_BASE_URL}/results/report-card/${sId}/${examQuery}`;
-    const response = await fetchWithAuth(url);
-
-    if (!response.ok) {
-      throw new Error("Report card file is not available yet.");
-    }
-
-    const blob = await response.blob();
-    const objectUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = `Report_Card_${sId}${examId ? `_Exam_${examId}` : ""}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(objectUrl);
-    toast.success("Report card downloaded successfully!");
+  const handleDownloadReportCard = () => {
+    const title = examTitles[0];
+    if (!title) return;
+    setReportExamTitle(title);
+    setReportResults(groupedResults.get(title) || results);
   };
 
   return (
@@ -627,25 +602,25 @@ export default function StudentResultsPage() {
       <div className="absolute bottom-10 left-10 w-85 h-85 bg-violet-200/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Results hero */}
-      <section className="relative z-10 overflow-hidden rounded-[2rem] border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 p-5 shadow-sm sm:rounded-[2.5rem] sm:p-8">
+      <section className="relative z-10 overflow-hidden rounded-[2rem] border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 p-5 shadow-sm sm:rounded-[2rem] sm:p-6">
         <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-blue-200/30 blur-3xl" />
         <div className="relative flex items-center justify-between gap-3">
           <div className="max-w-xl">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-blue-600 sm:text-xs">Academic Records</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">My <span className="bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">Results</span></h1>
-            <p className="mt-2 max-w-md text-xs leading-relaxed text-slate-500 sm:text-base">Track your semester marks, view rankings, and download report cards.</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">My <span className="text-blue-600">Results</span></h1>
+            <p className="mt-2 max-w-md text-xs leading-relaxed text-slate-500 sm:text-sm">Track your semester marks, view rankings, and download report cards.</p>
           </div>
-          <div className="relative mr-1 hidden h-28 w-28 shrink-0 items-center justify-center rounded-[2rem] bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 sm:flex">
-            <GraduationCap className="h-16 w-16" strokeWidth={1.7} />
-            <span className="absolute -bottom-1 -right-1 rounded-2xl border-4 border-white bg-emerald-100 p-2 text-emerald-600"><FileText className="h-6 w-6" /></span>
+          <div className="relative mr-1 hidden h-24 w-24 shrink-0 items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 sm:flex">
+            <GraduationCap className="h-12 w-12" strokeWidth={1.7} />
+            <span className="absolute -bottom-1 -right-1 rounded-xl border-4 border-white bg-emerald-100 p-1.5 text-emerald-600"><FileText className="h-5 w-5" /></span>
           </div>
         </div>
-        <div className="relative mt-5 flex gap-3 sm:mt-7 sm:gap-4">
+        <div className="relative mt-5 flex gap-3 sm:mt-5 sm:gap-3">
           <Button
             variant="outline"
             onClick={loadPageData}
             disabled={isLoading}
-            className="h-12 flex-1 rounded-[1.25rem] border-0 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm hover:bg-white sm:h-16 sm:flex-none sm:gap-3 sm:px-8 sm:text-lg"
+            className="h-12 flex-1 rounded-[1.25rem] border-0 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm hover:bg-white sm:h-12 sm:flex-none sm:gap-2 sm:px-5 sm:text-base"
           >
             {isLoading ? <Loader2 size={16} className="animate-spin text-[#2563eb]" /> : <RefreshCw size={16} className="text-slate-500" />}
             Refresh
@@ -653,43 +628,98 @@ export default function StudentResultsPage() {
 
           <Button
             onClick={handleDownloadReportCard}
-            disabled={downloadingReport || results.length === 0}
-            className="h-12 flex-[1.4] rounded-[1.25rem] bg-gradient-to-r from-sky-500 to-blue-700 px-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:from-sky-600 hover:to-blue-800 sm:h-16 sm:flex-none sm:gap-3 sm:px-8 sm:text-lg"
+            disabled={results.length === 0}
+            className="h-12 flex-[1.4] rounded-[1.25rem] bg-blue-600 px-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 sm:h-12 sm:flex-none sm:gap-2 sm:px-5 sm:text-base"
           >
-            {downloadingReport ? <Loader2 size={16} className="animate-spin text-white" /> : <Download size={16} className="text-white" />}
-            Report Card PDF
+            <FileText size={16} className="text-white" />
+            Preview / Download PDF
           </Button>
         </div>
       </section>
 
       {/* Stats */}
       <div className="z-10 grid grid-cols-2 gap-3 sm:gap-5">
-        <Card className="relative overflow-hidden rounded-[1.75rem] border-indigo-100/60 bg-gradient-to-br from-indigo-50/70 via-white to-white shadow-sm sm:rounded-[2rem]">
-          <CardContent className="relative z-10 flex min-h-[182px] items-center gap-3 p-4 sm:min-h-[240px] sm:gap-5 sm:p-7">
-            <div className="shrink-0 rounded-[1.25rem] bg-indigo-100/70 p-3 text-indigo-600 sm:p-5">
-              <Award size={26} className="sm:h-10 sm:w-10" />
+        {/* Card 1 — Average Performance */}
+        <Card className="relative overflow-hidden rounded-[2rem] border-slate-100/90 bg-white shadow-sm sm:rounded-[2.25rem]">
+          <CardContent className="relative z-10 flex min-h-[170px] flex-col justify-between p-4 pb-5 sm:min-h-[190px] sm:p-5 sm:pb-6">
+            {/* Top row: icon + trend badge */}
+            <div className="flex items-start justify-between">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#3b82f6] to-[#2563eb] text-white shadow-md shadow-blue-500/20 sm:h-14 sm:w-14">
+                <Award className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.2} />
+              </div>
+              <div className="flex items-center gap-1 rounded-full border border-emerald-100 bg-[#ecfdf5] px-2.5 py-1 text-xs font-bold text-[#059669]">
+                <ArrowUp className="h-3 w-3 stroke-[2.5]" />
+                <span>5%</span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="max-w-[9rem] text-[11px] font-extrabold uppercase leading-tight tracking-wide text-slate-500 sm:text-base">Average Performance</p>
-              <h2 className="mt-2 text-3xl font-black leading-none text-slate-900 sm:mt-3 sm:text-5xl">{stats.avgPercentage}%</h2>
-              <p className="mt-2 text-[10px] leading-tight text-slate-400 sm:text-sm">Keep up the great work!</p>
+            {/* Label + value + subtitle */}
+            <div className="mt-2.5">
+              <div className="flex items-center gap-1.5 text-slate-800">
+                <span className="text-sm font-bold sm:text-sm">Average Performance</span>
+                <Info className="h-3.5 w-3.5 cursor-pointer text-slate-400 stroke-[1.8]" />
+              </div>
+              <h2 className="mt-1 text-3xl font-extrabold leading-tight tracking-tight text-[#0066ff] sm:text-3xl">{stats.avgPercentage}%</h2>
+              <p className="mt-1 text-xs font-medium text-slate-400">Keep up the great work!</p>
             </div>
           </CardContent>
-          <svg aria-hidden="true" viewBox="0 0 320 60" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 h-12 w-full text-violet-300/70 sm:h-16"><path d="M0 45 C45 67 55 12 100 22 S155 66 205 24 S270 53 320 18 V60 H0Z" fill="currentColor" opacity=".18"/><path d="M0 45 C45 67 55 12 100 22 S155 66 205 24 S270 53 320 18" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
+          {/* Wave decoration */}
+          <svg aria-hidden="true" viewBox="0 0 240 70" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 w-full">
+            <defs>
+              <linearGradient id="wave-purple-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#c084fc" stopOpacity="0.35"/>
+                <stop offset="100%" stopColor="#e9d5ff" stopOpacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,52 C35,62 60,48 85,46 C110,44 125,28 145,28 C165,28 178,46 205,43 C225,40 235,34 240,30 V70 H0 Z" fill="url(#wave-purple-grad)"/>
+            <path d="M0,52 C35,62 60,48 85,46 C110,44 125,28 145,28 C165,28 178,46 205,43 C225,40 235,34 240,30" fill="none" stroke="#a855f7" strokeWidth="2"/>
+            <circle cx="145" cy="28" r="4.5" fill="#ffffff" stroke="#a855f7" strokeWidth="2.5"/>
+          </svg>
         </Card>
 
-        <Card className="relative overflow-hidden rounded-[1.75rem] border-emerald-100/60 bg-gradient-to-br from-emerald-50/70 via-white to-white shadow-sm sm:rounded-[2rem]">
-          <CardContent className="relative z-10 flex min-h-[182px] items-center gap-3 p-4 sm:min-h-[240px] sm:gap-5 sm:p-7">
-            <div className="shrink-0 rounded-[1.25rem] bg-emerald-100/70 p-3 text-emerald-600 sm:p-5">
-              <BookmarkCheck size={26} className="sm:h-10 sm:w-10" />
+        {/* Card 2 — Completed Evaluations */}
+        <Card className="relative overflow-hidden rounded-[2rem] border-slate-100/90 bg-white shadow-sm sm:rounded-[2.25rem]">
+          <CardContent className="relative z-10 flex min-h-[170px] flex-col justify-between p-4 pb-5 sm:min-h-[190px] sm:p-5 sm:pb-6">
+            {/* Top row: icon + trend badge */}
+            <div className="flex items-start justify-between">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-white shadow-md shadow-emerald-500/20 sm:h-14 sm:w-14">
+                <BookmarkCheck className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.2} />
+              </div>
+              <div className="flex items-center gap-1 rounded-full border border-emerald-100 bg-[#ecfdf5] px-2.5 py-1 text-xs font-bold text-[#059669]">
+                <ArrowUp className="h-3 w-3 stroke-[2.5]" />
+                <span>100%</span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="max-w-[9rem] text-[11px] font-extrabold uppercase leading-tight tracking-wide text-slate-500 sm:text-base">Completed Evaluations</p>
-              <h2 className="mt-2 text-3xl font-black leading-none text-slate-900 sm:mt-3 sm:text-5xl">{stats.completed}</h2>
-              <p className="mt-2 text-[10px] leading-tight text-slate-400 sm:text-sm">Exams completed</p>
+            {/* Label + value + subtitle */}
+            <div className="mt-2.5">
+              <div className="flex items-center gap-1.5 text-slate-800">
+                <span className="text-sm font-bold sm:text-sm">Completed Exams</span>
+                <Info className="h-3.5 w-3.5 cursor-pointer text-slate-400 stroke-[1.8]" />
+              </div>
+              <h2 className="mt-1 text-3xl font-extrabold leading-tight tracking-tight text-[#16a34a] sm:text-3xl">{stats.completed}</h2>
+              <p className="mt-1 text-xs font-medium text-slate-400">Distinct exams completed</p>
             </div>
           </CardContent>
-          <div aria-hidden="true" className="pointer-events-none absolute bottom-3 right-3 flex h-12 items-end gap-1 sm:h-16 sm:gap-2">{[30, 55, 82, 48, 70, 50, 100].map((height, i) => <span key={i} className="w-2 rounded-t bg-emerald-300/50 sm:w-4" style={{ height: `${height}%` }} />)}</div>
+          {/* Bar chart decoration on bottom right */}
+          <div aria-hidden="true" className="pointer-events-none absolute bottom-2.5 right-3 flex h-14 items-end gap-1.5 sm:h-16 sm:gap-2">
+            {[
+              { h: 22, o: 0.45 },
+              { h: 36, o: 0.55 },
+              { h: 50, o: 0.68 },
+              { h: 42, o: 0.75 },
+              { h: 68, o: 0.85 },
+              { h: 96, o: 0.95 },
+            ].map((bar, i) => (
+              <span
+                key={i}
+                className="w-2 rounded-t-sm sm:w-2.5"
+                style={{
+                  height: `${bar.h}%`,
+                  background: "linear-gradient(to top, rgba(167, 243, 208, 0.4), #34d399)",
+                  opacity: bar.o,
+                }}
+              />
+            ))}
+          </div>
         </Card>
       </div>
 
@@ -732,7 +762,7 @@ export default function StudentResultsPage() {
           <AnimatePresence>
             {examTitles.map((title, index) => {
               const examResults = groupedResults.get(title) || [];
-              const examId = findExamIdByTitle(title);
+              const examIds = findExamIdsByTitle(title);
               const totalObt = examResults.reduce((s, r) => s + (r.is_absent ? 0 : parseFloat(r.marks_obtained || "0")), 0);
               const totalMax = examResults.reduce((s, r) => s + parseFloat(r.max_marks || "0"), 0);
               const pct = totalMax > 0 ? Math.round((totalObt / totalMax) * 100) : 0;
@@ -749,47 +779,47 @@ export default function StudentResultsPage() {
                   transition={{ duration: 0.25 }}
                 >
                   <Card className="group flex h-full flex-col justify-between overflow-hidden rounded-[1.75rem] border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/40 shadow-sm transition-all duration-300 hover:border-indigo-200 hover:shadow-md sm:rounded-[2rem]">
-                    <CardHeader className="p-5 pb-3 sm:p-8 sm:pb-4">
+                    <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
                       <div className="flex items-start justify-between gap-2 sm:gap-3">
                         <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-                          <div className="shrink-0 rounded-[1.25rem] bg-indigo-50 p-4 text-indigo-600 sm:rounded-[1.5rem] sm:p-5">
-                            <BookOpen size={30} className="transition-transform duration-300 group-hover:scale-110 sm:h-10 sm:w-10" />
+                          <div className="shrink-0 rounded-[1.25rem] bg-indigo-50 p-3 text-indigo-600 sm:rounded-xl sm:p-3">
+                            <BookOpen size={24} className="transition-transform duration-300 group-hover:scale-110 sm:h-7 sm:w-7" />
                           </div>
                           <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 sm:text-xs">
                               {examResults.length} Subject{examResults.length !== 1 ? "s" : ""}
                             </span>
-                            <CardTitle className="mt-1 line-clamp-2 text-xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-2xl" title={title}>
+                            <CardTitle className="mt-1 line-clamp-2 text-xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-xl" title={title}>
                               {title}
                             </CardTitle>
                           </div>
                         </div>
-                        <span className={`h-14 min-w-[3.5rem] px-3 flex items-center justify-center rounded-full border text-lg font-black shrink-0 sm:h-16 sm:min-w-[4rem] sm:text-2xl ${gs.bg} ${gs.text} ${gs.border}`}>
+                        <span className={`h-12 min-w-[3rem] px-2.5 flex items-center justify-center rounded-full border text-base font-black shrink-0 sm:h-12 sm:min-w-[3rem] sm:text-lg ${gs.bg} ${gs.text} ${gs.border}`}>
                           {topGrade.toUpperCase()}
                         </span>
                       </div>
                     </CardHeader>
 
-                    <CardContent className="flex flex-1 flex-col justify-between gap-5 px-5 pb-5 pt-0 sm:gap-7 sm:px-8 sm:pb-8">
-                      <div className="mt-1 space-y-2.5 sm:space-y-3">
-                        <div className="flex justify-between text-sm font-bold text-slate-600 sm:text-lg">
+                    <CardContent className="flex flex-1 flex-col justify-between gap-4 px-5 pb-5 pt-0 sm:gap-5 sm:px-5 sm:pb-5">
+                      <div className="mt-1 space-y-2 sm:space-y-2.5">
+                        <div className="flex justify-between text-sm font-bold text-slate-600 sm:text-base">
                           <span>Score</span>
                           <span>{totalObt} / {totalMax}</span>
                         </div>
-                        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden sm:h-4">
+                        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden sm:h-3">
                           <div
                             className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <p className="text-sm text-slate-400 font-semibold text-right sm:text-base">{pct}%</p>
+                        <p className="text-sm text-slate-400 font-semibold text-right sm:text-sm">{pct}%</p>
                       </div>
 
                         <div className="mt-1 grid grid-cols-2 gap-2">
-                        {examId !== null && (
+                        {examIds.length > 0 && (
                           <Button
-                            onClick={() => handleOpenLeaderboard(title, examId)}
-                            className="h-14 border border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50 text-slate-800 hover:text-slate-900 rounded-[1.25rem] text-sm font-bold shadow-sm flex items-center justify-center gap-2 sm:h-16 sm:text-base"
+                            onClick={() => handleOpenLeaderboard(title, examIds)}
+                            className="h-12 border border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50 text-slate-800 hover:text-slate-900 rounded-xl text-sm font-bold shadow-sm flex items-center justify-center gap-2 sm:h-11 sm:text-sm"
                           >
                             <Users size={14} className="text-indigo-500" /> View Class
                           </Button>
@@ -812,9 +842,9 @@ export default function StudentResultsPage() {
                               // Keep the already loaded result visible if a refresh fails.
                             });
                           }}
-                          className={`h-14 rounded-[1.25rem] border-indigo-100 bg-indigo-50/40 text-sm font-bold gap-2 sm:h-16 sm:text-base ${examId === null ? "col-span-2" : ""}`}
+                          className={`h-12 rounded-xl border-indigo-100 bg-indigo-50/40 text-sm font-bold gap-2 sm:h-11 sm:text-sm ${examIds.length === 0 ? "col-span-2" : ""}`}
                         >
-                          <FileText size={14} /> View Report Card
+                          <FileText size={14} /> Preview Result
                         </Button>
                       </div>
                     </CardContent>
@@ -828,9 +858,9 @@ export default function StudentResultsPage() {
 
       {/* ─── Report Card Modal ────────────────────────────────────────────────── */}
       <Dialog open={!!reportExamTitle} onOpenChange={(open) => { if (!open) { setReportExamTitle(null); setReportResults([]); } }}>
-        <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-white p-0 shadow-2xl sm:left-1/2 sm:top-1/2 sm:h-[92dvh] sm:w-[94vw] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
+        <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-white p-0 shadow-2xl sm:left-1/2 sm:top-1/2 sm:h-[88dvh] sm:w-[88vw] sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
           {/* Modal Top Bar */}
-          <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-4 sm:px-5 sm:rounded-t-3xl">
+          <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-2 bg-blue-600 px-3 py-4 sm:px-5 sm:rounded-t-3xl">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <button
                 onClick={() => { setReportExamTitle(null); setReportResults([]); }}
@@ -839,22 +869,22 @@ export default function StudentResultsPage() {
                 <ChevronLeft size={18} />
               </button>
               <div className="min-w-0">
-                <h3 className="text-white font-black text-xs sm:text-sm">Result Details</h3>
+                <h3 className="text-white font-black text-xs sm:text-sm">Report Card Preview</h3>
                 <p className="truncate text-blue-100 text-[10px]">{reportExamTitle}</p>
               </div>
             </div>
           </div>
 
           {/* Report Card Body */}
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 p-3 sm:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 p-3 sm:p-4">
             {reportExamTitle && reportResults.length > 0 && (
-              <ResultCardPreview title={reportExamTitle} template={reportResults.find((result) => result.report_template)?.report_template || "classic"} school={{ name: schoolProfile?.name || (typeof window !== "undefined" ? localStorage.getItem("school_name") || "School" : "School"), logo: schoolProfile?.logo || (typeof window !== "undefined" ? localStorage.getItem("school_logo") || "" : ""), address: [schoolProfile?.address, schoolProfile?.city, schoolProfile?.state, schoolProfile?.pincode].filter(Boolean).join(", "), phone: schoolProfile?.phone, email: schoolProfile?.email, academicYear: schoolProfile?.academic_year_name || schoolProfile?.academic_year?.name, principalName: schoolProfile?.principal_name, teacherName: schoolProfile?.class_teacher_name, principalSignature: schoolProfile?.principal_signature, teacherSignature: schoolProfile?.clerk_signature, stamp: schoolProfile?.school_stamp }} student={{ id: studentProfile?.id || studentId, name: [studentProfile?.name, studentProfile?.surname].filter(Boolean).join(" ") || studentProfile?.student_name, rollNumber: studentProfile?.roll_no || studentProfile?.roll_number, admissionNumber: studentProfile?.gr_no || studentProfile?.gr_number || studentProfile?.admission_no, className: [studentProfile?.school_class_name || studentProfile?.school_class?.school_class, typeof studentProfile?.division === "object" ? studentProfile?.division?.division : studentProfile?.division_name || studentProfile?.division].filter(Boolean).join(" - "), dateOfBirth: studentProfile?.dob || studentProfile?.date_of_birth, photo: studentProfile?.profile_photo || studentProfile?.photo }} subjects={reportResults.map((result) => ({ subject: result.subject || reportExamTitle, maximum: result.max_marks || 0, obtained: result.is_absent ? "Absent" : result.marks_obtained ?? "—", grade: result.grade, remarks: result.remarks, absent: result.is_absent }))} totals={{ maximum: reportResults.reduce((sum, result) => sum + Number(result.max_marks || 0), 0), obtained: reportResults.reduce((sum, result) => sum + (result.is_absent ? 0 : Number(result.marks_obtained || 0)), 0), percentage: (() => { const max = reportResults.reduce((sum, result) => sum + Number(result.max_marks || 0), 0); const got = reportResults.reduce((sum, result) => sum + (result.is_absent ? 0 : Number(result.marks_obtained || 0)), 0); return max ? ((got / max) * 100).toFixed(2) : "0.00"; })(), grade: reportResults.find((result) => result.grade)?.grade }} remarks={reportResults.find((result) => result.remarks?.trim())?.remarks} />
+              <ResultCardPreview title={reportExamTitle} template={reportResults.find((result) => result.report_template)?.report_template || "classic"} school={{ name: schoolProfile?.school_full_name || schoolProfile?.name || (typeof window !== "undefined" ? localStorage.getItem("school_name") || "School" : "School"), logo: schoolProfile?.print_logo_url || schoolProfile?.main_logo_url || schoolProfile?.logo || (typeof window !== "undefined" ? localStorage.getItem("school_logo") || "" : ""), address: schoolProfile?.full_address || [schoolProfile?.address, schoolProfile?.city, schoolProfile?.state, schoolProfile?.pincode].filter(Boolean).join(", "), tagline: schoolProfile?.tagline, shortName: schoolProfile?.school_short_name, establishmentYear: schoolProfile?.establishment_year, boardAffiliation: schoolProfile?.board_affiliation, schoolCode: schoolProfile?.school_code || schoolProfile?.index_no || schoolProfile?.code, udiseCode: schoolProfile?.udise_code, phone: schoolProfile?.phone || schoolProfile?.phone_numbers, email: schoolProfile?.email || schoolProfile?.official_emails, academicYear: schoolProfile?.academic_year_name || schoolProfile?.academic_year?.name, principalName: schoolProfile?.principal_name, teacherName: schoolProfile?.class_teacher_name, principalSignature: schoolProfile?.principal_signature_url || schoolProfile?.principal_signature, teacherSignature: schoolProfile?.class_teacher_signature_url || schoolProfile?.clerk_signature, stamp: schoolProfile?.official_seal_url || schoolProfile?.school_stamp }} student={{ id: studentProfile?.id || studentId, name: [studentProfile?.name, studentProfile?.surname].filter(Boolean).join(" ") || studentProfile?.student_name, fatherName: getStudentProfileField(studentProfile, "father"), motherName: getStudentProfileField(studentProfile, "mother"), rollNumber: studentProfile?.roll_no || studentProfile?.roll_number, admissionNumber: studentProfile?.gr_no || studentProfile?.gr_number || studentProfile?.admission_no, className: studentProfile?.school_class_name || studentProfile?.school_class?.school_class, section: typeof studentProfile?.division === "object" ? studentProfile?.division?.division : studentProfile?.division_name || studentProfile?.division, dateOfBirth: studentProfile?.dob || studentProfile?.date_of_birth, photo: studentProfile?.profile_photo || studentProfile?.photo }} subjects={reportResults.map((result) => ({ subject: result.subject || reportExamTitle, maximum: result.max_marks || 0, obtained: result.is_absent ? "Absent" : result.marks_obtained ?? "—", grade: result.grade, remarks: result.remarks, absent: result.is_absent }))} totals={{ maximum: reportResults.reduce((sum, result) => sum + Number(result.max_marks || 0), 0), obtained: reportResults.reduce((sum, result) => sum + (result.is_absent ? 0 : Number(result.marks_obtained || 0)), 0), percentage: (() => { const max = reportResults.reduce((sum, result) => sum + Number(result.max_marks || 0), 0); const got = reportResults.reduce((sum, result) => sum + (result.is_absent ? 0 : Number(result.marks_obtained || 0)), 0); return max ? ((got / max) * 100).toFixed(2) : "0.00"; })(), grade: reportResults.find((result) => result.grade)?.grade }} remarks={reportResults.find((result) => result.remarks?.trim())?.remarks} />
             )}
           </div>
 
           {/* Bottom Actions */}
           <DialogFooter className="flex shrink-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
-            <Button variant="outline" onClick={() => { setReportExamTitle(null); setReportResults([]); }} className="rounded-xl px-5">Cancel</Button>
+            <Button variant="outline" onClick={() => { setReportExamTitle(null); setReportResults([]); }} className="rounded-xl px-5">Close Preview</Button>
             <Button
               onClick={handlePrint}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold px-5"
@@ -931,7 +961,7 @@ export default function StudentResultsPage() {
                         </div>
                       </div>
                       <span className={`h-7 min-w-[1.75rem] px-1.5 flex items-center justify-center rounded-full border font-black text-[10px] shrink-0 ${gs.bg} ${gs.text} ${gs.border}`}>
-                        {rank.grade}
+                        {rank.grade?.toUpperCase()}
                       </span>
                     </div>
                   );
