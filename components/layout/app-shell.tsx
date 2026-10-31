@@ -39,6 +39,7 @@ import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { PageTutorialDialog } from "@/components/tutorial/page-tutorial-dialog";
 import { cn } from "@/lib/utils";
 import type { CurrentUserProfile } from "@/types";
+import { useSchool, SCHOOL_PROFILE_UPDATED_EVENT } from "@/context/school-context";
 
 export interface SidebarLink {
   title: string;
@@ -142,7 +143,13 @@ function formatSchoolDisplayName(name?: string | null): string {
   if (trimmed.toLowerCase() === "vidyasanchalan") return "VidyaSanchalan";
   return trimmed
     .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => {
+      // Preserve uppercase acronyms & short codes (e.g. "JUJU", "DPS", "CBSE")
+      if (word.length <= 6 && word === word.toUpperCase() && /^[A-Z0-9]+$/.test(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
     .join(" ");
 }
 
@@ -157,6 +164,12 @@ export function
     noPadding,
     mainClassName,
   }: AppShellProps) {
+  const {
+    schoolName: ctxSchoolName,
+    schoolShortName: ctxSchoolShortName,
+    schoolFullName: ctxSchoolFullName,
+    schoolLogo: ctxSchoolLogo,
+  } = useSchool();
   const router = useRouter();
   const pathname = usePathname();
   const [authorizedPath, setAuthorizedPath] = useState<string | null>(null);
@@ -267,6 +280,72 @@ export function
       setSchoolLogo(localStorage.getItem("school_logo"));
     } catch { /* ignore */ }
   }, []);
+
+  useEffect(() => {
+    if (ctxSchoolLogo) {
+      setLogoImgError(false);
+    }
+  }, [ctxSchoolLogo]);
+
+  useEffect(() => {
+    const handleProfileUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+      const newDisplayName = detail.displayName || detail.school_short_name || detail.school_full_name;
+      if (newDisplayName) {
+        setSchoolName(newDisplayName);
+      }
+      if (detail.main_logo_url) {
+        setSchoolLogo(detail.main_logo_url);
+        setLogoImgError(false);
+      }
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const isTrustee =
+          roleTitle === "Trustee" ||
+          (prev.roles || []).some((r) =>
+            ["trustee", "admin(trustee)"].includes(String(r).toLowerCase().trim())
+          );
+        const updatedName = isTrustee
+          ? (newDisplayName || prev.name)
+          : prev.name;
+        const parts = updatedName.trim().split(/\s+/).filter(Boolean);
+        const newInitials =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : parts.length === 1
+            ? parts[0].slice(0, 2).toUpperCase()
+            : prev.initials;
+
+        return {
+          ...prev,
+          name: updatedName,
+          short_display_name: detail.school_short_name || detail.displayName,
+          school_short_name: detail.school_short_name,
+          school_full_name: detail.school_full_name,
+          initials: newInitials,
+          school: prev.school
+            ? {
+                ...prev.school,
+                name: newDisplayName || prev.school.name,
+                short_name: detail.school_short_name || prev.school.short_name,
+                full_name: detail.school_full_name || prev.school.full_name,
+                logo: detail.main_logo_url || prev.school.logo,
+              }
+            : null,
+        };
+      });
+      getCurrentUserProfile().then((freshData) => {
+        setProfile(freshData);
+      }).catch(() => {});
+    };
+
+    window.addEventListener(SCHOOL_PROFILE_UPDATED_EVENT, handleProfileUpdate);
+    return () => {
+      window.removeEventListener(SCHOOL_PROFILE_UPDATED_EVENT, handleProfileUpdate);
+    };
+  }, [roleTitle]);
 
   const [currentQuery, setCurrentQuery] = useState("");
 
@@ -535,11 +614,22 @@ export function
     headerTitle ||
     (isSuperAdminRole
       ? "VidyaSanchalan Platform"
-      : profile?.school?.name || schoolName || "VidyaSanchalan");
+      : profile?.short_display_name ||
+        profile?.school_short_name ||
+        profile?.school?.short_name ||
+        ctxSchoolShortName ||
+        ctxSchoolName ||
+        profile?.school_full_name ||
+        profile?.school?.full_name ||
+        profile?.school?.name ||
+        schoolName ||
+        "VidyaSanchalan");
   const currentSchoolDisplayName = isSuperAdminRole
     ? "VidyaSanchalan Platform"
     : formatSchoolDisplayName(rawSchoolName);
-  const activeLogo = isSuperAdminRole ? null : (profile?.school?.logo || profile?.avatar || schoolLogo);
+  const activeLogo = isSuperAdminRole
+    ? null
+    : (ctxSchoolLogo || schoolLogo || profile?.school?.logo || profile?.avatar);
 
   const navigation = (compact: boolean, onNavigate?: () => void) => (
     <div className="flex h-full flex-col relative z-10">
@@ -619,8 +709,38 @@ export function
     );
   }
 
-  const currentUserName = profile?.name || userName || "Administrator";
-  const userInitials = profile?.initials || currentUserName.slice(0, 2).toUpperCase() || "SA";
+  const isTrusteeRole =
+    roleTitle === "Trustee" ||
+    (profile?.roles || []).some((r) =>
+      ["trustee", "admin(trustee)"].includes(String(r).toLowerCase().trim())
+    ) ||
+    String(profile?.role || "").toLowerCase().includes("trustee");
+
+  const trusteeDisplayName =
+    profile?.short_display_name ||
+    profile?.school_short_name ||
+    profile?.school?.short_name ||
+    ctxSchoolShortName ||
+    ctxSchoolName ||
+    profile?.school_full_name ||
+    profile?.school?.full_name ||
+    profile?.school?.name ||
+    schoolName;
+
+  const currentUserName = isTrusteeRole && trusteeDisplayName
+    ? trusteeDisplayName
+    : (profile?.name || userName || "Administrator");
+
+  const computeInitials = (str: string) => {
+    const parts = str.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "TR";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const userInitials = isTrusteeRole && trusteeDisplayName
+    ? computeInitials(trusteeDisplayName)
+    : (profile?.initials || computeInitials(currentUserName));
 
   // Derive role-aware mobile bottom navigation items (5 items: 4 core + More)
   const mobileNavItems = (() => {
@@ -961,10 +1081,13 @@ export function
               </span>
               <div className="text-left hidden md:flex items-center gap-1">
                 <div>
-                  <span className={cn(
-                    "block max-w-[100px] truncate text-xs sm:text-sm font-semibold leading-tight",
-                    roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
-                  )}>
+                  <span
+                    title={currentUserName}
+                    className={cn(
+                      "block max-w-[120px] sm:max-w-[160px] truncate text-xs sm:text-sm font-semibold leading-tight",
+                      roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
+                    )}
+                  >
                     {currentUserName || "Student"}
                   </span>
                   <span className={cn(
