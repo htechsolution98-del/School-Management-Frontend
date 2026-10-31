@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   FileText,
@@ -463,7 +465,7 @@ export default function StudyMaterialsPage() {
                     Class <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <select
+                    <ResponsiveSelect
                       value={selectedClass}
                       onChange={(e) => setSelectedClass(e.target.value)}
                       className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
@@ -478,7 +480,7 @@ export default function StudyMaterialsPage() {
                       <option value="Std 8">Std 8</option>
                       <option value="Std 9">Std 9</option>
                       <option value="Std 10">Std 10</option>
-                    </select>
+                    </ResponsiveSelect>
                     <GraduationCap className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -490,7 +492,7 @@ export default function StudyMaterialsPage() {
                     Division <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <select
+                    <ResponsiveSelect
                       value={selectedDivision}
                       onChange={(e) => setSelectedDivision(e.target.value)}
                       className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
@@ -499,7 +501,7 @@ export default function StudyMaterialsPage() {
                       <option value="B">Div B</option>
                       <option value="C">Div C</option>
                       <option value="D">Div D</option>
-                    </select>
+                    </ResponsiveSelect>
                     <Users className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -514,7 +516,7 @@ export default function StudyMaterialsPage() {
                     Subject <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <select
+                    <ResponsiveSelect
                       value={selectedSubject}
                       onChange={(e) => setSelectedSubject(e.target.value)}
                       className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
@@ -525,7 +527,7 @@ export default function StudyMaterialsPage() {
                       <option value="Social Studies">Social Studies</option>
                       <option value="Hindi">Hindi</option>
                       <option value="Computer Science">Computer Sci</option>
-                    </select>
+                    </ResponsiveSelect>
                     <BookOpen className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -537,7 +539,7 @@ export default function StudyMaterialsPage() {
                     Category <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <select
+                    <ResponsiveSelect
                       value={materialType}
                       onChange={(e) => setMaterialType(e.target.value as any)}
                       className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all cursor-pointer shadow-2xs"
@@ -546,7 +548,7 @@ export default function StudyMaterialsPage() {
                       <option value="Assignment">Assignment</option>
                       <option value="Practice Sheet">Practice Sheet</option>
                       <option value="Reference Guide">Reference Guide</option>
-                    </select>
+                    </ResponsiveSelect>
                     <Tag className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -753,7 +755,7 @@ export default function StudyMaterialsPage() {
 
               {/* Class Filter */}
               <div className="relative w-full sm:w-32 shrink-0">
-                <select
+                <ResponsiveSelect
                   value={filterClass}
                   onChange={(e) => setFilterClass(e.target.value)}
                   className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -769,14 +771,14 @@ export default function StudyMaterialsPage() {
                   <option value="Std 8">Std 8</option>
                   <option value="Std 9">Std 9</option>
                   <option value="Std 10">Std 10</option>
-                </select>
+                </ResponsiveSelect>
                 <GraduationCap className="w-3 h-3 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3 h-3 text-[#7180A1] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
               {/* Category Filter */}
               <div className="relative w-full sm:w-36 shrink-0">
-                <select
+                <ResponsiveSelect
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
                   className="w-full h-9 pl-7 pr-6 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -786,7 +788,7 @@ export default function StudyMaterialsPage() {
                   <option value="Assignment">Assignment</option>
                   <option value="Practice Sheet">Practice Sheet</option>
                   <option value="Reference Guide">Reference Guide</option>
-                </select>
+                </ResponsiveSelect>
                 <Tag className="w-3 h-3 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3 h-3 text-[#7180A1] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>

@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import {
@@ -203,11 +205,11 @@ function CreateHomeworkModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
+      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg border border-[#E4E9F5] shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white rounded-none p-5 sm:p-7 w-full h-[100dvh] max-w-none border-0 shadow-2xl relative my-auto max-h-[100dvh] overflow-y-auto animate-in fade-in duration-150 sm:h-auto sm:max-w-lg sm:rounded-3xl sm:border sm:max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-4 border-b border-[#E4E9F5]">
@@ -257,7 +259,7 @@ function CreateHomeworkModal({
                 Class & Division <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <select
+                <ResponsiveSelect
                   value={divisionId}
                   onChange={(e) => setDivisionId(Number(e.target.value))}
                   className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -271,7 +273,7 @@ function CreateHomeworkModal({
                       </option>
                     ))
                   )}
-                </select>
+                </ResponsiveSelect>
                 <Users className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -282,7 +284,7 @@ function CreateHomeworkModal({
                 Subject <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <select
+                <ResponsiveSelect
                   value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
                   className="w-full h-10 pl-8 pr-7 rounded-xl bg-[#F8F9FD] border border-[#E4E9F5] text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -296,7 +298,7 @@ function CreateHomeworkModal({
                       </option>
                     ))
                   )}
-                </select>
+                </ResponsiveSelect>
                 <BookOpen className="w-3.5 h-3.5 text-[#2563EB] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <ChevronDown className="w-3.5 h-3.5 text-[#7180A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -426,11 +428,11 @@ function MarkModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
+      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-md border border-[#E4E9F5] shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white rounded-none p-5 sm:p-6 w-full h-[100dvh] max-w-none border-0 shadow-2xl relative my-auto overflow-y-auto animate-in fade-in duration-150 sm:h-auto sm:max-w-md sm:rounded-3xl sm:border"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-3.5 border-b border-[#E4E9F5]">
@@ -525,11 +527,11 @@ function DeleteModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
+      className="fixed inset-0 z-50 bg-[#172447]/50 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto font-['Sora',sans-serif]"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm border border-[#E4E9F5] shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-150 text-center space-y-3"
+        className="bg-white rounded-none p-5 sm:p-6 w-full h-[100dvh] max-w-none border-0 shadow-2xl relative my-auto flex flex-col justify-center overflow-y-auto animate-in fade-in duration-150 text-center space-y-3 sm:h-auto sm:max-w-sm sm:rounded-3xl sm:border"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-2xs">
@@ -838,7 +840,7 @@ export default function AllHomeworkPage() {
   }, [homeworks, searchHW, selectedClassFilter, selectedStatusFilter, selectedStatusDropdown]);
 
   return (
-    <div className="relative min-h-screen font-['Sora',sans-serif] text-[#172447] px-3.5 sm:px-6 py-3.5 sm:py-5 pb-44 lg:pb-8 max-w-7xl mx-auto box-border min-w-0 overflow-x-hidden">
+    <div className="relative font-['Sora',sans-serif] text-[#172447] px-3.5 sm:px-6 py-3.5 sm:py-5 pb-4 lg:pb-8 max-w-7xl mx-auto box-border min-w-0 overflow-x-hidden">
       <link rel="stylesheet" href={FONT_URL} />
 
       {/* ── Ambient Background Artwork (Exact Reference Formulation) ── */}
@@ -1044,7 +1046,7 @@ export default function AllHomeworkPage() {
           <div className="grid grid-cols-2 gap-2.5">
             {/* All Classes Dropdown */}
             <div className="relative">
-              <select
+              <ResponsiveSelect
                 value={selectedClassFilter}
                 onChange={(e) => setSelectedClassFilter(e.target.value)}
                 className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -1053,14 +1055,14 @@ export default function AllHomeworkPage() {
                 {uniqueClassOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </ResponsiveSelect>
               <GraduationCap className="w-4 h-4 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <ChevronDown className="w-4 h-4 text-[#7180A1] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             {/* All Status Dropdown */}
             <div className="relative">
-              <select
+              <ResponsiveSelect
                 value={selectedStatusDropdown}
                 onChange={(e) => setSelectedStatusDropdown(e.target.value)}
                 className="w-full h-11 pl-9 pr-8 rounded-2xl bg-white border border-white/80 shadow-xs text-xs font-bold text-[#172447] appearance-none outline-none focus:border-[#2563EB] cursor-pointer"
@@ -1069,7 +1071,7 @@ export default function AllHomeworkPage() {
                 <option value="ACTIVE">Active</option>
                 <option value="DRAFT">Draft</option>
                 <option value="OVERDUE">Overdue</option>
-              </select>
+              </ResponsiveSelect>
               <Filter className="w-3.5 h-3.5 text-[#2563EB] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <ChevronDown className="w-4 h-4 text-[#7180A1] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>

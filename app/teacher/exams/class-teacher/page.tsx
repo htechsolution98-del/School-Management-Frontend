@@ -172,7 +172,7 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -181,7 +181,7 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
         exit={{ opacity: 0, scale: 0.96 }}
         transition={{ duration: 0.22 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden"
+        className="bg-white rounded-none w-full h-[100dvh] max-w-none max-h-[100dvh] flex flex-col shadow-2xl border-0 overflow-hidden sm:h-auto sm:max-w-4xl sm:max-h-[92vh] sm:rounded-3xl sm:border"
       >
         {/* Header */}
         <div
@@ -274,7 +274,7 @@ function Modal({ exam, pal, onClose, rosterLoading }: ModalProps) {
             </div>
           ) : !exam.students || !exam.students.length ? (
             <div className="py-16 text-center text-slate-400">
-              <Users size={36} className="mx-auto mb-2 text-slate-200" />
+              <img src="/images/empty-folder.png" alt="No student data available" className="mx-auto mb-2 h-20 w-20 object-contain" />
               <p className="text-sm font-semibold">No student data available.</p>
             </div>
           ) : (

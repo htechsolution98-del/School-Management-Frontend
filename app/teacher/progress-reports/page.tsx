@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   FileCheck,
@@ -368,7 +370,7 @@ function ClassicReportCardModal({
                       </td>
                       <td className="px-4 py-2 font-bold font-mono text-center text-[#102a43]">
                         {isEditing ? (
-                          <select
+                          <ResponsiveSelect
                             value={cooperative}
                             onChange={(e) => setCooperative(e.target.value)}
                             className="bg-white border rounded px-2 py-0.5 text-xs outline-none"
@@ -379,7 +381,7 @@ function ClassicReportCardModal({
                             <option value="B">B (Good)</option>
                             <option value="C">C (Satisfactory)</option>
                             <option value="D">D (Needs Improvement)</option>
-                          </select>
+                          </ResponsiveSelect>
                         ) : (
                           cooperative
                         )}
@@ -391,7 +393,7 @@ function ClassicReportCardModal({
                       </td>
                       <td className="px-4 py-2 font-bold font-mono text-center text-[#102a43]">
                         {isEditing ? (
-                          <select
+                          <ResponsiveSelect
                             value={neatAndOrderly}
                             onChange={(e) => setNeatAndOrderly(e.target.value)}
                             className="bg-white border rounded px-2 py-0.5 text-xs outline-none"
@@ -402,7 +404,7 @@ function ClassicReportCardModal({
                             <option value="B">B (Good)</option>
                             <option value="C">C (Satisfactory)</option>
                             <option value="D">D (Needs Improvement)</option>
-                          </select>
+                          </ResponsiveSelect>
                         ) : (
                           neatAndOrderly
                         )}
@@ -414,7 +416,7 @@ function ClassicReportCardModal({
                       </td>
                       <td className="px-4 py-2 font-bold font-mono text-center text-[#102a43]">
                         {isEditing ? (
-                          <select
+                          <ResponsiveSelect
                             value={responsible}
                             onChange={(e) => setResponsible(e.target.value)}
                             className="bg-white border rounded px-2 py-0.5 text-xs outline-none"
@@ -425,7 +427,7 @@ function ClassicReportCardModal({
                             <option value="B">B (Good)</option>
                             <option value="C">C (Satisfactory)</option>
                             <option value="D">D (Needs Improvement)</option>
-                          </select>
+                          </ResponsiveSelect>
                         ) : (
                           responsible
                         )}
@@ -487,8 +489,9 @@ function ClassicReportCardModal({
                     ))}
                     {academics.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-4 py-3 text-center text-slate-400 italic">
-                          No subjects or exams scheduled for this month.
+                        <td colSpan={2} className="px-4 py-5 text-center text-slate-400">
+                          <img src="/images/empty-folder.png" alt="No subjects or exams" className="mx-auto mb-2 h-16 w-16 object-contain" />
+                          <span>No subjects or exams scheduled for this month.</span>
                         </td>
                       </tr>
                     )}
@@ -963,7 +966,7 @@ export default function ProgressReportsPage() {
               <Users className="h-3.5 w-3.5 text-[#2563EB]" />
               Class & Division
             </label>
-            <select
+            <ResponsiveSelect
               value={selectedDivisionId}
               onChange={(e) => setSelectedDivisionId(Number(e.target.value))}
               className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
@@ -973,7 +976,7 @@ export default function ProgressReportsPage() {
                   {d.name}
                 </option>
               ))}
-            </select>
+            </ResponsiveSelect>
           </div>
 
           {/* Exam Report Month Selector (Dynamic from exams) */}
@@ -982,7 +985,7 @@ export default function ProgressReportsPage() {
               <Calendar className="h-3.5 w-3.5 text-[#2563EB]" />
               Exam Month & Term
             </label>
-            <select
+            <ResponsiveSelect
               value={selectedMonthYear}
               onChange={(e) => setSelectedMonthYear(e.target.value)}
               className="w-full h-9 sm:h-10 px-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
@@ -992,7 +995,7 @@ export default function ProgressReportsPage() {
                   {m}
                 </option>
               ))}
-            </select>
+            </ResponsiveSelect>
           </div>
 
           {/* Monthly Summary Statistics */}
@@ -1073,7 +1076,8 @@ export default function ProgressReportsPage() {
               <span>Loading student roster and academic records for {selectedMonthYear}...</span>
             </div>
           ) : filteredStudents.length === 0 ? (
-            <div className="p-12 text-center text-xs text-slate-400 font-bold">
+            <div className="p-8 text-center text-xs text-slate-400 font-bold">
+              <img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" />
               {students.length === 0 ? "No students found for this division." : "No students match your search."}
             </div>
           ) : (

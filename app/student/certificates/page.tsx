@@ -19,6 +19,7 @@ import {
   X,
   FileCheck2,
   Eye,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,6 +30,7 @@ import {
   type CertificateRequestItem,
 } from "@/lib/certificate";
 import { DigitalCertificateModal } from "@/components/clerk/digital-certificate-modal";
+import { MobileSelectDrawer, MobileSelectTrigger } from "@/components/ui/mobile-select-drawer";
 
 function formatDDMMYYYY(dateStr: string): string {
   if (!dateStr) return "—";
@@ -50,6 +52,7 @@ export default function StudentCertificatesPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTypeDrawerOpen, setIsTypeDrawerOpen] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [viewingDigitalCopy, setViewingDigitalCopy] = useState<CertificateRequestItem | null>(null);
@@ -150,242 +153,103 @@ export default function StudentCertificatesPage() {
   }, [requests]);
 
   return (
-    <div className="bg-slate-50/60 p-0 sm:p-4 lg:p-6 pb-3 lg:pb-8 font-sans w-full min-w-0 max-w-full overflow-x-hidden">
-      {/* Top Banner / Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs">
-              <Award className="w-5 h-5" />
+    <div className="w-full min-w-0 max-w-7xl space-y-4 overflow-x-hidden bg-slate-50/60 p-2 pb-3 font-sans sm:mx-auto sm:space-y-6 sm:p-4 lg:p-6 lg:pb-8">
+      <section className="rounded-3xl border border-white/80 bg-white/85 p-4 shadow-[0_12px_35px_-24px_rgba(37,99,235,.55)] backdrop-blur-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-sky-100 text-blue-600 ring-1 ring-blue-100">
+              <Award className="h-6 w-6" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                Certificate Requests
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Request official school certificates and track verification by the clerk
-              </p>
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">Certificate Requests</h1>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-sm">Request official school certificates and track verification by the clerk.</p>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => loadData()}
-            disabled={loading}
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors shadow-xs"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-semibold text-sm shadow-md shadow-indigo-500/20 transition-all hover:shadow-lg hover:shadow-indigo-500/30"
-          >
-            <Plus className="w-4 h-4" />
-            Request Certificate
-          </button>
-        </div>
-      </div>
-
-      {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Requests</span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <FileText className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900">{stats.total}</div>
-          <p className="text-xs text-slate-400 mt-1">Submitted applications</p>
-        </div>
-
-        <div className="bg-white border border-amber-200/80 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Pending Review</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-amber-700">{stats.pending}</div>
-          <p className="text-xs text-amber-600/80 mt-1">With clerk office</p>
-        </div>
-
-        <div className="bg-white border border-emerald-200/80 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Issued & Approved</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-emerald-700">{stats.approved}</div>
-          <p className="text-xs text-emerald-600/80 mt-1">Ready for download</p>
-        </div>
-
-        <div className="bg-white border border-rose-200/80 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Declined</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <XCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-rose-700">{stats.rejected}</div>
-          <p className="text-xs text-rose-600/80 mt-1">Review feedback</p>
-        </div>
-      </div>
-
-      {/* Main Content Card */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        {/* Search & Filter Bar */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by certificate name or number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto max-w-full no-scrollbar pb-1">
-            {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  statusFilter === st
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {st === "ALL" ? "All" : st.charAt(0) + st.slice(1).toLowerCase()}
-              </button>
-            ))}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <button type="button" onClick={() => loadData()} disabled={loading} aria-label="Refresh certificates" title="Refresh certificates" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button type="button" onClick={() => setIsModalOpen(true)} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:brightness-105 active:scale-[.99] sm:flex-none sm:px-5">
+              <Plus className="h-4 w-4" /> Request Certificate
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Requests Table / List */}
+      <section aria-label="Certificate request summary" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <div className="flex min-w-0 items-center gap-3 rounded-3xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/70 p-3.5 shadow-sm sm:gap-4 sm:p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100/80 text-blue-600 sm:h-14 sm:w-14"><FileText className="h-5 w-5 sm:h-6 sm:w-6" /></div>
+          <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 sm:text-xs">Total Requests</p><p className="mt-1 text-2xl font-extrabold leading-none text-slate-950 sm:text-3xl">{stats.total}</p><p className="mt-1 line-clamp-2 text-[9px] leading-tight text-slate-500 sm:text-xs">Submitted applications</p></div>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 rounded-3xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/80 p-3.5 shadow-sm sm:gap-4 sm:p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100/80 text-amber-600 sm:h-14 sm:w-14"><Clock className="h-5 w-5 sm:h-6 sm:w-6" /></div>
+          <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 sm:text-xs">Pending Review</p><p className="mt-1 text-2xl font-extrabold leading-none text-amber-700 sm:text-3xl">{stats.pending}</p><p className="mt-1 line-clamp-2 text-[9px] leading-tight text-amber-700/70 sm:text-xs">With clerk office</p></div>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/80 p-3.5 shadow-sm sm:gap-4 sm:p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100/80 text-emerald-600 sm:h-14 sm:w-14"><CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" /></div>
+          <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 sm:text-xs">Issued &amp; Approved</p><p className="mt-1 text-2xl font-extrabold leading-none text-emerald-700 sm:text-3xl">{stats.approved}</p><p className="mt-1 line-clamp-2 text-[9px] leading-tight text-emerald-700/70 sm:text-xs">Ready for download</p></div>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 rounded-3xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/80 p-3.5 shadow-sm sm:gap-4 sm:p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-100/80 text-rose-600 sm:h-14 sm:w-14"><XCircle className="h-5 w-5 sm:h-6 sm:w-6" /></div>
+          <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-rose-700 sm:text-xs">Declined</p><p className="mt-1 text-2xl font-extrabold leading-none text-rose-700 sm:text-3xl">{stats.rejected}</p><p className="mt-1 line-clamp-2 text-[9px] leading-tight text-rose-700/70 sm:text-xs">Review feedback</p></div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-white/80 bg-white/90 p-3.5 shadow-[0_12px_35px_-24px_rgba(37,99,235,.45)] sm:p-5">
+        <label className="relative block">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 sm:left-4 sm:h-5 sm:w-5" />
+          <input type="search" placeholder="Search by certificate name or number..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50/40 pl-10 pr-4 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 sm:h-14 sm:pl-12 sm:text-sm" />
+        </label>
+        <div className="mt-3 flex max-w-full items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar sm:mt-4">
+          {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((st) => (
+            <button type="button" key={st} onClick={() => setStatusFilter(st)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition sm:px-6 sm:py-2.5 sm:text-sm ${statusFilter === st ? "bg-blue-600 text-white shadow-md shadow-blue-600/20" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+              {st === "ALL" ? "All" : st.charAt(0) + st.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section aria-label="Certificate requests" className="space-y-3">
         {loading ? (
-          <div className="py-20 text-center text-slate-400">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-indigo-600" />
-            <p className="text-sm font-medium">Loading certificate requests...</p>
-          </div>
+          <div className="rounded-3xl bg-white py-16 text-center text-slate-400 shadow-sm"><Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-blue-600" /><p className="text-sm font-medium">Loading certificate requests...</p></div>
         ) : filteredRequests.length === 0 ? (
-          <StudentEmptyState
-            title="No certificate requests found"
-            description="You haven't requested any certificates yet. Submit a new request whenever you need Bonafide, Leaving, or Character certificates."
-            actionLabel="Request Certificate"
-            onAction={() => setIsModalOpen(true)}
-          />
-        ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full min-w-[650px] text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3.5 px-5">Certificate Type</th>
-                  <th className="py-3.5 px-5">Certificate No.</th>
-                  <th className="py-3.5 px-5">Date Requested</th>
-                  <th className="py-3.5 px-5">Verification Status</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs sm:text-sm text-slate-700">
-                {filteredRequests.map((req) => {
-                  const isApproved = req.status === "APPROVED";
-                  const isPending = req.status === "PENDING";
-                  const isRejected = req.status === "REJECTED";
-
-                  return (
-                    <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                              isApproved
-                                ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                : isPending
-                                ? "bg-amber-50 text-amber-600 border border-amber-100"
-                                : "bg-rose-50 text-rose-600 border border-rose-100"
-                            }`}
-                          >
-                            <FileCheck2 className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900 block">
-                              {req.certificate_type_name || "Official Certificate"}
-                            </span>
-                            <span className="text-[11px] text-slate-400">Request #{req.id}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-5">
-                        {req.certificate_number ? (
-                          <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200">
-                            {req.certificate_number}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">Assigned on Issue</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-5 text-slate-600 font-medium">
-                        {formatDDMMYYYY(req.created_at)}
-                      </td>
-                      <td className="py-4 px-5">
-                        {isApproved && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Approved / Issued
-                          </span>
-                        )}
-                        {isPending && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3.5 h-3.5" /> Pending Clerk Approval
-                          </span>
-                        )}
-                        {isRejected && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                            <XCircle className="w-3.5 h-3.5" /> Request Declined
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-5 text-right">
-                        {isApproved ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setViewingDigitalCopy(req)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs border border-indigo-200 transition-colors shadow-2xs"
-                              title="View Digital Copy"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View Digital Copy
-                            </button>
-                            {req.certificate_file && (
-                              <a
-                                href={req.certificate_file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs"
-                                title="Download PDF"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                          </div>
-                        ) : isPending ? (
-                          <span className="text-xs text-amber-600 italic">Processing...</span>
-                        ) : (
-                          <span className="text-xs text-rose-500">Not Issued</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          <div className="rounded-3xl border border-white bg-white shadow-sm"><StudentEmptyState title="No certificate requests found" description="You haven't requested any certificates yet. Submit a new request whenever you need Bonafide, Leaving, or Character certificates." actionLabel="Request Certificate" onAction={() => setIsModalOpen(true)} /></div>
+        ) : filteredRequests.map((req) => {
+          const isApproved = req.status === "APPROVED";
+          const isPending = req.status === "PENDING";
+          const statusStyle = isApproved ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : isPending ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-rose-50 text-rose-700 ring-rose-100";
+          const statusText = isApproved ? "Approved" : isPending ? "Pending review" : "Declined";
+          return (
+            <article key={req.id} className="rounded-3xl border border-white bg-gradient-to-br from-white to-blue-50/30 p-4 shadow-[0_12px_35px_-28px_rgba(15,23,42,.4)] sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-5">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-14 sm:w-14 ${isApproved ? "bg-emerald-100/70 text-emerald-600" : isPending ? "bg-amber-100/70 text-amber-600" : "bg-rose-100/70 text-rose-600"}`}><FileCheck2 className="h-6 w-6" /></div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="line-clamp-2 text-sm font-extrabold leading-snug text-slate-950 sm:text-lg">{req.certificate_type_name || "Official Certificate"}</h2>
+                  <p className="mt-1 text-xs text-slate-500 sm:text-sm">Request #{req.id}</p>
+                  <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset sm:text-xs ${statusStyle}`}>
+                    {isApproved ? <CheckCircle2 className="h-3.5 w-3.5" /> : isPending ? <Clock className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}{statusText}
+                  </span>
+                </div>
+                <div className="hidden shrink-0 border-l border-slate-100 pl-4 sm:block sm:min-w-[190px]">
+                  <p className="text-xs text-slate-500">Certificate No.</p>
+                  <p className="mt-1 break-all text-sm font-bold text-slate-900">{req.certificate_number || "Assigned on issue"}</p>
+                  <p className="mt-3 text-xs text-slate-500">Date Requested</p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">{formatDDMMYYYY(req.created_at)}</p>
+                </div>
+                {isApproved && <button type="button" onClick={() => setViewingDigitalCopy(req)} aria-label={`View ${req.certificate_type_name || "certificate"}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-blue-50 hover:text-blue-700 sm:hidden"><ChevronRight className="h-6 w-6" /></button>}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-[11px] sm:hidden">
+                <div className="min-w-0"><p className="text-slate-400">Certificate No.</p><p className="mt-0.5 truncate font-semibold text-slate-800">{req.certificate_number || "Assigned on issue"}</p></div>
+                <div><p className="text-slate-400">Date Requested</p><p className="mt-0.5 font-semibold text-slate-800">{formatDDMMYYYY(req.created_at)}</p></div>
+              </div>
+              {isApproved && <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                <button type="button" onClick={() => setViewingDigitalCopy(req)} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 text-xs font-bold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100 sm:flex-none"><Eye className="h-4 w-4" />View Certificate</button>
+                {req.certificate_file && <a href={req.certificate_file} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 sm:flex-none"><Download className="h-4 w-4" />Download PDF</a>}
+              </div>}
+            </article>
+          );
+        })}
+      </section>
 
       {/* Request Certificate Modal */}
       {isModalOpen && (
@@ -394,7 +258,7 @@ export default function StudentCertificatesPage() {
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
@@ -418,11 +282,16 @@ export default function StudentCertificatesPage() {
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Certificate Type *
                   </label>
+                  <MobileSelectTrigger
+                    valueLabel={uniqueTypes.find((type) => type.id === Number(selectedTypeId))?.name || "Select certificate type"}
+                    onClick={() => setIsTypeDrawerOpen(true)}
+                    className="w-full rounded-xl border-blue-200 py-3 text-sm"
+                  />
                   <select
                     value={selectedTypeId}
                     onChange={(e) => setSelectedTypeId(Number(e.target.value))}
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                    className="hidden w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 md:block"
                   >
                     {uniqueTypes.map((t) => {
                       const alreadyRequested = activeRequestedTypeIds.has(t.id);
@@ -440,7 +309,7 @@ export default function StudentCertificatesPage() {
 
                 {/* Informational Notice */}
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Once submitted, the clerk desk will generate and approve your official certificate.
                     Duplicate requests for an active or issued certificate are automatically prevented.
@@ -461,7 +330,7 @@ export default function StudentCertificatesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
@@ -478,6 +347,19 @@ export default function StudentCertificatesPage() {
           </div>
         </div>
       )}
+      <MobileSelectDrawer
+        isOpen={isModalOpen && isTypeDrawerOpen}
+        onClose={() => setIsTypeDrawerOpen(false)}
+        title="Choose certificate type"
+        subtitle="Select the certificate you want to request"
+        options={uniqueTypes.map((type) => ({
+          value: type.id,
+          label: `${type.name}${activeRequestedTypeIds.has(type.id) ? " (Already Submitted / Active)" : ""}`,
+          disabled: activeRequestedTypeIds.has(type.id),
+        }))}
+        selectedValue={selectedTypeId}
+        onSelect={(value) => setSelectedTypeId(Number(value))}
+      />
       {/* Digital Certificate Modal */}
       <DigitalCertificateModal
         isOpen={!!viewingDigitalCopy}
