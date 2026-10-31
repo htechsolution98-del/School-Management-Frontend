@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -23,6 +24,12 @@ export function MobileBottomDrawer({
   children,
   actions,
 }: MobileBottomDrawerProps) {
+  const [mounted, setMounted] = React.useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Prevent background scrolling when open
   useEffect(() => {
     if (isOpen) {
@@ -35,10 +42,10 @@ export function MobileBottomDrawer({
     };
   }, [isOpen]);
 
-  return (
+  const drawer = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] md:hidden flex flex-col justify-end">
+        <div className="fixed inset-0 z-[1000] md:hidden flex flex-col justify-end">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -97,4 +104,6 @@ export function MobileBottomDrawer({
       )}
     </AnimatePresence>
   );
+
+  return mounted ? createPortal(drawer, document.body) : null;
 }

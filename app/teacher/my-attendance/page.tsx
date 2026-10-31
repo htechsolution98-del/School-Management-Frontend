@@ -878,8 +878,13 @@ export default function MyAttendancePage() {
               );
             })
           ) : (
-            <div className="py-6 text-center text-xs text-[#7183A6] font-medium">
-              No recent attendance records recorded yet.
+            <div className="py-4 text-center text-xs text-[#7183A6] font-medium">
+              <img
+                src="/images/empty-folder.png"
+                alt="No recent attendance records"
+                className="mx-auto mb-2 h-16 w-16 object-contain"
+              />
+              <p>No recent attendance records recorded yet.</p>
             </div>
           )}
         </div>

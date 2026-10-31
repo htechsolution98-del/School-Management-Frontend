@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import { useEffect, useState, useMemo } from "react";
 import { 
   Users, CheckCircle2, Loader2, Calendar, 
@@ -15,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
 import { cn } from "@/lib/utils";
 
 import { getAssignedTeachers } from "@/lib/clerk/assign-teacher";
@@ -72,6 +75,7 @@ export default function VerifyMarksPage() {
 
   // Mobile View Toggle: "cards" vs "table"
   const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">("cards");
+  const [selectedTableStudent, setSelectedTableStudent] = useState<any | null>(null);
 
   // Grid Data
   const [gridData, setGridData] = useState<{
@@ -690,7 +694,7 @@ export default function VerifyMarksPage() {
         <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
           {/* Year Switcher */}
           {academicYears.length > 1 ? (
-            <select
+            <ResponsiveSelect
               value={selectedYear?.id || ""}
               onChange={(e) => {
                 const yr = academicYears.find((y) => String(y.id) === e.target.value);
@@ -703,7 +707,7 @@ export default function VerifyMarksPage() {
                   📅 {y.name} {y.is_active ? "(Active)" : ""}
                 </option>
               ))}
-            </select>
+            </ResponsiveSelect>
           ) : selectedYear ? (
             <span className="text-[11px] font-bold text-[#2563EB] bg-blue-50 border border-blue-200 rounded-xl px-2 sm:px-2.5 py-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
@@ -763,7 +767,7 @@ export default function VerifyMarksPage() {
 
               {classTeacherAssignments.length === 0 && (
                 <div className="py-16 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed border-gray-200">
-                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <img src="/images/empty-folder.png" alt="No class teacher assignment" className="mx-auto mb-2 h-20 w-20 object-contain" />
                   <p className="font-bold text-slate-700">No Class Teacher Assignment</p>
                   <p className="text-xs text-slate-400 mt-1">
                     You are not currently assigned as the Class Teacher for any class.
@@ -1301,8 +1305,9 @@ export default function VerifyMarksPage() {
                     })}
 
                     {students.length === 0 && (
-                      <div className="py-12 text-center text-slate-400 text-xs">
-                        No students found matching your search.
+                      <div className="py-6 text-center text-slate-400 text-xs">
+                        <img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" />
+                        <p>No students found matching your search.</p>
                       </div>
                     )}
                   </div>
@@ -1451,7 +1456,7 @@ export default function VerifyMarksPage() {
 
                           if (activeTab === "ALL") {
                             return (
-                              <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
+                              <TableRow key={st.id} onClick={(event) => { if (!(event.target as HTMLElement).closest("input, button")) setSelectedTableStudent(st); }} title="Tap to view this student's marks" className="cursor-pointer hover:bg-slate-50/60 transition-colors">
                                 <TableCell className="text-center font-mono text-[11px] text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
                                 <TableCell className="text-xs font-mono font-bold text-[#2563EB] sticky left-10 bg-white z-10">{st.roll_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
@@ -1547,7 +1552,7 @@ export default function VerifyMarksPage() {
 
                           if (activeTab === "TEACHER_ASSESSMENT") {
                             return (
-                              <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
+                              <TableRow key={st.id} onClick={(event) => { if (!(event.target as HTMLElement).closest("input, button")) setSelectedTableStudent(st); }} title="Tap to view this student's marks" className="cursor-pointer hover:bg-slate-50/60 transition-colors">
                                 <TableCell className="text-center font-mono text-xs text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
                                 <TableCell className="text-xs font-mono font-bold text-[#2563EB]">{st.roll_no || "—"}</TableCell>
                                 <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
@@ -1607,7 +1612,7 @@ export default function VerifyMarksPage() {
                           const currentTerm = terms.find((t: any) => t.id === activeTab);
                           const currentSubjects = currentTerm?.subjects || [];
                           return (
-                            <TableRow key={st.id} className="hover:bg-slate-50/60 transition-colors">
+                            <TableRow key={st.id} onClick={(event) => { if (!(event.target as HTMLElement).closest("input, button")) setSelectedTableStudent(st); }} title="Tap to view this student's marks" className="cursor-pointer hover:bg-slate-50/60 transition-colors">
                               <TableCell className="text-center font-mono text-xs text-slate-400 sticky left-0 bg-white z-10">{idx + 1}</TableCell>
                               <TableCell className="text-xs font-mono font-bold text-[#2563EB]">{st.roll_no || "—"}</TableCell>
                               <TableCell className="text-xs font-mono text-slate-600">{st.gr_no || "—"}</TableCell>
@@ -1676,6 +1681,78 @@ export default function VerifyMarksPage() {
           )}
         </>
       )}
+
+      <MobileBottomDrawer
+        isOpen={!!selectedTableStudent}
+        onClose={() => setSelectedTableStudent(null)}
+        title={selectedTableStudent?.name || "Student Marks"}
+        subtitle={selectedTableStudent ? `Roll No. ${selectedTableStudent.roll_no || "—"} · GR No. ${selectedTableStudent.gr_no || "—"}` : undefined}
+      >
+        {selectedTableStudent && (() => {
+          const student = selectedTableStudent;
+          const totals = getStudentTotals(student);
+          const grade = getGradeAndColor(totals.percentage, totals.isAbsent);
+          const visibleTerms = activeTab === "ALL"
+            ? terms
+            : terms.filter((term: any) => String(term.id) === String(activeTab));
+          const showAssessment = activeTab === "ALL" || activeTab === "TEACHER_ASSESSMENT";
+
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                  <p className="text-[10px] font-bold uppercase text-blue-600">Marks Gained</p>
+                  <p className="mt-1 text-lg font-black text-blue-900">{totals.totalObtained} / {totals.totalMax}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-[10px] font-bold uppercase text-emerald-700">Percentage · Grade</p>
+                  <p className="mt-1 text-lg font-black text-emerald-900">
+                    {totals.percentage === null ? "—" : `${totals.percentage.toFixed(1)}%`} · {grade.grade}
+                  </p>
+                </div>
+              </div>
+
+              {visibleTerms.map((term: any) => (
+                <section key={term.id} className="overflow-hidden rounded-xl border border-slate-200">
+                  <h4 className="bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-800">{term.name}</h4>
+                  <div className="divide-y divide-slate-100 px-3">
+                    {(term.subjects || []).map((subject: any) => {
+                      const mark = student.terms_marks?.[term.id]?.[String(subject.id)];
+                      return (
+                        <div key={subject.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                          <span className="font-semibold capitalize text-slate-700">{subject.name}</span>
+                          <span className="shrink-0 font-bold text-slate-900">
+                            {mark ? (mark.is_absent ? "Absent" : `${mark.score} / ${mark.max ?? subject.max_marks}`) : "Not entered"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+
+              {showAssessment && taSubjects.length > 0 && (
+                <section className="overflow-hidden rounded-xl border border-amber-200">
+                  <h4 className="bg-amber-50 px-3 py-2 text-xs font-extrabold text-amber-800">Teacher Assessment</h4>
+                  <div className="divide-y divide-amber-100 px-3">
+                    {taSubjects.map((subject: any) => {
+                      const mark = student.teacher_assessments?.[String(subject.id)];
+                      return (
+                        <div key={subject.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                          <span className="font-semibold capitalize text-slate-700">{subject.name}</span>
+                          <span className="shrink-0 font-bold text-slate-900">
+                            {mark?.score == null ? "Not entered" : `${mark.score} / ${mark.max_score ?? subject.max_score}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          );
+        })()}
+      </MobileBottomDrawer>
 
       {/* ── Sticky Floating Action Bar on Mobile during Edit Mode ── */}
       {isEditMode && !isVerified && (

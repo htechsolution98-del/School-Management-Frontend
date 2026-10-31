@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -88,19 +90,19 @@ function StatCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`min-w-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-2xs hover:shadow-xs transition-all ${className}`}
+      className={`min-w-0 bg-gradient-to-br from-white via-white to-blue-50/70 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 rounded-2xl border border-blue-100/80 dark:border-slate-800 p-3.5 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-all ${className}`}
     >
       <div
-        className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0"
+        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0"
         style={{ background: `${color}18` }}
       >
-        <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5" style={{ color }} />
+        <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5" style={{ color }} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none mb-1 truncate">
+        <p className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-none mb-1.5 truncate">
           {label}
         </p>
-        <p className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-none truncate">
+        <p className="text-lg sm:text-xl font-black text-slate-950 dark:text-slate-100 leading-none truncate">
           {value}
         </p>
       </div>
@@ -216,12 +218,12 @@ function EditStudentAttendanceModal({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100"
+        className="bg-white h-[100dvh] w-full max-w-none rounded-none shadow-xl overflow-y-auto border-0 sm:h-auto sm:max-w-md sm:rounded-2xl sm:border"
       >
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
@@ -415,12 +417,12 @@ function StudentDetailModal({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100"
+        className="bg-white h-[100dvh] w-full max-w-none max-h-[100dvh] rounded-none flex flex-col overflow-hidden border-0 sm:h-auto sm:max-h-[85vh] sm:max-w-xl sm:rounded-2xl sm:border"
       >
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -558,7 +560,7 @@ export default function AttendanceHistoryPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "roll" | "name">("date_desc");
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(true);
 
   // Strict today ISO string (Disallow future dates)
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
@@ -800,8 +802,10 @@ export default function AttendanceHistoryPage() {
       absent,
       pct,
       malesCount: males.length,
+      malesPresent,
       malePct,
       femalesCount: females.length,
+      femalesPresent,
       femalePct,
     };
   }, [filteredRecords]);
@@ -868,13 +872,21 @@ export default function AttendanceHistoryPage() {
 
   return (
     <div className="w-full max-w-full overflow-hidden px-3 sm:px-6 py-4 pb-6 lg:pb-8 flex flex-col gap-4 text-slate-800 dark:text-slate-100">
+      <motion.section initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="relative isolate min-h-[150px] sm:min-h-[190px] overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-100 px-5 py-5 sm:px-8 sm:py-7 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950">
+        <img src="/images/leaves/leave-hero-illustration.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-5 -bottom-10 h-[175px] w-[245px] object-contain opacity-80 sm:right-2 sm:bottom-[-55px] sm:h-[270px] sm:w-[390px]" />
+        <div className="relative z-10 max-w-[68%] sm:max-w-[62%]">
+          <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-3 py-1 text-[10px] font-extrabold tracking-wider text-blue-700 sm:text-xs"><ClipboardList className="h-3.5 w-3.5" /> ATTENDANCE MANAGEMENT</span>
+          <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-4xl dark:text-white">Attendance <span className="text-blue-700">History</span></h1>
+          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-600 sm:text-base dark:text-slate-300">Review student attendance records, punch timelines and detailed reports.</p>
+        </div>
+      </motion.section>
       {/* ── Top Header ── */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-end gap-3"
       >
-        <div className="flex items-center gap-3">
+        <div className="hidden">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-xs">
             <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -888,16 +900,16 @@ export default function AttendanceHistoryPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto w-full sm:w-auto">
+        <div className="flex w-full items-center gap-2 self-end sm:self-auto sm:w-auto">
           {divisions.length > 0 && (
-            <select
+            <ResponsiveSelect
               value={selectedDivisionId}
               onChange={(e) =>
                 setSelectedDivisionId(
                   e.target.value === "all" ? "all" : Number(e.target.value)
                 )
               }
-              className="flex-1 sm:flex-initial bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs outline-none focus:border-blue-500 cursor-pointer"
+              className="min-w-0 flex-1 sm:min-w-[260px] sm:flex-initial bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="all">All Divisions ({divisions.length})</option>
               {divisions.map((d) => (
@@ -905,49 +917,47 @@ export default function AttendanceHistoryPage() {
                   {d.division_name}
                 </option>
               ))}
-            </select>
+            </ResponsiveSelect>
           )}
 
           <button
             onClick={handleExportCSV}
             disabled={filteredRecords.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 cursor-pointer"
             title="Export CSV"
+            aria-label="Export attendance as CSV"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden xs:inline sm:inline">Export</span>
-            <span className="hidden sm:inline">CSV</span>
+            <Download className="w-4 h-4 text-blue-600" />
           </button>
 
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={loadStudentAttendance}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 cursor-pointer"
             title="Refresh"
+            aria-label="Refresh attendance records"
           >
             <RefreshCw
-              className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`}
+              className={`w-4 h-4 text-blue-600 ${loading ? "animate-spin" : ""}`}
             />
-            <span className="hidden xs:inline">Refresh</span>
           </motion.button>
         </div>
       </motion.div>
 
       {/* ── View Mode Tabs: Students vs Staff Punch ── */}
-      <div className="grid grid-cols-2 sm:inline-flex p-1 bg-slate-100/90 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl w-full sm:w-auto">
+      <div className="grid grid-cols-2 p-1.5 bg-blue-50/80 dark:bg-slate-900 border border-blue-100 dark:border-slate-800 rounded-2xl w-full sm:max-w-2xl">
         <button
           onClick={() => setActiveTab("students")}
           className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === "students"
-              ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-400 shadow-xs"
+              ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-400 shadow-sm ring-1 ring-blue-100"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
           <Users className="w-4 h-4" />
-          <span className="hidden sm:inline">Student Attendance History</span>
-          <span className="sm:hidden">Students</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-700 font-semibold">
+          <span>Students</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold">
             {records.length}
           </span>
         </button>
@@ -956,13 +966,12 @@ export default function AttendanceHistoryPage() {
           onClick={() => setActiveTab("staff")}
           className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === "staff"
-              ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-400 shadow-xs"
+              ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-400 shadow-sm ring-1 ring-blue-100"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span className="hidden sm:inline">My Staff Punch Logs</span>
-          <span className="sm:hidden">Staff Punches</span>
+          <span>Staff Punches</span>
         </button>
       </div>
 
@@ -973,7 +982,7 @@ export default function AttendanceHistoryPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.04 }}
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5"
           >
             <StatCard
               icon={Calendar}
@@ -981,7 +990,7 @@ export default function AttendanceHistoryPage() {
               value={stats.total}
               color="#2563eb"
               delay={0.06}
-              className="col-span-2 sm:col-span-1"
+              className="col-span-2 lg:col-span-4"
             />
             <StatCard
               icon={CheckCircle2}
@@ -993,7 +1002,7 @@ export default function AttendanceHistoryPage() {
             <StatCard
               icon={Users}
               label="BOYS PRESENT"
-              value={`${stats.malesCount} (${stats.malePct}%)`}
+              value={`${stats.malesPresent} (${stats.malePct}%)`}
               color="#3b82f6"
               delay={0.10}
             />
@@ -1007,7 +1016,7 @@ export default function AttendanceHistoryPage() {
             <StatCard
               icon={UserCheck}
               label="GIRLS PRESENT"
-              value={`${stats.femalesCount} (${stats.femalePct}%)`}
+              value={`${stats.femalesPresent} (${stats.femalePct}%)`}
               color="#0284c7"
               delay={0.14}
             />
@@ -1185,7 +1194,7 @@ export default function AttendanceHistoryPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <select
+                    <ResponsiveSelect
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
                       className="flex-1 sm:flex-initial bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
@@ -1194,7 +1203,7 @@ export default function AttendanceHistoryPage() {
                       <option value="date_asc">Oldest First</option>
                       <option value="roll">Roll Number</option>
                       <option value="name">Name (A-Z)</option>
-                    </select>
+                    </ResponsiveSelect>
 
                     {hasActiveFilters && (
                       <button
@@ -1362,8 +1371,8 @@ export default function AttendanceHistoryPage() {
                   </div>
                 </div>
               ) : paginatedRecords.length === 0 ? (
-                <div className="py-12 px-4 text-center">
-                  <Calendar className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <div className="py-8 px-4 text-center">
+                  <img src="/images/empty-folder.png" alt="No records found" className="mx-auto mb-2 h-20 w-20 object-contain" />
                   <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
                     No records found
                   </div>
@@ -1382,7 +1391,7 @@ export default function AttendanceHistoryPage() {
                   )}
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                <div className="space-y-2 p-2 sm:p-3">
                   {paginatedRecords.map((r, idx) => {
                     const sName =
                       r.student_name ||
@@ -1394,13 +1403,13 @@ export default function AttendanceHistoryPage() {
                     return (
                       <div
                         key={r.id || idx}
-                        className="p-3.5 sm:p-4 hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors space-y-2.5"
+                        className="space-y-2.5 rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-blue-50/40 p-3.5 shadow-sm transition hover:border-blue-100 hover:shadow-md sm:p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
                       >
                         {/* Card Header: Avatar + Student Name + Status Badge */}
                         <div className="flex items-start justify-between gap-2.5">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div
-                              className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-2xs"
+                              className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-sm"
                               style={{ background: avatarBg }}
                             >
                               {initials}
@@ -1563,8 +1572,8 @@ export default function AttendanceHistoryPage() {
               </div>
             </div>
           ) : staffRecords.length === 0 ? (
-            <div className="py-12 text-center text-slate-400">
-              <Clock className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+            <div className="py-8 text-center text-slate-400">
+              <img src="/images/empty-folder.png" alt="No records found" className="mx-auto mb-2 h-20 w-20 object-contain" />
               <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
                 No records found
               </div>

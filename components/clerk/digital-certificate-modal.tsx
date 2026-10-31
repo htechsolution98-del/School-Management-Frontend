@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Printer,
   Download,
@@ -29,6 +29,10 @@ export function DigitalCertificateModal({
   request,
 }: DigitalCertificateModalProps) {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const paperStageRef = useRef<HTMLDivElement>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [paperScale, setPaperScale] = useState(() => typeof window === "undefined" ? 1 : Math.min(1, (window.innerWidth - 24) / 820));
+  const [paperDisplayHeight, setPaperDisplayHeight] = useState(1050);
 
   const parsedGeneratedData = useMemo(() => {
     if (!request?.generated_data) return null;
@@ -55,6 +59,30 @@ export function DigitalCertificateModal({
     request?.student_name || parsedGeneratedData?.studentName || "Student";
   const grNumber = request?.student_gr_no || parsedGeneratedData?.grNo || "";
 
+  useEffect(() => {
+    if (!isOpen || !rawHtml) return;
+    const stage = paperStageRef.current;
+    const paper = paperRef.current;
+    if (!stage || !paper) return;
+
+    const updateFit = () => {
+      const scale = Math.min(1, Math.max(0.2, stage.clientWidth / 820));
+      const fullHeight = Math.max(1050, paper.scrollHeight);
+      setPaperScale((current) => Math.abs(current - scale) > 0.002 ? scale : current);
+      setPaperDisplayHeight((current) => Math.abs(current - fullHeight * scale) > 1 ? fullHeight * scale : current);
+    };
+
+    updateFit();
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(stage);
+    observer.observe(paper);
+    window.addEventListener("resize", updateFit);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFit);
+    };
+  }, [isOpen, rawHtml, request?.id]);
+
   // Check if signatures are already inside the saved HTML
   const hasSignaturesInHtml = useMemo(() => {
     if (!rawHtml) return false;
@@ -69,24 +97,97 @@ export function DigitalCertificateModal({
 
   const handleDownloadPdf = async () => {
     const element = document.getElementById("digital-certificate-sheet");
-    if (!element) {
-      toast.error("Certificate document element not found.");
-      return;
-    }
-
     setIsDownloadingPdf(true);
     const toastId = toast.loading("Generating high-resolution PDF certificate...");
 
     try {
+      if (!element) {
+        if (!request.certificate_file) throw new Error("Certificate document is not available.");
+        const response = await fetch(request.certificate_file, { credentials: "include" });
+        if (!response.ok) throw new Error("Could not download the issued certificate file.");
+        const sourceFile = await response.blob();
+        const fileIsPdf = sourceFile.type.toLowerCase().includes("pdf") || /\.pdf(?:$|[?#])/i.test(request.certificate_file);
+        if (!fileIsPdf) throw new Error("The issued certificate file is not a PDF.");
+        const fileUrl = URL.createObjectURL(sourceFile);
+        const anchor = document.createElement("a");
+        anchor.href = fileUrl;
+        anchor.download = `${(certTitle || "Certificate").replace(/[^a-zA-Z0-9_-]/g, "_")}_${(studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+        toast.success("Certificate PDF downloaded.", { id: toastId });
+        return;
+      }
+
       const canvas = await html2canvas(element, {
-        scale: 2.5, // Crisp 300DPI vector-like rendering
+        scale: Math.min(2, window.devicePixelRatio || 1),
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: 1024,
+        onclone: (clonedDocument) => {
+          const clonedSheet = clonedDocument.getElementById("digital-certificate-sheet") as HTMLElement | null;
+          if (!clonedSheet) return;
+
+          // Export the same desktop-proportioned certificate when previewed on a phone.
+          Object.assign(clonedSheet.style, {
+            width: "820px",
+            maxWidth: "none",
+            minHeight: "1050px",
+            padding: "56px",
+            transform: "none",
+          });
+          const clonedFrame = clonedSheet.querySelector<HTMLElement>(".certificate-sheet-frame");
+          if (clonedFrame) Object.assign(clonedFrame.style, { padding: "32px", borderWidth: "2px" });
+
+          const colorCanvas = clonedDocument.createElement("canvas");
+          colorCanvas.width = colorCanvas.height = 1;
+          const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });
+          const normalizeColor = (value: string) => {
+            if (!colorContext || !/(oklch|oklab|color\()/i.test(value)) return value;
+            colorContext.clearRect(0, 0, 1, 1);
+            colorContext.fillStyle = "#000000";
+            colorContext.fillStyle = value;
+            colorContext.fillRect(0, 0, 1, 1);
+            const [red, green, blue, alpha] = colorContext.getImageData(0, 0, 1, 1).data;
+            return `rgba(${red}, ${green}, ${blue}, ${alpha / 255})`;
+          };
+          const inlineProperties = [
+            "display", "position", "box-sizing", "width", "height", "min-width", "max-width", "min-height", "max-height",
+            "margin-top", "margin-right", "margin-bottom", "margin-left", "padding-top", "padding-right",
+            "padding-bottom", "padding-left", "font-family", "font-size", "font-weight", "font-style",
+            "line-height", "letter-spacing", "color", "background-color", "border-top-width", "border-right-width",
+            "border-bottom-width", "border-left-width", "border-top-style", "border-right-style", "border-bottom-style",
+            "border-left-style", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+            "border-radius", "border-collapse", "border-spacing", "table-layout", "text-align", "vertical-align",
+            "white-space", "word-break", "overflow-wrap", "overflow-x", "overflow-y", "object-fit", "list-style-type", "opacity", "flex-direction", "flex-wrap",
+            "flex-grow", "flex-shrink", "flex-basis", "align-items", "align-self", "justify-content", "gap", "row-gap", "column-gap",
+            "grid-template-columns", "grid-template-rows", "grid-column-start", "grid-column-end",
+            "grid-row-start", "grid-row-end", "text-decoration", "text-transform", "box-shadow",
+          ];
+          const nodes = [clonedSheet, ...Array.from(clonedSheet.querySelectorAll<HTMLElement>("*"))];
+          for (const node of nodes) {
+            const computed = clonedDocument.defaultView?.getComputedStyle(node);
+            if (!computed) continue;
+            const declarations = inlineProperties.map((property) => {
+              let value = computed.getPropertyValue(property);
+              if (/(oklch|oklab|color\()/i.test(value)) {
+                if (/color$/.test(property) || property === "color" || property === "background-color") value = normalizeColor(value);
+                else return null;
+              }
+              return value ? [property, value] as const : null;
+            }).filter((item): item is readonly [string, string] => item !== null);
+            node.removeAttribute("style");
+            declarations.forEach(([property, value]) => node.style.setProperty(property, value));
+          }
+
+          // html2canvas cannot parse the app's oklch stylesheet, so use the
+          // computed styles captured above for this isolated certificate tree.
+          clonedDocument.querySelectorAll('style, link[rel="stylesheet"]').forEach((styleNode) => styleNode.remove());
+        },
       });
 
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -94,9 +195,25 @@ export function DigitalCertificateModal({
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+      const pixelsPerMm = canvas.width / pdfWidth;
+      const pagePixelHeight = Math.floor(pdfPageHeight * pixelsPerMm);
+      const pageCount = Math.ceil(canvas.height / pagePixelHeight);
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+        const sourceY = pageIndex * pagePixelHeight;
+        const sliceHeight = Math.min(pagePixelHeight, canvas.height - sourceY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const pageContext = pageCanvas.getContext("2d");
+        if (!pageContext) throw new Error("Could not prepare a PDF page.");
+        pageContext.fillStyle = "#ffffff";
+        pageContext.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageContext.drawImage(canvas, 0, sourceY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.96), "JPEG", 0, 0, pdfWidth, sliceHeight / pixelsPerMm, undefined, "FAST");
+      }
 
       const safeTitle = (certTitle || "Certificate").replace(/[^a-zA-Z0-9_-]/g, "_");
       const safeName = (studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -106,8 +223,7 @@ export function DigitalCertificateModal({
       toast.success(`Downloaded ${filename} successfully!`, { id: toastId });
     } catch (err: any) {
       console.error("PDF generation failed:", err);
-      toast.error("Direct PDF capture failed. Opening print dialog as fallback...", { id: toastId });
-      handlePrint();
+      toast.error(err?.message || "Could not generate the certificate PDF. Please try again.", { id: toastId });
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -207,24 +323,24 @@ export function DigitalCertificateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-5xl h-[94vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-xs sm:p-4 md:p-6">
+      <div className="my-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 sm:h-[94vh] sm:rounded-3xl">
         {/* Top Action Toolbar */}
-        <div className="px-5 sm:px-7 py-3.5 border-b border-slate-200/80 flex items-center justify-between bg-white shrink-0 z-20 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs shrink-0">
+        <div className="relative z-20 flex shrink-0 flex-col gap-3 border-b border-slate-200/80 bg-white px-3 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-3.5">
+          <div className="flex min-w-0 items-start gap-2.5 pr-8 sm:items-center sm:gap-3 sm:pr-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 shadow-xs sm:h-10 sm:w-10 sm:rounded-2xl">
               <Award className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <h3 className="min-w-0 flex-1 truncate font-bold text-slate-900 text-sm leading-snug sm:text-base">
                   {certTitle}
                 </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="hidden shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 sm:inline-flex">
                   <ShieldCheck className="w-3.5 h-3.5" /> Official Digital Copy
                 </span>
               </div>
-              <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="mt-0.5 truncate text-[11px] text-slate-500 sm:text-xs">
                 <span className="font-semibold text-slate-800">{studentName}</span>
                 {grNumber && <span>• GR: {grNumber}</span>}
                 <span className="font-mono text-slate-600">• #{certNumber}</span>
@@ -232,12 +348,16 @@ export function DigitalCertificateModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <button onClick={onClose} className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:hidden" aria-label="Close certificate">
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             {/* Primary Download PDF Button */}
             <button
               onClick={handleDownloadPdf}
               disabled={isDownloadingPdf}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-xs shadow-sm shadow-emerald-600/20 transition-all hover:shadow-md disabled:opacity-50"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md disabled:opacity-50 sm:h-auto sm:flex-none sm:px-4 sm:py-2"
               title="Download as PDF file directly"
             >
               {isDownloadingPdf ? (
@@ -248,7 +368,7 @@ export function DigitalCertificateModal({
               ) : (
                 <>
                   <FileDown className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
+                  <span className="sm:hidden">PDF</span><span className="hidden sm:inline">Download PDF</span>
                 </>
               )}
             </button>
@@ -257,10 +377,10 @@ export function DigitalCertificateModal({
             <button
               onClick={handlePrint}
               disabled={isDownloadingPdf}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-2xs"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3.5 sm:py-2"
               title="Print Document"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <Printer className="h-3.5 w-3.5 text-slate-600" />
               <span className="hidden sm:inline">Print</span>
             </button>
 
@@ -270,7 +390,7 @@ export function DigitalCertificateModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 download
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2"
                 title="Download Attached Physical File"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -280,7 +400,7 @@ export function DigitalCertificateModal({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-1"
+              className="ml-1 hidden rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:block"
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />
@@ -289,20 +409,33 @@ export function DigitalCertificateModal({
         </div>
 
         {/* Certificate Scrollable Canvas Stage */}
-        <div className="p-4 sm:p-8 md:p-12 overflow-y-auto flex-1 bg-slate-100/80 flex flex-col items-center">
+        <div ref={paperStageRef} className="min-h-0 flex-1 touch-pan-y overflow-y-auto bg-slate-100/80 p-2 sm:p-8 md:p-12">
           {rawHtml ? (
-            <div className="w-full flex flex-col items-center pb-12">
+            <div className="mx-auto pb-6 sm:pb-12" style={{ width: `${820 * paperScale}px`, height: `${paperDisplayHeight}px` }}>
               {/* Authentic Paper Sheet Container */}
               <div
                 id="digital-certificate-sheet"
-                className="w-full max-w-[820px] bg-white rounded-xs shadow-2xl border-4 border-slate-800 p-8 sm:p-14 relative font-serif text-slate-900 leading-relaxed box-border"
+                ref={paperRef}
+                className="relative box-border min-h-[1050px] w-[820px] max-w-none rounded-sm border-4 border-slate-800 bg-white p-14 font-serif leading-relaxed text-slate-900 shadow-2xl"
                 style={{
+                  width: "820px",
+                  maxWidth: "none",
                   minHeight: "1050px",
+                  padding: "56px",
+                  transform: `scale(${paperScale})`,
+                  transformOrigin: "top left",
                   boxShadow: "0 20px 40px -15px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)",
                 }}
               >
                 {/* Classic Inner Border Frame */}
-                <div className="border-2 border-slate-600 p-6 sm:p-8 h-full flex flex-col justify-between relative">
+                <div className="certificate-sheet-frame relative flex h-full flex-col justify-between border-2 border-slate-600 p-8">
+                  <style>{`
+                    .certificate-content-view { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+                    .certificate-content-view * { box-sizing: border-box; max-width: 100%; }
+                    .certificate-content-view table { width: 100% !important; max-width: 100%; table-layout: fixed; border-collapse: collapse; }
+                    .certificate-content-view th, .certificate-content-view td { overflow-wrap: anywhere; word-break: normal; }
+                    .certificate-content-view img { max-width: 100% !important; height: auto !important; object-fit: contain; }
+                  `}</style>
                   {/* Watermark Emblem in Background */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] select-none z-0">
                     <Award className="w-96 h-96 text-slate-900" />
@@ -310,7 +443,8 @@ export function DigitalCertificateModal({
 
                   {/* Rendered Live HTML Content from Clerk */}
                   <div
-                    className="relative z-10 w-full certificate-content-view text-sm sm:text-base"
+                    className="relative z-10 w-full certificate-content-view"
+                    style={{ fontSize: "16px" }}
                     dangerouslySetInnerHTML={{ __html: rawHtml }}
                   />
 
@@ -399,7 +533,7 @@ export function DigitalCertificateModal({
                   href={request.certificate_file}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-xs"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-blue-700"
                 >
                   <Download className="w-4 h-4" /> Download Official File
                 </a>

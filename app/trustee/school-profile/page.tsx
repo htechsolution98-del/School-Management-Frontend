@@ -105,6 +105,14 @@ const DOCUMENT_ASSETS: AssetFieldConfig[] = [
     previewType: "signature",
   },
   {
+    key: "class_teacher_signature_url",
+    label: "Class Teacher Digital Signature",
+    description: "Signature shown on student report cards. Upload a transparent image to replace the sample signature.",
+    recommendedSize: "400 × 150 px",
+    aspectRatioText: "8:3 Transparent PNG (Blue/Black Ink)",
+    previewType: "signature",
+  },
+  {
     key: "trustee_signature_url",
     label: "Trustee / Secretary Signature",
     description: "Authorized management signature for appointment letters and resolutions.",

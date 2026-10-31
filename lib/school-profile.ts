@@ -37,6 +37,7 @@ export interface SchoolProfileData {
   certificate_watermark_url: string;
   receipt_bg_url: string;
   principal_signature_url: string;
+  class_teacher_signature_url: string;
   trustee_signature_url: string;
   official_seal_url: string;
 
@@ -68,6 +69,7 @@ export const DEFAULT_SCHOOL_PROFILE: SchoolProfileData = {
   certificate_watermark_url: "",
   receipt_bg_url: "",
   principal_signature_url: "",
+  class_teacher_signature_url: "",
   trustee_signature_url: "",
   official_seal_url: "",
 };

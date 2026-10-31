@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Users,
@@ -215,7 +217,7 @@ function FilterSelect({
 }) {
   return (
     <div style={{ position: "relative" }}>
-      <select
+      <ResponsiveSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
         style={{
@@ -232,7 +234,7 @@ function FilterSelect({
         }}
       >
         {children}
-      </select>
+      </ResponsiveSelect>
       <ChevronDown
         size={12}
         color="#9ca3af"
@@ -426,12 +428,12 @@ function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onCancel}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden font-['Sora',sans-serif] animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white h-[100dvh] w-full max-w-none rounded-none border-0 shadow-2xl overflow-y-auto font-['Sora',sans-serif] animate-in fade-in duration-150 sm:h-auto sm:max-h-[92vh] sm:max-w-md sm:rounded-3xl sm:border"
       >
         {/* Header */}
         <div className="bg-[#FAFBFD] p-4 sm:p-5 border-b border-[#E5EAF4] flex items-center gap-3">
@@ -706,7 +708,7 @@ function StudentListView({
               </h1>
               {assignedDivisions && assignedDivisions.length > 1 && (
                 <div className="relative inline-block">
-                  <select
+                  <ResponsiveSelect
                     value={selectedDivisionId ?? ""}
                     onChange={(e) => onSelectDivision?.(Number(e.target.value))}
                     className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-white border border-[#E5EAF4] text-xs font-bold text-[#2563EB] shadow-xs cursor-pointer outline-none"
@@ -716,7 +718,7 @@ function StudentListView({
                         {ad.division_name}
                       </option>
                     ))}
-                  </select>
+                  </ResponsiveSelect>
                   <ChevronDown size={12} className="text-[#2563EB] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               )}
@@ -949,7 +951,7 @@ function StudentListView({
             );
           })}
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-[#7183A6] text-xs">No students found.</div>
+            <div className="p-6 text-center text-[#7183A6] text-xs"><img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" /><p>No students found.</p></div>
           )}
         </div>
 
@@ -1519,7 +1521,7 @@ function MarkAttendanceView({
             );
           })}
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-[#7183A6] text-xs">No students found.</div>
+            <div className="p-6 text-center text-[#7183A6] text-xs"><img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" /><p>No students found.</p></div>
           )}
         </div>
 
@@ -1772,12 +1774,12 @@ function EditStudentAttendanceModal({
 
   return (
     <div
-      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden font-['Sora',sans-serif] animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col"
+        className="bg-white h-[100dvh] w-full max-w-none rounded-none border-0 shadow-2xl overflow-hidden font-['Sora',sans-serif] animate-in fade-in duration-150 max-h-[100dvh] flex flex-col sm:h-auto sm:max-h-[92vh] sm:max-w-md sm:rounded-3xl sm:border"
       >
         {/* Header */}
         <div className="bg-[#FAFBFD] p-4 sm:p-5 border-b border-[#E5EAF4] flex items-center justify-between gap-3">
@@ -1807,7 +1809,7 @@ function EditStudentAttendanceModal({
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+        <div className="min-h-0 flex-1 p-4 sm:p-5 overflow-y-auto space-y-4">
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-xs font-semibold text-red-600">
               <AlertTriangle size={15} className="text-red-500 shrink-0" />
@@ -1902,7 +1904,7 @@ function EditStudentAttendanceModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 sm:p-4 bg-[#FAFBFD] border-t border-[#E5EAF4] flex items-center justify-end gap-2">
+        <div className="shrink-0 p-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:p-4 bg-[#FAFBFD] border-t border-[#E5EAF4] flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -1956,12 +1958,12 @@ function StudentViewModal({
 
   return (
     <div
-      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 bg-[#142044]/60 backdrop-blur-xs z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl sm:rounded-3xl border border-[#E5EAF4] shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden font-['Sora',sans-serif] animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+        className="bg-white h-[100dvh] w-full max-w-none rounded-none border-0 shadow-2xl overflow-hidden font-['Sora',sans-serif] animate-in fade-in duration-150 max-h-[100dvh] flex flex-col sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl sm:border"
       >
         {/* Header */}
         <div className="bg-[#FAFBFD] p-4 sm:p-5 border-b border-[#E5EAF4] flex items-center justify-between gap-3">

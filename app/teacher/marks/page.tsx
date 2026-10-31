@@ -858,7 +858,7 @@ export default function EnterMarksPage() {
               {/* Empty state when teacher has no assignments */}
               {uniqueClasses.length === 0 && !isLoading && (
                 <div className="py-16 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed border-gray-200">
-                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <img src="/images/empty-folder.png" alt="No classes assigned" className="mx-auto mb-2 h-20 w-20 object-contain" />
                   <p className="font-bold text-slate-700">No classes assigned</p>
                   <p className="text-xs text-slate-400 mt-1">
                     You have not been assigned to any classes.
@@ -1316,7 +1316,8 @@ export default function EnterMarksPage() {
 
                 {filteredStudents.length === 0 && (
                   <div className="py-12 text-center text-slate-500 text-xs bg-white rounded-2xl border border-dashed border-gray-200">
-                    No students matching &quot;{studentSearch}&quot;.
+                    <img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" />
+                    <p>No students matching &quot;{studentSearch}&quot;.</p>
                   </div>
                 )}
               </div>
