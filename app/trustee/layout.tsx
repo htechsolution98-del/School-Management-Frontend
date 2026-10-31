@@ -22,10 +22,12 @@ import {
   ReceiptText,
   Printer,
   Bell,
+  Building2,
 } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/trustee", icon: LayoutDashboard },
+  { title: "School Profile", href: "/trustee/school-profile", icon: Building2 },
   { title: "Notifications", href: "/trustee/notifications", icon: Bell },
   {
     title: "Staff Management",

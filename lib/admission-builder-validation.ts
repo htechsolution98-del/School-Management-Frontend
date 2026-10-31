@@ -4,11 +4,22 @@ export function validateAdmissionBuilder(input: {
   title: string; academicYearId: number | null; description: string;
   sections: { title: string; fields: ConfiguredField[] }[]; documents: ConfiguredField[];
   feesEnabled: boolean; feeType: string; feesAmount: string; individualFees: Record<number, string>; classIds: number[];
+  existingTitles?: string[];
 }, step?: number) {
   const errors: Record<string, string> = {};
   const duplicate = (values: string[]) => new Set(values.map(value => value.trim().toLowerCase())).size !== values.length;
   if (step === undefined || step === 0) {
-    if (!input.title.trim() || input.title.trim().length > 255) errors.title = "Enter a form title of 1–255 characters";
+    const cleanTitle = input.title.trim();
+    if (!cleanTitle || cleanTitle.length > 255) {
+      errors.title = "Enter a form title of 1–255 characters";
+    } else if (
+      input.existingTitles &&
+      input.existingTitles.some(
+        (t) => t && t.trim().toLowerCase() === cleanTitle.toLowerCase()
+      )
+    ) {
+      errors.title = "A form with this title already exists.";
+    }
     if (!input.academicYearId) errors.academicYear = "Select an academic year";
     if (input.description.length > 2000) errors.description = "Description must be 2000 characters or fewer";
     if (!input.sections.length) errors.sections = "Add at least one section";

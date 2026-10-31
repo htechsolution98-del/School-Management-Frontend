@@ -19,6 +19,7 @@ import {
   Loader2,
   MessageCircle,
   Plus,
+  Pencil,
   QrCode,
   RefreshCw,
   Search,
@@ -590,6 +591,56 @@ function CreateFormModal({
   );
 }
 
+// ─── Edit Form Modal ──────────────────────────────────────────────────────────
+function EditFormModal({
+  form,
+  onClose,
+  onUpdated,
+}: {
+  form: AdmissionFormResponse;
+  onClose: () => void;
+  onUpdated: (form: AdmissionFormResponse) => void;
+}) {
+  const handleSuccess = (updatedForm: AdmissionFormResponse) => {
+    onUpdated(updatedForm);
+    setTimeout(() => {
+      onClose();
+    }, 1600);
+  };
+
+  return (
+    <AnimatePresence mode="wait">
+      <ModalBackdrop key="edit-modal-backdrop" onClick={onClose} />
+
+      <motion.div
+        key="edit-form-modal"
+        initial={{ opacity: 0, scale: 0.97, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 16 }}
+        transition={{ type: "spring", stiffness: 340, damping: 30 }}
+        className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-5 overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative w-full max-w-5xl my-4 sm:my-8 shadow-2xl rounded-2xl">
+          <button
+            onClick={onClose}
+            aria-label="Close modal"
+            className="absolute top-3.5 right-3.5 z-20 flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/20 backdrop-blur-xs transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <PrincipalFormBuilder
+            formId={form.id}
+            initialData={form}
+            onSuccess={handleSuccess}
+            onClose={onClose}
+          />
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
@@ -621,6 +672,7 @@ function FormTableRow({
   form,
   index,
   onView,
+  onEdit,
   onShare,
   onDelete,
   onPublishToggle,
@@ -630,6 +682,7 @@ function FormTableRow({
   form: AdmissionFormResponse;
   index: number;
   onView: () => void;
+  onEdit: () => void;
   onShare: () => void;
   onDelete: () => void;
   onPublishToggle: (formId: number, currentStatus: boolean) => void;
@@ -726,6 +779,17 @@ function FormTableRow({
           >
             <Share2 className="h-3.5 w-3.5" />
             <span className="hidden md:inline">Share</span>
+          </Button>
+
+          {/* Edit Form Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onEdit}
+            className="h-8 w-8 p-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            title="Edit Form"
+          >
+            <Pencil className="h-4 w-4" />
           </Button>
 
           <Button
@@ -886,6 +950,7 @@ export default function AdmissionFormPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editForm, setEditForm] = useState<AdmissionFormResponse | null>(null);
   const [viewForm, setViewForm] = useState<AdmissionFormResponse | null>(null);
   const [shareForm, setShareForm] = useState<AdmissionFormResponse | null>(null);
   const [confirmDeleteForm, setConfirmDeleteForm] = useState<AdmissionFormResponse | null>(null);
@@ -1195,6 +1260,7 @@ export default function AdmissionFormPage() {
                       form={form}
                       index={idx}
                       onView={() => setViewForm(form)}
+                      onEdit={() => setEditForm(form)}
                       onShare={() => setShareForm(form)}
                       onDelete={() => setConfirmDeleteForm(form)}
                       onPublishToggle={handlePublishToggle}
@@ -1235,6 +1301,23 @@ export default function AdmissionFormPage() {
         <CreateFormModal
           onClose={() => setCreateOpen(false)}
           onCreated={handleCreated}
+        />
+      ) : null}
+
+      {/* Edit Form Modal */}
+      {editForm ? (
+        <EditFormModal
+          form={editForm}
+          onClose={() => setEditForm(null)}
+          onUpdated={async (updatedForm) => {
+            await fetchForms();
+            setSuccessBanner(
+              `Form "${updatedForm?.title || editForm.title}" was updated successfully!`
+            );
+            setTimeout(() => {
+              setSuccessBanner("");
+            }, 5000);
+          }}
         />
       ) : null}
 

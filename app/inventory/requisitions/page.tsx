@@ -267,7 +267,7 @@ export default function InventoryRequisitionsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-24 sm:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 pb-32 sm:pb-8 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
         <div className="min-w-0 flex-1">
@@ -395,7 +395,108 @@ export default function InventoryRequisitionsPage() {
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="w-full overflow-x-auto hide-scrollbar">
+          {/* Mobile Card List (< sm) */}
+          <div className="sm:hidden divide-y divide-slate-100 dark:divide-zinc-800 p-3">
+            {loading ? (
+              <div className="py-12 text-center text-slate-500">
+                <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto mb-2" />
+                <span className="text-xs">Loading staff requisitions...</span>
+              </div>
+            ) : filteredRequisitions.length === 0 ? (
+              <div className="py-10 text-center text-slate-500">
+                <img
+                  src="/images/empty-folder.png"
+                  alt="No requisitions found"
+                  className="w-16 h-auto object-contain mx-auto mb-2 filter drop-shadow-sm select-none pointer-events-none"
+                />
+                <p className="font-semibold text-slate-700 dark:text-zinc-300 text-sm">No requisitions found</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {searchQuery || statusFilter !== "ALL"
+                    ? "Try adjusting your search or status filter."
+                    : "No stock requests submitted yet."}
+                </p>
+              </div>
+            ) : (
+              filteredRequisitions.map((req, idx) => {
+                const isPending = req.status.toLowerCase() === "pending";
+                const hasSufficientStock = req.available_stock >= req.quantity_requested;
+
+                return (
+                  <div key={req.id} className="py-3.5 first:pt-1 last:pb-1 flex flex-col gap-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-8 w-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 dark:text-zinc-100 text-xs truncate">
+                            {req.requester_name}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {req.requester_role || "Staff"} • {formatDate(req.requested_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="shrink-0">{renderStatusBadge(req.status)}</div>
+                    </div>
+
+                    <div className="bg-slate-50/70 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 text-xs">
+                      <div className="flex items-center justify-between font-bold text-slate-900 dark:text-zinc-100">
+                        <span>{req.item_name}</span>
+                        <span className="text-indigo-600 dark:text-indigo-400">
+                          Qty: {req.quantity_requested} {req.unit}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                        <span className="font-mono text-[10px]">{req.item_code}</span>
+                        <span
+                          className={`font-semibold ${
+                            hasSufficientStock ? "text-emerald-600" : "text-rose-600"
+                          }`}
+                        >
+                          {req.available_stock} {req.unit} in stock
+                        </span>
+                      </div>
+                      {req.purpose && (
+                        <p className="text-[11px] text-slate-600 dark:text-zinc-300 mt-1.5 pt-1.5 border-t border-slate-200/60 dark:border-zinc-700/60">
+                          <span className="font-semibold text-slate-700 dark:text-zinc-200">Purpose: </span>
+                          {req.purpose}
+                        </p>
+                      )}
+                    </div>
+
+                    {isPending && (
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenReject(req)}
+                          className="h-8 px-3 rounded-lg text-xs font-semibold text-rose-600 border-rose-200 hover:bg-rose-50"
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!hasSufficientStock}
+                          onClick={() => handleOpenApprove(req)}
+                          className={`h-8 px-3 rounded-lg text-xs font-bold gap-1 ${
+                            !hasSufficientStock
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          }`}
+                        >
+                          <Check className="h-3.5 w-3.5" /> Approve
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View (>= sm) */}
+          <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
             <table className="w-full min-w-[780px] text-left text-xs whitespace-nowrap">
               <thead className="bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400">
                 <tr>
