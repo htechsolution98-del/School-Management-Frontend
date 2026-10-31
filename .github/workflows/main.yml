@@ -28,37 +28,12 @@ jobs:
           ssh -T -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'SSHEOF'
             set -e
             cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
-
-            # npm install in the running container can modify the tracked lockfile.
-            # Preserve that version before resetting to the target branch version.
-            if git ls-files --error-unmatch -- package-lock.json >/dev/null 2>&1; then
-              if ! git diff --quiet -- package-lock.json || ! git diff --cached --quiet -- package-lock.json; then
-                backup_root="${DEPLOY_BACKUP_ROOT:-$HOME/.local/state/school-management-deploy/frontend}"
-                mkdir -p -- "$backup_root"
-                backup_dir=$(mktemp -d "$backup_root/$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
-                if [ -e package-lock.json ]; then
-                  cp -p -- package-lock.json "$backup_dir/package-lock.json"
-                fi
-                git diff --cached --binary -- package-lock.json > "$backup_dir/package-lock-staged.patch" 2>/dev/null || true
-                git diff --binary -- package-lock.json > "$backup_dir/package-lock-unstaged.patch" 2>/dev/null || true
-                echo "Saved server lockfile changes in $backup_dir"
-              fi
-            fi
-
-            echo "=== Resetting Working Tree ==="
-            git checkout -f -- package-lock.json 2>/dev/null || true
-            git reset --hard HEAD
-
-            echo "=== Sync Remote Branch ==="
-            git fetch origin "${{ secrets.FRONTEND_BRANCH }}"
-            git reset --hard "origin/${{ secrets.FRONTEND_BRANCH }}"
-
+            git pull origin "${{ secrets.FRONTEND_BRANCH }}"          
             echo "=== Restart Container (triggers dependency install, build and start) ==="
             docker restart "${{ secrets.FRONTEND_CONT_NAME }}"
 
             echo "=== Waiting 50s for build to complete ==="
             sleep 50
-
             echo "=== Deployment Successful... DevOps Team ==="
           SSHEOF
 
