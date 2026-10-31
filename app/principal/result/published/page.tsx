@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { getSavedResultTemplate, saveResultTemplate, type ResultTemplateId } from "@/lib/result-template";
 import { ResultTemplatePicker } from "@/components/results/result-template-picker";
 import { writePrintableResultCards } from "@/lib/result-report-print";
+import { downloadResultReportCardPDF } from "@/lib/result-pdf-generator";
 import { ResultCardPreview } from "@/components/results/result-card-preview";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -66,6 +67,12 @@ export default function PublishedResultsPage() {
 
   // Detailed Modal view for student official report card
   const [selectedStudentForCard, setSelectedStudentForCard] = useState<any | null>(null);
+  const [modalCardData, setModalCardData] = useState<{
+    subjects: Array<{ subject: string; maximum: string | number; obtained: string | number; grade?: string; remarks?: string; absent?: boolean }>;
+    totals: { maximum: string | number; obtained: string | number; percentage: number | string; grade?: string };
+    title: string;
+    loading: boolean;
+  } | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const [exams, setExams] = useState<any[]>([]);
@@ -374,6 +381,188 @@ export default function PublishedResultsPage() {
       template: activeTemplate,
     });
   };
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+  useEffect(() => {
+    if (!selectedStudentForCard) {
+      setModalCardData(null);
+      return;
+    }
+
+    let active = true;
+
+    if (!examMode) {
+      const components = selectedStudentForCard.component_breakdown?.components || [];
+      const subjects = components.map((component: any) => ({
+        subject: component.name,
+        maximum: `${component.weightage_pct}% weight`,
+        obtained: `${component.score_pct}%`,
+        remarks: component.details,
+      }));
+      setModalCardData({
+        subjects,
+        totals: {
+          maximum: "100%",
+          obtained: `${Number(selectedStudentForCard.total_percentage || 0).toFixed(2)}%`,
+          percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2),
+          grade: selectedStudentForCard.grade,
+        },
+        title: "Final Examination",
+        loading: false,
+      });
+      return;
+    }
+
+    const studentId = String(selectedStudentForCard.student ?? selectedStudentForCard.student_id ?? selectedStudentForCard.id ?? "");
+    const selectedExam = classExams.find((exam: any) => String(exam.id) === selectedExamId);
+    const termKey = selectedExam?.exam_term?.id ?? selectedExam?.exam_term ?? selectedExam?.term_name ?? selectedExam?.title;
+    const termExams = classExams.filter((exam: any) => {
+      const key = exam.exam_term?.id ?? exam.exam_term ?? exam.term_name ?? exam.title;
+      return String(key).toLowerCase() === String(termKey).toLowerCase();
+    });
+
+    const reportTitle = (selectedExam?.title || examPreview?.exam_title || "TERM 1 EXAMINATION").toUpperCase();
+
+    const initialSub = [{
+      subject: examPreview?.subject_name || selectedExam?.subject_name || selectedExam?.title || "Exam",
+      maximum: selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 50,
+      obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
+      grade: selectedStudentForCard.grade,
+      remarks: selectedStudentForCard.remarks,
+      absent: selectedStudentForCard.is_absent,
+    }];
+    setModalCardData({
+      subjects: initialSub,
+      totals: {
+        maximum: selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 50,
+        obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
+        percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2),
+        grade: selectedStudentForCard.grade,
+      },
+      title: reportTitle,
+      loading: termExams.length > 1,
+    });
+
+    if (termExams.length <= 1) return;
+
+    (async () => {
+      try {
+        const fullSubjects: Array<{ subject: string; maximum: string | number; obtained: string | number; grade?: string; remarks?: string; absent?: boolean }> = [];
+        let totalMax = 0;
+        let totalObt = 0;
+
+        for (const exam of termExams) {
+          const preview = String(exam.id) === selectedExamId
+            ? examPreview
+            : await getExamResultPreview(Number(exam.id), selectedDivFilter);
+          const foundSt = (preview?.students || []).find((s: any) => String(s.student ?? s.student_id ?? s.id) === studentId);
+          if (foundSt) {
+            const subName = preview?.subject_name || exam.subject_name || exam.title;
+            const mMax = Number(foundSt.max_marks ?? preview?.max_marks ?? 50);
+            const mObt = foundSt.is_absent ? 0 : Number(foundSt.marks_obtained ?? 0);
+            totalMax += mMax;
+            totalObt += mObt;
+            fullSubjects.push({
+              subject: subName,
+              maximum: mMax,
+              obtained: foundSt.is_absent ? "Absent" : foundSt.marks_obtained ?? 0,
+              grade: foundSt.grade,
+              remarks: foundSt.remarks,
+              absent: foundSt.is_absent,
+            });
+          }
+        }
+
+        if (!active) return;
+
+        if (fullSubjects.length > 0) {
+          const pct = totalMax > 0 ? (totalObt / totalMax) * 100 : 0;
+          const grade = pct >= 90 ? "a+" : pct >= 80 ? "a" : pct >= 70 ? "b+" : pct >= 60 ? "b" : pct >= 40 ? "c" : "f";
+          setModalCardData({
+            subjects: fullSubjects,
+            totals: {
+              maximum: totalMax,
+              obtained: totalObt,
+              percentage: pct.toFixed(2),
+              grade,
+            },
+            title: reportTitle,
+            loading: false,
+          });
+        }
+      } catch {
+        if (active) setModalCardData((prev) => prev ? { ...prev, loading: false } : null);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [selectedStudentForCard, examMode, selectedExamId, classExams, examPreview, selectedDivFilter]);
+
+  const handleDownloadPDF = async () => {
+    if (!selectedStudentForCard) return;
+    setIsDownloadingPDF(true);
+    try {
+      const studentId = String(selectedStudentForCard.student ?? selectedStudentForCard.student_id ?? selectedStudentForCard.id ?? "");
+      const studentName = selectedStudentForCard.student_name || selectedStudentForCard.name || "Student";
+      const rollNumber = selectedStudentForCard.roll_no || selectedStudentForCard.roll_number || "—";
+      const admissionNumber = selectedStudentForCard.gr_no || selectedStudentForCard.admission_no || "—";
+      const className = [
+        currentClassObj?.school_class,
+        selectedStudentForCard.division && selectedStudentForCard.division !== "ALL"
+          ? selectedStudentForCard.division
+          : selectedDivFilter !== "ALL" ? selectedDivFilter : ""
+      ].filter(Boolean).join(" - ");
+
+      const subjectsToInclude = modalCardData?.subjects?.length
+        ? modalCardData.subjects
+        : [{
+            subject: examPreview?.subject_name || examPreview?.exam_title || "Subject",
+            maximum: selectedStudentForCard.max_marks ?? 50,
+            obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
+            grade: selectedStudentForCard.grade,
+            remarks: selectedStudentForCard.remarks,
+            absent: selectedStudentForCard.is_absent,
+          }];
+
+      const totalsToInclude = modalCardData?.totals || {
+        maximum: selectedStudentForCard.max_marks ?? 50,
+        obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
+        percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2),
+        grade: selectedStudentForCard.grade || "A",
+      };
+
+      await downloadResultReportCardPDF({
+        school: {
+          name: schoolBrand.name,
+          logo: schoolBrand.logo,
+          address: schoolBrand.address,
+          phone: schoolBrand.phone,
+          email: schoolBrand.email,
+          academicYear: currentYearObj?.name || (currentYearObj?.start_year ? `${currentYearObj.start_year} - ${currentYearObj.end_year}` : "2026-27"),
+        },
+        title: modalCardData?.title || (examMode ? (examPreview?.term_name || examPreview?.exam_title || "TERM 1 EXAMINATION") : "Final Academic Result"),
+        student: {
+          id: studentId,
+          name: studentName,
+          rollNumber,
+          admissionNumber,
+          className,
+          photo: selectedStudentForCard.photo || selectedStudentForCard.profile_photo,
+        },
+        subjects: subjectsToInclude,
+        totals: totalsToInclude,
+        remarks: selectedStudentForCard.remarks,
+        template: resultTemplate as ResultTemplateId,
+      });
+
+      toast.success(`Result PDF for ${studentName} downloaded successfully!`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to download PDF.");
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
   const handlePrint = () => {
     if (selectedStudentForCard) {
       const studentId = selectedStudentForCard.student ?? selectedStudentForCard.student_id ?? selectedStudentForCard.id;
@@ -742,18 +931,25 @@ export default function PublishedResultsPage() {
         <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-slate-50 p-0 sm:left-1/2 sm:top-1/2 sm:h-[92dvh] sm:w-[94vw] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
             {selectedStudentForCard && <ResultCardPreview
-              title={examMode ? examPreview?.exam_title || "Exam Result" : "Final Examination"}
+              title={modalCardData?.title || (examMode ? examPreview?.exam_title || "Exam Result" : "Final Examination")}
               template={resultTemplate as ResultTemplateId}
               school={{ name: schoolBrand.name, logo: schoolBrand.logo, address: schoolBrand.address, phone: schoolBrand.phone, email: schoolBrand.email, academicYear: currentYearObj?.name || (currentYearObj?.start_year ? `${currentYearObj.start_year} - ${currentYearObj.end_year}` : undefined) }}
               student={{ id: selectedStudentForCard.student || selectedStudentForCard.student_id || selectedStudentForCard.id, name: selectedStudentForCard.student_name, rollNumber: selectedStudentForCard.roll_no, admissionNumber: selectedStudentForCard.gr_no, className: [currentClassObj?.school_class, selectedStudentForCard.division && selectedStudentForCard.division !== "ALL" ? selectedStudentForCard.division : selectedDivFilter !== "ALL" ? selectedDivFilter : ""].filter(Boolean).join(" - "), photo: selectedStudentForCard.photo || selectedStudentForCard.profile_photo }}
-              subjects={examMode ? [{ subject: examPreview?.subject_name || examPreview?.exam_title || "Exam", maximum: selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0, obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0, grade: selectedStudentForCard.grade, remarks: selectedStudentForCard.remarks, absent: selectedStudentForCard.is_absent }] : (selectedStudentForCard.component_breakdown?.components || []).map((component: any) => ({ subject: component.name, maximum: `${component.weightage_pct}% weight`, obtained: `${component.score_pct}%`, remarks: component.details }))}
-              totals={{ maximum: examMode ? selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0 : "100%", obtained: examMode ? selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0 : `${Number(selectedStudentForCard.total_percentage || 0).toFixed(2)}%`, percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2), grade: selectedStudentForCard.grade }}
+              subjects={modalCardData?.subjects || (examMode ? [{ subject: examPreview?.subject_name || examPreview?.exam_title || "Exam", maximum: selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0, obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0, grade: selectedStudentForCard.grade, remarks: selectedStudentForCard.remarks, absent: selectedStudentForCard.is_absent }] : (selectedStudentForCard.component_breakdown?.components || []).map((component: any) => ({ subject: component.name, maximum: `${component.weightage_pct}% weight`, obtained: `${component.score_pct}%`, remarks: component.details })))}
+              totals={modalCardData?.totals || { maximum: examMode ? selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0 : "100%", obtained: examMode ? selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0 : `${Number(selectedStudentForCard.total_percentage || 0).toFixed(2)}%`, percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2), grade: selectedStudentForCard.grade }}
               remarks={selectedStudentForCard.remarks}
             />}
           </div>
           <DialogFooter className="flex shrink-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
             <Button variant="outline" onClick={() => setSelectedStudentForCard(null)} className="rounded-xl">Cancel</Button>
-            <Button onClick={handlePrint} className="gap-2 rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700"><Download className="h-4 w-4" />Download PDF</Button>
+            <Button
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPDF}
+              className="gap-2 rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700 shadow-md shadow-blue-500/20"
+            >
+              {isDownloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isDownloadingPDF ? "Downloading..." : "Download PDF"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
