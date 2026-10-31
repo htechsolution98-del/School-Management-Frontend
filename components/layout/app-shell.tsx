@@ -625,8 +625,9 @@ export function
   // Derive role-aware mobile bottom navigation items (5 items: 4 core + More)
   const mobileNavItems = (() => {
     const role = (roleTitle || "").toLowerCase();
+    const currentPath = (pathname || "").toLowerCase();
 
-    if (role.includes("inventory")) {
+    if (currentPath.startsWith("/inventory") || role.includes("inventory")) {
       return [
         { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
         { title: "Stock", href: "/inventory/stock", icon: Boxes },
@@ -958,7 +959,7 @@ export function
               )}>
                 {userInitials || "ST"}
               </span>
-              <div className="text-left hidden sm:flex items-center gap-1">
+              <div className="text-left hidden md:flex items-center gap-1">
                 <div>
                   <span className={cn(
                     "block max-w-[100px] truncate text-xs sm:text-sm font-semibold leading-tight",
@@ -978,7 +979,7 @@ export function
                   roleTitle === "Student" ? "text-white/80" : "text-white/80 lg:text-slate-400"
                 )} />
               </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 sm:hidden", roleTitle === "Student" ? "text-white/80" : "text-white/80")} />
+              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 md:hidden", roleTitle === "Student" ? "text-white/80" : "text-white/80")} />
             </button>
           </div>
         </header>
@@ -994,7 +995,7 @@ export function
         <main
           className={cn(
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
-            (noPadding || roleTitle === "Teacher") ? "p-0 pb-28 lg:pb-0" : "px-2 sm:px-6 py-2.5 sm:py-5 pb-28 lg:pb-5",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-32 lg:pb-0" : "px-2 sm:px-6 py-2.5 sm:py-5 pb-32 lg:pb-5",
             mainClassName
           )}
         >
@@ -1008,7 +1009,7 @@ export function
             WebkitBackdropFilter: "blur(24px) saturate(180%)",
             backdropFilter: "blur(24px) saturate(180%)",
           }}
-          className="fixed bottom-3 inset-x-3 sm:inset-x-8 max-w-md mx-auto z-40 rounded-3xl bg-white/25 border border-slate-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.04)] p-1.5 lg:hidden print:hidden"
+          className="fixed bottom-3 inset-x-3 sm:inset-x-8 max-w-md mx-auto z-40 rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_12px_40px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)] p-1.5 lg:hidden print:hidden"
         >
           <div className="flex items-center justify-around w-full">
             {mobileNavItems.map((item, idx) => {

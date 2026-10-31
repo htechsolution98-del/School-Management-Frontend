@@ -311,7 +311,7 @@ export default function ReplacementsAndReturnsPage() {
   };
 
   return (
-    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-24 sm:pb-8">
+    <div className="space-y-6 px-3 sm:px-6 py-4 sm:py-6 max-w-7xl mx-auto w-full min-w-0 pb-32 sm:pb-8">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -323,12 +323,12 @@ export default function ReplacementsAndReturnsPage() {
             Process damaged/size exchange requests with Free vs Chargeable pricing decisions, and handle returnable items.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="w-full sm:w-auto">
           <button
             onClick={handleOpenProcessModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20 active:scale-95 transition-all w-full sm:w-auto"
           >
-            <RotateCcw className="w-4 h-4" /> Process Return / Exchange
+            <RotateCcw className="w-4 h-4 shrink-0" /> Process Return / Exchange
           </button>
         </div>
       </div>
@@ -372,83 +372,157 @@ export default function ReplacementsAndReturnsPage() {
               <p className="text-xs mt-1">Student size exchanges or damaged replacement requests will appear here.</p>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto hide-scrollbar">
-              <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3.5 px-4">Student</th>
-                    <th className="py-3.5 px-4">Item</th>
-                    <th className="py-3.5 px-4">Reason</th>
-                    <th className="py-3.5 px-4">Requested Variant</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Review / Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {replacements.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-white">{r.student_name}</div>
-                        <div className="text-xs text-slate-400">Roll #{r.student_roll || "—"}</div>
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
-                        {r.item_name} (x{r.quantity})
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {r.reason}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400">
-                        {r.requested_size_name ? `Size: ${r.requested_size_name}` : "Standard"}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                          r.status === "ISSUED"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            : r.status === "APPROVED"
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                            : r.status === "REJECTED"
-                            ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                        }`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
+            <>
+              {/* Mobile Card View (< sm) */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3">
+                {replacements.map((r) => (
+                  <div key={r.id} className="py-3.5 first:pt-1 last:pb-1 flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-white text-xs">
+                          {r.student_name}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Roll #{r.student_roll || "—"}
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        r.status === "ISSUED"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                          : r.status === "APPROVED"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                          : r.status === "REJECTED"
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                      }`}>
+                        {r.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-white">
+                          {r.item_name} <span className="text-slate-500">(x{r.quantity})</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Reason: <span className="font-medium text-slate-600 dark:text-slate-300">{r.reason}</span>
+                          {r.requested_size_name ? ` • Size: ${r.requested_size_name}` : ""}
+                        </div>
+                      </div>
+
+                      <div>
                         {r.status === "PENDING" && (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenReview(r, "REJECT")}
+                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-semibold"
+                            >
+                              Reject
+                            </button>
                             <button
                               onClick={() => handleOpenReview(r, "APPROVE")}
                               className="px-2.5 py-1 rounded-lg bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs font-semibold shadow-xs"
                             >
                               Approve
                             </button>
-                            <button
-                              onClick={() => handleOpenReview(r, "REJECT")}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-semibold"
-                            >
-                              Reject
-                            </button>
                           </div>
                         )}
                         {r.status === "APPROVED" && (
                           <button
                             onClick={() => handleOpenReview(r, "ISSUE")}
-                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm"
                           >
-                            Dispense & Deduct Stock
+                            Dispense
                           </button>
                         )}
                         {r.status === "ISSUED" && (
-                          <span className="text-xs text-emerald-600 font-semibold">Completed</span>
+                          <span className="text-[11px] text-emerald-600 font-semibold">Completed</span>
                         )}
-                      </td>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Student</th>
+                      <th className="py-3.5 px-4">Item</th>
+                      <th className="py-3.5 px-4">Reason</th>
+                      <th className="py-3.5 px-4">Requested Variant</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Review / Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {replacements.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-900 dark:text-white">{r.student_name}</div>
+                          <div className="text-xs text-slate-400">Roll #{r.student_roll || "—"}</div>
+                        </td>
+                        <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+                          {r.item_name} (x{r.quantity})
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {r.reason}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400">
+                          {r.requested_size_name ? `Size: ${r.requested_size_name}` : "Standard"}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                            r.status === "ISSUED"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                              : r.status === "APPROVED"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : r.status === "REJECTED"
+                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                          }`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {r.status === "PENDING" && (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleOpenReview(r, "APPROVE")}
+                                className="px-2.5 py-1 rounded-lg bg-[#5826df] hover:bg-[#4a1ec2] text-white text-xs font-semibold shadow-xs"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleOpenReview(r, "REJECT")}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-semibold"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                          {r.status === "APPROVED" && (
+                            <button
+                              onClick={() => handleOpenReview(r, "ISSUE")}
+                              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm"
+                            >
+                              Dispense & Deduct Stock
+                            </button>
+                          )}
+                          {r.status === "ISSUED" && (
+                            <span className="text-xs text-emerald-600 font-semibold">Completed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )
         ) : (
           /* Returns Table */
@@ -459,42 +533,74 @@ export default function ReplacementsAndReturnsPage() {
               <p className="text-xs mt-1">Returned blazers, sports kits, or library gear are tracked here.</p>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto hide-scrollbar">
-              <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3.5 px-4">Return Date</th>
-                    <th className="py-3.5 px-4">Student</th>
-                    <th className="py-3.5 px-4">Item Returned</th>
-                    <th className="py-3.5 px-4">Qty</th>
-                    <th className="py-3.5 px-4">Condition</th>
-                    <th className="py-3.5 px-4">Reason / Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {returns.map((ret) => (
-                    <tr key={ret.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4 text-xs text-slate-500">{ret.return_date}</td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">{ret.student_name}</td>
-                      <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+            <>
+              {/* Mobile Card View (< sm) */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3">
+                {returns.map((ret) => (
+                  <div key={ret.id} className="py-3 first:pt-1 last:pb-1 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-bold text-xs text-slate-900 dark:text-white">
+                        {ret.student_name}
+                      </div>
+                      <span className={`inline-flex px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                        ret.condition === "GOOD"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                      }`}>
+                        {ret.condition}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="font-semibold text-slate-700 dark:text-slate-300">
                         {ret.item_name} {ret.size_name ? `(Size ${ret.size_name})` : ""}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold">{ret.quantity}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
-                          ret.condition === "GOOD"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                        }`}>
-                          {ret.condition} (Restocked: {ret.condition === "GOOD" ? "Yes" : "No"})
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-500">{ret.reason || "N/A"}</td>
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">Qty: {ret.quantity}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {ret.return_date} • {ret.reason || "No notes"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block w-full overflow-x-auto hide-scrollbar">
+                <table className="w-full min-w-[720px] text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/75 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Return Date</th>
+                      <th className="py-3.5 px-4">Student</th>
+                      <th className="py-3.5 px-4">Item Returned</th>
+                      <th className="py-3.5 px-4">Qty</th>
+                      <th className="py-3.5 px-4">Condition</th>
+                      <th className="py-3.5 px-4">Reason / Notes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {returns.map((ret) => (
+                      <tr key={ret.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 text-xs text-slate-500">{ret.return_date}</td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">{ret.student_name}</td>
+                        <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+                          {ret.item_name} {ret.size_name ? `(Size ${ret.size_name})` : ""}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold">{ret.quantity}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
+                            ret.condition === "GOOD"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          }`}>
+                            {ret.condition} (Restocked: {ret.condition === "GOOD" ? "Yes" : "No"})
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500">{ret.reason || "N/A"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )
         )}
       </div>
