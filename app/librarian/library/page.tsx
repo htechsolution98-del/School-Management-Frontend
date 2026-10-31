@@ -610,6 +610,17 @@ export default function LibrarianDashboard() {
     loadAllData();
   }, [loadAllData]);
 
+  // Refresh the waitlist whenever staff open its panel so newly submitted
+  // student reservations appear without requiring a full page reload.
+  useEffect(() => {
+    if (activeTab !== "reservations") return;
+    getReservations(true)
+      .then((items) => setReservations(items.slice().sort((a, b) =>
+        new Date(b.reservation_date || 0).getTime() - new Date(a.reservation_date || 0).getTime()
+      )))
+      .catch(() => undefined);
+  }, [activeTab]);
+
   // Derived statistics (Live real-time computed from data or instant SWR summary)
   const stats = useMemo(() => {
     if (books.length > 0 || issuedRecords.length > 0) {

@@ -29,8 +29,11 @@ import { toast } from "sonner";
 import { getSavedResultTemplate, saveResultTemplate, type ResultTemplateId } from "@/lib/result-template";
 import { ResultTemplatePicker } from "@/components/results/result-template-picker";
 import { writePrintableResultCards } from "@/lib/result-report-print";
-import { downloadResultReportCardPDF } from "@/lib/result-pdf-generator";
 import { ResultCardPreview } from "@/components/results/result-card-preview";
+import { getSchoolProfile } from "@/lib/school-profile";
+import { downloadResultPreviewPDF } from "@/lib/result-dom-pdf";
+import { API_BASE_URL } from "@/lib/config";
+import { fetchWithAuth } from "@/lib/auth";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +55,21 @@ import {
   type ResultWeightageConfig,
 } from "@/lib/exam-api";
 
+function examsBelongToSameTerm(selectedExam: any, candidateExam: any, selectedTermName?: string) {
+  const normalize = (value: unknown) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const selectedName = normalize(selectedTermName || selectedExam?.term_name || selectedExam?.exam_term?.name);
+  const candidateName = normalize(candidateExam?.term_name || candidateExam?.exam_term?.name);
+  if (selectedName && candidateName) return selectedName === candidateName;
+
+  const selectedId = selectedExam?.exam_term?.id ?? selectedExam?.exam_term;
+  const candidateId = candidateExam?.exam_term?.id ?? candidateExam?.exam_term;
+  if (selectedId !== undefined && selectedId !== null && candidateId !== undefined && candidateId !== null) {
+    return String(selectedId) === String(candidateId);
+  }
+
+  return normalize(selectedExam?.title) === normalize(candidateExam?.title);
+}
+
 export default function PublishedResultsPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -72,17 +90,20 @@ export default function PublishedResultsPage() {
     totals: { maximum: string | number; obtained: string | number; percentage: number | string; grade?: string };
     title: string;
     loading: boolean;
+    error?: string;
   } | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const [exams, setExams] = useState<any[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>("");
   const [examPreview, setExamPreview] = useState<any>(null);
+  const [termExamPreviews, setTermExamPreviews] = useState<Array<{ exam: any; preview: any }>>([]);
   const [finalAvailable, setFinalAvailable] = useState(false);
-  const [schoolBrand, setSchoolBrand] = useState({ name: "School", logo: "", address: "", phone: "", email: "", indexNo: "" });
+  const [schoolBrand, setSchoolBrand] = useState({ name: "School", shortName: "", logo: "", tagline: "", address: "", phone: "", email: "", indexNo: "", establishmentYear: "", boardAffiliation: "", schoolCode: "", udiseCode: "", principalName: "", teacherName: "", principalSignature: "", teacherSignature: "", stamp: "" });
   const [resultTemplate, setResultTemplate] = useState("classic");
   const [templateNeedsPublish, setTemplateNeedsPublish] = useState(false);
   const [isPublishingTemplate, setIsPublishingTemplate] = useState(false);
+
 
   const classExams = useMemo(() => exams.filter((exam: any) => {
     const classId = typeof exam.class_group === "object" && exam.class_group ? exam.class_group.id : exam.class_group;
@@ -90,15 +111,58 @@ export default function PublishedResultsPage() {
     const divMatches = selectedDivFilter === "ALL" || !exam.division || exam.division === "ALL" || String(exam.division).toLowerCase() === selectedDivFilter.toLowerCase();
     return String(classId) === selectedClassId && (!yearId || String(yearId) === selectedYearId) && divMatches;
   }), [exams, selectedClassId, selectedYearId, selectedDivFilter]);
+  const examTermGroups = useMemo(() => {
+    const groups: Array<{ id: string; label: string; exams: any[] }> = [];
+    classExams.forEach((exam: any) => {
+      const termLabel = String(exam.term_name || exam.exam_term?.name || exam.title || "Examination").trim();
+      const existing = groups.find((group) => examsBelongToSameTerm(group.exams[0], exam, group.label));
+      if (existing) existing.exams.push(exam);
+      else groups.push({ id: String(exam.id), label: termLabel, exams: [exam] });
+    });
+    return groups;
+  }, [classExams]);
   const examMode = Boolean(selectedExamId && selectedExamId !== "FINAL");
-  const visibleExamRows = useMemo(() => (examPreview?.students || []).filter((row: any) => row.is_published), [examPreview]);
-  const displayResults: any[] = examMode ? visibleExamRows.map((row: any) => {
-    const marks = row.marks_obtained === null ? 0 : Number(row.marks_obtained);
-    const maxMarks = Number(row.max_marks || examPreview.max_marks || 0);
-    const percentage = maxMarks > 0 ? Number(((marks / maxMarks) * 100).toFixed(2)) : 0;
-    return { ...row, id: row.student, student: row.student, total_percentage: percentage,
-      component_breakdown: { components: [{ name: examPreview.exam_title, type: "EXAM", weightage_pct: 100, score_pct: percentage, contribution_pct: percentage, details: row.is_absent ? "Absent" : `Marks: ${marks}/${maxMarks}` }], final_percentage: percentage } };
-  }) : resultsData;
+  const displayResults: any[] = useMemo(() => {
+    if (!examMode) return resultsData;
+    const byStudent = new Map<string, any>();
+    termExamPreviews.forEach(({ exam, preview }) => {
+      (preview?.students || []).filter((row: any) => row.is_published).forEach((row: any) => {
+        const studentId = String(row.student ?? row.student_id ?? row.id ?? "");
+        if (!studentId) return;
+        const item = byStudent.get(studentId) || {
+          ...row, id: studentId, student: studentId, marks_obtained: 0, max_marks: 0,
+          subject_results: [], is_absent: true, report_template: row.report_template,
+        };
+        const absent = Boolean(row.is_absent);
+        const max = Number(row.max_marks ?? preview.max_marks ?? exam.max_marks ?? 0);
+        const obtained = absent ? 0 : Number(row.marks_obtained || 0);
+        item.subject_results.push({
+          subject_name: preview.subject_name || exam.subject_name || exam.title || "Subject",
+          max_marks: max,
+          marks_obtained: absent ? "Absent" : obtained,
+          is_absent: absent,
+          grade: row.grade,
+          remarks: row.remarks,
+        });
+        item.marks_obtained += obtained;
+        item.max_marks += max;
+        item.is_absent = item.is_absent && absent;
+        item.report_template ||= row.report_template;
+        byStudent.set(studentId, item);
+      });
+    });
+    return Array.from(byStudent.values()).map((row) => {
+      const percentage = row.max_marks ? Number(((row.marks_obtained / row.max_marks) * 100).toFixed(2)) : 0;
+      const grade = percentage >= 90 ? "A+" : percentage >= 75 ? "A" : percentage >= 60 ? "B" : percentage >= 40 ? "C" : "F";
+      return { ...row, total_percentage: percentage, grade,
+        component_breakdown: { components: row.subject_results.map((subject: any) => ({
+          name: subject.subject_name, type: "SUBJECT", weightage_pct: row.max_marks ? subject.max_marks * 100 / row.max_marks : 0,
+          score_pct: subject.is_absent || !subject.max_marks ? 0 : Number(subject.marks_obtained) * 100 / subject.max_marks,
+          contribution_pct: row.max_marks ? (subject.is_absent ? 0 : Number(subject.marks_obtained)) * 100 / row.max_marks : 0,
+          details: subject.is_absent ? "Absent" : `Marks: ${subject.marks_obtained}/${subject.max_marks}`,
+        })), final_percentage: percentage } };
+    });
+  }, [examMode, resultsData, termExamPreviews]);
 
   const classesWithExams = useMemo(() => {
     if (!exams || exams.length === 0) return classes;
@@ -177,6 +241,31 @@ export default function PublishedResultsPage() {
     try {
       setSchoolBrand((brand) => ({ ...brand, name: localStorage.getItem("school_name") || brand.name, logo: localStorage.getItem("school_logo") || "" }));
     } catch {}
+    Promise.allSettled([
+      getSchoolProfile(),
+      fetchWithAuth(`${API_BASE_URL}/me/`).then((response) => response.ok ? response.json() : null),
+    ]).then(([brandingResult, meResult]) => {
+      const branding = brandingResult.status === "fulfilled" ? brandingResult.value : null;
+      const me = meResult.status === "fulfilled" ? meResult.value : null;
+      const school = me?.school || me || {};
+      setSchoolBrand((brand) => ({
+        ...brand,
+        name: branding?.school_full_name || school.name || brand.name,
+        shortName: branding?.school_short_name || brand.shortName,
+        logo: branding?.print_logo_url || branding?.main_logo_url || school.logo || brand.logo,
+        tagline: branding?.tagline || brand.tagline,
+        address: branding?.full_address || [school.address, school.city, school.state, school.pincode].filter(Boolean).join(", ") || brand.address,
+        phone: branding?.phone_numbers || school.phone || brand.phone,
+        email: branding?.official_emails || school.email || brand.email,
+        establishmentYear: branding?.establishment_year || brand.establishmentYear,
+        boardAffiliation: branding?.board_affiliation || brand.boardAffiliation,
+        schoolCode: branding?.school_code || school.index_no || brand.schoolCode,
+        udiseCode: branding?.udise_code || school.udise_code || brand.udiseCode,
+        principalSignature: branding?.principal_signature_url || brand.principalSignature,
+        teacherSignature: branding?.class_teacher_signature_url || brand.teacherSignature,
+        stamp: branding?.official_seal_url || brand.stamp,
+      }));
+    });
   }, []);
 
   useEffect(() => {
@@ -219,19 +308,25 @@ export default function PublishedResultsPage() {
   }, [selectedYearId, selectedClassId, selectedDivFilter]);
 
   useEffect(() => {
-    if (!selectedExamId || selectedExamId === "FINAL") { setExamPreview(null); setTemplateNeedsPublish(false); return; }
+    if (!selectedExamId || selectedExamId === "FINAL") { setExamPreview(null); setTermExamPreviews([]); setTemplateNeedsPublish(false); return; }
     setTemplateNeedsPublish(false);
     let active = true;
-    getExamResultPreview(Number(selectedExamId), selectedDivFilter)
-      .then((data) => {
+    const selectedExam = classExams.find((exam: any) => String(exam.id) === selectedExamId);
+    const termExams = selectedExam
+      ? classExams.filter((exam: any) => examsBelongToSameTerm(selectedExam, exam, selectedExam.term_name || selectedExam.exam_term?.name))
+      : [];
+    Promise.all(termExams.map(async (exam: any) => ({ exam, preview: await getExamResultPreview(Number(exam.id), selectedDivFilter) })))
+      .then((items) => {
         if (!active) return;
+        setTermExamPreviews(items);
+        const data = items.find((item) => String(item.exam.id) === selectedExamId)?.preview || null;
         setExamPreview(data);
-        const publishedTemplate = data.students?.find((row: any) => row.is_published)?.report_template;
+        const publishedTemplate = data?.students?.find((row: any) => row.is_published)?.report_template;
         if (publishedTemplate) { setResultTemplate(publishedTemplate); saveResultTemplate(publishedTemplate); setTemplateNeedsPublish(false); }
       })
-      .catch(() => { if (active) setExamPreview(null); });
+      .catch(() => { if (active) { setExamPreview(null); setTermExamPreviews([]); toast.error("Could not load all published subjects for this exam term."); } });
     return () => { active = false; };
-  }, [selectedExamId, selectedDivFilter]);
+  }, [selectedExamId, selectedDivFilter, classExams]);
 
   useEffect(() => {
     if (!classExams.length) { setSelectedExamId(""); setExamPreview(null); return; }
@@ -260,11 +355,7 @@ export default function PublishedResultsPage() {
     if (examMode) {
       const selectedExam = classExams.find((exam: any) => String(exam.id) === selectedExamId);
       if (selectedExam) {
-        const termKey = selectedExam.exam_term?.id ?? selectedExam.exam_term ?? selectedExam.term_name ?? selectedExam.title;
-        const termExams = classExams.filter((exam: any) => {
-          const candidateKey = exam.exam_term?.id ?? exam.exam_term ?? exam.term_name ?? exam.title;
-          return String(candidateKey) === String(termKey);
-        });
+        const termExams = classExams.filter((exam: any) => examsBelongToSameTerm(selectedExam, exam, examPreview?.term_name));
         const previews: PromiseSettledResult<any>[] = [];
         for (const exam of termExams) {
           try {
@@ -415,11 +506,7 @@ export default function PublishedResultsPage() {
 
     const studentId = String(selectedStudentForCard.student ?? selectedStudentForCard.student_id ?? selectedStudentForCard.id ?? "");
     const selectedExam = classExams.find((exam: any) => String(exam.id) === selectedExamId);
-    const termKey = selectedExam?.exam_term?.id ?? selectedExam?.exam_term ?? selectedExam?.term_name ?? selectedExam?.title;
-    const termExams = classExams.filter((exam: any) => {
-      const key = exam.exam_term?.id ?? exam.exam_term ?? exam.term_name ?? exam.title;
-      return String(key).toLowerCase() === String(termKey).toLowerCase();
-    });
+    const termExams = classExams.filter((exam: any) => examsBelongToSameTerm(selectedExam, exam, examPreview?.term_name));
 
     const reportTitle = (selectedExam?.title || examPreview?.exam_title || "TERM 1 EXAMINATION").toUpperCase();
 
@@ -455,7 +542,7 @@ export default function PublishedResultsPage() {
           const preview = String(exam.id) === selectedExamId
             ? examPreview
             : await getExamResultPreview(Number(exam.id), selectedDivFilter);
-          const foundSt = (preview?.students || []).find((s: any) => String(s.student ?? s.student_id ?? s.id) === studentId);
+          const foundSt = (preview?.students || []).find((s: any) => s.is_published && String(s.student ?? s.student_id ?? s.id) === studentId);
           if (foundSt) {
             const subName = preview?.subject_name || exam.subject_name || exam.title;
             const mMax = Number(foundSt.max_marks ?? preview?.max_marks ?? 50);
@@ -489,9 +576,16 @@ export default function PublishedResultsPage() {
             title: reportTitle,
             loading: false,
           });
+        } else {
+          setModalCardData((prev) => prev ? {
+            ...prev,
+            subjects: [],
+            loading: false,
+            error: "No published subject marks were found for this student in the selected term.",
+          } : null);
         }
       } catch {
-        if (active) setModalCardData((prev) => prev ? { ...prev, loading: false } : null);
+        if (active) setModalCardData((prev) => prev ? { ...prev, subjects: [], loading: false, error: "Could not load every published subject for this term. Close the marksheet and try again." } : null);
       }
     })();
 
@@ -502,59 +596,11 @@ export default function PublishedResultsPage() {
     if (!selectedStudentForCard) return;
     setIsDownloadingPDF(true);
     try {
-      const studentId = String(selectedStudentForCard.student ?? selectedStudentForCard.student_id ?? selectedStudentForCard.id ?? "");
       const studentName = selectedStudentForCard.student_name || selectedStudentForCard.name || "Student";
-      const rollNumber = selectedStudentForCard.roll_no || selectedStudentForCard.roll_number || "—";
-      const admissionNumber = selectedStudentForCard.gr_no || selectedStudentForCard.admission_no || "—";
-      const className = [
-        currentClassObj?.school_class,
-        selectedStudentForCard.division && selectedStudentForCard.division !== "ALL"
-          ? selectedStudentForCard.division
-          : selectedDivFilter !== "ALL" ? selectedDivFilter : ""
-      ].filter(Boolean).join(" - ");
-
-      const subjectsToInclude = modalCardData?.subjects?.length
-        ? modalCardData.subjects
-        : [{
-            subject: examPreview?.subject_name || examPreview?.exam_title || "Subject",
-            maximum: selectedStudentForCard.max_marks ?? 50,
-            obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
-            grade: selectedStudentForCard.grade,
-            remarks: selectedStudentForCard.remarks,
-            absent: selectedStudentForCard.is_absent,
-          }];
-
-      const totalsToInclude = modalCardData?.totals || {
-        maximum: selectedStudentForCard.max_marks ?? 50,
-        obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0,
-        percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2),
-        grade: selectedStudentForCard.grade || "A",
-      };
-
-      await downloadResultReportCardPDF({
-        school: {
-          name: schoolBrand.name,
-          logo: schoolBrand.logo,
-          address: schoolBrand.address,
-          phone: schoolBrand.phone,
-          email: schoolBrand.email,
-          academicYear: currentYearObj?.name || (currentYearObj?.start_year ? `${currentYearObj.start_year} - ${currentYearObj.end_year}` : "2026-27"),
-        },
-        title: modalCardData?.title || (examMode ? (examPreview?.term_name || examPreview?.exam_title || "TERM 1 EXAMINATION") : "Final Academic Result"),
-        student: {
-          id: studentId,
-          name: studentName,
-          rollNumber,
-          admissionNumber,
-          className,
-          photo: selectedStudentForCard.photo || selectedStudentForCard.profile_photo,
-        },
-        subjects: subjectsToInclude,
-        totals: totalsToInclude,
-        remarks: selectedStudentForCard.remarks,
-        template: resultTemplate as ResultTemplateId,
-      });
-
+      const card = document.querySelector<HTMLElement>("[data-result-card-preview='true']");
+      if (!card) throw new Error("The result preview is not ready yet.");
+      const safeName = `${studentName}_${modalCardData?.title || "Result"}`.replace(/[^a-zA-Z0-9_-]+/g, "_");
+      await downloadResultPreviewPDF(card, `${safeName}_Report_Card.pdf`);
       toast.success(`Result PDF for ${studentName} downloaded successfully!`);
     } catch (err: any) {
       toast.error(err?.message || "Failed to download PDF.");
@@ -585,8 +631,12 @@ export default function PublishedResultsPage() {
     setIsPublishingTemplate(true);
     try {
       if (examMode) {
-        await updatePublishedResultTemplate({ scope: "exam", exam: Number(selectedExamId), division: selectedDivFilter, template: resultTemplate as ResultTemplateId });
+        await Promise.all(termExamPreviews.map(({ exam }) => updatePublishedResultTemplate({ scope: "exam", exam: Number(exam.id), division: selectedDivFilter, template: resultTemplate as ResultTemplateId })));
         setExamPreview((current: any) => current ? { ...current, students: current.students.map((row: any) => row.is_published ? { ...row, report_template: resultTemplate } : row) } : current);
+        setTermExamPreviews((current) => current.map(({ exam, preview }) => ({
+          exam,
+          preview: { ...preview, students: (preview.students || []).map((row: any) => row.is_published ? { ...row, report_template: resultTemplate } : row) },
+        })));
       } else {
         await updatePublishedResultTemplate({ scope: "final", academic_year: Number(selectedYearId), school_class: Number(selectedClassId), division: selectedDivFilter, template: resultTemplate as ResultTemplateId });
         setResultsData((current) => current.map((row) => row.is_published ? { ...row, report_template: resultTemplate as ResultTemplateId } : row));
@@ -737,9 +787,13 @@ export default function PublishedResultsPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Published exam:</label>
               <Select value={selectedExamId} onValueChange={(value) => { if (value) setSelectedExamId(value); }}>
-                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold"><SelectValue placeholder="Select exam" /></SelectTrigger>
+                <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-semibold">
+                  <SelectValue placeholder="Select exam">
+                    {selectedExamId === "FINAL" ? "Final Annual Result" : examTermGroups.find((group) => group.id === selectedExamId)?.label || "Select exam"}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  {classExams.map((exam: any) => <SelectItem key={exam.id} value={String(exam.id)}>{exam.title}{exam.subject_name ? ` — ${exam.subject_name}` : ""}</SelectItem>)}
+                  {examTermGroups.map((group) => <SelectItem key={group.id} value={group.id}>{group.label}</SelectItem>)}
                   {finalAvailable && resultsData.length > 0 && <SelectItem value="FINAL">Final Annual Result</SelectItem>}
                 </SelectContent>
               </Select>
@@ -758,30 +812,30 @@ export default function PublishedResultsPage() {
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4">
-            <span className="text-xs font-bold text-muted-foreground uppercase">Published Students</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-zinc-100 mt-1">{examMode ? displayResults.length : stats.count}</div>
+          <CardContent className="p-3 sm:p-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase sm:text-xs">Published Students</span>
+            <div className="text-xl font-black text-slate-900 dark:text-zinc-100 mt-1 sm:text-2xl">{examMode ? displayResults.length : stats.count}</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4">
-            <span className="text-xs font-bold text-muted-foreground uppercase">Class Average</span>
-            <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{examMode ? (displayResults.length ? (displayResults.reduce((sum, r) => sum + Number(r.total_percentage), 0) / displayResults.length).toFixed(2) : "0.00") : stats.avg}%</div>
+          <CardContent className="p-3 sm:p-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase sm:text-xs">Class Average</span>
+            <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1 sm:text-2xl">{examMode ? (displayResults.length ? (displayResults.reduce((sum, r) => sum + Number(r.total_percentage), 0) / displayResults.length).toFixed(2) : "0.00") : stats.avg}%</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4">
-            <span className="text-xs font-bold text-muted-foreground uppercase">Highest Score</span>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{examMode ? (displayResults.length ? Math.max(...displayResults.map((r) => Number(r.total_percentage))).toFixed(2) : "0.00") : stats.highest}%</div>
+          <CardContent className="p-3 sm:p-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase sm:text-xs">Highest Score</span>
+            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 sm:text-2xl">{examMode ? (displayResults.length ? Math.max(...displayResults.map((r) => Number(r.total_percentage))).toFixed(2) : "0.00") : stats.highest}%</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardContent className="p-4">
-            <span className="text-xs font-bold text-muted-foreground uppercase">Passing Rate</span>
-            <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{examMode ? `${displayResults.length ? Math.round(displayResults.filter((r) => r.grade !== "F").length * 100 / displayResults.length) : 0}%` : stats.passRate}</div>
+          <CardContent className="p-3 sm:p-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase sm:text-xs">Passing Rate</span>
+            <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1 sm:text-2xl">{examMode ? `${displayResults.length ? Math.round(displayResults.filter((r) => r.grade !== "F").length * 100 / displayResults.length) : 0}%` : stats.passRate}</div>
           </CardContent>
         </Card>
       </div>
@@ -930,10 +984,13 @@ export default function PublishedResultsPage() {
       <Dialog open={!!selectedStudentForCard} onOpenChange={(open) => { if (!open) setSelectedStudentForCard(null); }}>
         <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-slate-50 p-0 sm:left-1/2 sm:top-1/2 sm:h-[92dvh] sm:w-[94vw] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
-            {selectedStudentForCard && <ResultCardPreview
+            {selectedStudentForCard && !modalCardData && <div className="mx-auto flex min-h-64 max-w-xl items-center justify-center text-center text-base font-semibold text-slate-600">Preparing marksheet…</div>}
+            {selectedStudentForCard && modalCardData?.loading && <div className="mx-auto flex min-h-64 max-w-xl items-center justify-center text-center text-base font-semibold text-slate-600">Loading all published subject marks for this term…</div>}
+            {selectedStudentForCard && modalCardData?.error && <div role="alert" className="mx-auto max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-5 text-center text-sm font-semibold text-rose-800">{modalCardData.error}</div>}
+            {selectedStudentForCard && modalCardData && !modalCardData.loading && !modalCardData.error && <ResultCardPreview
               title={modalCardData?.title || (examMode ? examPreview?.exam_title || "Exam Result" : "Final Examination")}
               template={resultTemplate as ResultTemplateId}
-              school={{ name: schoolBrand.name, logo: schoolBrand.logo, address: schoolBrand.address, phone: schoolBrand.phone, email: schoolBrand.email, academicYear: currentYearObj?.name || (currentYearObj?.start_year ? `${currentYearObj.start_year} - ${currentYearObj.end_year}` : undefined) }}
+              school={{ name: schoolBrand.name, shortName: schoolBrand.shortName, logo: schoolBrand.logo, tagline: schoolBrand.tagline, address: schoolBrand.address, phone: schoolBrand.phone, email: schoolBrand.email, establishmentYear: schoolBrand.establishmentYear, boardAffiliation: schoolBrand.boardAffiliation, schoolCode: schoolBrand.schoolCode, udiseCode: schoolBrand.udiseCode, principalName: schoolBrand.principalName, teacherName: schoolBrand.teacherName, principalSignature: schoolBrand.principalSignature, teacherSignature: schoolBrand.teacherSignature, stamp: schoolBrand.stamp, academicYear: currentYearObj?.name || (currentYearObj?.start_year ? `${currentYearObj.start_year} - ${currentYearObj.end_year}` : undefined) }}
               student={{ id: selectedStudentForCard.student || selectedStudentForCard.student_id || selectedStudentForCard.id, name: selectedStudentForCard.student_name, rollNumber: selectedStudentForCard.roll_no, admissionNumber: selectedStudentForCard.gr_no, className: [currentClassObj?.school_class, selectedStudentForCard.division && selectedStudentForCard.division !== "ALL" ? selectedStudentForCard.division : selectedDivFilter !== "ALL" ? selectedDivFilter : ""].filter(Boolean).join(" - "), photo: selectedStudentForCard.photo || selectedStudentForCard.profile_photo }}
               subjects={modalCardData?.subjects || (examMode ? [{ subject: examPreview?.subject_name || examPreview?.exam_title || "Exam", maximum: selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0, obtained: selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0, grade: selectedStudentForCard.grade, remarks: selectedStudentForCard.remarks, absent: selectedStudentForCard.is_absent }] : (selectedStudentForCard.component_breakdown?.components || []).map((component: any) => ({ subject: component.name, maximum: `${component.weightage_pct}% weight`, obtained: `${component.score_pct}%`, remarks: component.details })))}
               totals={modalCardData?.totals || { maximum: examMode ? selectedStudentForCard.max_marks ?? examPreview?.max_marks ?? 0 : "100%", obtained: examMode ? selectedStudentForCard.is_absent ? "Absent" : selectedStudentForCard.marks_obtained ?? 0 : `${Number(selectedStudentForCard.total_percentage || 0).toFixed(2)}%`, percentage: Number(selectedStudentForCard.total_percentage || 0).toFixed(2), grade: selectedStudentForCard.grade }}
@@ -944,11 +1001,11 @@ export default function PublishedResultsPage() {
             <Button variant="outline" onClick={() => setSelectedStudentForCard(null)} className="rounded-xl">Cancel</Button>
             <Button
               onClick={handleDownloadPDF}
-              disabled={isDownloadingPDF}
+              disabled={isDownloadingPDF || !modalCardData || modalCardData.loading || !!modalCardData.error}
               className="gap-2 rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700 shadow-md shadow-blue-500/20"
             >
               {isDownloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {isDownloadingPDF ? "Downloading..." : "Download PDF"}
+              {isDownloadingPDF ? "Downloading..." : modalCardData?.loading ? "Loading subjects..." : "Download PDF"}
             </Button>
           </DialogFooter>
         </DialogContent>

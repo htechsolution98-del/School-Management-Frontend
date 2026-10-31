@@ -1,8 +1,11 @@
 "use client";
 
 import { StudentEmptyState } from "@/components/student/student-empty-state";
+import { MobileSelectDrawer, MobileSelectTrigger } from "@/components/ui/mobile-select-drawer";
+import { toast } from "sonner";
+import { downloadResultPreviewPDF } from "@/lib/result-dom-pdf";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Wallet,
   CreditCard,
@@ -510,6 +513,63 @@ function ReceiptModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+function PaymentHistoryReceiptPreview({ payment, payments, onClose }: { payment: Payment; payments: Payment[]; onClose: () => void }) {
+  const cardRef = useRef<HTMLElement>(null);
+  const [downloading, setDownloading] = useState(false);
+  const receiptItems = payment.receipt_number
+    ? payments.filter((item) => item.receipt_number === payment.receipt_number)
+    : [payment];
+  const receiptNumber = payment.receipt_number || `PAY-${payment.id}`;
+  const paidAt = payment.payment_date || payment.date || payment.created_at || "";
+  const dateLabel = paidAt ? new Date(paidAt).toLocaleString("en-IN", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const totalPaid = receiptItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const downloadReceipt = async () => {
+    if (!cardRef.current) return;
+    setDownloading(true);
+    try {
+      await downloadResultPreviewPDF(cardRef.current, `receipt-${receiptNumber.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+    } catch (error) {
+      console.error("Unable to download payment receipt", error);
+      toast.error("Could not download this payment receipt. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm sm:items-center sm:p-4">
+    <section className="flex h-[96dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:h-[92dvh] sm:max-w-4xl sm:rounded-3xl">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
+        <div><h2 className="text-base font-bold text-slate-900 sm:text-lg">Payment Receipt</h2><p className="text-xs text-slate-500">Receipt {receiptNumber}</p></div>
+        <button type="button" onClick={onClose} aria-label="Close receipt preview" className="rounded-full p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-auto bg-slate-100 p-3 sm:p-6">
+        <article ref={cardRef} className="mx-auto flex min-h-[900px] w-full max-w-[740px] flex-col border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:min-h-[1000px] sm:p-8" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+          <header className="flex items-center gap-4 border-b-[3px] border-blue-800 pb-5">
+            {payment.school_logo ? <img src={payment.school_logo} alt="School logo" className="h-16 w-16 shrink-0 object-contain sm:h-24 sm:w-24" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-50 text-2xl font-bold text-blue-800 sm:h-24 sm:w-24">{(payment.school_name || "S").charAt(0)}</div>}
+            <div className="min-w-0 flex-1 text-center"><h1 className="break-words text-lg font-black uppercase text-blue-950 sm:text-2xl">{payment.school_name || "School"}</h1>{payment.school_address && <p className="mt-1 text-xs text-slate-600 sm:text-sm">{payment.school_address}</p>}{payment.school_phone && <p className="text-xs text-slate-600">{payment.school_phone}</p>}</div>
+            <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-center text-blue-900 sm:px-4"><span className="block text-[10px] uppercase tracking-wide">Payment Status</span><strong className={`mt-1 block text-xs sm:text-sm ${payment.is_verified ? "text-emerald-700" : "text-amber-700"}`}>{payment.is_verified ? "VERIFIED" : "PENDING"}</strong></div>
+          </header>
+
+          <div className="my-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-center sm:my-7"><h2 className="text-lg font-black uppercase tracking-wide text-blue-950 sm:text-2xl">Fee Payment Receipt</h2><p className="mt-1 text-xs font-bold uppercase tracking-[0.28em] text-blue-800">Official Payment Record</p></div>
+
+          <section className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-xl border border-slate-200 p-4 sm:gap-x-8 sm:p-6">
+            {[["Student Name", payment.student_name], ["GR Number", payment.student_gr_no], ["Class / Division", [payment.student_class, payment.student_division].filter(Boolean).join(" / ")], ["Academic Year", payment.academic_year_name], ["Receipt Number", receiptNumber], ["Payment Date", dateLabel]].map(([label, value]) => <div key={label}><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">{label}</p><p className="mt-1 break-words text-xs font-bold text-slate-900 sm:text-sm">{value || "—"}</p></div>)}
+          </section>
+
+          <section className="my-5 overflow-hidden rounded-xl border border-slate-200 sm:my-7"><table className="w-full border-collapse"><thead><tr className="bg-blue-950 text-white"><th className="px-3 py-3 text-left text-xs sm:px-4 sm:text-sm">Fee Description</th><th className="px-3 py-3 text-left text-xs sm:px-4 sm:text-sm">Billing Period</th><th className="px-3 py-3 text-right text-xs sm:px-4 sm:text-sm">Amount</th></tr></thead><tbody>{receiptItems.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="px-3 py-3 text-xs sm:px-4 sm:text-sm">{item.feetype_name || item.fee_description || "School Fee"}</td><td className="px-3 py-3 text-xs sm:px-4 sm:text-sm">{item.fee_billing_period || "—"}</td><td className="px-3 py-3 text-right text-xs font-semibold sm:px-4 sm:text-sm">{formatINR(item.amount)}</td></tr>)}</tbody></table></section>
+
+          <section className="grid grid-cols-2 gap-3 sm:gap-4"><div className="rounded-xl border border-blue-200 bg-blue-50 p-4"><span className="text-[10px] font-bold uppercase text-blue-700 sm:text-xs">Payment Mode</span><strong className="mt-1 block text-sm uppercase text-blue-950 sm:text-lg">{String(payment.payment_mode || "—").replaceAll("_", " ")}</strong></div><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><span className="text-[10px] font-bold uppercase text-emerald-700 sm:text-xs">Total Paid</span><strong className="mt-1 block text-sm text-emerald-900 sm:text-lg">{formatINR(totalPaid)}</strong></div></section>
+          <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-bold text-slate-800 sm:text-sm">Transaction Details</p><p className="mt-2 break-all text-xs text-slate-600">Transaction ID: {payment.transaction_id || payment.razorpay_payment_id || "—"}</p><p className="mt-1 text-xs text-slate-600">Note: {payment.note || "—"}</p></section>
+          <footer className="mt-auto grid grid-cols-2 gap-8 px-3 pb-8 pt-16 text-center text-xs font-bold text-slate-700"><div className="border-t border-slate-500 pt-2">Parent / Guardian</div><div className="border-t border-slate-500 pt-2">Authorized Signatory</div></footer>
+          <p className="border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">This is a computer generated receipt. Please retain it for your records.</p>
+        </article>
+      </div>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white p-3 sm:px-6"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Close</button><button type="button" onClick={downloadReceipt} disabled={downloading} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{downloading ? "Preparing PDF…" : "Download PDF"}</button></footer>
+    </section>
+  </div>;
+}
+
 const MONTHS = [
   "January",
   "February",
@@ -540,10 +600,12 @@ export default function PayFeesPage() {
   const [selectedMonth, setSelectedMonth] = useState("All Months");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [searchFees, setSearchFees] = useState("");
+  const [mobileFilterDrawer, setMobileFilterDrawer] = useState<"month" | "status" | null>(null);
 
   // Pay modal
   const [payingFee, setPayingFee] = useState<MyStudentFee | null>(null);
   const [receiptFee, setReceiptFee] = useState<MyStudentFee | null>(null);
+  const [historyReceipt, setHistoryReceipt] = useState<Payment | null>(null);
 
   // History pagination
   const [historyPage, setHistoryPage] = useState(1);
@@ -682,8 +744,86 @@ export default function PayFeesPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadHistoryReceipt = async (payment: Payment) => {
+    try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+      const relatedPayments = payment.receipt_number
+        ? paymentHistory.filter((item) => item.receipt_number === payment.receipt_number)
+        : [payment];
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 16;
+      const paidAt = payment.payment_date || payment.date || payment.created_at || "";
+      const dateLabel = paidAt
+        ? new Date(paidAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "—";
+      const receiptNumber = payment.receipt_number || `PAY-${payment.id}`;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(25, 59, 115);
+      doc.text(payment.school_name || "School Fee Receipt", pageWidth / 2, 19, { align: "center" });
+      doc.setFontSize(12);
+      doc.text("PAYMENT RECEIPT", pageWidth / 2, 28, { align: "center" });
+      doc.setDrawColor(37, 99, 235);
+      doc.setLineWidth(0.6);
+      doc.line(margin, 33, pageWidth - margin, 33);
+
+      doc.setFontSize(10);
+      doc.setTextColor(35, 48, 70);
+      const leftInfo = [
+        ["Receipt No.", receiptNumber],
+        ["Student", payment.student_name || "—"],
+        ["GR No.", payment.student_gr_no || "—"],
+        ["Class", [payment.student_class, payment.student_division].filter(Boolean).join(" / ") || "—"],
+      ];
+      const rightInfo = [
+        ["Payment Date", dateLabel],
+        ["Payment Mode", String(payment.payment_mode || "—").replaceAll("_", " ").toUpperCase()],
+        ["Transaction ID", payment.transaction_id || payment.razorpay_payment_id || "—"],
+        ["Status", payment.is_verified ? "VERIFIED" : "PENDING VERIFICATION"],
+      ];
+      leftInfo.forEach(([label, value], index) => {
+        const y = 43 + index * 8;
+        doc.setFont("helvetica", "bold"); doc.text(`${label}:`, margin, y);
+        doc.setFont("helvetica", "normal"); doc.text(String(value), margin + 28, y, { maxWidth: 56 });
+      });
+      rightInfo.forEach(([label, value], index) => {
+        const y = 43 + index * 8;
+        doc.setFont("helvetica", "bold"); doc.text(`${label}:`, 108, y);
+        doc.setFont("helvetica", "normal"); doc.text(String(value), 140, y, { maxWidth: 54 });
+      });
+
+      autoTable(doc, {
+        startY: 80,
+        head: [["Fee Description", "Billing Period", "Amount"]],
+        body: relatedPayments.map((item) => [
+          item.feetype_name || item.fee_description || "School Fee",
+          item.fee_billing_period || "—",
+          formatINR(item.amount),
+        ]),
+        foot: [["Total Paid", "", formatINR(relatedPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0))]],
+        theme: "grid",
+        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
+        footStyles: { fillColor: [239, 246, 255], textColor: [25, 59, 115], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 3 },
+      });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text("Thank you for your payment.", pageWidth / 2, (doc as any).lastAutoTable.finalY + 12, { align: "center" });
+      doc.save(`receipt-${receiptNumber.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+    } catch (error) {
+      console.error("Unable to download payment receipt", error);
+      toast.error("Could not download this payment receipt. Please try again.");
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-32 sm:pb-8">
       {/* Error Banner */}
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-600 text-sm">
@@ -699,29 +839,29 @@ export default function PayFeesPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-4 sm:mb-6">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
             <div
               key={index}
-              className={`bg-white rounded-2xl border ${card.border} p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3 shadow-sm`}
+              className={`bg-white rounded-2xl border ${card.border} p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 shadow-sm min-w-0`}
             >
               <div
-                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${card.iconBg}`}
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shrink-0 ${card.iconBg}`}
               >
                 <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
               </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500 mb-0.5 sm:mb-1">{card.title}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] sm:text-sm text-gray-500 mb-0.5 sm:mb-1 truncate">{card.title}</p>
                 {loading ? (
                   <div className="h-7 sm:h-8 w-24 sm:w-28 bg-gray-100 animate-pulse rounded-lg" />
                 ) : (
-                  <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                  <p className="text-base sm:text-2xl font-bold text-gray-900 truncate">
                     {card.amount}
                   </p>
                 )}
-                <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">{card.description}</p>
+                <p className="hidden sm:block text-xs text-gray-400 mt-1">{card.description}</p>
               </div>
             </div>
           );
@@ -729,11 +869,16 @@ export default function PayFeesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6 flex flex-wrap gap-2 sm:gap-3 items-center shadow-sm">
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6 grid grid-cols-2 sm:flex gap-2 sm:gap-3 items-center shadow-sm">
+        <MobileSelectTrigger
+          valueLabel={selectedMonth}
+          onClick={() => setMobileFilterDrawer("month")}
+          className="w-full md:hidden"
+        />
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+          className="hidden md:block min-w-0 border border-gray-200 rounded-xl px-3 py-2 sm:px-4 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
         >
           <option>All Months</option>
           {MONTHS.map((m) => (
@@ -741,10 +886,15 @@ export default function PayFeesPage() {
           ))}
         </select>
 
+        <MobileSelectTrigger
+          valueLabel={selectedStatus}
+          onClick={() => setMobileFilterDrawer("status")}
+          className="w-full md:hidden"
+        />
         <select
           value={selectedStatus}
           onChange={(e) => setSelectedStatus(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+          className="hidden md:block min-w-0 border border-gray-200 rounded-xl px-3 py-2 sm:px-4 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
         >
           <option>All Status</option>
           <option>Paid</option>
@@ -753,20 +903,20 @@ export default function PayFeesPage() {
           <option>Cancelled</option>
         </select>
 
-        <div className="flex-1 relative min-w-[140px] sm:min-w-[180px]">
+        <div className="col-span-2 sm:flex-1 relative min-w-0">
           <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <input
             type="text"
             placeholder="Search fees..."
             value={searchFees}
             onChange={(e) => setSearchFees(e.target.value)}
-            className="w-full pl-8 sm:pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full pl-8 sm:pl-9 pr-3 sm:pr-4 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>
 
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ml-auto"
+          className="col-span-2 sm:ml-auto flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto"
         >
           <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Export
@@ -959,8 +1109,8 @@ export default function PayFeesPage() {
       </div>
 
       {/* Payment History */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 mb-6 min-w-0">
+        <div className="flex items-center justify-between mb-4 gap-2">
           <h2 className="text-xl font-bold text-gray-900">Payment History</h2>
           <button className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 px-4 py-1.5 rounded-lg font-medium">
             View All
@@ -975,26 +1125,63 @@ export default function PayFeesPage() {
             description="Fee receipts and successful transactions will appear here once settled."
           />
         ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full min-w-[620px] text-sm">
+          <>
+          <div className="space-y-2 sm:hidden">
+            {pagedHistory.map((payment, index) => {
+              const paidAt = new Date(String((payment as any).date ?? payment.created_at ?? ""));
+              return <article key={`${payment.receipt_number || "payment"}-${index}`} className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-slate-500">Date</p>
+                    <p className="text-xs font-semibold text-slate-800">{paidAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                    <p className="text-[10px] text-slate-400">{paidAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[11px] font-medium text-slate-500">Amount</p>
+                    <p className="text-sm font-bold text-slate-900">{formatINR(payment.amount)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2">
+                  <div className="min-w-0"><p className="text-[10px] text-slate-400">Payment Mode</p><div className="truncate"><PaymentModeIcon mode={(payment.payment_mode ?? "online") as PaymentMode} /></div></div>
+                  <div className="min-w-0"><p className="text-[10px] text-slate-400">Receipt No.</p><p className="truncate text-xs font-medium text-slate-700">{payment.receipt_number || "—"}</p></div>
+                  <div className="min-w-0"><p className="text-[10px] text-slate-400">Status</p><span className={`inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${payment.is_verified ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{payment.is_verified ? "Verified" : "Pending"}</span></div>
+                  <div className="col-span-2 pt-1">
+                    <button type="button" onClick={() => setHistoryReceipt(payment)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+                      <Download className="h-3.5 w-3.5" /> View / Download Receipt
+                    </button>
+                  </div>
+                </div>
+              </article>;
+            })}
+          </div>
+          <div className="hidden sm:block w-full min-w-0">
+            <table className="w-full table-fixed text-xs sm:text-sm">
+              <colgroup>
+                <col className="w-[44%] sm:w-auto" />
+                <col className="w-[25%] sm:w-auto" />
+                <col className="w-[31%] sm:w-auto" />
+                <col className="hidden sm:table-column" />
+                <col className="hidden sm:table-column" />
+                <col className="hidden sm:table-column" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left text-gray-500 font-medium py-3 pr-4">
+                  <th className="text-left text-gray-500 font-medium py-2 sm:py-3 pr-1 sm:pr-4">
                     Date
                   </th>
-                  <th className="text-left text-gray-500 font-medium py-3 pr-4">
+                  <th className="text-left text-gray-500 font-medium py-2 sm:py-3 pr-1 sm:pr-4">
                     Amount
                   </th>
-                  <th className="text-left text-gray-500 font-medium py-3 pr-4">
+                  <th className="text-left text-gray-500 font-medium py-2 sm:py-3 pr-1 sm:pr-4">
                     Payment Mode
                   </th>
-                  <th className="text-left text-gray-500 font-medium py-3 pr-4">
+                  <th className="hidden sm:table-cell text-left text-gray-500 font-medium py-3 pr-4">
                     Receipt No.
                   </th>
-                  <th className="text-left text-gray-500 font-medium py-3 pr-4">
+                  <th className="hidden sm:table-cell text-left text-gray-500 font-medium py-3 pr-4">
                     Status
                   </th>
-                  <th className="text-left text-gray-500 font-medium py-3">
+                  <th className="hidden sm:table-cell text-left text-gray-500 font-medium py-3">
                     Action
                   </th>
                 </tr>
@@ -1005,8 +1192,8 @@ export default function PayFeesPage() {
                     key={index}
                     className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="py-3 pr-4 text-gray-700">
-                      {new Date(
+                    <td className="py-2 sm:py-3 pr-1 sm:pr-4 text-gray-700 align-middle">
+                      <span className="block truncate">{new Date(
                         String(
                           (payment as any).date ?? payment.created_at ?? "",
                         ),
@@ -1014,22 +1201,21 @@ export default function PayFeesPage() {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      })}</span>
+                      <span className="hidden sm:block text-[11px] text-gray-400">{new Date(String((payment as any).date ?? payment.created_at ?? "")).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
                     </td>
-                    <td className="py-3 pr-4 text-gray-800 font-medium">
+                    <td className="py-2 sm:py-3 pr-1 sm:pr-4 text-gray-800 font-medium whitespace-nowrap">
                       {formatINR(payment.amount)}
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="py-2 sm:py-3 pr-1 sm:pr-4 truncate">
                       <PaymentModeIcon
                         mode={(payment.payment_mode ?? "online") as PaymentMode}
                       />
                     </td>
-                    <td className="py-3 pr-4 text-gray-700">
+                    <td className="hidden sm:table-cell py-3 pr-4 text-gray-700">
                       {payment.receipt_number}
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="hidden sm:table-cell py-3 pr-4">
                       <span
                         className={`text-xs font-semibold px-3 py-1 rounded-full ${
                           payment.is_verified
@@ -1040,8 +1226,8 @@ export default function PayFeesPage() {
                         {payment.is_verified ? "Verified" : "Pending"}
                       </span>
                     </td>
-                    <td className="py-3">
-                      <button className="text-gray-400 hover:text-blue-600 transition-colors">
+                    <td className="hidden sm:table-cell py-3">
+                      <button type="button" aria-label="View payment receipt" onClick={() => setHistoryReceipt(payment)} className="text-gray-400 hover:text-blue-600 transition-colors">
                         <Download className="w-4 h-4" />
                       </button>
                     </td>
@@ -1050,17 +1236,18 @@ export default function PayFeesPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* Pagination */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-          <p className="text-sm text-gray-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs sm:text-sm text-gray-400">
             Showing{" "}
             {Math.min((historyPage - 1) * PAGE_SIZE + 1, paymentHistory.length)}
             –{Math.min(historyPage * PAGE_SIZE, paymentHistory.length)} of{" "}
             {paymentHistory.length} records
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
               disabled={historyPage === 1}
@@ -1124,6 +1311,18 @@ export default function PayFeesPage() {
         </div>
       </div>
 
+      <MobileSelectDrawer
+        isOpen={mobileFilterDrawer !== null}
+        onClose={() => setMobileFilterDrawer(null)}
+        title={mobileFilterDrawer === "month" ? "Filter by month" : "Filter by status"}
+        subtitle="Choose how to filter your fees"
+        options={mobileFilterDrawer === "month"
+          ? [{ label: "All Months", value: "All Months" }, ...MONTHS.map((month) => ({ label: month, value: month }))]
+          : ["All Status", "Paid", "Pending", "Partial", "Cancelled"].map((status) => ({ label: status, value: status }))}
+        selectedValue={mobileFilterDrawer === "month" ? selectedMonth : selectedStatus}
+        onSelect={(value) => mobileFilterDrawer === "month" ? setSelectedMonth(String(value)) : setSelectedStatus(String(value))}
+      />
+
       {/* Partial Pay Modal */}
       {payingFee && (
         <PartialPayModal
@@ -1139,6 +1338,13 @@ export default function PayFeesPage() {
       {/* Receipt Modal */}
       {receiptFee && (
         <ReceiptModal fee={receiptFee} onClose={() => setReceiptFee(null)} />
+      )}
+      {historyReceipt && (
+        <PaymentHistoryReceiptPreview
+          payment={historyReceipt}
+          payments={paymentHistory}
+          onClose={() => setHistoryReceipt(null)}
+        />
       )}
     </div>
   );

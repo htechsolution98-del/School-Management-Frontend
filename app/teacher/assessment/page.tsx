@@ -1,5 +1,7 @@
 "use client";
 
+
+import ResponsiveSelect from "@/components/ui/responsive-select";
 import { useEffect, useState, useMemo } from "react";
 import {
   GraduationCap,
@@ -542,7 +544,7 @@ export default function TeacherAssessmentPage() {
           {/* Year Switcher Pill */}
           {academicYears.length > 1 ? (
             <div className="relative">
-              <select
+              <ResponsiveSelect
                 value={selectedYear?.id || ""}
                 onChange={(e) => {
                   const yr = academicYears.find((y) => String(y.id) === e.target.value);
@@ -560,7 +562,7 @@ export default function TeacherAssessmentPage() {
                     📅 {y.name} {y.is_active ? "(Active)" : ""}
                   </option>
                 ))}
-              </select>
+              </ResponsiveSelect>
             </div>
           ) : selectedYear ? (
             <span className="text-[11px] font-bold text-[#2563EB] bg-blue-50 border border-blue-200 rounded-xl px-2.5 py-1 flex items-center gap-1">
@@ -827,7 +829,7 @@ export default function TeacherAssessmentPage() {
               {/* Empty state when teacher has no assignments */}
               {uniqueClasses.length === 0 && !isLoading && (
                 <div className="py-16 text-center text-slate-500 text-sm bg-white rounded-2xl border border-dashed border-gray-200">
-                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <img src="/images/empty-folder.png" alt="No classes assigned" className="mx-auto mb-2 h-20 w-20 object-contain" />
                   <p className="font-bold text-slate-700">No classes assigned</p>
                   <p className="text-xs text-slate-400 mt-1">
                     You have not been assigned to any classes for teacher assessment.
@@ -935,7 +937,7 @@ export default function TeacherAssessmentPage() {
 
                 {filteredClassSubjects.length === 0 && (
                   <div className="col-span-full py-12 text-center text-slate-500 text-xs bg-white rounded-2xl border border-dashed border-gray-200 p-6 space-y-3">
-                    <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                    <img src="/images/empty-folder.png" alt="No assigned subjects" className="mx-auto h-20 w-20 object-contain" />
                     <div>
                       <p className="font-bold text-slate-700 text-sm">No Assigned Subjects Found</p>
                       <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -1200,8 +1202,9 @@ export default function TeacherAssessmentPage() {
                 })}
 
                 {filteredStudents.length === 0 && (
-                  <div className="py-10 text-center text-slate-500 text-xs bg-white rounded-xl border border-dashed border-gray-200">
-                    No students found matching your search.
+                  <div className="py-6 text-center text-slate-500 text-xs bg-white rounded-xl border border-dashed border-gray-200">
+                    <img src="/images/empty-folder.png" alt="No students found" className="mx-auto mb-2 h-20 w-20 object-contain" />
+                    <p>No students found matching your search.</p>
                   </div>
                 )}
               </div>
