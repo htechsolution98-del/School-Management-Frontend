@@ -254,7 +254,7 @@ export default function SchoolManager() {
           <SchoolLogo src={school.logo} name={camelCaseText(school.name)} />
           <div className="min-w-0">
             <p className="max-w-64 font-semibold text-slate-800">{camelCaseText(school.name) || "Unnamed school"}</p>
-            <p className="mt-1 text-xs text-slate-500">{school.code || "No code"}{school.index_no ? ` · ${school.index_no}` : ""}</p>
+            <p className="mt-1 text-xs text-slate-500">{school.code ? `Code: ${school.code}` : "No code"}{school.index_no ? ` · ${school.index_no}` : ""}</p>
           </div>
         </div>
       ),

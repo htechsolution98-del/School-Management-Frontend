@@ -29,6 +29,9 @@ export interface CurrentUserProfile {
   id: number;
   username: string;
   name: string;
+  short_display_name?: string | null;
+  school_short_name?: string | null;
+  school_full_name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email: string | null;
@@ -44,6 +47,8 @@ export interface CurrentUserProfile {
   school: {
     id: number;
     name: string;
+    full_name?: string | null;
+    short_name?: string | null;
     slug: string | null;
     logo?: string | null;
     address?: string | null;
@@ -111,6 +116,8 @@ export interface Department {
   school: number;
   created_at: string;
   updated_at: string;
+  staff_count?: number;
+  total_staff?: number;
 }
 
 export interface Staff {
