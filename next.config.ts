@@ -2,9 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  // Keep Next's build worker count low on memory-limited environments.
+
   experimental: {
-    cpus: 1,
+    // Tree-shake heavy icon and component packages across all 213 routes
+    optimizePackageImports: [
+      "lucide-react",
+      "@hugeicons/react",
+      "react-icons",
+      "@mui/material",
+      "date-fns",
+      "framer-motion",
+    ],
   },
 };
 
