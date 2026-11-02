@@ -194,8 +194,15 @@
   will-change: transform;
 }
 
-.pause-on-hover:hover {
+.pause-on-hover:hover,
+.pause-on-hover:active,
+.pause-on-hover:focus-within {
   animation-play-state: paused;
+}
+
+.animate-marquee-right-cards {
+  animation: marquee-right 34s linear infinite;
+  will-change: transform;
 }
 
 /* Custom premium scrollbar styling */

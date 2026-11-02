@@ -729,7 +729,11 @@ export function
 
   const currentUserName = isTrusteeRole && trusteeDisplayName
     ? trusteeDisplayName
-    : (profile?.name || userName || "Administrator");
+    : (profile?.staff_profile?.name ||
+       (profile?.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "") ||
+       profile?.name ||
+       userName ||
+       "Administrator");
 
   const computeInitials = (str: string) => {
     const parts = str.trim().split(/\s+/).filter(Boolean);
@@ -1117,8 +1121,8 @@ export function
         {/* Content Body: Snug pb-16 on mobile clears the 64px floating glass bar without creating excessive empty space */}
         <main
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-28 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
-            (noPadding || roleTitle === "Teacher") ? "p-0 pb-32 lg:pb-0" : "px-2 sm:px-6 py-2.5 sm:py-5 pb-32 lg:pb-5",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full min-w-0 no-scrollbar bg-[#F5F7FC] pb-20 lg:pb-0 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-transparent print:max-w-none print:w-auto",
+            (noPadding || roleTitle === "Teacher") ? "p-0 pb-20 lg:pb-0" : "px-2 sm:px-6 py-2.5 sm:py-5 pb-20 lg:pb-5",
             mainClassName
           )}
         >

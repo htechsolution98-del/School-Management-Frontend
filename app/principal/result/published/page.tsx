@@ -258,7 +258,7 @@ export default function PublishedResultsPage() {
         phone: branding?.phone_numbers || school.phone || brand.phone,
         email: branding?.official_emails || school.email || brand.email,
         establishmentYear: branding?.establishment_year || brand.establishmentYear,
-        boardAffiliation: branding?.board_affiliation || brand.boardAffiliation,
+        boardAffiliation: (Array.isArray(branding?.board_affiliation) ? branding.board_affiliation.join(", ") : branding?.board_affiliation) || brand.boardAffiliation,
         schoolCode: branding?.school_code || school.index_no || brand.schoolCode,
         udiseCode: branding?.udise_code || school.udise_code || brand.udiseCode,
         principalSignature: branding?.principal_signature_url || brand.principalSignature,
