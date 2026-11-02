@@ -588,7 +588,7 @@ export default function EnterMarksPage() {
   const maxMarks = selectedExam?.max_marks || 100;
 
   return (
-    <div className="space-y-4 pb-3 sm:pb-5 lg:pb-10 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
+    <div className="space-y-4 pb-3 sm:pb-6 lg:pb-8 px-3 sm:px-6 py-3 sm:py-5 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden font-sans">
       {/* ── Top Compact Breadcrumb Header Bar ── */}
       <div className="bg-white dark:bg-zinc-900 px-4 py-3 sm:py-3.5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -1413,22 +1413,23 @@ export default function EnterMarksPage() {
               </div>
 
               {/* ── STICKY BOTTOM ACTION BAR (Save & Submit) ── */}
-              <div className="sticky bottom-16 lg:bottom-4 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3 rounded-2xl border border-gray-200 shadow-lg flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-bold text-slate-800">Entered:</span>
-                  <span className="font-extrabold text-[#2563EB]">
+              <div className="sticky bottom-16 lg:bottom-4 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-2 sm:p-3 rounded-2xl border border-gray-200/90 shadow-xl flex items-center justify-between gap-1 sm:gap-3 max-w-full min-w-0">
+                <div className="flex items-center gap-1 text-xs shrink-0">
+                  <span className="font-bold text-slate-700 hidden sm:inline">Entered:</span>
+                  <span className="font-extrabold text-[#2563EB] bg-blue-50 px-1.5 sm:px-2 py-0.5 rounded-lg border border-blue-100 text-[11px] sm:text-xs whitespace-nowrap">
                     {entryStats.entered + entryStats.absent} / {entryStats.total}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 shrink min-w-0 justify-end">
                   {hasExistingMarks && !isEditMode && !isSubmittedToClassTeacher && !lockedByOtherTeacher && (
                     <Button
                       variant="outline"
                       onClick={() => setIsEditMode(true)}
-                      className="rounded-xl text-xs font-bold h-9 px-3 border-gray-200"
+                      className="rounded-xl text-[11px] sm:text-xs font-bold h-8 sm:h-9 px-2 sm:px-3 border-gray-200 shrink-0"
                     >
-                      Edit Marks
+                      <span>Edit</span>
+                      <span className="hidden sm:inline">&nbsp;Marks</span>
                     </Button>
                   )}
 
@@ -1442,10 +1443,11 @@ export default function EnterMarksPage() {
                       (!!lockedByOtherTeacher && !isClassTeacher)
                     }
                     variant="outline"
-                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-3.5 border-blue-200 text-[#2563EB] hover:bg-blue-50"
+                    className="rounded-xl text-[11px] sm:text-xs gap-1 sm:gap-1.5 font-bold h-8 sm:h-9 px-2 sm:px-3.5 border-blue-200 text-[#2563EB] hover:bg-blue-50 shrink-0"
                   >
-                    {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                    <span>Save Draft</span>
+                    {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
+                    <span>Save</span>
+                    <span className="hidden sm:inline">&nbsp;Draft</span>
                   </Button>
 
                   <Button
@@ -1457,14 +1459,15 @@ export default function EnterMarksPage() {
                       isSubmittedToClassTeacher ||
                       (!!lockedByOtherTeacher && !isClassTeacher)
                     }
-                    className="rounded-xl text-xs gap-1.5 font-bold h-9 sm:h-10 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-blue-500/20"
+                    className="rounded-xl text-[11px] sm:text-xs gap-1 sm:gap-1.5 font-bold h-8 sm:h-9 px-2.5 sm:px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-blue-500/20 shrink-0"
                   >
                     {isSubmitting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <GraduationCap className="h-3.5 w-3.5" />
+                      <GraduationCap className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     )}
-                    <span>{isClassTeacher ? "Submit Marks" : "Submit to Class Teacher"}</span>
+                    <span>Submit</span>
+                    <span className="hidden md:inline">{isClassTeacher ? " Marks" : " to Class Teacher"}</span>
                   </Button>
                 </div>
               </div>

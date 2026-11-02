@@ -35,6 +35,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Quote,
+  X,
 } from "lucide-react";
 import { getPublishedFormLink } from "@/lib/principal";
 
@@ -86,6 +87,7 @@ const getIcon = (name: string, className?: string) => {
 
 export default function LandingPage() {
   const [formLink, setFormLink] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeFeatureIdx, setActiveFeatureIdx] = useState<number | null>(null);
   const [expandedCardIdxs, setExpandedCardIdxs] = useState<number[]>([]);
 
@@ -409,6 +411,17 @@ export default function LandingPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isMobileMenuOpen]);
+
   const handleGetStarted = () => {
     window.location.href = "/signup";
   };
@@ -418,27 +431,31 @@ export default function LandingPage() {
 
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-gradient-to-r from-[#1D496C]/95 via-[#285E89]/95 to-[#1D496C]/95 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-gradient-to-r">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative flex items-center">
-                <div className="flex h-14 w-auto items-center justify-center rounded-xl bg-white p-1.5 shadow-md border border-white/10">
-                  <img src="/logo.png" alt="VidyaSanchalan Logo" className="h-10 w-auto max-w-[160px] object-contain" />
+        <div className="container mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-2 sm:gap-4">
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink min-w-0">
+              <div className="relative flex items-center shrink-0">
+                <div className="flex h-10 sm:h-12 w-auto items-center justify-center rounded-xl bg-white p-1.5 shadow-md border border-white/15 group-hover:scale-105 transition-transform duration-300">
+                  <img src="/logo.png" alt="VidyaSanchalan Logo" className="h-7 sm:h-8.5 w-auto max-w-[120px] sm:max-w-[160px] object-contain" />
                 </div>
-                <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#FFA600] ring-2 ring-white"></div>
+                <div className="absolute -right-0.5 -top-0.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-[#FFA600] ring-2 ring-[#1D496C]"></div>
               </div>
-              <div>
-                <span className="text-xl font-black tracking-tight"><span className="text-white">Vidya</span><span className="text-[#FFA600]">Sanchalan</span></span>
-                <p className="text-[10px] text-white/70 font-bold uppercase tracking-wider mt-0.5">School Management</p>
+              <div className="min-w-0">
+                <span className="text-sm sm:text-xl font-black tracking-tight block leading-tight truncate">
+                  <span className="text-white">Vidya</span><span className="text-[#FFA600]">Sanchalan</span>
+                </span>
+                <p className="text-[8px] sm:text-[10px] text-white/75 font-bold uppercase tracking-wider mt-0.5 truncate hidden min-[360px]:block">School Management</p>
               </div>
-            </div>
+            </Link>
 
             <nav className="hidden md:flex items-center gap-8">
               {[
                 { name: "Home", href: "/" },
-                { name: "Features", href: "/features" },
+                { name: "Features", href: "#features" },
                 { name: "Modules", href: "/modules" },
-                { name: "Contact Us", href: "/contact" },
+                { name: "About", href: "#about" },
+                { name: "Why Us", href: "#why-choose-us" },
+                { name: "Contact", href: "/contact" },
               ].map((item) => (
                 <Link
                   key={item.name}
@@ -451,46 +468,178 @@ export default function LandingPage() {
               ))}
             </nav>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden md:inline-flex rounded-lg text-white/90 hover:bg-white/10 hover:text-white"
+                className="hidden md:inline-flex h-9 rounded-xl text-white/90 hover:bg-white/10 hover:text-white font-semibold text-xs sm:text-sm"
                 asChild
               >
                 <Link href="/login">Sign in</Link>
               </Button>
               <Button
                 size="sm"
-                className="rounded-lg bg-[#FFA600] text-white shadow-md hover:bg-[#ED6708] hover:scale-105 transition-all duration-300"
+                className="h-9 rounded-xl bg-[#FFA600] text-white shadow-md hover:bg-[#ED6708] hover:scale-105 transition-all duration-300 font-bold text-xs sm:text-sm px-2.5 sm:px-4 inline-flex items-center justify-center gap-1 shrink-0"
                 onClick={handleGetStarted}
               >
-                Get Started
-                <ArrowRight className="ml-2 h-3 w-3" />
+                <span>Get Started</span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
               </Button>
-              <Button variant="outline" size="icon" className="md:hidden rounded-lg border-white/20 text-white hover:bg-white/10">
-                <Menu className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden h-9 w-9 rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 inline-flex items-center justify-center shrink-0 transition-colors"
+                aria-label="Open mobile navigation menu"
+              >
+                <Menu className="h-5 w-5" />
               </Button>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Mobile Drawer / Sidebar */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+            />
+
+            {/* Sidebar Content */}
+            <motion.aside
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 240 }}
+              className="absolute right-0 top-0 bottom-0 w-[84%] max-w-xs bg-gradient-to-b from-[#1D496C] via-[#285E89] to-[#15354F] text-white p-5 shadow-2xl flex flex-col justify-between overflow-y-auto"
+            >
+              <div>
+                {/* Drawer Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-white/15">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-10 w-auto items-center justify-center rounded-xl bg-white p-1.5 shadow-md">
+                      <img src="/logo.png" alt="VidyaSanchalan" className="h-7 w-auto object-contain" />
+                    </div>
+                    <div>
+                      <span className="text-base font-black tracking-tight block leading-tight">
+                        <span className="text-white">Vidya</span><span className="text-[#FFA600]">Sanchalan</span>
+                      </span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">School ERP</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="rounded-xl text-white/80 hover:text-white hover:bg-white/15 h-8 w-8"
+                    aria-label="Close menu"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+
+                {/* Navigation Links */}
+                <nav className="py-4 space-y-1">
+                  {[
+                    { name: "Home", href: "/", icon: "Sparkles" },
+                    { name: "Features", href: "#features", icon: "BookOpen" },
+                    { name: "Modules", href: "/modules", icon: "GraduationCap" },
+                    { name: "About Platform", href: "#about", icon: "Shield" },
+                    { name: "Why Choose Us", href: "#why-choose-us", icon: "Award" },
+                    { name: "Contact Us", href: "/contact", icon: "Bell" },
+                  ].map((item) => (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 transition-all group"
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className="text-white/60 group-hover:text-[#FFA600] transition-colors">
+                          {getIcon(item.icon, "h-4 w-4")}
+                        </span>
+                        {item.name}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
+                    </Link>
+                  ))}
+                </nav>
+
+                {/* Admission Notice Card if Link Available */}
+                {formLink && (
+                  <div className="mt-2 p-3.5 rounded-2xl bg-gradient-to-br from-[#FFA600]/20 to-[#ED6708]/20 border border-[#FFA600]/30 backdrop-blur-xs">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFA600] mb-1">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Admission Open
+                    </div>
+                    <p className="text-[11px] text-white/80 mb-2.5 leading-relaxed">
+                      Online admission forms for 2026-27 are currently active.
+                    </p>
+                    <a
+                      href={formLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#FFA600] text-white py-2 px-3 text-xs font-bold hover:bg-[#ED6708] transition-colors shadow-sm"
+                    >
+                      Apply Online <ArrowRight className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Drawer Bottom Actions */}
+              <div className="pt-4 border-t border-white/15 space-y-2.5">
+                <Button
+                  variant="outline"
+                  className="w-full justify-center rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 py-4 text-xs font-bold"
+                  asChild
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Link href="/login">Sign In to Portal</Link>
+                </Button>
+
+                <Button
+                  className="w-full justify-center rounded-xl bg-[#FFA600] text-white shadow-lg hover:bg-[#ED6708] py-4 text-xs font-bold"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleGetStarted();
+                  }}
+                >
+                  Get Started <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Admission Marquee */}
       {formLink && (
-        <div className="sticky top-16 z-40 overflow-hidden bg-[#ED6708] py-2 border-b border-[#ED6708]/20 shadow-sm">
-          <div className="flex whitespace-nowrap items-center gap-12 px-4 w-max animate-marquee-left-fast pause-on-hover">
+        <div className="sticky top-16 z-40 overflow-hidden bg-gradient-to-r from-[#ED6708] via-[#FFA600] to-[#ED6708] py-2 border-b border-orange-600/20 shadow-sm">
+          <div className="flex whitespace-nowrap items-center gap-8 sm:gap-12 px-4 w-max animate-marquee-left-fast pause-on-hover">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="flex items-center gap-3 text-sm font-medium text-white">
-                <Sparkles className="h-4 w-4 text-white/80" />
-                <span>Admission forms are available! Follow the link to apply:</span>
+              <div key={i} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-semibold text-white">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20">
+                  <Sparkles className="h-3 w-3 text-white" />
+                </span>
+                <span>Admission forms are available! Apply online for academic year 2026-27:</span>
                 <a
                   href={formLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-white/15 hover:bg-white/25 px-3 py-1 rounded-full border border-white/30 underline decoration-white/50 underline-offset-4 transition-all"
+                  className="inline-flex items-center gap-1 bg-white text-[#ED6708] hover:bg-white/95 px-3 py-0.5 rounded-full text-xs font-bold shadow-sm transition-all hover:scale-105"
                 >
-                  {formLink}
+                  Apply Online
+                  <ArrowRight className="h-3 w-3" />
                 </a>
               </div>
             ))}
@@ -538,70 +687,73 @@ export default function LandingPage() {
 
             {/* Left Side Content */}
             <motion.div
-              initial={{ opacity: 0, x: -60 }}
+              initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="lg:col-span-7 space-y-8 text-left"
+              className="lg:col-span-7 space-y-6 sm:space-y-8 text-left"
             >
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <Badge
                   variant="outline"
-                  className="rounded-full px-4 py-1.5 border-[#6A7626]/30 bg-[#6A7626]/10 text-[#6A7626] shadow-sm font-bold tracking-wider uppercase text-xs"
+                  className="rounded-full px-3.5 py-1 sm:px-4 sm:py-1.5 border-[#6A7626]/30 bg-[#6A7626]/10 text-[#6A7626] shadow-xs font-bold tracking-wider uppercase text-[10px] sm:text-xs"
                 >
                   {heroBadge}
                 </Badge>
 
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15]">
-                  <span className="bg-gradient-to-r from-[#285E89] to-[#FFA600] bg-clip-text text-transparent block font-black mb-2 text-5xl sm:text-6xl lg:text-7.5xl tracking-tighter">
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.12]">
+                  <span className="bg-gradient-to-r from-[#285E89] via-[#1D496C] to-[#FFA600] bg-clip-text text-transparent block font-black mb-1 sm:mb-2 text-4xl sm:text-6xl lg:text-7xl tracking-tighter">
                     {heroTitle}
                   </span>
-                  <span className="text-[#1D496C] text-2xl sm:text-3xl lg:text-4xl font-extrabold block">
+                  <span className="text-[#1D496C] text-xl sm:text-3xl lg:text-4xl font-extrabold block">
                     {heroSubtitle}
                   </span>
                 </h1>
               </div>
 
-              <p className="text-base sm:text-lg text-[#475569] leading-relaxed font-medium">
+              <p className="text-sm sm:text-base lg:text-lg text-[#475569] leading-relaxed font-medium">
                 {heroDescription}
               </p>
 
-              {/* Small Highlights Checklist */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {/* Small Highlights Checklist (2-2-1 Form) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1 sm:pt-2">
                 {[
                   "Online & Offline Admission",
                   "Smart Fee Management",
                   "Attendance & Geo Tracking",
                   "Parent Progress Reports",
-                  "Homework & Online Exams"
+                  "Homework & Online Exams",
                 ].map((item, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 + index * 0.08, duration: 0.5 }}
-                    className="flex items-center gap-3 bg-[#1D496C]/5 hover:bg-[#1D496C]/10 border border-[#1D496C]/10 rounded-xl px-4 py-3 transition-colors shadow-sm"
+                    className={`flex items-center gap-2 sm:gap-2.5 bg-white/85 hover:bg-white border border-[#1D496C]/10 rounded-xl px-2.5 py-2.5 sm:px-4 sm:py-3 transition-colors shadow-xs ${
+                      index === 4 ? "col-span-2" : ""
+                    }`}
                   >
                     <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#6A7626]/20 text-[#6A7626]">
-                      <CheckCircle2 className="h-4 w-4 stroke-[3]" />
+                      <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[3]" />
                     </div>
-                    <span className="text-sm font-semibold text-[#1D496C]">{item}</span>
+                    <span className="text-[11px] sm:text-sm font-semibold text-[#1D496C] leading-snug">{item}</span>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-4">
+              {/* Action Buttons (1 * 2 Layout) */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2 sm:pt-4">
                 <Button
                   size="lg"
-                  className="rounded-xl bg-[#429CE4] text-white shadow-xl shadow-[#429CE4]/20 hover:shadow-2xl hover:shadow-[#429CE4]/30 hover:bg-[#1D496C] px-8 py-6 text-base font-bold transition-all duration-300 transform hover:scale-105"
+                  className="w-full rounded-xl bg-[#429CE4] text-white shadow-xl shadow-[#429CE4]/20 hover:shadow-2xl hover:shadow-[#429CE4]/30 hover:bg-[#1D496C] px-3 sm:px-7 py-3.5 sm:py-6 text-xs sm:text-base font-bold transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center gap-1 sm:gap-2"
                   onClick={handleGetStarted}
                 >
-                  Request Demo
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <span>Request Demo</span>
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  className="rounded-xl border-2 border-[#6A7626] bg-white text-[#6A7626] hover:bg-[#6A7626]/5 px-8 py-6 text-base font-bold transition-all duration-300 transform hover:scale-105"
+                  className="w-full rounded-xl border-2 border-[#6A7626] bg-white text-[#6A7626] hover:bg-[#6A7626]/5 px-3 sm:px-7 py-3.5 sm:py-6 text-xs sm:text-base font-bold transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center"
                   asChild
                 >
                   <Link href="#features">Learn More</Link>
@@ -674,11 +826,11 @@ export default function LandingPage() {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.8, duration: 0.5 }}
-                  className="absolute bottom-6 left-6 right-6 backdrop-blur-md bg-white/80 border border-white/20 p-4 rounded-2xl shadow-lg flex items-center justify-between"
+                  className="absolute bottom-3.5 left-3.5 right-3.5 sm:bottom-6 sm:left-6 sm:right-6 backdrop-blur-md bg-white/90 border border-white/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-lg flex items-center justify-between"
                 >
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[#6A7626] font-bold">Admission Portal</p>
-                    <p className="text-sm font-extrabold text-[#1D496C]">Active & Open for 2026</p>
+                    <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#6A7626] font-bold">Admission Portal</p>
+                    <p className="text-xs sm:text-sm font-extrabold text-[#1D496C]">Active & Open for 2026</p>
                   </div>
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
                 </motion.div>
@@ -884,7 +1036,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2">
                 {aboutHighlights.map((item, i) => (
                   <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-3">
                     <div className="h-8 w-8 rounded-lg bg-[#429CE4]/10 flex items-center justify-center text-[#429CE4] shrink-0">
@@ -921,10 +1073,157 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-8 pt-4">
+          {/* Mobile View: Continuous Smooth Left-to-Right Moving Slider */}
+          <div className="sm:hidden -mt-2 mb-2 text-center">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6A7626] bg-[#6A7626]/10 px-3 py-1 rounded-full border border-[#6A7626]/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+              Auto-Moving Left → Right • Touch to Pause
+            </span>
+          </div>
+
+          <div
+            className="sm:hidden relative w-full overflow-hidden py-3 -mx-4 px-2"
+            style={{
+              maskImage: "linear-gradient(to right, transparent, white 6%, white 94%, transparent)",
+              WebkitMaskImage: "linear-gradient(to right, transparent, white 6%, white 94%, transparent)",
+            }}
+          >
+            <div
+              className="flex gap-4 w-max animate-marquee-right-cards pause-on-hover"
+              onTouchStart={(e) => { e.currentTarget.style.animationPlayState = "paused"; }}
+              onTouchEnd={(e) => { e.currentTarget.style.animationPlayState = "running"; }}
+            >
+              {/* First Set of Cards */}
+              {features.map((feature, index) => (
+                <div
+                  key={`m1-${index}`}
+                  onClick={() => setActiveFeatureIdx(activeFeatureIdx === index ? null : index)}
+                  className={`main-feature-card relative rounded-[24px] border shadow-md flex flex-col justify-between overflow-hidden cursor-pointer w-[280px] p-5.5 transition-colors duration-300 shrink-0 ${
+                    activeFeatureIdx === index
+                      ? activeBgStyles[index].bg
+                      : "bg-white text-slate-800 border-slate-100 shadow-slate-200/50"
+                  }`}
+                >
+                  <div>
+                    <div className={`w-12 h-1 bg-gradient-to-r ${feature.color} rounded-full mb-3.5 ${activeFeatureIdx === index ? "opacity-0" : ""}`}></div>
+
+                    <h3 className={`font-extrabold text-lg leading-snug mb-3 transition-colors duration-300 ${
+                      activeFeatureIdx === index
+                        ? (index === 3 ? "text-[#1D496C]" : "text-white")
+                        : "text-[#1D496C]"
+                    }`}>
+                      {feature.title}
+                    </h3>
+
+                    <ul className="space-y-3 pl-0.5">
+                      {((expandedCardIdxs.includes(index) || feature.points.length <= 4)
+                        ? feature.points
+                        : feature.points.slice(0, 4)
+                      ).map((point: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm">
+                          <CheckCircle2 className={`mt-0.5 h-4 w-4 stroke-[2.5] shrink-0 transition-colors ${
+                            activeFeatureIdx === index
+                              ? (activeBgStyles[index].check === "text-white" ? "text-white" : "text-[#1D496C]")
+                              : "text-[#6A7626]"
+                          }`} />
+                          <span className={`font-semibold leading-relaxed transition-colors ${
+                            activeFeatureIdx === index ? activeBgStyles[index].text : "text-slate-600"
+                          }`}>
+                            {point}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {feature.points.length > 4 && (
+                      <button
+                        onClick={(e) => toggleCardPoints(index, e)}
+                        className={`mt-3.5 text-xs font-black transition-colors inline-flex items-center gap-1.5 hover:underline ${
+                          activeFeatureIdx === index
+                            ? (index === 3 ? "text-[#1D496C]/90 hover:text-[#1D496C]" : "text-white/90 hover:text-white")
+                            : "text-[#1D496C] hover:text-[#285E89]"
+                        }`}
+                      >
+                        {expandedCardIdxs.includes(index) ? (
+                          <>Read Less <ChevronDown className="h-3 w-3 rotate-180 transition-transform duration-300" /></>
+                        ) : (
+                          <>Read More <ChevronDown className="h-3 w-3 transition-transform duration-300" /></>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Second Set of Cards (for seamless infinite loop) */}
+              {features.map((feature, index) => (
+                <div
+                  key={`m2-${index}`}
+                  onClick={() => setActiveFeatureIdx(activeFeatureIdx === index ? null : index)}
+                  className={`main-feature-card relative rounded-[24px] border shadow-md flex flex-col justify-between overflow-hidden cursor-pointer w-[280px] p-5.5 transition-colors duration-300 shrink-0 ${
+                    activeFeatureIdx === index
+                      ? activeBgStyles[index].bg
+                      : "bg-white text-slate-800 border-slate-100 shadow-slate-200/50"
+                  }`}
+                >
+                  <div>
+                    <div className={`w-12 h-1 bg-gradient-to-r ${feature.color} rounded-full mb-3.5 ${activeFeatureIdx === index ? "opacity-0" : ""}`}></div>
+
+                    <h3 className={`font-extrabold text-lg leading-snug mb-3 transition-colors duration-300 ${
+                      activeFeatureIdx === index
+                        ? (index === 3 ? "text-[#1D496C]" : "text-white")
+                        : "text-[#1D496C]"
+                    }`}>
+                      {feature.title}
+                    </h3>
+
+                    <ul className="space-y-3 pl-0.5">
+                      {((expandedCardIdxs.includes(index) || feature.points.length <= 4)
+                        ? feature.points
+                        : feature.points.slice(0, 4)
+                      ).map((point: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm">
+                          <CheckCircle2 className={`mt-0.5 h-4 w-4 stroke-[2.5] shrink-0 transition-colors ${
+                            activeFeatureIdx === index
+                              ? (activeBgStyles[index].check === "text-white" ? "text-white" : "text-[#1D496C]")
+                              : "text-[#6A7626]"
+                          }`} />
+                          <span className={`font-semibold leading-relaxed transition-colors ${
+                            activeFeatureIdx === index ? activeBgStyles[index].text : "text-slate-600"
+                          }`}>
+                            {point}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {feature.points.length > 4 && (
+                      <button
+                        onClick={(e) => toggleCardPoints(index, e)}
+                        className={`mt-3.5 text-xs font-black transition-colors inline-flex items-center gap-1.5 hover:underline ${
+                          activeFeatureIdx === index
+                            ? (index === 3 ? "text-[#1D496C]/90 hover:text-[#1D496C]" : "text-white/90 hover:text-white")
+                            : "text-[#1D496C] hover:text-[#285E89]"
+                        }`}
+                      >
+                        {expandedCardIdxs.includes(index) ? (
+                          <>Read Less <ChevronDown className="h-3 w-3 rotate-180 transition-transform duration-300" /></>
+                        ) : (
+                          <>Read More <ChevronDown className="h-3 w-3 transition-transform duration-300" /></>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop & Tablet Grid View */}
+          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-8 pt-4">
             {features.map((feature, index) => (
               <div
-                key={index}
+                key={`desktop-${index}`}
                 onClick={() => setActiveFeatureIdx(activeFeatureIdx === index ? null : index)}
                 className={`main-feature-card relative rounded-[24px] border shadow-lg hover:shadow-2xl flex flex-col justify-between transition-all duration-500 hover:-translate-y-2 overflow-hidden cursor-pointer w-full p-6 transition-colors duration-300 ${activeFeatureIdx === index
                   ? activeBgStyles[index].bg
@@ -996,7 +1295,7 @@ export default function LandingPage() {
 
       <section
         id="why-choose-us"
-        className="pt-12 pb-16 bg-[#F8FAFC] relative overflow-hidden bg-cover bg-center"
+        className="pt-4 sm:pt-12 pb-10 sm:pb-16 bg-[#F8FAFC] relative overflow-hidden bg-cover bg-center"
         style={{ backgroundImage: "linear-gradient(to bottom, rgba(248, 250, 252, 0.96), rgba(248, 250, 252, 0.92)), url('/bg-image.png')" }}
       >
         {/* Soft background decor blobs */}
@@ -1004,10 +1303,10 @@ export default function LandingPage() {
         <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-[#429CE4]/5 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-8 items-center">
             {/* Left Column - Graphic Column */}
-            <div className="lg:col-span-5 relative flex items-center justify-center min-h-[500px] sm:min-h-[580px] py-10">
-              <div className="relative w-full max-w-[340px] sm:max-w-[420px] aspect-square flex items-center justify-center group">
+            <div className="lg:col-span-5 relative flex items-center justify-center min-h-[350px] sm:min-h-[580px] pt-1 pb-14 sm:py-10">
+              <div className="relative w-full max-w-[320px] sm:max-w-[420px] aspect-square flex items-center justify-center group">
                 
                 {/* Behind-Left Image Card */}
                 {(() => {
@@ -1149,7 +1448,7 @@ export default function LandingPage() {
                 })()}
 
                 {/* Floating Capsule Pills underneath */}
-                <div className="absolute bottom-[-4.5rem] left-[1rem] sm:left-[3rem] md:left-0 flex flex-wrap gap-2 z-40 max-w-[340px]">
+                <div className="absolute bottom-[-3.5rem] sm:bottom-[-4.5rem] left-[1rem] sm:left-[3rem] md:left-0 flex flex-wrap gap-2 z-40 max-w-[340px]">
                   {whyPills.map((pill, idx) => {
                     const pillBgClasses = ["bg-[#5D3FD3] shadow-[#5D3FD3]/20", "bg-[#1C1C1E] border border-white/10", "bg-[#285E89] shadow-[#285E89]/20"];
                     const activeBg = pillBgClasses[idx % pillBgClasses.length];
@@ -1406,22 +1705,22 @@ export default function LandingPage() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Card className="border-0 bg-gradient-to-br from-[#1D496C] to-[#15354F] text-white shadow-2xl overflow-hidden rounded-[2.5rem] cursor-pointer">
             <div className="absolute inset-0 bg-grid-white/[0.08] [mask-image:radial-gradient(ellipse_at_center,white,transparent)]"></div>
-            <CardContent className="p-16 text-center relative">
+            <CardContent className="p-6 sm:p-12 lg:p-16 text-center relative">
               <div className="max-w-2xl mx-auto space-y-6">
                 <Badge variant="outline" className="rounded-lg px-4 py-2 border-white/20 bg-white/10 text-white shadow-sm font-semibold">
                   <Rocket className="mr-2 h-3.5 w-3.5 text-[#FFA600]" />
                   Get Started Today
                 </Badge>
-                <h2 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl text-white">
+                <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
                   Ready to Transform Your School Management?
                 </h2>
-                <p className="text-slate-200/90 text-base sm:text-lg font-medium">
+                <p className="text-slate-200/90 text-sm sm:text-base lg:text-lg font-medium leading-relaxed">
                   Join thousands of schools already using VidyaSanchalan to streamline their operations
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-3 sm:pt-4">
                   <Button
                     size="lg"
-                    className="rounded-xl bg-[#FFA600] text-white shadow-xl shadow-[#FFA600]/10 hover:shadow-2xl hover:shadow-[#FFA600]/20 hover:bg-[#ED6708] px-8 py-6 text-base font-bold transition-all duration-300 transform hover:scale-105"
+                    className="w-full sm:w-auto rounded-xl bg-[#FFA600] text-white shadow-xl shadow-[#FFA600]/10 hover:shadow-2xl hover:shadow-[#FFA600]/20 hover:bg-[#ED6708] px-8 py-5 sm:py-6 text-sm sm:text-base font-bold transition-all duration-300 transform hover:scale-105"
                     onClick={handleGetStarted}
                   >
                     Start Free Trial
@@ -1430,7 +1729,7 @@ export default function LandingPage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="rounded-xl border-2 border-white/30 bg-transparent text-white hover:bg-white/10 hover:border-white/50 px-8 py-6 text-base font-bold transition-all duration-300 transform hover:scale-105"
+                    className="w-full sm:w-auto rounded-xl border-2 border-white/30 bg-transparent text-white hover:bg-white/10 hover:border-white/50 px-8 py-5 sm:py-6 text-sm sm:text-base font-bold transition-all duration-300 transform hover:scale-105"
                     asChild
                   >
                     <Link href="/login">Contact Sales</Link>

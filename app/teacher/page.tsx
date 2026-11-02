@@ -102,7 +102,13 @@ export default function TeacherDashboard() {
     void loadDashboardData();
   }, [loadDashboardData]);
 
-  const teacherName = profile?.name || profile?.user?.name || profile?.username || "Teacher";
+  const teacherName =
+    profile?.staff_profile?.name ||
+    (profile?.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "") ||
+    profile?.name ||
+    profile?.user?.name ||
+    profile?.username ||
+    "Teacher";
   const activeHomework = useMemo(
     () => homework.filter((item) => item.is_active).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
     [homework]
