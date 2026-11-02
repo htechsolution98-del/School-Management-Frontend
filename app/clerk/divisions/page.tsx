@@ -180,9 +180,9 @@ export default function DivisionsPage() {
       return;
     }
 
-    const trimmedDivision = divisionName.trim();
-    if (!trimmedDivision) {
-      toast.error("Please enter a division name");
+    const trimmedInput = divisionName.trim();
+    if (!trimmedInput) {
+      toast.error("Please enter a division name or count");
       return;
     }
 
@@ -198,19 +198,79 @@ export default function DivisionsPage() {
       return;
     }
 
+    // Determine target division names (A, B, C...)
+    let targetDivisions: string[] = [];
+
+    // Case 1: Numeric count input (e.g., "3" -> ["A", "B", "C"])
+    if (/^\d+$/.test(trimmedInput)) {
+      const count = parseInt(trimmedInput, 10);
+      if (count <= 0 || count > 26) {
+        toast.error("Division count must be between 1 and 26");
+        return;
+      }
+      targetDivisions = Array.from({ length: count }, (_, i) =>
+        String.fromCharCode(65 + i)
+      );
+    } else {
+      // Case 2: Comma-Separated Alphabet Input (e.g., "a,b,c" or "A, B")
+      const parsed = trimmedInput
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+
+      // Deduplicate within the input while preserving order
+      targetDivisions = Array.from(new Set(parsed));
+    }
+
+    if (targetDivisions.length === 0) {
+      toast.error("Please enter valid division letters or count");
+      return;
+    }
+
+    // Check against existing divisions for the selected school class to avoid creating duplicates
+    const existingForClass = divisions.filter((d) => {
+      const cId = d.SchoolClass ?? d.school_class ?? d.class_id;
+      return cId === numClassId;
+    });
+
+    const existingNames = new Set(
+      existingForClass.map((d) => (d.division || "").trim().toUpperCase())
+    );
+
+    const duplicateDivisions = targetDivisions.filter((name) =>
+      existingNames.has(name)
+    );
+
+    if (duplicateDivisions.length > 0) {
+      if (duplicateDivisions.length === 1) {
+        toast.error(
+          `Division "${duplicateDivisions[0]}" already exists for this class.`
+        );
+      } else {
+        toast.error(
+          `Divisions ${duplicateDivisions.map((d) => `"${d}"`).join(", ")} already exist for this class.`
+        );
+      }
+      return;
+    }
+
     setIsSaving(true);
     try {
       const payload: Division = {
         SchoolClass: numClassId,
         school_class: numClassId,
         class_id: numClassId,
-        division: trimmedDivision,
+        division: targetDivisions.join(", "),
         capacity: numCapacity,
         student_capacity: numCapacity,
       };
 
       await saveDivision(payload);
-      toast.success("Division created successfully");
+      toast.success(
+        targetDivisions.length > 1
+          ? `${targetDivisions.length} divisions (${targetDivisions.join(", ")}) created successfully`
+          : `Division "${targetDivisions[0]}" created successfully`
+      );
 
       // Reset form
       setDivisionName("");
@@ -413,11 +473,14 @@ export default function DivisionsPage() {
                   </label>
                   <Input
                     type="text"
-                    placeholder="e.g. A, B, C or 1, 2, 3"
+                    placeholder="e.g., 3 or A, B, C"
                     value={divisionName}
                     onChange={(e) => setDivisionName(e.target.value)}
                     className="h-10 bg-slate-50/70 border-slate-200 text-sm rounded-xl focus:bg-white transition-colors"
                   />
+                  <p className="text-xs text-slate-500">
+                    Enter number of divisions (e.g., 3 for A, B, C) or specific letters separated by commas (e.g., A, B, C).
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
