@@ -98,7 +98,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
       } else {
         const errData = await response.clone().json();
         const errorDesc = extractErrorMessage(errData, "Request failed");
-        
+
         if (!errorDesc.includes("Refresh token is required") && errorDesc.trim()) {
           toast.error(errorDesc, { id: API_ERROR_TOAST_ID });
         }
@@ -427,6 +427,30 @@ export async function refreshToken(): Promise<boolean> {
   }
 }
 
+const PROTECTED_ROUTE_PREFIXES = [
+  "/teacher",
+  "/principal",
+  "/trustee",
+  "/clerk",
+  "/librarian",
+  "/inventory",
+  "/fees",
+  "/student",
+  "/parent",
+  "/superadmin",
+  "/admin",
+  "/user",
+];
+
+export function isProtectedRoute(pathname?: string): boolean {
+  if (!pathname || pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/signup")) {
+    return false;
+  }
+  return PROTECTED_ROUTE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 // ─── Authenticated Fetch ──────────────────────────────────────────────────────
 
 export async function fetchWithAuth(
@@ -448,13 +472,13 @@ export async function fetchWithAuth(
     return response;
   }
 
-  // SCHOOL DEACTIVATED / ACCOUNT DISABLED → force logout
+    // ACCOUNT INACTIVE / SCHOOL DEACTIVATED / DISABLED → force logout immediately
   try {
     const errBody = await response.clone().json();
     const msg = errBody?.detail || errBody?.message || "";
-    if (/deactivated|disabled/i.test(msg)) {
+    if (/deactivated|disabled|inactive/i.test(msg) || errBody?.code === "user_inactive") {
       clearAuthSession();
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
         window.location.href = "/login";
       }
       return response;
@@ -470,6 +494,9 @@ export async function fetchWithAuth(
   // REFRESH FAILED
   if (!refreshed) {
     clearAuthSession();
+    if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+    }
     return response;
   }
 
@@ -616,4 +643,3 @@ export async function verifyFace(imageBlob: Blob): Promise<any> {
 
   return response.json();
 }
-

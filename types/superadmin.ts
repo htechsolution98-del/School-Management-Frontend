@@ -51,6 +51,8 @@ export interface School {
   gst_included?: boolean;
   gst_percentage?: number | string;
   subscription_details?: SchoolSubscriptionDetails | null;
+  staff_count?: number;
+  student_count?: number;
 }
 
 export interface CreateSchoolPayload {

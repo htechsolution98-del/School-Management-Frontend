@@ -19,17 +19,23 @@ import {
   HelpCircle,
   ShieldCheck,
   Check,
+  Search,
+  X,
+  Filter,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import { fetchAdmissions, patchFieldValues, patchStudentDivision } from "@/lib/clerk/admissions";
 import { getClasses } from "@/lib/clerk/classes";
 import { getDivisions } from "@/lib/clerk/divisions";
+import { getStudentProfiles, updateStudentProfile } from "@/lib/clerk/student-profiles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { capitalizeWords } from "@/lib/utils";
 
 interface SchoolClass {
   id?: number | string;
@@ -96,6 +102,35 @@ function formatDivLabel(d: any): string {
   return `Division ${raw}`;
 }
 
+function resolveStudentDivision(student: any, divisionsList?: Division[]): string {
+  if (!student || typeof student !== "object") return "";
+
+  if (typeof student.division === "string" && student.division.trim()) {
+    const raw = student.division.trim();
+    return raw.replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim();
+  }
+
+  if (student.division && typeof student.division === "object") {
+    const nested = student.division.name || student.division.division || student.division.division_name;
+    if (typeof nested === "string" && nested.trim()) {
+      return nested.trim().replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim();
+    }
+  }
+
+  const divId = typeof student.division === "number" ? student.division : typeof student.division_id === "number" ? student.division_id : null;
+  if (divId && divisionsList && divisionsList.length > 0) {
+    const matched = divisionsList.find((d) => String(d.id) === String(divId));
+    if (matched) {
+      const matchedName = matched.division || (matched as any).name || (matched as any).division_name;
+      if (typeof matchedName === "string" && matchedName.trim()) {
+        return matchedName.trim().replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim();
+      }
+    }
+  }
+
+  return "";
+}
+
 function getDivVal(d: any): string {
   if (!d) return "A";
   if (typeof d === "string") return d;
@@ -118,6 +153,51 @@ export default function StudentPromotionPage() {
   const [targetYear, setTargetYear] = useState<string>("");
   const [isAlumniMode, setIsAlumniMode] = useState<boolean>(false);
 
+  // Particular / Checkbox Student Selection
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredStudents.length && filteredStudents.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredStudents.map((s) => s.id)));
+    }
+  };
+
+  const toggleSelectStudent = (id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handlePromoteSelectedOnly = () => {
+    if (selectedIds.size === 0) {
+      toast.error("Please select at least one student using the checkboxes.");
+      return;
+    }
+    setStudents((prev) =>
+      prev.map((s) => ({
+        ...s,
+        status: selectedIds.has(s.id) ? "promote" : "detain",
+      }))
+    );
+    toast.success(`Marked ${selectedIds.size} selected student(s) for promotion. Others set to Detain.`);
+  };
+
+  const handleMarkSelectedStatus = (status: "promote" | "detain" | "left") => {
+    if (selectedIds.size === 0) {
+      toast.error("Please select at least one student using the checkboxes.");
+      return;
+    }
+    setStudents((prev) =>
+      prev.map((s) => (selectedIds.has(s.id) ? { ...s, status } : s))
+    );
+    toast.success(`Marked ${selectedIds.size} student(s) as ${status.toUpperCase()}.`);
+  };
+
   // Roll Number Strategy
   const [rollNoStrategy, setRollNoStrategy] = useState<"alpha_first" | "alpha_last" | "gr_num" | "keep">("alpha_first");
 
@@ -126,6 +206,8 @@ export default function StudentPromotionPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "promote" | "detain" | "left">("all");
   const [successReport, setSuccessReport] = useState<{
     promotedCount: number;
     detainedCount: number;
@@ -194,6 +276,73 @@ export default function StudentPromotionPage() {
     loadMeta();
   }, []);
 
+  // Filter divisions according to selected source class
+  const sourceDivisions = useMemo(() => {
+    if (!sourceClass || divisions.length === 0) return divisions;
+    const currentClassObj = classes.find(
+      (c: SchoolClass) =>
+        normalize(c.id) === normalize(sourceClass) ||
+        normalize(c.school_class) === normalize(sourceClass) ||
+        normalize(c.name) === normalize(sourceClass)
+    );
+    const targetId = currentClassObj ? String(currentClassObj.id) : String(sourceClass);
+    const targetName = currentClassObj?.school_class || currentClassObj?.name || String(sourceClass);
+
+    const filtered = divisions.filter((d: any) => {
+      const dClassId = d.SchoolClass ? (typeof d.SchoolClass === "object" ? String(d.SchoolClass.id) : String(d.SchoolClass)) : "";
+      const dClassName = d.class_name || (typeof d.SchoolClass === "object" ? d.SchoolClass.school_class : "") || "";
+      if (dClassId && (dClassId === targetId || normalize(dClassId) === normalize(targetId))) return true;
+      if (dClassName && (normalize(dClassName) === normalize(targetName) || normalize(dClassName) === normalize(sourceClass))) return true;
+      return false;
+    });
+
+    return filtered.length > 0 ? filtered : divisions;
+  }, [sourceClass, classes, divisions]);
+
+  // Filter divisions according to selected target class
+  const targetDivisions = useMemo(() => {
+    if (!targetClass || divisions.length === 0) return divisions;
+    const currentClassObj = classes.find(
+      (c: SchoolClass) =>
+        normalize(c.id) === normalize(targetClass) ||
+        normalize(c.school_class) === normalize(targetClass) ||
+        normalize(c.name) === normalize(targetClass)
+    );
+    const targetId = currentClassObj ? String(currentClassObj.id) : String(targetClass);
+    const targetName = currentClassObj?.school_class || currentClassObj?.name || String(targetClass);
+
+    const filtered = divisions.filter((d: any) => {
+      const dClassId = d.SchoolClass ? (typeof d.SchoolClass === "object" ? String(d.SchoolClass.id) : String(d.SchoolClass)) : "";
+      const dClassName = d.class_name || (typeof d.SchoolClass === "object" ? d.SchoolClass.school_class : "") || "";
+      if (dClassId && (dClassId === targetId || normalize(dClassId) === normalize(targetId))) return true;
+      if (dClassName && (normalize(dClassName) === normalize(targetName) || normalize(dClassName) === normalize(targetClass))) return true;
+      return false;
+    });
+
+    return filtered.length > 0 ? filtered : divisions;
+  }, [targetClass, classes, divisions]);
+
+  // Sync division selections when class changes
+  useEffect(() => {
+    if (sourceClass && sourceDivisions.length > 0) {
+      if (sourceDivision !== "") {
+        const match = sourceDivisions.some((d) => getDivVal(d).toLowerCase() === sourceDivision.toLowerCase());
+        if (!match) {
+          setSourceDivision("");
+        }
+      }
+    }
+  }, [sourceClass, sourceDivisions]);
+
+  useEffect(() => {
+    if (targetClass && targetDivisions.length > 0) {
+      const match = targetDivisions.some((d) => getDivVal(d).toLowerCase() === targetDivision.toLowerCase());
+      if (!match) {
+        setTargetDivision(getDivVal(targetDivisions[0]));
+      }
+    }
+  }, [targetClass, targetDivisions]);
+
   // Auto pick next class when source class changes
   useEffect(() => {
     if (sourceClass && classes.length > 0) {
@@ -219,63 +368,130 @@ export default function StudentPromotionPage() {
     setLoadingStudents(true);
     setSuccessReport(null);
     try {
-      const admissionsData = await fetchAdmissions().catch(() => []);
+      const [profilesData, admissionsData] = await Promise.all([
+        getStudentProfiles().catch(() => []),
+        fetchAdmissions().catch(() => []),
+      ]);
 
       const matchingStudents: PromotionStudent[] = [];
+      const seenIds = new Set<string>();
+      const seenAdmNos = new Set<string>();
+      const seenGrs = new Set<string>();
+
       const currentClassObj = classes.find(
         (c: SchoolClass) =>
           normalize(c.id) === normalize(sourceClass) ||
           normalize(c.school_class) === normalize(sourceClass) ||
           normalize(c.name) === normalize(sourceClass)
       );
-      const currentClassName = currentClassObj?.school_class || currentClassObj?.name || String(sourceClass);
+      const currentClassName = (currentClassObj?.school_class || currentClassObj?.name || String(sourceClass)).trim();
+      const currentClassId = currentClassObj ? String(currentClassObj.id) : "";
+      const normTargetClass = normalize(currentClassName);
+      const cleanSourceDiv = String(sourceDivision || "").replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim().toLowerCase();
 
-      if (Array.isArray(admissionsData)) {
-        // Filter students with assigned GR number belonging to this class
-        admissionsData.forEach((adm: any, idx: number) => {
-          const gr = adm.gr_number || adm.gr_no;
-          if (!gr) return; // Only students with assigned GR number
-
-          const admClass = String(adm.school_class || getFieldValue(adm, [/class/i, /standard/i]) || "").trim();
-          const admDiv = String(adm.division || getFieldValue(adm, [/division/i, /section/i]) || "").trim();
-
-          const admClassNorm = normalize(admClass);
-          const srcClassNorm = normalize(sourceClass);
-          const currClassNorm = normalize(currentClassName);
+      // 1. Process Enrolled Students from Student Profiles (Primary Source)
+      if (Array.isArray(profilesData)) {
+        profilesData.forEach((st: any, idx: number) => {
+          const rawClass = String(st.class_name || st.school_class || "").trim();
+          const matchedClass = classes.find(
+            (c: SchoolClass) =>
+              String(c.id) === rawClass ||
+              normalize(c.school_class) === normalize(rawClass) ||
+              normalize(c.name) === normalize(rawClass)
+          );
+          const studentClassName = matchedClass ? (matchedClass.school_class || matchedClass.name || String(matchedClass.id)) : rawClass;
+          const normStudentClass = normalize(studentClassName);
 
           const matchClass =
             !sourceClass ||
-            admClassNorm === srcClassNorm ||
-            admClassNorm === currClassNorm ||
-            (currClassNorm && admClassNorm.includes(currClassNorm)) ||
-            (srcClassNorm && admClassNorm.includes(srcClassNorm)) ||
-            admClass === String(sourceClass);
+            normStudentClass === normTargetClass ||
+            (currentClassId && (rawClass === currentClassId || normStudentClass === normalize(currentClassId))) ||
+            (normTargetClass && normStudentClass.includes(normTargetClass)) ||
+            (normTargetClass && normTargetClass.includes(normStudentClass));
 
-          const admDivNorm = normalize(admDiv);
-          const srcDivNorm = normalize(sourceDivision);
+          const resolvedDiv = resolveStudentDivision(st, divisions) || "A";
+          const cleanDiv = resolvedDiv.replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim();
 
           const matchDiv =
-            !sourceDivision ||
-            admDivNorm === srcDivNorm ||
-            (srcDivNorm && admDivNorm.includes(srcDivNorm)) ||
-            !admDiv;
+            !cleanSourceDiv ||
+            cleanDiv.toLowerCase() === cleanSourceDiv ||
+            cleanDiv.toLowerCase().includes(cleanSourceDiv) ||
+            cleanSourceDiv.includes(cleanDiv.toLowerCase());
+
+          if (matchClass && matchDiv) {
+            const sName = st.full_name || st.name || (st.first_name ? `${st.first_name} ${st.last_name || ""}`.trim() : `Student #${st.id}`);
+            seenIds.add(String(st.id));
+            if (st.admission_number) seenAdmNos.add(String(st.admission_number));
+            if (st.gr_no) seenGrs.add(String(st.gr_no));
+
+            matchingStudents.push({
+              id: st.id,
+              admissionNumber: st.admission_number || undefined,
+              gr_number: st.gr_no || undefined,
+              student_name: sName,
+              first_name: st.first_name || sName.split(" ")[0] || sName,
+              last_name: st.last_name || sName.split(" ").slice(1).join(" ") || "",
+              name: sName,
+              roll_number: st.roll_no || idx + 1,
+              school_class: studentClassName || currentClassName,
+              division: cleanDiv || "A",
+              status: "promote",
+            });
+          }
+        });
+      }
+
+      // 2. Process Admissions Data
+      if (Array.isArray(admissionsData)) {
+        admissionsData.forEach((adm: any, idx: number) => {
+          const admNo = String(adm.admission_number || "");
+          const gr = adm.gr_number || adm.gr_no || "";
+          if (admNo && seenAdmNos.has(admNo)) return;
+          if (gr && seenGrs.has(String(gr))) return;
+          if (adm.id && seenIds.has(String(adm.id))) return;
+
+          let rawClass = String(adm.school_class || getFieldValue(adm, [/(applying\s*(for)?\s*)?class/i, /standard/i, /grade/i, /std/i]) || "").trim();
+          const matchedClass = classes.find(
+            (c: SchoolClass) =>
+              String(c.id) === rawClass ||
+              normalize(c.school_class) === normalize(rawClass) ||
+              normalize(c.name) === normalize(rawClass)
+          );
+          const studentClassName = matchedClass ? (matchedClass.school_class || matchedClass.name || String(matchedClass.id)) : rawClass;
+          const normStudentClass = normalize(studentClassName);
+
+          let rawDiv = String(adm.division || getFieldValue(adm, [/division/i, /section/i, /sec/i]) || "A").trim();
+          const cleanDiv = rawDiv.replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim() || "A";
+
+          const matchClass =
+            !sourceClass ||
+            normStudentClass === normTargetClass ||
+            (currentClassId && (rawClass === currentClassId || normStudentClass === normalize(currentClassId))) ||
+            (normTargetClass && normStudentClass.includes(normTargetClass)) ||
+            (normTargetClass && normTargetClass.includes(normStudentClass));
+
+          const matchDiv =
+            !cleanSourceDiv ||
+            cleanDiv.toLowerCase() === cleanSourceDiv ||
+            cleanDiv.toLowerCase().includes(cleanSourceDiv) ||
+            cleanSourceDiv.includes(cleanDiv.toLowerCase());
 
           if (matchClass && matchDiv) {
             const sName =
-              getFieldValue(adm, [/student.*name/i, /full.*name/i, /first.*name/i]) ||
+              getFieldValue(adm, [/student.*name/i, /full.*name/i, /first.*name/i, /candidate.*name/i]) ||
               `Student #${adm.admission_number || adm.id}`;
 
             matchingStudents.push({
               id: adm.id || adm.admission_number,
               admissionNumber: adm.admission_number,
-              gr_number: gr,
+              gr_number: gr || undefined,
               student_name: sName,
               first_name: sName.split(" ")[0] || sName,
               last_name: sName.split(" ").slice(1).join(" ") || "",
               name: sName,
-              roll_number: adm.roll_number || idx + 1,
-              school_class: admClass,
-              division: admDiv || "A",
+              roll_number: adm.roll_number || matchingStudents.length + 1,
+              school_class: studentClassName || currentClassName,
+              division: cleanDiv,
               status: "promote",
             });
           }
@@ -284,7 +500,7 @@ export default function StudentPromotionPage() {
 
       setStudents(matchingStudents);
       if (matchingStudents.length === 0) {
-        toast.info(`No students with assigned GR numbers found in ${currentClassName || "this class"}.`);
+        toast.info(`No students found in ${currentClassName || "this class"}.`);
       }
     } catch (err) {
       console.error("Failed to fetch students for promotion:", err);
@@ -342,6 +558,27 @@ export default function StudentPromotionPage() {
     return [...withNewRoll, ...nonPromoting];
   }, [students, rollNoStrategy]);
 
+  // Search & Filter students
+  const filteredStudents = useMemo(() => {
+    return computedStudentsWithRoll.filter((stu) => {
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const name = (stu.student_name || stu.name || [stu.first_name, stu.last_name].filter(Boolean).join(" ")).toLowerCase().trim();
+        const admNo = String(stu.admissionNumber || "").toLowerCase();
+        const grNo = String(stu.gr_number || "").toLowerCase();
+        if (!name.includes(q) && !admNo.includes(q) && !grNo.includes(q)) {
+          return false;
+        }
+      }
+      // 2. Status Filter
+      if (statusFilter !== "all" && stu.status !== statusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [computedStudentsWithRoll, searchQuery, statusFilter]);
+
   // Execute Promotion
   const handleExecutePromotion = async () => {
     if (students.length === 0) {
@@ -358,15 +595,87 @@ export default function StudentPromotionPage() {
     let promoted = 0;
     let detained = 0;
     let left = 0;
+    const errors: string[] = [];
 
     try {
+      const admissionsData = await fetchAdmissions().catch(() => []);
+
+      const targetClsObj = classes.find(
+        (c: SchoolClass) =>
+          normalize(c.id) === normalize(targetClass) ||
+          normalize(c.school_class) === normalize(targetClass) ||
+          normalize(c.name) === normalize(targetClass)
+      );
+      const targetClassId =
+        targetClsObj?.id != null
+          ? Number(targetClsObj.id)
+          : !isNaN(Number(targetClass))
+          ? Number(targetClass)
+          : null;
+      const cleanTargetDiv =
+        (targetDivision || "A").replace(/^division\s*/i, "").replace(/^div\s*/i, "").trim() || "A";
+
+      if (!isAlumniMode && !targetClassId) {
+        toast.error("Could not find target class record. Please re-select the target class.");
+        setExecuting(false);
+        return;
+      }
+
       for (const stu of computedStudentsWithRoll) {
         if (stu.status === "promote") {
-          promoted++;
-          if (stu.admissionNumber) {
-            if (targetDivision) {
-              await patchStudentDivision(stu.admissionNumber, targetDivision).catch(() => {});
+          try {
+            // 1. Update Student record in database (/api/students/<id>/)
+            const stuIdNum = Number(stu.id);
+            if (!isNaN(stuIdNum) && stuIdNum > 0) {
+              const studentPayload: Record<string, any> = {
+                division: cleanTargetDiv,
+                roll_no: String(stu.newRollNo != null ? stu.newRollNo : stu.roll_number || ""),
+              };
+              if (!isAlumniMode && targetClassId != null) {
+                studentPayload.school_class = targetClassId;
+              }
+              await updateStudentProfile(stuIdNum, studentPayload);
             }
+
+            // 2. Sync Admission record if admissionNumber exists
+            if (stu.admissionNumber) {
+              if (cleanTargetDiv) {
+                await patchStudentDivision(stu.admissionNumber, cleanTargetDiv).catch(() => {});
+              }
+
+              if (!isAlumniMode && targetClass) {
+                const adm = admissionsData.find(
+                  (a: any) => String(a.admission_number) === String(stu.admissionNumber)
+                );
+                if (adm?.field_values && Array.isArray(adm.field_values)) {
+                  const classField = adm.field_values.find((f: any) => {
+                    const lbl = (f.field_label || f.label || f.field?.label || "").toLowerCase();
+                    const map = (f.field?.map_to_student_field || "").toLowerCase();
+                    return map === "school_class" || /class|standard|grade/i.test(lbl);
+                  });
+                  if (classField) {
+                    const rawField = (classField as any).field;
+                    const fId =
+                      typeof rawField === "object" && rawField
+                        ? rawField.id
+                        : rawField || (classField as any).field_id;
+                    const newClassVal =
+                      targetClsObj?.school_class ||
+                      targetClsObj?.name ||
+                      (targetClsObj?.id ? String(targetClsObj.id) : targetClass);
+                    if (fId) {
+                      await patchFieldValues(stu.admissionNumber, [
+                        { field_id: Number(fId), value: String(newClassVal) },
+                      ]).catch(() => {});
+                    }
+                  }
+                }
+              }
+            }
+            promoted++;
+          } catch (studentErr: any) {
+            console.error(`Error promoting student ${stu.student_name || stu.id}:`, studentErr);
+            errors.push(`${stu.student_name || `Student #${stu.id}`}: ${studentErr.message || "Failed"}`);
           }
         } else if (stu.status === "detain") {
           detained++;
@@ -376,8 +685,13 @@ export default function StudentPromotionPage() {
       }
 
       setSuccessReport({ promotedCount: promoted, detainedCount: detained, leftCount: left });
-      toast.success(`Promotion completed! ${promoted} students successfully processed.`);
-      fetchStudentsForPromotion();
+      if (errors.length > 0) {
+        toast.warning(`Promoted ${promoted} student(s), but ${errors.length} failed: ${errors[0]}`);
+      } else {
+        toast.success(`Promotion completed! ${promoted} student(s) successfully promoted.`);
+      }
+      setSelectedIds(new Set());
+      await fetchStudentsForPromotion();
     } catch (err: any) {
       console.error("Promotion execution error:", err);
       toast.error(err.message || "Failed during promotion execution.");
@@ -437,7 +751,7 @@ export default function StudentPromotionPage() {
             </>
           ) : (
             <>
-              <Sparkles className="h-4 w-4" /> Execute Roll-Over Promotion
+              <Sparkles className="h-4 w-4" /> Execute Roll-Over Promotion ({students.filter((s) => s.status === "promote").length} to Promote)
             </>
           )}
         </Button>
@@ -494,7 +808,7 @@ export default function StudentPromotionPage() {
                 className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-2.5 bg-white dark:bg-zinc-900 font-medium"
               >
                 <option value="">All Divisions</option>
-                {divisions.map((d: Division) => (
+                {sourceDivisions.map((d: Division) => (
                   <option key={String(d.id || getDivVal(d))} value={getDivVal(d)}>
                     {formatDivLabel(d)}
                   </option>
@@ -557,7 +871,7 @@ export default function StudentPromotionPage() {
                     onChange={(e) => setTargetDivision(e.target.value)}
                     className="w-full text-xs h-9 rounded-xl border border-gray-200 dark:border-zinc-700 px-2.5 bg-white dark:bg-zinc-900 font-medium"
                   >
-                    {divisions.map((d: Division) => (
+                    {targetDivisions.map((d: Division) => (
                       <option key={String(d.id || getDivVal(d))} value={getDivVal(d)}>
                         {formatDivLabel(d)}
                       </option>
@@ -644,7 +958,7 @@ export default function StudentPromotionPage() {
         <CardHeader className="p-4 px-6 bg-slate-50 dark:bg-zinc-800/40 border-b border-gray-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm font-bold text-gray-900 dark:text-zinc-100">
-              Student Promotion List ({students.length} Students in {sourceClassName})
+              Student Promotion List ({filteredStudents.length}{filteredStudents.length !== students.length ? ` of ${students.length}` : ""} Students in {sourceClassName})
             </CardTitle>
           </div>
 
@@ -671,10 +985,144 @@ export default function StudentPromotionPage() {
           </div>
         </CardHeader>
 
+        {/* Search & Filtration Bar */}
+        <div className="p-4 px-6 bg-white dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search bar */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search by student name, G.R. number, or admission number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 text-xs h-9 rounded-xl border-gray-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/60"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-400 font-medium mr-1 flex items-center gap-1">
+              <Filter className="h-3 w-3" /> Filter:
+            </span>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                statusFilter === "all"
+                  ? "bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs"
+                  : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200"
+              }`}
+            >
+              All ({students.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("promote")}
+              className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                statusFilter === "promote"
+                  ? "bg-emerald-600 text-white shadow-2xs"
+                  : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100"
+              }`}
+            >
+              Promote ({students.filter((s) => s.status === "promote").length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("detain")}
+              className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                statusFilter === "detain"
+                  ? "bg-amber-600 text-white shadow-2xs"
+                  : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100"
+              }`}
+            >
+              Detain ({students.filter((s) => s.status === "detain").length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("left")}
+              className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                statusFilter === "left"
+                  ? "bg-red-600 text-white shadow-2xs"
+                  : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100"
+              }`}
+            >
+              Left ({students.filter((s) => s.status === "left").length})
+            </button>
+          </div>
+        </div>
+
+        {/* Selected Particular Students Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-purple-50 dark:bg-purple-950/40 border-b border-purple-200 dark:border-purple-900/50 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-purple-600 text-white font-mono text-xs px-2.5">
+                {selectedIds.size} Selected
+              </Badge>
+              <span className="text-xs font-semibold text-purple-900 dark:text-purple-200">
+                Action for selected students:
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleMarkSelectedStatus("promote")}
+                className="text-xs h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-2xs"
+              >
+                Mark Selected as Promote ({selectedIds.size})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handlePromoteSelectedOnly}
+                className="text-xs h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-2xs"
+              >
+                Promote Only Selected (Detain Others)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleMarkSelectedStatus("detain")}
+                className="text-xs h-7 px-3 text-amber-700 border-amber-300 hover:bg-amber-50 rounded-lg font-semibold"
+              >
+                Detain Selected ({selectedIds.size})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs h-7 px-2 text-slate-500 hover:text-slate-800"
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-100/70 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 font-bold border-b border-gray-200 dark:border-zinc-700 text-[11px] uppercase tracking-wider">
+                <th className="p-3.5 text-center w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all students"
+                    checked={filteredStudents.length > 0 && selectedIds.size === filteredStudents.length}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer align-middle"
+                  />
+                </th>
                 <th className="p-3.5 text-center w-14">Old Roll</th>
                 <th className="p-3.5 w-24">G.R. No</th>
                 <th className="p-3.5">Student Full Name</th>
@@ -686,14 +1134,14 @@ export default function StudentPromotionPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
               {loadingStudents ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-gray-500">
+                  <td colSpan={7} className="p-10 text-center text-gray-500">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-purple-600" />
                     Loading students for {sourceClassName}...
                   </td>
                 </tr>
-              ) : computedStudentsWithRoll.length === 0 ? (
+              ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-gray-500">
+                  <td colSpan={7} className="p-12 text-center text-gray-500">
                     <img
                       src="/images/empty-folder.png"
                       alt="No students found"
@@ -706,8 +1154,8 @@ export default function StudentPromotionPage() {
                   </td>
                 </tr>
               ) : (
-                computedStudentsWithRoll.map((stu) => {
-                  const name = `${stu.first_name || ""} ${stu.last_name || ""} ${stu.student_name || stu.name || ""}`.trim();
+                filteredStudents.map((stu) => {
+                  const name = (stu.student_name || stu.name || [stu.first_name, stu.last_name].filter(Boolean).join(" ")).trim();
                   return (
                     <tr
                       key={stu.id}
@@ -719,6 +1167,15 @@ export default function StudentPromotionPage() {
                           : "bg-red-50/20"
                       }`}
                     >
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${stu.student_name || stu.name}`}
+                          checked={selectedIds.has(stu.id)}
+                          onChange={() => toggleSelectStudent(stu.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer align-middle"
+                        />
+                      </td>
                       <td className="p-3 text-center font-mono font-bold text-gray-500">
                         {stu.roll_number || "—"}
                       </td>
@@ -726,10 +1183,10 @@ export default function StudentPromotionPage() {
                         {stu.gr_number || "—"}
                       </td>
                       <td className="p-3 font-bold text-gray-900 dark:text-zinc-100">
-                        {name || "Student"}
+                        {capitalizeWords(name) || "Student"}
                       </td>
                       <td className="p-3 text-gray-600 dark:text-zinc-400">
-                        {stu.school_class || sourceClassName} - Div {stu.division || "A"}
+                        {capitalizeWords(stu.school_class || sourceClassName)} - Div {(stu.division || "A").toUpperCase()}
                       </td>
                       {!isAlumniMode && (
                         <td className="p-3 text-center">
@@ -778,6 +1235,22 @@ export default function StudentPromotionPage() {
                             TC / Left
                           </button>
                         </div>
+                        <button
+                          type="button"
+                          title="Promote only this student and detain others"
+                          onClick={() => {
+                            setStudents((prev) =>
+                              prev.map((s) => ({
+                                ...s,
+                                status: s.id === stu.id ? "promote" : "detain",
+                              }))
+                            );
+                            toast.success(`Promoting only "${stu.student_name || stu.name}". All others set to Detain.`);
+                          }}
+                          className="ml-2 text-[10px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 px-2 py-1 rounded-md border border-purple-200 dark:border-purple-800 transition-colors"
+                        >
+                          Only
+                        </button>
                       </td>
                     </tr>
                   );

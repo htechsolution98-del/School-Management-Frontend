@@ -7,6 +7,8 @@ export interface ChildProfile {
   surname: string;
   gr_no: string;
   roll_no: string;
+  father_name?: string;
+  mother_name?: string;
   school_class_id?: number;
   school_class_name: string;
   division: string;
@@ -139,4 +141,21 @@ export async function getParentAttendanceNotifications(): Promise<AttendanceNoti
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
+
+export async function getParentChildResults(studentId?: number): Promise<any[]> {
+  const query = studentId ? `?student_id=${studentId}` : "";
+  const res = await fetchWithAuth(`${API_BASE_URL}/results/my-results/${query}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : data.results || [];
+}
+
 

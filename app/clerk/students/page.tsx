@@ -75,6 +75,8 @@ import {
   getClasses,
 } from "@/lib/clerk";
 import { openAuthenticatedDocument } from "@/lib/document-viewer";
+import { fetchWithAuth } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/config";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import type { Admission } from "@/types/clerk";
 
@@ -345,11 +347,49 @@ function StudentDetailsModal({
 
   if (!admission) return null;
 
-  const handleViewDoc = async (url: string, title?: string) => {
+  const handleViewDoc = async (
+    docOrUrl: string | { id?: number; file?: string; document_field?: number; document_label?: string; document_file?: string; document_name?: string },
+    title?: string
+  ) => {
+    let url = typeof docOrUrl === "string" ? docOrUrl : (docOrUrl.file || docOrUrl.document_file || "");
+    const docId = typeof docOrUrl === "object" ? docOrUrl.id : undefined;
+    const docFieldId = typeof docOrUrl === "object" ? docOrUrl.document_field : undefined;
+    const docLabel = (typeof docOrUrl === "object" ? (docOrUrl.document_label || docOrUrl.document_name) : title) || "Document";
+
     if (!url) return;
     setLoadingViewDoc(url);
     try {
-      await openAuthenticatedDocument(url, title || "Document", url);
+      let targetUrl = url;
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/updateDocument/view-url/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            document_id: docId,
+            file_url: url,
+            admission_number: admission?.admission_number,
+            document_field_id: docFieldId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.cloudinary_url || data.url) {
+            targetUrl = data.cloudinary_url || data.url;
+            if (typeof docOrUrl === "object") {
+              if (docOrUrl.file) docOrUrl.file = targetUrl;
+              if (docOrUrl.document_file) docOrUrl.document_file = targetUrl;
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Could not resolve Cloudinary URL via API:", apiErr);
+      }
+
+      if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      } else {
+        await openAuthenticatedDocument(targetUrl, docLabel, targetUrl);
+      }
     } finally {
       setLoadingViewDoc(null);
     }
@@ -704,7 +744,7 @@ function StudentDetailsModal({
                               {doc.file && (
                                 <button
                                   type="button"
-                                  onClick={() => handleViewDoc(doc.file, doc.document_label)}
+                                  onClick={() => handleViewDoc(doc)}
                                   disabled={loadingViewDoc === doc.file}
                                   className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1 cursor-pointer"
                                   title="View Document"
@@ -1161,7 +1201,13 @@ export default function StudentRecordsPage() {
   const handleSaveFields = async () => {
     if (!editingAdmission) return;
     for (const field of editingAdmission.field_values) {
-      if (isAadhaarField({ label: field.field_label || "" }) && !aadhaarSchema.safeParse(editedFields[String(field.field)] ?? field.value ?? "").success) { toast.error(AADHAAR_ERROR); return; }
+      if (isAadhaarField({ label: field.field_label || "" })) {
+        const rawVal = (editedFields[String(field.field)] ?? field.value ?? "").replace(/\s+|-/g, "");
+        if (rawVal && !aadhaarSchema.safeParse(rawVal).success) {
+          toast.error(AADHAAR_ERROR);
+          return;
+        }
+      }
     }
     setIsSavingFields(true);
     try {
@@ -1737,7 +1783,9 @@ export default function StudentRecordsPage() {
 
               if (isClassField && classes.length > 0) {
                 const matchedClass = classes.find(
-                  (c) => String(c.id) === String(currentValue) || c.school_class === currentValue
+                  (c) =>
+                    String(c.id) === String(currentValue) ||
+                    (c.school_class || "").trim().toLowerCase() === (currentValue || "").trim().toLowerCase()
                 );
                 const selectedVal = matchedClass ? String(matchedClass.id) : String(currentValue);
 

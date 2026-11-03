@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, extractErrorMessage } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { LocationSettings, LocationSettingsRecord } from "@/types/clerk";
 
@@ -11,8 +11,13 @@ export async function getLocationSettings(): Promise<LocationSettingsRecord | nu
     if (response.status === 404) return null;
     let message = "Failed to fetch location settings.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }
@@ -32,8 +37,13 @@ export async function saveLocationSettings(payload: LocationSettings): Promise<v
   if (!response.ok) {
     let message = "Failed to save location settings.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }
@@ -48,8 +58,13 @@ export async function deleteLocationSettings(id: number | string): Promise<void>
   if (!response.ok && response.status !== 204) {
     let message = "Failed to delete location settings.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }

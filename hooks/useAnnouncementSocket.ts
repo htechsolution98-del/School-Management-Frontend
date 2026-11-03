@@ -132,10 +132,10 @@ export function useAnnouncementSocket() {
       const userKey = currentUserId ? `${READ_IDS_KEY}_${currentUserId}` : READ_IDS_KEY;
       const userStored = localStorage.getItem(userKey);
       const generalStored = localStorage.getItem(READ_IDS_KEY);
-      
+
       const userIds: (number | string)[] = userStored ? JSON.parse(userStored) : [];
       const generalIds: (number | string)[] = generalStored ? JSON.parse(generalStored) : [];
-      
+
       const merged = Array.from(new Set([...userIds, ...generalIds].map(String)));
       return merged;
     } catch {
@@ -301,7 +301,7 @@ export function useAnnouncementSocket() {
           const updatedReadIds = [...rIds, id];
           persistReadIds(updatedReadIds);
           setReadIds(updatedReadIds);
-          
+
           setNotifications((prev) => {
             const unread = prev.filter(
               (n) => !updatedReadIds.some((r) => String(r) === String(n.id))
@@ -391,10 +391,18 @@ export function useAnnouncementSocket() {
           return;
         }
 
-        // Staff status changed in real-time
+                // Staff status changed in real-time
         if (data?.type === "staff_status_changed") {
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("staff_status_changed", { detail: data }));
+            const currentUid = localStorage.getItem("user_id");
+            if (data?.action === "deactivated" && data?.user_id && String(data.user_id) === String(currentUid)) {
+              toast.error("Account Inactive", {
+                description: data?.message || "Your account has been deactivated by the administrator. Logging out...",
+              });
+              setTimeout(() => forceLogout(), 1200);
+              return;
+            }
           }
           return;
         }

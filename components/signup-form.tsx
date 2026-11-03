@@ -37,14 +37,18 @@ export function SignupForm() {
 
     try {
       const isEmail = identifier.includes("@");
+      const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
+      const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+      const cleanIdentifier = isEmail ? identifier.trim() : cleanMobile;
+
       const payload = isEmail
-        ? { email: identifier.trim() }
-        : { mobile: identifier.trim().replace(/\s+/g, "") };
+        ? { email: cleanIdentifier }
+        : { mobile: cleanMobile };
 
       await sendOtp(payload);
 
       const searchParams = new URLSearchParams();
-      searchParams.set("identifier", identifier.trim());
+      searchParams.set("identifier", cleanIdentifier);
       searchParams.set("type", isEmail ? "email" : "mobile");
 
       router.push(`/verify-otp?${searchParams.toString()}`);

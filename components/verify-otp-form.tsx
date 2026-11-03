@@ -49,15 +49,19 @@ function VerifyOtpInner() {
     }
 
     try {
+      const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
+      const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+      const cleanIdentifier = type === "email" ? identifier.trim() : cleanMobile;
+
       const payload: any = {
         otp: otp.trim(),
-        password: password,
+        password: password.trim(),
       };
 
       if (type === "email") {
-        payload.email = identifier;
+        payload.email = cleanIdentifier;
       } else {
-        payload.mobile = identifier;
+        payload.mobile = cleanMobile;
       }
 
       if (typeof window !== "undefined") {
@@ -69,7 +73,7 @@ function VerifyOtpInner() {
 
       await verifyOtp(payload);
       
-      router.push(`/login?identifier=${encodeURIComponent(identifier)}`);
+      router.push(`/login?identifier=${encodeURIComponent(cleanIdentifier)}`);
     } catch (err: any) {
       setError(err.message || "Verification failed. Please check your OTP and try again.");
     } finally {

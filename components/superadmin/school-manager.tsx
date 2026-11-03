@@ -1,7 +1,7 @@
 "use client";
 
 import { SchoolDetails } from "@/components/superadmin/school-details";
-import { Building2, Sparkles, Calendar, CreditCard, Clock, ShieldCheck, Check, Edit2, Loader2, Plus, Power, RefreshCw, Trash2 } from "lucide-react";
+import { Building2, Sparkles, Calendar, CreditCard, Clock, ShieldCheck, Check, Edit2, Loader2, Plus, Power, RefreshCw, Trash2, AlertTriangle, GraduationCap, Users } from "lucide-react";
 
 import { useCallback, useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -91,7 +91,8 @@ export default function SchoolManager() {
   const [detailsSchool, setDetailsSchool] = useState<School | null>(null);
   const [busyFeature, setBusyFeature] = useState<number | null>(null);
   const [accessError, setAccessError] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
+    const [preview, setPreview] = useState<string | null>(null);
+  const [cannotDeleteSchool, setCannotDeleteSchool] = useState<School | null>(null);
 
   // Compute total trial duration dynamically
   const calculateTrialDays = () => {
@@ -190,10 +191,27 @@ export default function SchoolManager() {
       document.getElementById(`school-${Object.keys(next)[0]}`)?.focus();
       return;
     }
-    if (schools.some(school => school.id !== editing?.id && school.email?.toLowerCase() === result.data.email)) {
+        // Multiple schools can have the same name. Only email, phone, and index_no must be unique.
+    if (schools.some(school => school.id !== editing?.id && school.email?.trim().toLowerCase() === result.data.email.trim().toLowerCase())) {
       setErrors({ email: "This email is already used by another school." });
       document.getElementById("school-email")?.focus();
       return;
+    }
+
+    const normPhone = result.data.phone.replace(/[\s()\-.]/g, "");
+    if (schools.some(school => school.id !== editing?.id && school.phone?.replace(/[\s()\-.]/g, "") === normPhone)) {
+      setErrors({ phone: "This phone number is already used by another school." });
+      document.getElementById("school-phone")?.focus();
+      return;
+    }
+
+    if (result.data.index_no?.trim()) {
+      const normIndex = result.data.index_no.trim().toLowerCase();
+      if (schools.some(school => school.id !== editing?.id && school.index_no?.trim().toLowerCase() === normIndex)) {
+        setErrors({ index_no: "This index number is already registered by another school." });
+        document.getElementById("school-index_no")?.focus();
+        return;
+      }
     }
     setSaving(true); setErrors({}); setFormError("");
     try {
@@ -219,8 +237,15 @@ export default function SchoolManager() {
     finally { setActionId(null); }
   };
 
-  const remove = async (school: School) => {
-    if (!school.id || !(await confirm(`Delete ${camelCaseText(school.name)}? This removes the school and its related records.`))) return;
+    const remove = async (school: School) => {
+    if (!school.id) return;
+    const staffCount = school.staff_count ?? 0;
+    const studentCount = school.student_count ?? 0;
+    if (staffCount > 0 || studentCount > 0) {
+      setCannotDeleteSchool(school);
+      return;
+    }
+    if (!(await confirm(`Delete ${camelCaseText(school.name)}? This will permanently delete the school and its trustee account.`))) return;
     setActionId(school.id); setError("");
     try { await deleteSchool(school.id); setSuccess("School deleted successfully."); await load(); }
     catch (err) { setError(err instanceof Error ? err.message : "Unable to delete school."); }
@@ -253,8 +278,18 @@ export default function SchoolManager() {
         <div className="flex items-center gap-3">
           <SchoolLogo src={school.logo} name={camelCaseText(school.name)} />
           <div className="min-w-0">
-            <p className="max-w-64 font-semibold text-slate-800">{camelCaseText(school.name) || "Unnamed school"}</p>
+                        <p className="max-w-64 font-semibold text-slate-800">{camelCaseText(school.name) || "Unnamed school"}</p>
             <p className="mt-1 text-xs text-slate-500">{school.code ? `Code: ${school.code}` : "No code"}{school.index_no ? ` · ${school.index_no}` : ""}</p>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">
+                <GraduationCap className="h-3 w-3 text-indigo-500" />
+                {school.student_count ?? 0} Students
+              </span>
+              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">
+                <Users className="h-3 w-3 text-teal-600" />
+                {school.staff_count ?? 0} Staff
+              </span>
+            </div>
           </div>
         </div>
       ),
@@ -412,7 +447,7 @@ export default function SchoolManager() {
         <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="admin-scroll-area min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 space-y-6">
           <fieldset disabled={saving} className="space-y-6">
-            
+
             {/* 1. BASIC SCHOOL INFO */}
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -878,6 +913,54 @@ export default function SchoolManager() {
         </div>
         <div className="flex shrink-0 justify-end border-t border-slate-200 p-4">
           <AdminButton onClick={() => setAccessSchool(null)} disabled={busyFeature !== null}>Done</AdminButton>
+        </div>
+            </DialogContent>
+    </Dialog>
+
+    {/* Warning Dialog when attempting to delete a school with active staff or students */}
+    <Dialog open={!!cannotDeleteSchool} onOpenChange={(val) => { if (!val) setCannotDeleteSchool(null); }}>
+      <DialogContent className="max-w-md rounded-2xl p-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 shadow-sm">
+            <AlertTriangle className="h-7 w-7 text-amber-600" />
+          </div>
+          <DialogTitle className="text-xl font-bold text-slate-900">
+            Cannot Delete Institution
+          </DialogTitle>
+          <DialogDescription className="mt-2 text-sm text-slate-600">
+            <strong className="text-slate-800">{camelCaseText(cannotDeleteSchool?.name)}</strong> has existing active records and cannot be deleted.
+          </DialogDescription>
+
+          <div className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-left space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 font-medium text-slate-600">
+                <GraduationCap className="h-4 w-4 text-indigo-600" />
+                Enrolled Students
+              </span>
+              <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 border border-indigo-200">
+                {cannotDeleteSchool?.student_count ?? 0} Students
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 font-medium text-slate-600">
+                <Users className="h-4 w-4 text-teal-600" />
+                Assigned Staff Members
+              </span>
+              <span className="inline-flex items-center rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-700 border border-teal-200">
+                {cannotDeleteSchool?.staff_count ?? 0} Staff
+              </span>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs leading-relaxed text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-xl p-3 text-left">
+            <strong>Action Required:</strong> To prevent data loss and orphaned accounts, all enrolled students and assigned staff members must be transferred or removed from this school before this trustee/school can be deleted.
+          </p>
+
+          <div className="mt-6 flex w-full justify-end">
+                        <AdminButton onClick={() => setCannotDeleteSchool(null)}>
+              Understood
+            </AdminButton>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
