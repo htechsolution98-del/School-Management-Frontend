@@ -476,7 +476,7 @@ export async function fetchWithAuth(
   try {
     const errBody = await response.clone().json();
     const msg = errBody?.detail || errBody?.message || "";
-    if (/deactivated|disabled|inactive/i.test(msg) || errBody?.code === "user_inactive") {
+    if (/deactivated|disabled/i.test(msg) || errBody?.code === "user_inactive") {
       clearAuthSession();
       if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
         window.location.href = "/login";
