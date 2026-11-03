@@ -3,8 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useMotionValue, useSpring, useInView, animate } from "framer-motion";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -401,31 +399,37 @@ export default function LandingPage() {
   const gsapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let ctx: any;
     if (typeof window !== "undefined") {
-      gsap.registerPlugin(ScrollTrigger);
+      Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(
+        ([{ default: gsap }, { ScrollTrigger }]) => {
+          gsap.registerPlugin(ScrollTrigger);
 
+          ctx = gsap.context(() => {
+            gsap.fromTo(
+              ".main-feature-card",
+              { opacity: 0, y: 60, scale: 0.9 },
+              {
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                duration: 0.8,
+                stagger: 0.1,
+                ease: "power3.out",
+                scrollTrigger: {
+                  trigger: gsapContainerRef.current,
+                  start: "top 80%",
+                  toggleActions: "play none none none",
+                },
+              }
+            );
+          }, gsapContainerRef);
+        }
+      );
 
-
-      const ctx = gsap.context(() => {
-        gsap.fromTo(".main-feature-card",
-          { opacity: 0, y: 60, scale: 0.9 },
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.8,
-            stagger: 0.1,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: gsapContainerRef.current,
-              start: "top 80%",
-              toggleActions: "play none none none",
-            }
-          }
-        );
-      }, gsapContainerRef);
-
-      return () => ctx.revert();
+      return () => {
+        if (ctx) ctx.revert();
+      };
     }
   }, []);
 

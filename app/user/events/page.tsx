@@ -6,10 +6,10 @@ import { EventsCalendarHub } from "@/components/events/events-calendar-hub";
 export default function UserEventsPage() {
   return (
     <EventsCalendarHub
-      roleTitle="Transport"
+      roleTitle="Applicant"
       canManage={false}
       pageTitle="School Calendar & Holidays"
-      pageSubtitle="View school operational days, gazetted holidays, and special event schedules."
+      pageSubtitle="View school operational days, gazetted holidays, and admission event schedules."
     />
   );
 }
