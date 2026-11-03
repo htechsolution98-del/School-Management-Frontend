@@ -212,7 +212,7 @@ export async function initiateRazorpayPayment({
   });
 
   try {
-    rzp.on("payment.failed", (response) => {
+    rzp.on("payment.failed", (response: any) => {
       onFailure(response?.error?.description ?? "Payment failed. Please try again.");
     });
     rzp.open();

@@ -1,7 +1,5 @@
 "use client";
 
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, isSupported, type Messaging } from "firebase/messaging";
 import { API_BASE_URL } from "./config";
 import { fetchWithAuth } from "./auth";
 
@@ -15,16 +13,25 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-ZWHWTLLG0S",
 };
 
-export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let cachedApp: any = null;
+let messagingInstance: any = null;
 
-let messagingInstance: Messaging | null = null;
+export async function getFirebaseApp() {
+  if (!cachedApp) {
+    const { initializeApp, getApps, getApp } = await import("firebase/app");
+    cachedApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  }
+  return cachedApp;
+}
 
-export async function getClientMessaging(): Promise<Messaging | null> {
+export async function getClientMessaging(): Promise<any> {
   if (typeof window === "undefined") return null;
+  const { isSupported, getMessaging } = await import("firebase/messaging");
   const supported = await isSupported().catch(() => false);
   if (!supported) return null;
   if (!messagingInstance) {
-    messagingInstance = getMessaging(app);
+    const appInstance = await getFirebaseApp();
+    messagingInstance = getMessaging(appInstance);
   }
   return messagingInstance;
 }
@@ -94,6 +101,7 @@ export async function enablePushNotifications(
       tokenOptions.vapidKey = finalVapidKey;
     }
 
+    const { getToken } = await import("firebase/messaging");
     const token = await getToken(messaging, tokenOptions);
     if (!token) {
       return { success: false, error: "Could not retrieve FCM registration token" };
@@ -127,13 +135,14 @@ export function listenToForegroundMessages(
 ): () => void {
   let unsubscribe: (() => void) | null = null;
 
-  getClientMessaging().then((messaging) => {
+  getClientMessaging().then(async (messaging) => {
     if (!messaging) return;
+    const { onMessage } = await import("firebase/messaging");
     unsubscribe = onMessage(messaging, (payload) => {
       console.log("[FCM Client] Foreground message received:", payload);
       const title = payload.notification?.title || payload.data?.title || "Absent Alert";
       const body = payload.notification?.body || payload.data?.message || payload.data?.body || "Student marked absent";
-      
+
       onNotification({
         title,
         body,

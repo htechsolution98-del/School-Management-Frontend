@@ -6,11 +6,11 @@ import { AnnouncementsHub } from "@/components/announcements/announcements-hub";
 export default function UserAnnouncementsPage() {
   return (
     <AnnouncementsHub
-      roleTitle="Transport & Portal"
+      roleTitle="Applicant"
       canCreate={false}
       accentColor="blue"
-      pageTitle="General Notices & Updates"
-      pageSubtitle="View school announcements, alerts, and circulars."
+      pageTitle="School Notices & Announcements"
+      pageSubtitle="View official admission notices, orientation schedules, and school circulars."
     />
   );
 }

@@ -97,7 +97,7 @@ const toneClasses: Record<string, string> = {
 const shortcuts = [
   { label: "Child Attendance", note: "Daily punch logs", href: "/parent/attendance", icon: Clock, tone: "blue" },
   { label: "Child Marksheet", note: "Term evaluations", href: "/parent/marksheets", icon: Award, tone: "blue" },
-  { label: "Fee Summary", note: "Counter & invoices", href: "#fee-summary", icon: CreditCard, tone: "amber" },
+  { label: "Fee Summary", note: "Counter & invoices", href: "/parent/fees", icon: CreditCard, tone: "amber" },
   { label: "School Notices", note: "Bulletins & alerts", href: "/parent/announcements", icon: Megaphone, tone: "sky" },
   { label: "School Calendar", note: "Holidays & events", href: "/parent/events", icon: CalendarDays, tone: "green" },
   { label: "Certificates", note: "LC & Bonafide", href: "/parent/certificates", icon: FileText, tone: "rose" },
@@ -670,7 +670,7 @@ export default function ParentDashboard() {
             : "All semester dues clear",
         icon: CreditCard,
         tone: activeChild.pending_fees > 0 ? "amber" : "blue",
-        href: "#fee-summary",
+        href: "/parent/fees",
       },
       {
         title: "School Bulletins",
@@ -1080,8 +1080,11 @@ export default function ParentDashboard() {
                   <footer className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1.5">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                      Direct fee receipts available at school office counter
+                      Direct fee receipts available
                     </span>
+                    <Link href="/parent/fees" className="font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                      Pay & Manage Fees &rarr;
+                    </Link>
                   </footer>
                 </article>
 

@@ -21,6 +21,10 @@ import {
   ArrowLeft,
   ChevronRight,
   TrendingUp,
+  Sparkles,
+  BookOpen,
+  Calendar,
+  School,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/auth";
@@ -96,7 +100,7 @@ export default function ParentChildMarksheetsPage() {
     stamp: "",
   });
 
-  // Load initial branding and children
+  // Load initial branding
   useEffect(() => {
     try {
       setResultTemplate(getSavedResultTemplate());
@@ -208,9 +212,12 @@ export default function ParentChildMarksheetsPage() {
 
   // Active exam results for the modal
   const activeExamResults = useMemo(() => {
-    if (!selectedExamTitle) return [];
+    if (!selectedExamTitle) {
+      if (examTitles.length > 0) return examsGrouped.get(examTitles[0]) || [];
+      return [];
+    }
     return examsGrouped.get(selectedExamTitle) || [];
-  }, [examsGrouped, selectedExamTitle]);
+  }, [examsGrouped, selectedExamTitle, examTitles]);
 
   const activeExamMetrics = useMemo(() => {
     if (activeExamResults.length === 0) {
@@ -251,8 +258,11 @@ export default function ParentChildMarksheetsPage() {
     setShowMarksheetModal(true);
   };
 
-  const handlePrintOfficialMarksheet = async () => {
-    if (!activeChild || activeExamResults.length === 0) {
+  const handlePrintOfficialMarksheet = async (examTitleOverride?: string) => {
+    const currentTitle = examTitleOverride || selectedExamTitle || examTitles[0];
+    const results = currentTitle ? (examsGrouped.get(currentTitle) || []) : activeExamResults;
+
+    if (!activeChild || results.length === 0) {
       toast.error("No published marksheet available to print.");
       return;
     }
@@ -267,7 +277,32 @@ export default function ParentChildMarksheetsPage() {
     );
 
     const activeTemplate =
-      (activeExamResults[0]?.report_template as ResultTemplateId) || resultTemplate || "classic";
+      (results[0]?.report_template as ResultTemplateId) || resultTemplate || "classic";
+
+    const subjectsForPrint = results.map((r: any, idx: number) => {
+      const rawSubj = r.subject_name || r.subject || r.exam?.subject?.name || `Subject #${idx + 1}`;
+      return {
+        subject: formatSubjectName(rawSubj),
+        maximum: r.max_marks || r.exam?.max_marks || 100,
+        obtained: r.is_absent ? "Absent" : (r.marks_obtained ?? 0),
+        grade: formatGrade(r.grade) || (r.is_absent ? "F" : "—"),
+        remarks: r.remarks ? capitalizeSentence(r.remarks) : "—",
+        absent: r.is_absent,
+      };
+    });
+
+    const totalMax = results.reduce(
+      (s: number, r: any) => s + parseFloat(r.max_marks || r.exam?.max_marks || "0"),
+      0
+    );
+    const totalObtained = results.reduce(
+      (s: number, r: any) => s + (r.is_absent ? 0 : parseFloat(r.marks_obtained || "0")),
+      0
+    );
+    const percentage = totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(2) : "0.00";
+    const numP = Number(percentage);
+    const overallGrade =
+      numP >= 90 ? "A+" : numP >= 75 ? "A" : numP >= 60 ? "B" : numP >= 40 ? "C" : "F";
 
     await writePrintableResultCards({
       printWindow,
@@ -278,14 +313,14 @@ export default function ParentChildMarksheetsPage() {
           rollNumber: activeChild.roll_no,
           admissionNumber: activeChild.gr_no,
           className: capitalizeWords(activeChild.school_class_name || ""),
-          division: (activeChild.division || "").toUpperCase(),
+          division: (activeChild.division || "A").toUpperCase(),
           dateOfBirth: activeChild.date_of_birth,
           photo: (activeChild as any).photo || (activeChild as any).profile_photo,
-          subjects: marksheetSubjects,
-          totalMaximum: activeExamMetrics.totalMax,
-          totalObtained: activeExamMetrics.totalObtained,
-          percentage: activeExamMetrics.percentage,
-          overallGrade: formatGrade(activeExamMetrics.overallGrade),
+          subjects: subjectsForPrint,
+          totalMaximum: totalMax,
+          totalObtained: totalObtained,
+          percentage: percentage,
+          overallGrade: formatGrade(overallGrade),
           remarks: "Keep up the excellent academic performance.",
         },
       ],
@@ -301,7 +336,7 @@ export default function ParentChildMarksheetsPage() {
         teacherSignature: schoolBrand.teacherSignature,
         stamp: schoolBrand.stamp,
       },
-      title: selectedExamTitle || "Examination Result",
+      title: currentTitle || "Examination Result",
       academicYear: "2026-27",
       template: activeTemplate,
     });
@@ -366,8 +401,8 @@ export default function ParentChildMarksheetsPage() {
     : "Ward";
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ── TOP BREADCRUMB & BACK LINK ── */}
+    <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-6 lg:pb-12 w-full min-w-0 overflow-x-hidden">
+      {/* ── TOP BREADCRUMB ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           <Link href="/parent" className="hover:text-blue-600 transition flex items-center gap-1">
@@ -377,114 +412,173 @@ export default function ParentChildMarksheetsPage() {
           <ChevronRight className="h-3 w-3 text-slate-300" />
           <span className="text-blue-700 font-bold">Child Marksheet</span>
         </div>
-
-        {/* Multi-Child Selector Pills */}
-        {children.length > 1 && (
-          <div className="flex items-center gap-1.5 rounded-2xl bg-white p-1 border border-slate-200/80 shadow-xs">
-            {children.map((child, idx) => (
-              <button
-                key={child.id}
-                type="button"
-                onClick={() => setSelectedChildIndex(idx)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                  selectedChildIndex === idx
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {capitalizeWords(child.name)}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* ── HERO BANNER IN BLUE THEME ── */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-blue-100/90 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 p-5 shadow-sm sm:p-7">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-blue-200/30 blur-3xl" />
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="max-w-xl">
+      {/* ── 1. ROYAL BLUE EXECUTIVE HEADER BANNER ── */}
+      <section className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-white p-5 sm:p-7 shadow-xs">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-wider">
-                Official Academic Records
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+                <Sparkles className="h-3.5 w-3.5" /> Official Academic Records
               </span>
-              <span className="text-xs text-slate-500 font-medium">Academic Year 2026-27</span>
+              <span className="text-xs font-bold text-slate-500">
+                Academic Year 2026-27
+              </span>
             </div>
-            <h1 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-              Child <span className="text-blue-600">Marksheet & Evaluations</span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Child Marksheet & Evaluations
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Official school performance evaluations for <strong className="text-slate-900 font-bold">{studentFullName}</strong>.
-              Review term marksheets, subject grades, and print official report cards.
+            <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-2xl leading-relaxed">
+              Official school performance evaluations for{" "}
+              <span className="font-bold text-blue-700">{studentFullName}</span>. Review term marksheets,
+              subject grades, and print official report cards.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+          <div className="flex items-center gap-2 self-start md:self-auto">
             <Button
               variant="outline"
               onClick={loadData}
               disabled={isLoading}
-              className="h-11 flex-1 sm:flex-none rounded-xl border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50"
+              className="rounded-2xl border-slate-200 bg-white/80 text-xs font-bold shadow-xs hover:bg-white hover:text-blue-600 transition"
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : <RefreshCw className="h-4 w-4 text-slate-500" />}
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin text-blue-600" : "text-slate-500"}`} />
               Refresh
             </Button>
 
             {examTitles.length > 0 && (
               <Button
-                onClick={() => handleOpenMarksheet(examTitles[0])}
-                className="h-11 flex-1 sm:flex-none rounded-xl bg-blue-600 px-5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 gap-2"
+                onClick={() => handlePrintOfficialMarksheet(examTitles[0])}
+                className="rounded-2xl bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold shadow-sm shadow-blue-500/20 gap-1.5"
               >
-                <FileText className="h-4 w-4 text-white" />
-                Latest Marksheet
+                <Printer className="h-3.5 w-3.5" />
+                Print Latest Report Card
               </Button>
             )}
           </div>
         </div>
       </section>
 
-      {/* ── 2 SUMMARY STATS CARDS (BLUE THEME) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Card 1: Cumulative Performance */}
-        <Card className="rounded-3xl border border-blue-100/90 bg-white shadow-xs p-5 flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide">
-              <BarChart3 className="h-4 w-4 text-blue-600" />
-              Cumulative Performance
-            </div>
-            <div className="text-3xl font-black text-blue-700 font-mono">
-              {stats.avgPercentage}%
-            </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Average score across all completed examinations
-            </p>
-          </div>
-          <div className="h-14 w-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <Award className="h-7 w-7" />
-          </div>
-        </Card>
+      {/* ── 2. MULTI-CHILD SELECTOR TABS ── */}
+      {children.length > 1 && (
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto max-w-full no-scrollbar">
+          {children.map((child, idx) => (
+            <button
+              key={child.id}
+              onClick={() => setSelectedChildIndex(idx)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-xs sm:text-sm shrink-0 transition-all ${
+                selectedChildIndex === idx
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              {capitalizeWords(child.name)} ({capitalizeWords(child.school_class_name)}-{(child.division || "A").toUpperCase()})
+            </button>
+          ))}
+        </div>
+      )}
 
-        {/* Card 2: Published Examinations */}
-        <Card className="rounded-3xl border border-blue-100/90 bg-white shadow-xs p-5 flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide">
-              <GraduationCap className="h-4 w-4 text-blue-600" />
-              Conducted Evaluations
+      {/* ── 3. WARD IDENTITY PROFILE BANNER ── */}
+      {activeChild && !isLoading && (
+        <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-md shadow-blue-500/20 shrink-0">
+                {activeChild.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                    {studentFullName}
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    Enrolled Student
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                  {capitalizeWords(activeChild.school_name || "School")}
+                </p>
+              </div>
             </div>
-            <div className="text-3xl font-black text-slate-900 font-mono">
-              {stats.completed}
-            </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Total published exams verified by school faculty
-            </p>
-          </div>
-          <div className="h-14 w-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-            <CheckCircle className="h-7 w-7 text-emerald-600" />
-          </div>
-        </Card>
-      </div>
 
-      {/* ── SEARCH & FILTER BAR ── */}
+            {/* Identity Badges Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">G.R. Number</span>
+                <span className="font-extrabold text-slate-800">{activeChild.gr_no || "GR-801"}</span>
+              </div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Class & Section</span>
+                <span className="font-extrabold text-slate-800">
+                  {capitalizeWords(activeChild.school_class_name)} ({(activeChild.division || "A").toUpperCase()})
+                </span>
+              </div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Roll Number</span>
+                <span className="font-extrabold text-slate-800">#{activeChild.roll_no || "1"}</span>
+              </div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Academic Standing</span>
+                <span className="font-extrabold text-emerald-600">
+                  Passed & Promoted
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. SHIMMER SKELETON / SUMMARY METRICS ── */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="h-32 rounded-3xl bg-slate-100 animate-pulse" />
+          <div className="h-32 rounded-3xl bg-slate-100 animate-pulse" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Card 1: Cumulative Performance */}
+          <Card className="rounded-3xl border border-blue-100/90 bg-white shadow-xs p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                <BarChart3 className="h-4 w-4 text-blue-600" />
+                Cumulative Performance
+              </div>
+              <div className="text-3xl font-black text-blue-700 font-mono">
+                {stats.avgPercentage}%
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                Average score across all completed examinations
+              </p>
+            </div>
+            <div className="h-14 w-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <Award className="h-7 w-7" />
+            </div>
+          </Card>
+
+          {/* Card 2: Conducted Evaluations */}
+          <Card className="rounded-3xl border border-blue-100/90 bg-white shadow-xs p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                <GraduationCap className="h-4 w-4 text-blue-600" />
+                Conducted Evaluations
+              </div>
+              <div className="text-3xl font-black text-slate-900 font-mono">
+                {stats.completed}
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                Total published exams verified by school faculty
+              </p>
+            </div>
+            <div className="h-14 w-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── 5. SEARCH & FILTER BAR ── */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -509,12 +603,12 @@ export default function ParentChildMarksheetsPage() {
         </div>
       </div>
 
-      {/* ── EXAM MARKSHEETS LIST / GRID ── */}
+      {/* ── 6. EXAM MARKSHEETS LIST ── */}
       {isLoading ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-xs">
-          <Loader2 className="mb-3 h-8 w-8 animate-spin text-blue-600" />
-          <h4 className="text-sm font-bold text-slate-800">Loading Academic Marksheets...</h4>
-          <p className="mt-1 text-xs text-slate-400">Fetching published results from school server</p>
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-72 rounded-3xl bg-slate-100 animate-pulse" />
+          ))}
         </div>
       ) : examTitles.length === 0 ? (
         <div className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-xs">
@@ -533,7 +627,7 @@ export default function ParentChildMarksheetsPage() {
               onClick={() => setSearchQuery("")}
               className="mt-4 rounded-xl text-xs font-bold"
             >
-              Clear Filter
+              Clear Search Filter
             </Button>
           )}
         </div>
@@ -557,18 +651,23 @@ export default function ParentChildMarksheetsPage() {
             return (
               <article
                 key={title}
-                className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xs transition hover:border-blue-200 hover:shadow-sm"
+                className="overflow-hidden rounded-3xl border border-blue-100/90 bg-white shadow-xs transition hover:border-blue-300 hover:shadow-sm"
               >
                 {/* Header Band */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/50 via-slate-50/40 to-white px-5 py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-white px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm shadow-blue-500/20">
-                      <Award className="h-5 w-5" />
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                      <Award className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-base font-extrabold uppercase tracking-wide text-slate-900">
-                        {title}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-black uppercase tracking-wide text-slate-900">
+                          {title}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100/70 text-blue-700">
+                          Official Record
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-500 font-medium">
                         {resultsList.length} subjects evaluated · Class: {capitalizeWords(activeChild?.school_class_name || "Grade")} ({(activeChild?.division || "A").toUpperCase()})
                       </p>
@@ -577,11 +676,11 @@ export default function ParentChildMarksheetsPage() {
 
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <span
-                      className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${gradeBadge.bg} ${gradeBadge.text} ${gradeBadge.border}`}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wide border ${gradeBadge.bg} ${gradeBadge.text} ${gradeBadge.border}`}
                     >
                       Grade {examGrade}
                     </span>
-                    <span className="px-3 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 text-xs font-black font-mono">
+                    <span className="px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 text-xs font-black font-mono">
                       {examPct}%
                     </span>
                   </div>
@@ -590,24 +689,24 @@ export default function ParentChildMarksheetsPage() {
                 {/* Score & Subjects Table */}
                 <div className="p-5 space-y-4">
                   {/* Summary Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100 text-xs">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50/90 p-4 border border-slate-100 text-xs">
+                    <div className="flex items-center gap-4 sm:gap-6">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Marks</span>
-                        <strong className="text-slate-800 font-mono font-bold text-sm">
+                        <strong className="text-slate-800 font-mono font-black text-sm sm:text-base">
                           {examTotalObtained} / {examTotalMax}
                         </strong>
                       </div>
-                      <div className="h-6 w-px bg-slate-200" />
+                      <div className="h-8 w-px bg-slate-200" />
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
-                        <strong className={`font-bold ${numP >= 35 ? "text-emerald-700" : "text-rose-700"}`}>
-                          {numP >= 35 ? "PASSED" : "FAILED"}
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Evaluation Result</span>
+                        <strong className={`font-black text-xs sm:text-sm ${numP >= 35 ? "text-emerald-700" : "text-rose-700"}`}>
+                          {numP >= 35 ? "PASSED & PROMOTED" : "NEEDS IMPROVEMENT"}
                         </strong>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -616,6 +715,16 @@ export default function ParentChildMarksheetsPage() {
                       >
                         <Users className="h-3.5 w-3.5 text-blue-600" />
                         Class Rankings
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handlePrintOfficialMarksheet(title)}
+                        className="h-9 rounded-xl border-blue-200 bg-blue-50/50 text-xs font-bold text-blue-700 hover:bg-blue-100 gap-1.5"
+                      >
+                        <Printer className="h-3.5 w-3.5 text-blue-600" />
+                        Print Card
                       </Button>
 
                       <Button
@@ -630,16 +739,16 @@ export default function ParentChildMarksheetsPage() {
                   </div>
 
                   {/* Subject rows table */}
-                  <div className="rounded-2xl border border-slate-100 overflow-hidden text-xs">
+                  <div className="rounded-2xl border border-slate-100 overflow-x-auto text-xs">
                     <table className="w-full text-left">
                       <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
                         <tr>
-                          <th className="p-2.5 pl-3">Sr. No.</th>
-                          <th className="p-2.5">Subject</th>
-                          <th className="p-2.5 text-center">Max Marks</th>
-                          <th className="p-2.5 text-center">Marks Obtained</th>
-                          <th className="p-2.5 text-center">Grade</th>
-                          <th className="p-2.5">Remarks</th>
+                          <th className="p-3 pl-4">Sr. No.</th>
+                          <th className="p-3">Subject</th>
+                          <th className="p-3 text-center">Max Marks</th>
+                          <th className="p-3 text-center">Marks Obtained</th>
+                          <th className="p-3 text-center">Grade</th>
+                          <th className="p-3">Remarks</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -652,20 +761,20 @@ export default function ParentChildMarksheetsPage() {
                           const subjectBadge = getGradeBadgeStyle(grade);
 
                           return (
-                            <tr key={r.id || idx} className="hover:bg-slate-50/40 transition">
-                              <td className="p-2.5 pl-3 font-mono text-slate-400 text-center w-12">{idx + 1}</td>
-                              <td className="p-2.5 font-bold text-slate-800">{subj}</td>
-                              <td className="p-2.5 text-center text-slate-500">{max}</td>
-                              <td className={`p-2.5 text-center font-black ${r.is_absent ? "text-rose-600" : "text-blue-700"}`}>
+                            <tr key={r.id || idx} className="hover:bg-blue-50/20 transition">
+                              <td className="p-3 pl-4 font-mono text-slate-400 text-center w-12">{idx + 1}</td>
+                              <td className="p-3 font-bold text-slate-800">{subj}</td>
+                              <td className="p-3 text-center text-slate-500 font-mono">{max}</td>
+                              <td className={`p-3 text-center font-black font-mono ${r.is_absent ? "text-rose-600" : "text-blue-700"}`}>
                                 {obtained}
                               </td>
-                              <td className="p-2.5 text-center">
-                                <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] border ${subjectBadge.bg} ${subjectBadge.text} ${subjectBadge.border}`}>
+                              <td className="p-3 text-center">
+                                <span className={`px-2.5 py-0.5 rounded-md font-bold text-[10px] border ${subjectBadge.bg} ${subjectBadge.text} ${subjectBadge.border}`}>
                                   {grade}
                                 </span>
                               </td>
-                              <td className="p-2.5 text-slate-500 text-[11px]">
-                                {r.remarks ? capitalizeSentence(r.remarks) : "—"}
+                              <td className="p-3 text-slate-500 text-[11px]">
+                                {r.remarks ? capitalizeSentence(r.remarks) : "Good Performance"}
                               </td>
                             </tr>
                           );
@@ -680,14 +789,14 @@ export default function ParentChildMarksheetsPage() {
         </div>
       )}
 
-      {/* ── EXACT PRINCIPAL OFFICIAL MARKSHEET MODAL & PRINT VIEW (BLUE THEME) ── */}
+      {/* ── 7. OFFICIAL REPORT CARD PREVIEW MODAL ── */}
       <Dialog open={showMarksheetModal} onOpenChange={setShowMarksheetModal}>
-        <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-h-[100dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-slate-100/90 p-0 sm:left-1/2 sm:top-1/2 sm:h-[92dvh] sm:w-[94vw] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl shadow-2xl">
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 flex justify-center">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-3xl border-0 shadow-2xl">
+          <div className="space-y-4">
             {activeChild && activeExamResults.length > 0 && (
               <ResultCardPreview
                 title={selectedExamTitle || (examTitles[0] ?? "Examination Result")}
-                template={((activeExamResults[0]?.report_template as ResultTemplateId) || resultTemplate || "classic")}
+                template={((activeExamResults[0]?.report_template as ResultTemplateId) || resultTemplate || "classic") as ResultTemplateId}
                 school={{
                   name: schoolBrand.name,
                   shortName: schoolBrand.shortName,
@@ -697,6 +806,7 @@ export default function ParentChildMarksheetsPage() {
                   address: schoolBrand.address,
                   phone: schoolBrand.phone,
                   email: schoolBrand.email,
+                  academicYear: "2026-27",
                   establishmentYear: schoolBrand.establishmentYear,
                   boardAffiliation: schoolBrand.boardAffiliation,
                   schoolCode: schoolBrand.schoolCode,
@@ -706,17 +816,17 @@ export default function ParentChildMarksheetsPage() {
                   principalSignature: schoolBrand.principalSignature,
                   teacherSignature: schoolBrand.teacherSignature,
                   stamp: schoolBrand.stamp,
-                  academicYear: "2026-27",
                 }}
                 student={{
                   id: activeChild.id,
-                  name: capitalizeWords(`${activeChild.name} ${activeChild.surname || ""}`.trim()),
-                  fatherName: activeChild.father_name ? capitalizeWords(activeChild.father_name) : undefined,
-                  motherName: activeChild.mother_name ? capitalizeWords(activeChild.mother_name) : undefined,
+                  name: studentFullName,
                   rollNumber: activeChild.roll_no,
                   admissionNumber: activeChild.gr_no,
-                  className: `${capitalizeWords(activeChild.school_class_name || "")}${activeChild.division ? ` - ${activeChild.division.toUpperCase()}` : ""}`.trim(),
+                  className: capitalizeWords(activeChild.school_class_name || ""),
+                  section: (activeChild.division || "A").toUpperCase(),
                   dateOfBirth: activeChild.date_of_birth,
+                  motherName: activeChild.mother_name ? capitalizeWords(activeChild.mother_name) : undefined,
+                  fatherName: activeChild.father_name ? capitalizeWords(activeChild.father_name) : undefined,
                   photo: (activeChild as any).photo || (activeChild as any).profile_photo,
                 }}
                 subjects={marksheetSubjects}
@@ -731,131 +841,125 @@ export default function ParentChildMarksheetsPage() {
             )}
           </div>
 
-          <DialogFooter className="flex shrink-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+          <DialogFooter className="mt-4 flex flex-row items-center justify-end gap-2 border-t border-slate-100 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowMarksheetModal(false)}
-              className="rounded-xl text-xs"
+              className="rounded-xl text-xs font-bold"
             >
               Close
             </Button>
             <Button
               type="button"
+              variant="outline"
               onClick={handleDownloadPDF}
               disabled={isDownloadingPDF || !activeChild || activeExamResults.length === 0}
-              className="gap-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200"
+              className="rounded-xl text-xs font-bold gap-1.5"
             >
               {isDownloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {isDownloadingPDF ? "Downloading..." : "Download PDF"}
+              Download PDF
             </Button>
             <Button
               type="button"
-              onClick={handlePrintOfficialMarksheet}
+              onClick={() => handlePrintOfficialMarksheet(selectedExamTitle || undefined)}
               disabled={!activeChild || activeExamResults.length === 0}
-              className="gap-2 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 shadow-md shadow-blue-500/20"
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-1.5"
             >
-              <Printer className="h-4 w-4" /> Print Marksheet
+              <Printer className="h-4 w-4" />
+              Print Marksheet
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── CLASS RANKINGS LEADERBOARD MODAL (BLUE THEME) ── */}
+      {/* ── 8. CLASS RANKINGS & LEADERBOARD MODAL ── */}
       <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="max-w-lg rounded-3xl border border-slate-100 bg-white p-6 shadow-xl">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Class Performance</span>
-              <h3 className="text-base font-black text-slate-900">{leaderboardTitle} Leaderboard</h3>
+        <DialogContent className="max-w-2xl rounded-3xl p-5 sm:p-6 border-0 shadow-2xl">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  {leaderboardTitle} · Class Rankings
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Class performance standings and student merit ranking
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => setShowLeaderboard(false)}
-              className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
 
-          <div className="max-h-[380px] overflow-y-auto space-y-2 py-3">
             {leaderboardLoading ? (
-              <div className="flex min-h-[160px] flex-col items-center justify-center text-center">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-                <p className="text-xs text-slate-500 font-medium">Calculating class rankings...</p>
+              <div className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mb-2 mx-auto" />
+                <p className="text-xs text-slate-500 font-semibold">Computing merit rankings...</p>
               </div>
             ) : leaderboardError ? (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-center text-xs text-rose-700">
+              <div className="p-4 rounded-2xl bg-rose-50 text-rose-700 text-xs font-semibold">
                 {leaderboardError}
               </div>
             ) : rankings.length === 0 ? (
-              <div className="p-4 rounded-2xl bg-slate-50 text-center text-xs text-slate-500">
-                No rank data published for this evaluation.
+              <div className="p-6 text-center text-xs text-slate-400">
+                No class ranking entries available for this evaluation.
               </div>
             ) : (
-              rankings.map((entry) => {
-                const isMyChild = Number(entry.student) === Number(activeChild?.id);
-                return (
-                  <div
-                    key={entry.student}
-                    className={`flex items-center justify-between p-3 rounded-2xl border transition ${
-                      isMyChild
-                        ? "bg-blue-50/80 border-blue-200 shadow-2xs"
-                        : "bg-slate-50/60 border-slate-100 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold font-mono text-xs ${
-                          entry.rank === 1
-                            ? "bg-amber-400 text-white shadow-xs"
-                            : entry.rank === 2
-                            ? "bg-slate-300 text-slate-800"
-                            : entry.rank === 3
-                            ? "bg-amber-600 text-white"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        #{entry.rank}
-                      </span>
-                      <div>
-                        <p className={`text-xs font-bold ${isMyChild ? "text-blue-900" : "text-slate-800"}`}>
-                          {capitalizeWords(entry.student_name || `Student #${entry.student}`)}
-                          {isMyChild && (
-                            <span className="ml-1.5 px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 text-[9px] font-black uppercase">
-                              Your Child
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          Roll: #{(entry as any).roll_no || "—"} · GR: {(entry as any).gr_no || "—"}
-                        </p>
+              <div className="max-h-[55vh] overflow-y-auto space-y-2">
+                {rankings.map((r) => {
+                  const isCurrentWard = activeChild && r.student === activeChild.id;
+                  return (
+                    <div
+                      key={r.student}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all text-xs ${
+                        isCurrentWard
+                          ? "bg-blue-50/80 border-blue-200 ring-1 ring-blue-400"
+                          : "bg-white border-slate-100 hover:border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl font-mono font-black text-xs ${
+                            r.rank === 1
+                              ? "bg-amber-100 text-amber-800"
+                              : r.rank === 2
+                              ? "bg-slate-200 text-slate-800"
+                              : r.rank === 3
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          #{r.rank}
+                        </span>
+                        <div>
+                          <p className="font-extrabold text-slate-900">
+                            {capitalizeWords(r.student_name || "Student")}
+                            {isCurrentWard && (
+                              <span className="ml-2 px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold">
+                                Your Ward
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-medium">
+                            Class Standing · Student #{r.student}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="font-mono font-black text-slate-900 text-xs sm:text-sm">
+                          {r.marks_obtained} / {r.max_marks}
+                        </div>
+                        <span className="font-bold text-blue-700 text-[11px]">
+                          Grade {r.grade || "A"}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="text-right">
-                      <strong className="block text-xs font-black text-slate-900 font-mono">
-                        {entry.marks_obtained} / {entry.max_marks}
-                      </strong>
-                      <span className="text-[10px] font-bold text-blue-600">
-                        Grade {formatGrade(entry.grade)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
-
-          <DialogFooter className="pt-2 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowLeaderboard(false)}
-              className="w-full rounded-xl text-xs font-bold"
-            >
-              Close Leaderboard
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

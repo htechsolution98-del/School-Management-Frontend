@@ -12,8 +12,6 @@ import {
   FileDown,
   Check,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { toast } from "sonner";
 import type { CertificateRequestItem } from "@/lib/certificate";
 
@@ -119,6 +117,9 @@ export function DigitalCertificateModal({
         toast.success("Certificate PDF downloaded.", { id: toastId });
         return;
       }
+
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF } = await import("jspdf");
 
       const canvas = await html2canvas(element, {
         scale: Math.min(2, window.devicePixelRatio || 1),
