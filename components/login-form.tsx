@@ -67,16 +67,17 @@ function LoginFormInner() {
 
     const isEmail = identifier.includes("@");
     const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
-    const is10DigitMobile = /^[0-9]{10}$/.test(digitsOnly);
+    const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+    const isMobile = /^[0-9]{10}$/.test(cleanMobile);
 
     setIsLoading(true);
 
-    const payload: LoginRequest = { password };
+    const payload: LoginRequest = { password: password.trim() };
     if (isEmail) {
       payload.email = identifier;
-    } else if (is10DigitMobile) {
-      payload.mobile = digitsOnly;
-      payload.username = digitsOnly;
+    } else if (isMobile) {
+      payload.mobile = cleanMobile;
+      payload.username = cleanMobile;
     } else {
       payload.username = identifier;
     }

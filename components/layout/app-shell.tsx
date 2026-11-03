@@ -37,7 +37,7 @@ import { getCurrentUserProfile } from "@/lib/current-user";
 import { ProfileDialog } from "@/components/profile/profile-dialog";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { PageTutorialDialog } from "@/components/tutorial/page-tutorial-dialog";
-import { cn } from "@/lib/utils";
+import { cn, capitalizeWords } from "@/lib/utils";
 import type { CurrentUserProfile } from "@/types";
 import { useSchool, SCHOOL_PROFILE_UPDATED_EVENT } from "@/context/school-context";
 
@@ -1092,13 +1092,13 @@ export function
                       roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
                     )}
                   >
-                    {currentUserName || "Student"}
+                    {capitalizeWords(currentUserName) || "Student"}
                   </span>
                   <span className={cn(
                     "block truncate text-[11px] font-normal leading-tight",
                     roleTitle === "Student" ? "text-white/80" : "text-white/75 lg:text-[#7183A6]"
                   )}>
-                    {profile?.role?.toLowerCase() || (roleTitle || "student").toLowerCase()}
+                    {capitalizeWords(profile?.role || roleTitle || "Student")}
                   </span>
                 </div>
                 <ChevronDown className={cn(

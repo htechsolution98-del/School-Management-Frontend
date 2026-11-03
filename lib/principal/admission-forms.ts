@@ -1,5 +1,5 @@
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, getAccessToken } from "@/lib/auth";
 import { getErrorMessage, normalizeList } from "./helpers";
 import type {
   AdmissionFormCreatePayload,
@@ -7,6 +7,26 @@ import type {
 } from "@/types/principal";
 
 const FORMS_URL = `${API_BASE_URL}${API_ENDPOINTS.FORMS}`;
+
+export interface PublishedFormItem {
+  id: number;
+  title: string;
+  unique_link: string;
+  form_link: string;
+  api_form_link?: string;
+  school_id?: number | null;
+  school_name: string;
+  school_slug?: string;
+  academic_year?: string;
+}
+
+export interface PublishedFormLinkResponse {
+  form_link: string;
+  unique_link: string | null;
+  school_name?: string;
+  forms: PublishedFormItem[];
+  count?: number;
+}
 
 export async function getAdmissionForms(): Promise<AdmissionFormResponse[]> {
   const response = await fetchWithAuth(FORMS_URL);
@@ -91,24 +111,48 @@ export async function updateAdmissionForm(
   return response.json();
 }
 
-export async function getPublishedFormLink(): Promise<{ form_link: string }> {
+export async function getPublishedFormLink(): Promise<PublishedFormLinkResponse> {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.FORM_LINK}`);
+    const token = typeof window !== "undefined" ? getAccessToken() : null;
+    const url = `${API_BASE_URL}${API_ENDPOINTS.FORM_LINK}`;
+    const response = token
+      ? await fetchWithAuth(url)
+      : await fetch(url, { headers: { "Content-Type": "application/json" } });
 
     if (!response.ok) {
-      return { form_link: "" };
+      return { form_link: "", unique_link: null, forms: [] };
     }
 
     const data = await response.json();
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-    if (data.unique_link && typeof window !== "undefined") {
-      data.form_link = new URL(`/form/${data.unique_link}`, window.location.origin).toString();
-    } else if (data.form_link && data.form_link.startsWith("/")) {
-      data.form_link = new URL(data.form_link, API_BASE_URL).toString();
+    const rawForms: PublishedFormItem[] = Array.isArray(data.forms) ? data.forms : [];
+    const formattedForms: PublishedFormItem[] = rawForms.map((item) => {
+      let resolvedLink = item.form_link || "";
+      if (item.unique_link) {
+        resolvedLink = origin ? `${origin}/form/${item.unique_link}` : `/form/${item.unique_link}`;
+      }
+      return {
+        ...item,
+        form_link: resolvedLink,
+      };
+    });
+
+    let mainFormLink = data.form_link || "";
+    if (data.unique_link) {
+      mainFormLink = origin ? `${origin}/form/${data.unique_link}` : `/form/${data.unique_link}`;
+    } else if (formattedForms.length > 0) {
+      mainFormLink = formattedForms[0].form_link;
     }
 
-    return data;
-  } catch (error) {
-    return { form_link: "" };
+    return {
+      form_link: mainFormLink,
+      unique_link: data.unique_link || (formattedForms[0]?.unique_link ?? null),
+      school_name: data.school_name || formattedForms[0]?.school_name || "",
+      forms: formattedForms,
+      count: formattedForms.length,
+    };
+  } catch {
+    return { form_link: "", unique_link: null, forms: [] };
   }
 }

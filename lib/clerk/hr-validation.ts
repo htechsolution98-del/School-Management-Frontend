@@ -50,12 +50,15 @@ export function validateStaffRecord(
   }
 
   const others = staff.filter(member => member.id !== editingId);
-  if (trimmedEmail && others.some(member => member.email?.trim().toLowerCase() === trimmedEmail)) {
-    errors.email = "This email is already assigned to a staff member.";
-  }
-  if (normMobile && others.some(member => normalizePhone(member.mobile || "") === normMobile)) {
-    errors.mobile = "This mobile number is already assigned to a staff member.";
-  }
+  const existingStaffByEmail = trimmedEmail ? others.find(member => member.email?.trim().toLowerCase() === trimmedEmail) : null;
+  const existingStaffByMobile = normMobile ? others.find(member => normalizePhone(member.mobile || "") === normMobile) : null;
+  const existingMember = existingStaffByEmail || existingStaffByMobile;
+
+  const selectedDepts = (data.departments && data.departments.length > 0)
+    ? data.departments
+    : (data.department ? [data.department] : []);
+
+  // When an existing staff member is detected, their email & phone are valid for re-assignment/updating
 
   const selectedRole = roles?.find(r => String(r.id) === String(data.category));
   const isClerk = selectedRole
@@ -63,10 +66,10 @@ export function validateStaffRecord(
     : (typeof data.category === "string" && data.category.toLowerCase().includes("clerk"));
 
   if (!isClerk) {
-    if (!departments.some(item => item.id === data.department)) {
-      errors.department = "Select an available department.";
+    if (selectedDepts.length === 0 || !selectedDepts.some(id => departments.some(item => item.id === id))) {
+      errors.department = "Select at least one available department.";
     }
-  } else if (data.department && !departments.some(item => item.id === data.department)) {
+  } else if (selectedDepts.length > 0 && !selectedDepts.some(id => departments.some(item => item.id === id))) {
     errors.department = "Select an available department.";
   }
 

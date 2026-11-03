@@ -336,13 +336,13 @@ export default function ClerkDashboard() {
       <div className="relative z-30">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs px-4 py-3 flex items-center gap-3 focus-within:ring-2 focus-within:ring-[#5826df]/20 focus-within:border-[#5826df]/40 transition-all">
           <Search className="h-5 w-5 text-[#5826df] shrink-0" />
-          <input
+                    <input
             type="text"
             placeholder="Find a student by name, GR number, roll number or class..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
-            className="w-full bg-transparent text-sm sm:text-base font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
+            className="clerk-search-input w-full bg-transparent border-0 border-none outline-none ring-0 focus:ring-0 focus:outline-none focus:border-none shadow-none text-sm sm:text-base font-medium text-slate-800 placeholder-slate-400 py-1"
           />
           {searchQuery && (
             <button

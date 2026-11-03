@@ -410,12 +410,19 @@ function FormDetailsModal({
               </span>
             </div>
             <div className="h-3 w-px bg-slate-200" />
-            {form.fees_enable ? (
-              <div className="flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
-                <IndianRupee className="h-3 w-3" />
-                <span>₹{form.fees}</span>
-                <span className="text-emerald-600 text-[10px]">Application Fee</span>
-              </div>
+                        {form.fees_enable ? (
+              String(form.fee_type || "").toLowerCase() === "individual" || String(form.fee_type || "").toLowerCase() === "per_class" || Boolean((form as any).fee_structures && (form as any).fee_structures.length > 0) ? (
+                <div className="flex items-center gap-1.5 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5">
+                  <IndianRupee className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs">Per Class Fee</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                  <IndianRupee className="h-3 w-3" />
+                  <span>₹{form.fees != null ? form.fees : "0"}</span>
+                  <span className="text-emerald-600 text-[10px]">Application Fee</span>
+                </div>
+              )
             ) : (
               <span className="text-slate-500 font-semibold bg-slate-100 rounded-full px-2.5 py-0.5">
                 Free Admission
@@ -534,7 +541,7 @@ function FormDetailsModal({
                       key={`fee-${fIdx}`}
                       className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs shadow-2xs"
                     >
-                      <span className="font-semibold text-slate-800">{fee.class_label || fee.class_code || `Class #${fee.class_name}`}</span>
+                                            <span className="font-semibold text-slate-800">{fee.class_name_display || fee.class_label || fee.class_code || fee.school_class || `Class #${fee.class_name}`}</span>
                       <span className="font-bold text-emerald-700">₹{fee.fee_amount}</span>
                     </div>
                   ))}
@@ -725,12 +732,19 @@ function FormTableRow({
           <span className="text-xs text-slate-400 italic">No description</span>
         )}
       </td>
-      <td className="px-5 py-3.5">
+            <td className="px-5 py-3.5">
         {form.fees_enable ? (
-          <div className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-full px-2.5 py-0.5 w-fit">
-            <IndianRupee className="h-3 w-3" />
-            <span className="text-xs font-bold">{form.fees}</span>
-          </div>
+          String(form.fee_type || "").toLowerCase() === "individual" || String(form.fee_type || "").toLowerCase() === "per_class" || Boolean((form as any).fee_structures && (form as any).fee_structures.length > 0) ? (
+            <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 border border-blue-200/80 rounded-full px-2.5 py-0.5 w-fit">
+              <IndianRupee className="h-3 w-3 text-blue-600" />
+              <span className="text-xs font-bold">Per Class</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-full px-2.5 py-0.5 w-fit">
+              <IndianRupee className="h-3 w-3" />
+              <span className="text-xs font-bold">₹{form.fees != null ? form.fees : "0"}</span>
+            </div>
+          )
         ) : (
           <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">
             Free

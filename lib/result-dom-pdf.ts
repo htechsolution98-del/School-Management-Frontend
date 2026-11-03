@@ -1,24 +1,54 @@
-function normalizeOklch(value: string): string {
-  return value.replace(/oklch\(\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+)(?:deg)?(?:\s*\/\s*([\d.]+%?))?\s*\)/gi, (_match, lightnessToken: string, chromaToken: string, hueToken: string, alphaToken?: string) => {
-    const lightness = lightnessToken.endsWith("%") ? Number(lightnessToken.slice(0, -1)) / 100 : Number(lightnessToken);
-    const chroma = chromaToken.endsWith("%") ? Number(chromaToken.slice(0, -1)) * 0.004 : Number(chromaToken);
-    const angle = Number(hueToken) * Math.PI / 180;
-    const a = chroma * Math.cos(angle);
-    const b = chroma * Math.sin(angle);
-    const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-    const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-    const s = (lightness - 0.0894841775 * a - 1.2914855480 * b) ** 3;
-    const channels = [
-      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-      -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-    ].map((channel) => {
-      const linear = Math.max(0, Math.min(1, channel));
-      return Math.round(255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055));
-    });
-    const alpha = alphaToken ? Number(alphaToken.replace("%", "")) / (alphaToken.endsWith("%") ? 100 : 1) : 1;
-    return alpha < 1 ? `rgba(${channels.join(", ")}, ${alpha})` : `rgb(${channels.join(", ")})`;
+function parseAlpha(alphaToken?: string): number {
+  if (!alphaToken) return 1;
+  const clean = alphaToken.replace("%", "").trim();
+  const num = Number(clean);
+  if (Number.isNaN(num)) return 1;
+  return alphaToken.endsWith("%") ? num / 100 : num;
+}
+
+function oklabToRgb(L: number, a: number, b: number, alpha = 1): string {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  const channels = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  ].map((channel) => {
+    const linear = Math.max(0, Math.min(1, channel));
+    return Math.round(255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055));
   });
+  return alpha < 1 ? `rgba(${channels.join(", ")}, ${alpha})` : `rgb(${channels.join(", ")})`;
+}
+
+export function normalizeColor(value: string): string {
+  if (!value || typeof value !== "string") return value;
+
+  // 1. Convert oklch(...) to rgb/rgba
+  let result = value.replace(
+    /oklch\(\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+)(?:deg)?(?:\s*\/\s*([\d.]+%?))?\s*\)/gi,
+    (_match, lightnessToken: string, chromaToken: string, hueToken: string, alphaToken?: string) => {
+      const lightness = lightnessToken.endsWith("%") ? Number(lightnessToken.slice(0, -1)) / 100 : Number(lightnessToken);
+      const chroma = chromaToken.endsWith("%") ? Number(chromaToken.slice(0, -1)) * 0.004 : Number(chromaToken);
+      const angle = (Number(hueToken) * Math.PI) / 180;
+      const a = chroma * Math.cos(angle);
+      const b = chroma * Math.sin(angle);
+      return oklabToRgb(lightness, a, b, parseAlpha(alphaToken));
+    }
+  );
+
+  // 2. Convert oklab(...) to rgb/rgba
+  result = result.replace(
+    /oklab\(\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+%?)\s*[, ]+\s*([+-]?[\d.]+%?)(?:\s*\/\s*([\d.]+%?))?\s*\)/gi,
+    (_match, lightnessToken: string, aToken: string, bToken: string, alphaToken?: string) => {
+      const lightness = lightnessToken.endsWith("%") ? Number(lightnessToken.slice(0, -1)) / 100 : Number(lightnessToken);
+      const a = aToken.endsWith("%") ? (Number(aToken.slice(0, -1)) / 100) * 0.4 : Number(aToken);
+      const b = bToken.endsWith("%") ? (Number(bToken.slice(0, -1)) / 100) * 0.4 : Number(bToken);
+      return oklabToRgb(lightness, a, b, parseAlpha(alphaToken));
+    }
+  );
+
+  return result;
 }
 
 /** Export the visible report card so the PDF keeps the exact preview layout and images. */
@@ -26,7 +56,7 @@ export async function downloadResultPreviewPDF(element: HTMLElement, filename: s
   await document.fonts?.ready;
 
   // Inline the rendered layout, then capture it in a blank same-origin iframe so
-  // html2canvas never parses the application's Tailwind v4 oklch stylesheets.
+  // html2canvas never parses the application's Tailwind v4 oklch/oklab stylesheets.
   const clone = element.cloneNode(true) as HTMLElement;
   const originalNodes: Array<HTMLElement | SVGElement> = [element, ...Array.from(element.querySelectorAll<HTMLElement | SVGElement>("*"))];
   const clonedNodes: Array<HTMLElement | SVGElement> = [clone, ...Array.from(clone.querySelectorAll<HTMLElement | SVGElement>("*"))];
@@ -36,7 +66,7 @@ export async function downloadResultPreviewPDF(element: HTMLElement, filename: s
     for (let propertyIndex = 0; propertyIndex < computed.length; propertyIndex += 1) {
       const property = computed.item(propertyIndex);
       if (property.startsWith("--")) continue;
-      const value = normalizeOklch(computed.getPropertyValue(property));
+      const value = normalizeColor(computed.getPropertyValue(property));
       copy.style.setProperty(property, value, computed.getPropertyPriority(property));
     }
     copy.removeAttribute("class");
@@ -84,6 +114,9 @@ export async function downloadResultPreviewPDF(element: HTMLElement, filename: s
       windowHeight: Math.ceil(element.scrollHeight),
       width: Math.ceil(element.getBoundingClientRect().width),
       height: Math.ceil(element.scrollHeight),
+      onclone: (clonedDoc) => {
+        Array.from(clonedDoc.querySelectorAll("style, link[rel='stylesheet']")).forEach((node) => node.remove());
+      },
     });
 
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });

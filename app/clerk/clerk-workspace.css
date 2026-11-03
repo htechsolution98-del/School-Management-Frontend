@@ -17,8 +17,24 @@
 .office-heading-note { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 12px; max-width: 300px; }
 .office-heading-note svg { color: var(--office-accent); flex-shrink: 0; }
 .clerk-page [data-slot="card"] { padding-block: 0; gap: 0; border: 1px solid var(--office-line); box-shadow: 0 2px 10px rgba(0,0,0,0.02); --tw-ring-shadow: 0 0 #0000; border-radius: 18px; }
-.clerk-page :is(input, select) { min-height: 40px; border-color: var(--office-line); border-radius: 12px; font-size: 12px; }
-.clerk-page :is(input, select):focus-visible { outline: 2px solid rgba(88, 38, 223, 0.3); outline-offset: 2px; }
+.clerk-page :is(input:not(.clerk-search-input), select) { min-height: 40px; border-color: var(--office-line); border-radius: 12px; font-size: 12px; }
+.clerk-page :is(input:not(.clerk-search-input), select):focus-visible { outline: 2px solid rgba(88, 38, 223, 0.3); outline-offset: 2px; }
+
+.clerk-page input.clerk-search-input {
+  min-height: unset !important;
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+}
+.clerk-page input.clerk-search-input:focus,
+.clerk-page input.clerk-search-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
 .clerk-page .office-primary { background: #5826df; color: white; border-radius: 12px; padding-inline: 18px; min-height: 39px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 8px rgba(88, 38, 223, 0.25); }
 .clerk-page .office-primary:hover { background: #4a1ec6; }
 .office-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

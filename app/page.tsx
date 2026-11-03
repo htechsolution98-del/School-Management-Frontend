@@ -37,7 +37,8 @@ import {
   Quote,
   X,
 } from "lucide-react";
-import { getPublishedFormLink } from "@/lib/principal";
+import { getPublishedFormLink, type PublishedFormItem } from "@/lib/principal";
+import { capitalizeWords } from "@/lib/utils";
 
 function StatCounter({ target, suffix }: { target: number; suffix: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -87,6 +88,7 @@ const getIcon = (name: string, className?: string) => {
 
 export default function LandingPage() {
   const [formLink, setFormLink] = useState("");
+  const [publishedForms, setPublishedForms] = useState<PublishedFormItem[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeFeatureIdx, setActiveFeatureIdx] = useState<number | null>(null);
   const [expandedCardIdxs, setExpandedCardIdxs] = useState<number[]>([]);
@@ -359,7 +361,23 @@ export default function LandingPage() {
 
   useEffect(() => {
     getPublishedFormLink()
-      .then((data: any) => setFormLink(data.form_link))
+      .then((data: any) => {
+        setFormLink(data.form_link || "");
+        if (Array.isArray(data.forms) && data.forms.length > 0) {
+          setPublishedForms(data.forms);
+        } else if (data.form_link) {
+          setPublishedForms([
+            {
+              id: 1,
+              title: "Student Admission Form",
+              unique_link: data.unique_link || "",
+              form_link: data.form_link,
+              school_name: data.school_name || "School",
+              academic_year: "2026-27",
+            },
+          ]);
+        }
+      })
       .catch((err: any) => console.error("Failed to fetch link", err));
   }, []);
 
@@ -575,23 +593,50 @@ export default function LandingPage() {
                 </nav>
 
                 {/* Admission Notice Card if Link Available */}
-                {formLink && (
-                  <div className="mt-2 p-3.5 rounded-2xl bg-gradient-to-br from-[#FFA600]/20 to-[#ED6708]/20 border border-[#FFA600]/30 backdrop-blur-xs">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFA600] mb-1">
+                {(publishedForms.length > 0 || Boolean(formLink)) && (
+                  <div className="mt-2 p-3.5 rounded-2xl bg-gradient-to-br from-[#FFA600]/20 to-[#ED6708]/20 border border-[#FFA600]/30 backdrop-blur-xs space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFA600]">
                       <Sparkles className="h-3.5 w-3.5" />
                       Admission Open
                     </div>
-                    <p className="text-[11px] text-white/80 mb-2.5 leading-relaxed">
-                      Online admission forms for 2026-27 are currently active.
+                    <p className="text-[11px] text-white/80 leading-relaxed">
+                      Active online school admission forms for 2026-27:
                     </p>
-                    <a
-                      href={formLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#FFA600] text-white py-2 px-3 text-xs font-bold hover:bg-[#ED6708] transition-colors shadow-sm"
-                    >
-                      Apply Online <ArrowRight className="h-3 w-3" />
-                    </a>
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar">
+                      {(publishedForms.length > 0
+                        ? publishedForms
+                        : [
+                            {
+                              id: 0,
+                              title: "Student Admission Form",
+                              unique_link: "",
+                              form_link: formLink,
+                              school_name: "School",
+                              academic_year: "2026-27",
+                            },
+                          ]
+                      ).map((item, fIdx) => (
+                        <a
+                          key={fIdx}
+                          href={item.form_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all text-white text-xs font-bold"
+                        >
+                          <div className="truncate">
+                            <span className="block text-[10px] uppercase tracking-wider text-[#FFA600]">
+                              {capitalizeWords(item.school_name)}
+                            </span>
+                            <span className="truncate block font-semibold text-white/90">
+                              {capitalizeWords(item.title)}
+                            </span>
+                          </div>
+                          <span className="shrink-0 flex items-center gap-1 text-[11px] text-[#FFA600] font-bold">
+                            Apply <ArrowRight className="h-3 w-3" />
+                          </span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -622,27 +667,53 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
 
-      {/* Admission Marquee */}
-      {formLink && (
+      {/* Admission Marquee Ribbon */}
+      {(publishedForms.length > 0 || Boolean(formLink)) && (
         <div className="sticky top-16 z-40 overflow-hidden bg-gradient-to-r from-[#ED6708] via-[#FFA600] to-[#ED6708] py-2 border-b border-orange-600/20 shadow-sm">
           <div className="flex whitespace-nowrap items-center gap-8 sm:gap-12 px-4 w-max animate-marquee-left-fast pause-on-hover">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-semibold text-white">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20">
-                  <Sparkles className="h-3 w-3 text-white" />
-                </span>
-                <span>Admission forms are available! Apply online for academic year 2026-27:</span>
-                <a
-                  href={formLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 bg-white text-[#ED6708] hover:bg-white/95 px-3 py-0.5 rounded-full text-xs font-bold shadow-sm transition-all hover:scale-105"
+            {Array.from({ length: Math.max(3, Math.ceil(9 / (publishedForms.length || 1))) }).flatMap((_, setIdx) =>
+              (publishedForms.length > 0
+                ? publishedForms
+                : [
+                    {
+                      id: 0,
+                      title: "Student Admission Form",
+                      unique_link: "",
+                      form_link: formLink,
+                      school_name: "School Admission",
+                      academic_year: "2026-27",
+                    },
+                  ]
+              ).map((item, idx) => (
+                <div
+                  key={`${setIdx}-${item.id || idx}`}
+                  className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-semibold text-white"
                 >
-                  Apply Online
-                  <ArrowRight className="h-3 w-3" />
-                </a>
-              </div>
-            ))}
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <Sparkles className="h-3 w-3 text-white" />
+                  </span>
+
+                  {/* Which school form that is */}
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-white text-[#ED6708] font-black text-[11px] sm:text-xs tracking-wide shadow-xs uppercase">
+                    {capitalizeWords(item.school_name || "School")}
+                  </span>
+
+                  <span>
+                    {capitalizeWords(item.title || "Student Admission Form")} ({item.academic_year || "2026-27"}):
+                  </span>
+
+                  <a
+                    href={item.form_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 bg-white text-[#ED6708] hover:bg-white/95 px-3 py-0.5 rounded-full text-xs font-bold shadow-sm transition-all hover:scale-105"
+                  >
+                    Apply Online
+                    <ArrowRight className="h-3 w-3" />
+                  </a>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
