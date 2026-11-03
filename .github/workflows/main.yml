@@ -34,10 +34,14 @@ jobs:
           S_USER: ${{ secrets.SSH_USER }}
           S_HOST: ${{ secrets.SSH_HOST }}
           WORK_DIR: ${{ secrets.FRONTEND_WORK_DIR }}
-          BRANCH: ${{ secrets.FRONTEND_BRANCH }}
+          # Always the branch that triggered the run (stg). Do NOT use secrets.FRONTEND_BRANCH:
+          # it does not resolve to stg and made the server reset to main.
+          BRANCH: ${{ github.ref_name }}
           CONT: ${{ secrets.FRONTEND_CONT_NAME }}
         run: |
-          ssh -T -p "$S_PORT" "$S_USER@$S_HOST" "WORK_DIR='$WORK_DIR' BRANCH='$BRANCH' CONT='$CONT' bash -s" << 'SSHEOF'
+          # Keepalives: the build wait is long and silent; a network device dropped the idle
+          # connection after about 4.5 minutes (run #72: "Connection reset by peer", exit 255).
+          ssh -T -p "$S_PORT" -o ServerAliveInterval=30 -o ServerAliveCountMax=40 "$S_USER@$S_HOST" "WORK_DIR='$WORK_DIR' BRANCH='$BRANCH' CONT='$CONT' bash -s" << 'SSHEOF'
             set -euo pipefail
             cd -- "$WORK_DIR"
             git fetch origin "$BRANCH"
@@ -48,6 +52,7 @@ jobs:
             for i in $(seq 1 90); do
               code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3008/ || true)
               if [ "$code" = "200" ]; then echo "=== Healthy (HTTP 200): deployment successful ==="; exit 0; fi
+              echo "waiting for site ($i/90) http=$code"   # output every round keeps the SSH connection active
               sleep 10
             done
 
