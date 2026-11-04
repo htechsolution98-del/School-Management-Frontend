@@ -45,8 +45,8 @@ export function validateStaffRecord(
   const normMobile = normalizePhone(data.mobile || "");
   if (!normMobile) {
     errors.mobile = "Mobile number is required.";
-  } else if (normMobile.length !== 10 || !/^\d{10}$/.test(normMobile)) {
-    errors.mobile = "Mobile number must be exactly 10 digits.";
+  } else if (normMobile.length !== 10 || !/^[6-9]\d{9}$/.test(normMobile)) {
+    errors.mobile = "Mobile number must be a 10-digit number starting with 6, 7, 8, or 9.";
   }
 
   const others = staff.filter(member => member.id !== editingId);

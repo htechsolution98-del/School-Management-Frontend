@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Boxes,
   Settings,
+  User,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -20,7 +21,14 @@ const sidebarLinks = [
   { title: "Staff Attendance", href: "/principal/staff-attendance", icon: UserCheck },
   { title: "Marks Verification", href: "/principal/result/marks/verification", icon: FileCheck },
   { title: "Announcements", href: "/principal/announcements", icon: Megaphone },
-  { title: "Account Settings", href: "/principal/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/principal/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/vice-principal/profile", icon: User },
+    ],
+  },
 ];
 
 export default function VicePrincipalLayout({ children }: { children: React.ReactNode }) {

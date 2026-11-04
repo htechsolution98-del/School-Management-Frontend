@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Clock,
   Settings,
+  User,
   ClipboardList,
   CheckSquare,
   UserCheck,
@@ -78,7 +79,14 @@ const sidebarLinks = [
   { title: "Attendance Exceptions", href: "/principal/attendance-exceptions", icon: Clock },
   { title: "Support & Helpdesk", href: "/principal/support", icon: CalendarCheck },
   { title: "Request Supplies", href: "/principal/stock-request", icon: Boxes },
-  { title: "Account Settings", href: "/principal/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/principal/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/principal/profile", icon: User },
+    ],
+  },
 ];
 
 export default function PrincipalLayout({ children }: { children: React.ReactNode }) {

@@ -15,6 +15,7 @@ import {
   Banknote,
   ClipboardList,
   Bell,
+  User,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -33,6 +34,7 @@ const sidebarLinks = [
   { title: "Reports & Analytics", href: "/inventory/reports", icon: BarChart3 },
   { title: "My Leaves", href: "/inventory/leaves", icon: CalendarCheck },
   { title: "My Payslips", href: "/inventory/payslips", icon: Banknote },
+  { title: "My Profile", href: "/inventory/profile", icon: User },
 ];
 
 export default function InventoryLayout({ children }: { children: React.ReactNode }) {

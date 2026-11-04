@@ -427,13 +427,17 @@ export function useAnnouncementSocket() {
         console.log("WebSocket message received:", data);
 
         // School deactivated → force logout immediately
-        if (data?.type === "logout" || data?.reason === "school_deactivated") {
-          toast.error("Session ended", {
+        if (
+          data?.type === "logout" ||
+          data?.type === "school_deactivated" ||
+          data?.reason === "school_deactivated"
+        ) {
+          toast.error("School Deactivated", {
             description:
               data?.message ||
-              "Your school has been deactivated. Contact administrator.",
+              "Your school account has been deactivated. You have been logged out.",
           });
-          setTimeout(() => forceLogout(), 1500);
+          setTimeout(() => forceLogout(), 1200);
           return;
         }
 

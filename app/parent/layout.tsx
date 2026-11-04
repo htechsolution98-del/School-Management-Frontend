@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Settings,
+  User,
 } from "lucide-react";
 import { capitalizeWords } from "@/lib/utils";
 
@@ -22,7 +23,14 @@ const sidebarLinks = [
   { title: "Certificates", href: "/parent/certificates", icon: FileText },
   { title: "Announcements", href: "/parent/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/parent/events", icon: CalendarDays },
-  { title: "Account Settings", href: "/parent/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/parent/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/parent/profile", icon: User },
+    ],
+  },
 ];
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {

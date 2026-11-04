@@ -68,7 +68,7 @@ export function validateAdmissionField(field: AdmissionField, value: unknown, to
   if (isAadhaarAdmissionField(field) && !/^\d{12}$/.test(text)) return "Aadhaar number must contain exactly 12 digits";
   if (isUdiseAdmissionField(field) && !/^\d{11}$/.test(text)) return "UDISE number must contain exactly 11 digits";
   if (isAbcAdmissionField(field) && !/^\d{12}$/.test(text)) return "ABC ID / APAAR ID must contain exactly 12 digits";
-  if (isPhoneField(field) && !/^[6-9]\d{9}$/.test(text)) return "Enter a valid 10-digit mobile number starting with 6–9";
+  if (isPhoneField(field) && !/^[6-9]\d{9}$/.test(text)) return "Mobile number must be a 10-digit number starting with 6, 7, 8, or 9";
   if (isEmailField(field) && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text)) return "Enter a valid email address";
   if (isPinField(field) && !/^[1-9]\d{5}$/.test(text)) return "Enter a valid 6-digit PIN code";
   if (field.field_type === "number" && !isPhoneField(field) && !isAadhaarAdmissionField(field) && !isUdiseAdmissionField(field) && !isAbcAdmissionField(field) && !isPinField(field) && (!/^\d+(\.\d+)?$/.test(text) || !Number.isFinite(Number(text)))) return "Enter a valid non-negative number";

@@ -14,7 +14,6 @@ import {
   BookOpen,
   GraduationCap,
   FileText,
-  UserCheck,
   UserPlus,
   LifeBuoy,
   Banknote,
@@ -23,12 +22,12 @@ import {
   Printer,
   Bell,
   Building2,
+  User,
 } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/trustee", icon: LayoutDashboard },
   { title: "School Profile", href: "/trustee/school-profile", icon: Building2 },
-  { title: "Notifications", href: "/trustee/notifications", icon: Bell },
   {
     title: "Staff Management",
     href: "/trustee/staff-management",
@@ -50,6 +49,8 @@ const sidebarLinks = [
       { title: "Cheque Printing", href: "/trustee/cheque-printing", icon: Printer },
     ],
   },
+  { title: "Announcements", href: "/trustee/announcements", icon: Megaphone },
+  { title: "Events & Holidays", href: "/trustee/events", icon: CalendarDays },
   {
     title: "Reports & Audit",
     href: "/trustee/reports",
@@ -61,11 +62,17 @@ const sidebarLinks = [
     ],
   },
   { title: "Subscription & Billing", href: "/trustee/subscription", icon: CreditCard },
-  { title: "Announcements", href: "/trustee/announcements", icon: Megaphone },
-  { title: "Events & Holidays", href: "/trustee/events", icon: CalendarDays },
-  { title: "Activity Logs", href: "/trustee/activity-logs", icon: History },
-  { title: "Support & Helpdesk", href: "/trustee/support", icon: LifeBuoy },
-  { title: "Account Settings", href: "/trustee/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/trustee/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/trustee/profile", icon: User },
+      { title: "Notifications", href: "/trustee/notifications", icon: Bell },
+      { title: "Activity Log", href: "/trustee/activity-logs", icon: History },
+      { title: "Support", href: "/trustee/support", icon: LifeBuoy },
+    ],
+  },
 ];
 
 export default function TrusteeLayout({ children }: { children: React.ReactNode }) {

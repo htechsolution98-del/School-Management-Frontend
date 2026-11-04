@@ -12,6 +12,7 @@ import {
   Calendar,
   CalendarCheck,
   Settings,
+  User,
   School,
   Layers,
   UserPlus,
@@ -107,8 +108,8 @@ const sidebarLinks = [
   { title: "Assign Teacher", href: "/clerk/assign-teacher", icon: Plus },
   { title: "Teacher Workload", href: "/clerk/teacher-workload", icon: SlidersHorizontal },
   { title: "Timetable", href: "/clerk/timetable", icon: Calendar },
-  { title: "Daily Cash Register", href: "/fees/cash-register", icon: Banknote },
-  { title: "Account Ledger", href: "/fees/account-ledger", icon: BookOpen },
+  { title: "Daily Cash Register", href: "/clerk/cash-register", icon: Banknote },
+  { title: "Account Ledger", href: "/clerk/account-ledger", icon: BookOpen },
   { title: "Request Supplies", href: "/clerk/stock-request", icon: Boxes },
   { title: "Announcements", href: "/clerk/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/clerk/events", icon: CalendarDays },
@@ -117,7 +118,14 @@ const sidebarLinks = [
   { title: "My Leaves", href: "/clerk/leaves", icon: CalendarCheck },
   { title: "My Attendance", href: "/clerk/my-attendance", icon: ClipboardList },
   { title: "Leave Settings", href: "/clerk/leave-config", icon: Settings },
-  { title: "Account Settings", href: "/clerk/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/clerk/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/clerk/profile", icon: User },
+    ],
+  },
 ];
 
 export default function ClerkLayout({ children }: { children: React.ReactNode }) {

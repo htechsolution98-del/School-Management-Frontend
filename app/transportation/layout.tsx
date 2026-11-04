@@ -10,6 +10,7 @@ import {
   Megaphone,
   CalendarDays,
   Settings,
+  User,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -20,7 +21,14 @@ const sidebarLinks = [
   { title: "My Leaves", href: "/teacher/leaves", icon: CalendarCheck },
   { title: "Announcements", href: "/teacher/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/teacher/events", icon: CalendarDays },
-  { title: "Account Settings", href: "/teacher/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/teacher/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/transportation/profile", icon: User },
+    ],
+  },
 ];
 
 export default function TransportationLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,5 @@
 "use client";
+import { validateIndianMobile } from "@/lib/password-validation";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +31,39 @@ export function SignupForm() {
   const [error, setError] = useState("");
   const router = useRouter();
 
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    setError("");
+
+    const isPureDigits = /^\d+$/.test(val);
+    if (isPureDigits) {
+      if (val.length === 1 && !/^[6-9]/.test(val)) {
+        setError("Mobile number must start with 6, 7, 8, or 9.");
+        return;
+      }
+      if (!/^[6-9]/.test(val)) {
+        setError("Mobile number must start with 6, 7, 8, or 9.");
+      }
+      if (val.length > 10) {
+        val = val.slice(0, 10);
+      }
+    } else {
+      const digitsOnly = val.replace(/[\s()\-+]/g, "");
+      if (/^\d+$/.test(digitsOnly)) {
+        let clean = digitsOnly;
+        if (clean.startsWith("91") && clean.length === 12 && /^[6-9]/.test(clean.slice(2))) {
+          clean = clean.slice(2);
+        } else if (clean.startsWith("0") && clean.length === 11 && /^[6-9]/.test(clean.slice(1))) {
+          clean = clean.slice(1);
+        }
+        if (clean.length === 10 && /^[6-9]/.test(clean)) {
+          val = clean;
+        }
+      }
+    }
+    setIdentifier(val);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -37,6 +71,14 @@ export function SignupForm() {
 
     try {
       const isEmail = identifier.includes("@");
+      if (!isEmail) {
+        const mobErr = validateIndianMobile(identifier);
+        if (mobErr) {
+          setError(mobErr);
+          setIsLoading(false);
+          return;
+        }
+      }
       const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
       const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
       const cleanIdentifier = isEmail ? identifier.trim() : cleanMobile;
@@ -146,7 +188,8 @@ export function SignupForm() {
               placeholder="e.g. name@example.com or 9876543210"
               required
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              maxLength={/^\d+$/.test(identifier) ? 10 : undefined}
+              onChange={handleIdentifierChange}
               onFocus={() => setFocused("identifier")}
               onBlur={() => setFocused(null)}
               className="pl-10 h-12 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#CBD5E1] shadow-sm focus:border-[#FFA600] focus:ring-2 focus:ring-[#FFA600]/20 transition-all duration-200"

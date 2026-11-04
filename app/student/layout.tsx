@@ -13,6 +13,7 @@ import {
   Settings,
   Award,
   Clock,
+  User,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -81,6 +82,9 @@ const sidebarLinks = [
     title: "Account Settings",
     href: "/student/settings",
     icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/student/profile", icon: User },
+    ],
   },
 ];
 

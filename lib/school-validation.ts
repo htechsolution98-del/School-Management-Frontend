@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const MOBILE_LENGTH = 10;
-export const MOBILE_ERROR_MESSAGE = "Enter a valid 10-digit mobile number.";
+export const MOBILE_ERROR_MESSAGE = "Enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.";
 
 /**
  * Mobile numbers must be exactly 10 digits. Formatting characters that users
@@ -12,7 +12,7 @@ export const mobileSchema = z
   .string()
   .trim()
   .transform((value) => value.replace(/[\s()\-.]/g, ""))
-  .refine((value) => new RegExp(`^[0-9]{${MOBILE_LENGTH}}$`).test(value), {
+  .refine((value) => /^[6-9][0-9]{9}$/.test(value), {
     message: MOBILE_ERROR_MESSAGE,
   });
 
@@ -25,7 +25,7 @@ export const schoolFormSchema = z.object({
   state: z.string().trim().min(2, "State must contain at least 2 characters.").max(100, "State must be 100 characters or fewer."),
   country: z.string().trim().min(2, "Country must contain at least 2 characters.").max(100, "Country must be 100 characters or fewer."),
   pincode: z.string().trim().min(1, "Postal code is required.").max(10, "Postal code must be 10 characters or fewer."),
-  index_no: z.string().trim().max(100, "Index number must be 100 characters or fewer.").refine(value => !value || /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/.test(value), "Use letters, numbers, spaces, hyphens, underscores or slashes for the index number.").optional(),
+  index_no: z.string().trim().max(100, "Index number must be 100 characters or fewer.").refine(value => !value || (/^[0-9.]+$/.test(value) && /\d/.test(value)), "Index number must contain only digits and dots (no letters or special characters).").optional(),
   logo: z.custom<File>(value => typeof File !== "undefined" && value instanceof File, "Choose an image file.")
     .refine(file => file.size <= 2 * 1024 * 1024, "Logo must be 2 MB or smaller.")
     .refine(file => ["image/png", "image/jpeg", "image/webp"].includes(file.type), "Upload a valid PNG, JPEG or WebP image.").nullable().optional(),

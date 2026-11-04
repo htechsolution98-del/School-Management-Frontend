@@ -190,18 +190,59 @@ export default function TrusteeSubscriptionPage() {
               </h2>
             </div>
 
-            <div className="bg-indigo-50/80 border border-indigo-100 rounded-2xl p-4 sm:text-right shrink-0">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Active Days Remaining
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-center sm:text-left">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Start Date
+                </div>
+                <div className="text-sm font-black text-slate-800 mt-1">
+                  {formatDate(sub.start_date || (sub as any).subscription_start_date) || "—"}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Subscription Started</div>
               </div>
-              <div className="text-2xl font-black text-indigo-700">
-                {daysLeft > 0 ? `${daysLeft} Days` : "Expired"}
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-center sm:text-left">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  End Date (Due)
+                </div>
+                <div className="text-sm font-black text-slate-900 mt-1">
+                  {formatDate(sub.due_date || (sub as any).subscription_end_date) || "—"}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Expiration / Renewal</div>
               </div>
-              <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
-                Valid Until: <span className="font-bold text-slate-900">{formatDate(sub.due_date)}</span>
+
+              <div className={`col-span-2 sm:col-span-1 border rounded-2xl p-3.5 text-center sm:text-right ${
+                daysLeft > 0
+                  ? "bg-indigo-50/80 border-indigo-100"
+                  : "bg-rose-50/80 border-rose-200"
+              }`}>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  {daysLeft > 0 ? "Days Remaining" : "Overdue Status"}
+                </div>
+                <div className={`text-xl font-black ${
+                  daysLeft > 0 ? "text-indigo-700" : "text-rose-600"
+                }`}>
+                  {daysLeft > 0 ? `${daysLeft} Days` : `Overdue by ${Math.abs(daysLeft)}d`}
+                </div>
+                <div className="text-[10px] font-semibold text-slate-600 mt-0.5">
+                  {daysLeft > 0 ? "License Active" : "Renewal Required"}
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Overdue Alert Callout */}
+          {daysLeft < 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Subscription Expired (Overdue by {Math.abs(daysLeft)} days):</span>
+                <p className="mt-0.5 text-amber-800">
+                  Your plan expired on <span className="font-semibold">{formatDate(sub.due_date)}</span>. When you renew, the renewal period will be counted seamlessly from your previous expiration date, deducting the overdue period.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Quick Expand Term Stacking Buttons */}
           <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">

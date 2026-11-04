@@ -61,7 +61,7 @@ const emptyForm: CreateSchoolPayload = {
 
 const fields = [
   { key: "name", label: "School name", placeholder: "Enter school name", max: 255, span: true },
-  { key: "index_no", label: "Index number", placeholder: "e.g. IND-123", max: 100, optional: true },
+  { key: "index_no", label: "Index number", placeholder: "e.g. 12.34.56", max: 100, optional: true },
   { key: "email", label: "Email", placeholder: "school@example.com", max: 254, type: "email" },
   { key: "phone", label: "Phone number", placeholder: "e.g. 9876543210", max: 10, type: "tel" },
   { key: "address", label: "Address", placeholder: "Street address", span: true },

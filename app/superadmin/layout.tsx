@@ -2,7 +2,7 @@
 
 import React from "react";
 import { AdminShell } from "@/components/superadmin/admin-shell";
-import { Building2, LayoutDashboard, Sparkles, CreditCard, BadgePercent, History, Headphones, BookOpen } from "lucide-react";
+import { Building2, LayoutDashboard, Sparkles, CreditCard, BadgePercent, History, Headphones, BookOpen, User } from "lucide-react";
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/superadmin", icon: LayoutDashboard, exact: true },
@@ -13,6 +13,7 @@ const sidebarLinks = [
   { title: "Tutorials", href: "/superadmin/tutorials", icon: BookOpen },
   { title: "Activity Logs", href: "/superadmin/activity-logs", icon: History },
   { title: "Razorpay", href: "/superadmin/razorpay", icon: CreditCard },
+  { title: "My Profile", href: "/superadmin/profile", icon: User },
 ];
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
@@ -22,4 +23,3 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     </AdminShell>
   );
 }
-

@@ -467,23 +467,30 @@ export async function fetchWithAuth(
   };
   const response = await sendRequest();
 
-  // SUCCESS
+  // ACCOUNT INACTIVE / SCHOOL DEACTIVATED / DISABLED → force logout immediately
+  if (response.status === 401 || response.status === 403) {
+    try {
+      const errBody = await response.clone().json();
+      const msg = String(errBody?.detail || errBody?.message || "");
+      const isDeactivated =
+        /deactivated|suspended|disabled|school.*inactive/i.test(msg) ||
+        errBody?.code === "user_inactive" ||
+        errBody?.code === "school_deactivated";
+
+      if (isDeactivated) {
+        clearAuthSession();
+        if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
+          window.location.href = `/login?reason=${encodeURIComponent(msg || "school_deactivated")}`;
+        }
+        return response;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // SUCCESS / NON-401 RESPONSES
   if (response.status !== 401) {
     return response;
   }
-
-    // ACCOUNT INACTIVE / SCHOOL DEACTIVATED / DISABLED → force logout immediately
-  try {
-    const errBody = await response.clone().json();
-    const msg = errBody?.detail || errBody?.message || "";
-    if (/deactivated|disabled/i.test(msg) || errBody?.code === "user_inactive") {
-      clearAuthSession();
-      if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
-        window.location.href = "/login";
-      }
-      return response;
-    }
-  } catch { /* ignore */ }
 
   // Parallel dashboard requests share one refresh, including token rotation.
   if (!refreshPromise) {

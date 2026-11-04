@@ -27,7 +27,7 @@ import {
   getStudentExams, 
   getStudentAttendance, 
   getStudentSyllabus, 
-  getStudentFees,
+  getMyFees,
   submitHomework,
   type HomeworkItem,
   type StudentExam,
@@ -115,7 +115,7 @@ export default function StudentDashboardPage() {
           getStudentExams(),
           getStudentAttendance(),
           getStudentSyllabus(),
-          getStudentFees(),
+          getMyFees(),
           fetchWithAuth(`${API_BASE_URL}/timetable/`).then(r => r.ok ? r.json() : []).catch(() => []),
           fetchWithAuth(`${API_BASE_URL}/studentget/me/`).then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
