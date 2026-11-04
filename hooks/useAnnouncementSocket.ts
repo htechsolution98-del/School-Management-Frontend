@@ -8,6 +8,17 @@ import { forceLogout, getAccessToken, fetchWithAuth } from "@/lib/auth";
 
 const LOCAL_STORAGE_KEY = "announcement_notifications";
 const READ_IDS_KEY = "read_announcement_ids";
+const SYNC_EVENT_NAME = "antigravity_notifications_sync";
+
+function broadcastSync(detail: {
+  unreadCount: number;
+  readIds?: (number | string)[];
+  notifications?: AnnouncementResponse[];
+}) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME, { detail }));
+  }
+}
 
 function isTargetAudienceForUser(
   announcement: AnnouncementResponse,
@@ -124,6 +135,28 @@ export function useAnnouncementSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Sync across all components (e.g. AppShell header bell & NotificationsHub page)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      if (typeof detail.unreadCount === "number") {
+        setUnreadCount(detail.unreadCount);
+      }
+      if (Array.isArray(detail.readIds)) {
+        setReadIds(detail.readIds);
+      }
+      if (Array.isArray(detail.notifications)) {
+        setNotifications(detail.notifications);
+      }
+    };
+
+    window.addEventListener(SYNC_EVENT_NAME, handleSync);
+    return () => window.removeEventListener(SYNC_EVENT_NAME, handleSync);
+  }, []);
+
   // Helper to load read IDs from localStorage (checking both user-scoped and global keys)
   const getReadIds = useCallback((): (number | string)[] => {
     if (typeof window === "undefined") return [];
@@ -207,13 +240,18 @@ export function useAnnouncementSocket() {
           if (attRes.ok) {
             const attData = await attRes.json();
             if (Array.isArray(attData)) {
-              parentAttNotices = attData.map((a: any, idx: number) => ({
-                id: typeof a.id === "number" ? a.id : (Number(a.id) || (idx + 990000)),
-                title: a.title ? a.title.toUpperCase() : "ATTENDANCE NOTIFICATION",
-                description: a.message,
-                created_at: a.created_at,
-                announcement_for: "PARENT",
-              }));
+              parentAttNotices = attData.map((a: any, idx: number) => {
+                const noticeId = a.id !== undefined && a.id !== null ? a.id : (idx + 990000);
+                return {
+                  id: noticeId,
+                  raw_id: a.id,
+                  title: a.title ? a.title.toUpperCase() : "ATTENDANCE NOTIFICATION",
+                  description: a.message,
+                  created_at: a.created_at,
+                  announcement_for: "PARENT",
+                  is_read: Boolean(a.is_read),
+                };
+              });
             }
           }
         } catch {
@@ -227,10 +265,15 @@ export function useAnnouncementSocket() {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
 
+      // Attendance read IDs from server serializer
+      const attReadIds = parentAttNotices
+        .filter((n: any) => n.is_read)
+        .map((n) => String(n.id));
+
       // Merge local read IDs with server database read IDs
       const localReadIds = getReadIds();
       const allMergedReadIds = Array.from(
-        new Set([...localReadIds, ...serverReadIds, ...serializerReadIds].map(String))
+        new Set([...localReadIds, ...serverReadIds, ...serializerReadIds, ...attReadIds].map(String))
       );
       persistReadIds(allMergedReadIds);
       setReadIds(allMergedReadIds);
@@ -241,6 +284,7 @@ export function useAnnouncementSocket() {
         const unread = sorted.filter((n) => !allMergedReadIds.some((r) => String(r) === String(n.id))).length;
         setUnreadCount(unread);
         localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
+        broadcastSync({ unreadCount: unread, readIds: allMergedReadIds, notifications: sorted });
       }
     } catch (err) {
       console.warn("Failed to fetch fresh announcements from API:", err);
@@ -281,24 +325,15 @@ export function useAnnouncementSocket() {
     }
   }, []);
 
-  const clearNotifications = useCallback(() => {
-    saveNotifications([], 0);
-    setReadIds([]);
-    if (typeof window !== "undefined") {
-      const currentUserId = localStorage.getItem("user_id");
-      if (currentUserId) localStorage.removeItem(`${READ_IDS_KEY}_${currentUserId}`);
-      localStorage.removeItem(READ_IDS_KEY);
-    }
-  }, [saveNotifications]);
-
   const markAsRead = useCallback((id: number | string) => {
     if (typeof window !== "undefined") {
       try {
         const rIds = getReadIds();
         const strId = String(id);
         const exists = rIds.some((existing) => String(existing) === strId);
+        const updatedReadIds = exists ? rIds : [...rIds, id];
+
         if (!exists) {
-          const updatedReadIds = [...rIds, id];
           persistReadIds(updatedReadIds);
           setReadIds(updatedReadIds);
 
@@ -308,16 +343,23 @@ export function useAnnouncementSocket() {
             ).length;
             setUnreadCount(unread);
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_unread_count`, String(unread));
+            broadcastSync({ unreadCount: unread, readIds: updatedReadIds, notifications: prev });
             return prev;
           });
         }
 
-        // Always persist to backend database asynchronously
+        // Persist to backend database asynchronously for both announcements and attendance
         fetchWithAuth(`${API_BASE_URL}/announcements/mark-read/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id }),
-        }).catch((err) => console.warn("Failed to sync mark announcement read to server:", err));
+        }).catch(() => {});
+
+        fetchWithAuth(`${API_BASE_URL}/attendance-notification/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }).catch(() => {});
       } catch (err) {
         console.error("Failed to mark announcement as read:", err);
       }
@@ -328,21 +370,37 @@ export function useAnnouncementSocket() {
     if (typeof window !== "undefined") {
       try {
         const ids = notifications.map((n) => n.id);
-        persistReadIds(ids);
-        setReadIds(ids);
+        const existing = getReadIds();
+        const merged = Array.from(new Set([...existing, ...ids].map(String)));
+        persistReadIds(merged);
+        setReadIds(merged);
         saveNotifications(notifications, 0);
 
-        // Persist all-read to backend database
+        // Immediately broadcast to all components so header bell count vanishes instantly
+        broadcastSync({ unreadCount: 0, readIds: merged, notifications });
+
+        // Persist all-read to backend databases asynchronously
         fetchWithAuth(`${API_BASE_URL}/announcements/mark-read/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ all: true, ids }),
-        }).catch((err) => console.warn("Failed to sync mark-all-read to server:", err));
+        }).catch(() => {});
+
+        fetchWithAuth(`${API_BASE_URL}/attendance-notification/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true, ids }),
+        }).catch(() => {});
       } catch (err) {
         console.error("Failed to mark all as read:", err);
       }
     }
-  }, [notifications, saveNotifications, persistReadIds]);
+  }, [notifications, getReadIds, saveNotifications, persistReadIds]);
+
+  // Do not delete notifications: clearing marks all as read so history is kept
+  const clearNotifications = useCallback(() => {
+    markAllAsRead();
+  }, [markAllAsRead]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
@@ -486,7 +544,7 @@ export function useAnnouncementSocket() {
       console.warn("WebSocket encountered error:", error);
       socket.close();
     };
-  }, [getReadIds, saveNotifications, notifications]);
+  }, [getReadIds, saveNotifications]);
 
   useEffect(() => {
     connect();
