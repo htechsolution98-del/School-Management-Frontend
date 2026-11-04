@@ -2,39 +2,64 @@ name: School-Management-Frontend
 
 on:
   push:
-    branches:
-      - stg
+    branches: [stg]
 
 concurrency:
   group: frontend-stg-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
       - name: Install SSH Key
+        env:
+          KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          S_PORT: ${{ secrets.SSH_PORT }}
+          S_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          set -eu
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$S_PORT" -H "$S_HOST" >> ~/.ssh/known_hosts
 
-      - name: Deploy Frontend
+      - name: Deploy Frontend (restart builds on the server, then health-check)
+        env:
+          S_PORT: ${{ secrets.SSH_PORT }}
+          S_USER: ${{ secrets.SSH_USER }}
+          S_HOST: ${{ secrets.SSH_HOST }}
+          WORK_DIR: ${{ secrets.FRONTEND_WORK_DIR }}
+          # Always the branch that triggered the run (stg). Do NOT use secrets.FRONTEND_BRANCH:
+          # it does not resolve to stg and made the server reset to main.
+          BRANCH: ${{ github.ref_name }}
+          CONT: ${{ secrets.FRONTEND_CONT_NAME }}
         run: |
-          ssh -T -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'SSHEOF'
-            set -e
-            cd -- "${{ secrets.FRONTEND_WORK_DIR }}"
-            git pull origin "${{ secrets.FRONTEND_BRANCH }}"          
-            echo "=== Restart Container (triggers dependency install, build and start) ==="
-            docker restart "${{ secrets.FRONTEND_CONT_NAME }}"
+          # Keepalives: the build wait is long and silent; a network device dropped the idle
+          # connection after about 4.5 minutes (run #72: "Connection reset by peer", exit 255).
+          ssh -T -p "$S_PORT" -o ServerAliveInterval=30 -o ServerAliveCountMax=40 "$S_USER@$S_HOST" "WORK_DIR='$WORK_DIR' BRANCH='$BRANCH' CONT='$CONT' bash -s" << 'SSHEOF'
+            set -euo pipefail
+            cd -- "$WORK_DIR"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
+            echo "=== Restart container (install + build + start, about 6-8 min) ==="
+            docker restart "$CONT"
 
-            echo "=== Waiting 50s for build to complete ==="
-            sleep 50
-            echo "=== Deployment Successful... DevOps Team ==="
+            for i in $(seq 1 90); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3008/ || true)
+              if [ "$code" = "200" ]; then echo "=== Healthy (HTTP 200): deployment successful ==="; exit 0; fi
+              echo "waiting for site ($i/90) http=$code"   # output every round keeps the SSH connection active
+              sleep 10
+            done
+
+            echo "=== NOT healthy after 15 minutes: last container logs ==="
+            docker logs --tail 40 "$CONT" 2>&1 || true
+            docker stop "$CONT" || true   # stop the restart-build loop
+            exit 1
           SSHEOF
 
       - name: Cleanup SSH

@@ -167,107 +167,12 @@ export default function LandingPage() {
   const [badges, setBadges] = useState<any[]>([]);
   const [testimonialsList, setTestimonialsList] = useState<any[]>([]);
 
-  // Set initial fallbacks on mount, then fetch live data from MongoDB
+  // Set built-in landing content on mount
   useEffect(() => {
     setFeatures(fallbackFeatures);
     setModules(fallbackModules);
     setBadges(fallbackBadges);
     setTestimonialsList(fallbackTestimonials);
-
-    // 1. Fetch Landing Settings
-    fetch("/api/landing/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.isSeeded && data.settings) {
-          setHeroBadge(data.settings.heroBadge || "★ Smart School ERP Platform");
-          setHeroTitle(data.settings.heroTitle || "VidhyaSanchalan");
-          setHeroSubtitle(data.settings.heroSubtitle || "Complete Smart School Management System");
-          setHeroDescription(data.settings.heroDescription || "");
-          setSatisfactionRate(data.settings.satisfactionRate || 99.8);
-          if (data.settings.heroImage) setHeroImage(data.settings.heroImage);
-          if (data.settings.heroImages && data.settings.heroImages.length > 0) {
-            setHeroImages(data.settings.heroImages);
-          } else if (data.settings.heroImage) {
-            setHeroImages([data.settings.heroImage]);
-          }
-          if (data.settings.stats && data.settings.stats.length > 0) {
-            setStats(data.settings.stats);
-          }
-          if (data.settings.whyChooseUs && data.settings.whyChooseUs.length > 0) {
-            setWhyChooseUs(data.settings.whyChooseUs);
-          }
-          if (data.settings.whyBadge) setWhyBadge(data.settings.whyBadge);
-          if (data.settings.whyTitle) setWhyTitle(data.settings.whyTitle);
-          if (data.settings.whyTitleHighlight) setWhyTitleHighlight(data.settings.whyTitleHighlight);
-          if (data.settings.whyPills && data.settings.whyPills.length > 0) {
-            setWhyPills(data.settings.whyPills);
-          }
-          if (data.settings.whyImageMain) setWhyImageMain(data.settings.whyImageMain);
-          if (data.settings.whyImagesMain && data.settings.whyImagesMain.length > 0) {
-            setWhyImagesMain(data.settings.whyImagesMain);
-          } else if (data.settings.whyImageMain) {
-            setWhyImagesMain([data.settings.whyImageMain]);
-          }
-          if (data.settings.whyImageLeft) setWhyImageLeft(data.settings.whyImageLeft);
-          if (data.settings.whyImageBottomLeft) setWhyImageBottomLeft(data.settings.whyImageBottomLeft);
-          if (data.settings.whyImageBottomRight) setWhyImageBottomRight(data.settings.whyImageBottomRight);
-          if (data.settings.whyCollageCards && data.settings.whyCollageCards.length > 0) {
-            setWhyCollageCards(data.settings.whyCollageCards);
-          } else {
-            setWhyCollageCards([
-              { label: "Smart Campus", image: data.settings.whyImageLeft || "/why choose us.jpg", position: "behind-left" },
-              { label: "Analytics Panel", image: data.settings.whyImageBottomLeft || "/progress report.jpeg", position: "bottom-left" },
-              { label: "Admission Desk", image: data.settings.whyImageBottomRight || "/admission (1).jpg", position: "bottom-right" }
-            ]);
-          }
-          if (data.settings.aboutBadge) setAboutBadge(data.settings.aboutBadge);
-          if (data.settings.aboutTitle) setAboutTitle(data.settings.aboutTitle);
-          if (data.settings.aboutTitleHighlight) setAboutTitleHighlight(data.settings.aboutTitleHighlight);
-          if (data.settings.aboutDescription) setAboutDescription(data.settings.aboutDescription);
-          if (data.settings.aboutQuote) setAboutQuote(data.settings.aboutQuote);
-          if (data.settings.aboutImage) setAboutImage(data.settings.aboutImage);
-          if (data.settings.aboutImages && data.settings.aboutImages.length > 0) {
-            setAboutImages(data.settings.aboutImages);
-          } else if (data.settings.aboutImage) {
-            setAboutImages([data.settings.aboutImage]);
-          }
-          if (data.settings.aboutHighlights && data.settings.aboutHighlights.length > 0) {
-            setAboutHighlights(data.settings.aboutHighlights);
-          }
-        }
-      })
-      .catch((err) => console.log("Failed to fetch settings from DB, using fallback", err));
-
-    // 2. Fetch Features
-    fetch("/api/landing/features")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.features && data.features.length > 0) {
-          setFeatures(data.features);
-        }
-      })
-      .catch((err) => console.log("Failed to fetch features from DB, using fallback", err));
-
-    // 3. Fetch Slider Modules
-    fetch("/api/landing/modules")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          if (data.modules && data.modules.length > 0) setModules(data.modules);
-          if (data.badges && data.badges.length > 0) setBadges(data.badges);
-        }
-      })
-      .catch((err) => console.log("Failed to fetch slider modules from DB, using fallback", err));
-
-    // 4. Fetch Testimonials
-    fetch("/api/landing/testimonials")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.testimonials && data.testimonials.length > 0) {
-          setTestimonialsList(data.testimonials);
-        }
-      })
-      .catch((err) => console.log("Failed to fetch testimonials from DB, using fallback", err));
   }, []);
 
   useEffect(() => {
