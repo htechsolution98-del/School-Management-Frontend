@@ -75,11 +75,15 @@ export async function downloadResultPreviewPDF(element: HTMLElement, filename: s
   clone.removeAttribute("id");
   clone.style.setProperty("position", "static");
   clone.style.setProperty("max-width", "none");
+  clone.style.setProperty("width", "740px");
+  clone.style.setProperty("transform", "none");
   clone.style.setProperty("overflow", "visible");
 
+  const targetWidth = 740;
+  const targetHeight = Math.max(1000, Math.ceil(element.scrollHeight || 1050));
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
-  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${Math.ceil(element.getBoundingClientRect().width)}px;height:${Math.ceil(element.scrollHeight)}px;border:0`;
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${targetWidth}px;height:${targetHeight}px;border:0`;
   document.body.appendChild(frame);
   const frameDocument = frame.contentDocument;
   const frameWindow = frame.contentWindow;

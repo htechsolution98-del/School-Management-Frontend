@@ -459,29 +459,42 @@ function CheckoutContent() {
 
       {/* Days Expansion Telemetry Card */}
       {billingCalc && (
-        <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 rounded-2xl p-5 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                <span>Days Expansion Calculation</span>
-                <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">
-                  +{monthsCount} Month{monthsCount > 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="text-xs font-bold text-slate-800 mt-0.5">
-                From: <span className="text-slate-600">{formatDateSafe(billingCalc.current_due_date) || "Today"}</span> → To:{" "}
-                <span className="text-emerald-700 font-extrabold">{formatDateSafe(billingCalc.new_due_date) || "Calculated"}</span>
+        <div className="space-y-2">
+          {billingCalc.overdue_days > 0 && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Overdue Deduction Applied:</span> Your subscription was overdue by{" "}
+                <span className="font-extrabold text-amber-950">{billingCalc.overdue_days} days</span>. This renewal counts from your previous expiration date (<span className="font-bold">{formatDateSafe(billingCalc.current_due_date)}</span>), deducting the overdue period.
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="text-right sm:border-l sm:border-indigo-200 sm:pl-6 shrink-0">
-            <div className="text-[10px] uppercase font-bold text-slate-500">Total Valid Coverage</div>
-            <div className="text-lg font-black text-emerald-700">
-              {billingCalc.expanded_days || monthsCount * 30} Days
+          <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 rounded-2xl p-5 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                  <span>Days Expansion Calculation</span>
+                  <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">
+                    +{monthsCount} Month{monthsCount > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-slate-800 mt-1 flex flex-wrap items-center gap-x-2">
+                  <span>Start Date: <span className="text-slate-600 font-semibold">{formatDateSafe(billingCalc.start_date || billingCalc.current_due_date) || "Today"}</span></span>
+                  <span className="text-slate-400">→</span>
+                  <span>New End Date: <span className="text-emerald-700 font-extrabold">{formatDateSafe(billingCalc.new_due_date) || "Calculated"}</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right sm:border-l sm:border-indigo-200 sm:pl-6 shrink-0">
+              <div className="text-[10px] uppercase font-bold text-slate-500">Total Valid Coverage</div>
+              <div className="text-lg font-black text-emerald-700">
+                {billingCalc.expanded_days || monthsCount * 30} Days
+              </div>
             </div>
           </div>
         </div>

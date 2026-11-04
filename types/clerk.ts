@@ -119,6 +119,24 @@ export interface Admission {
   created_at?: string | null;
   gr_no?: string | null;
   division?: string | null;
+  student_id?: number | null;
+  student_details?: {
+    id: number;
+    surname?: string;
+    name?: string;
+    father_name?: string;
+    mother_name?: string;
+    date_of_birth?: string;
+    gender?: string;
+    mobile?: string;
+    school_class?: number | string;
+    school_class_name?: string;
+    division?: string;
+    roll_no?: string;
+    aadhar_number?: string;
+    address?: string;
+    gr_no?: string;
+  } | null;
   field_values: {
     id: number;
     field: number;

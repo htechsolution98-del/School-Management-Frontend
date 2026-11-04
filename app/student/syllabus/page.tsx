@@ -153,7 +153,19 @@ export default function StudentSyllabusPage() {
   };
 
   const filteredSyllabuses = useMemo(() => {
-    return syllabuses.filter((s) => {
+    // Deduplicate by subject so each subject appears only once in the student's curriculum view
+    const seenSubjects = new Set<string>();
+    const uniqueList: StudentSyllabusItem[] = [];
+
+    for (const item of syllabuses) {
+      const subjectKey = String(item.subject_name || item.subject || item.id).trim().toLowerCase();
+      if (!seenSubjects.has(subjectKey)) {
+        seenSubjects.add(subjectKey);
+        uniqueList.push(item);
+      }
+    }
+
+    return uniqueList.filter((s) => {
       const subName = (s.subject_name || "General Subject").toLowerCase();
       const divLabel = s.school_class && s.divison_name
         ? `${s.school_class} (${s.divison_name})`.toLowerCase()

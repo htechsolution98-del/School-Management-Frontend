@@ -1,4 +1,5 @@
 "use client";
+import { validateStrongPassword, validateIndianMobile } from "@/lib/password-validation";
 
 import { useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,10 +43,26 @@ function VerifyOtpInner() {
     setIsLoading(true);
     setError("");
 
+    const pwdErr = validateStrongPassword(password);
+    if (pwdErr) {
+      setError(pwdErr);
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       setIsLoading(false);
       return;
+    }
+
+    if (type !== "email") {
+      const mobErr = validateIndianMobile(identifier);
+      if (mobErr) {
+        setError(mobErr);
+        setIsLoading(false);
+        return;
+      }
     }
 
     try {

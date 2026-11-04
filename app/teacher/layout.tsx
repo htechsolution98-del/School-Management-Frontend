@@ -20,6 +20,7 @@ import {
   Banknote,
   Clock,
   Bell,
+  User,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getDashboardRoute } from "@/lib/auth";
@@ -43,7 +44,14 @@ const sidebarLinks = [
   { title: "My Payslips", href: "/teacher/payslips", icon: Banknote },
   { title: "Attendance History", href: "/teacher/attendance", icon: ClipboardList },
   { title: "Exam Timetable", href: "/teacher/exams", icon: CalendarRange },
-  { title: "Account Settings", href: "/teacher/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/teacher/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/teacher/profile", icon: User },
+    ],
+  },
 ];
 
 const ALLOWED_TEACHER_ROLES = ["teacher", "staff"];

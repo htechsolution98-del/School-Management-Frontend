@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
 import {
   CreditCard,
   DollarSign,
@@ -14,8 +13,6 @@ import {
   Download,
   Calendar,
   Building2,
-  ArrowLeft,
-  ChevronRight,
   Sparkles,
   FileText,
   Clock,
@@ -376,18 +373,6 @@ export default function ParentFeesPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-6 lg:pb-12 w-full min-w-0 overflow-x-hidden">
-      {/* ── TOP BREADCRUMB ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <Link href="/parent" className="hover:text-blue-600 transition flex items-center gap-1">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Dashboard
-          </Link>
-          <ChevronRight className="h-3 w-3 text-slate-300" />
-          <span className="text-blue-700 font-bold">Fee Payments & Dues</span>
-        </div>
-      </div>
-
       {/* ── 1. ROYAL BLUE EXECUTIVE HEADER BANNER ── */}
       <section className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-white p-5 sm:p-7 shadow-xs">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -598,81 +583,151 @@ export default function ParentFeesPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
-                <tr>
-                  <th className="p-3 pl-4">Fee Category</th>
-                  <th className="p-3">Billing Cycle</th>
-                  <th className="p-3 text-right">Billed Amount</th>
-                  <th className="p-3 text-right">Amount Paid</th>
-                  <th className="p-3 text-right">Balance Due</th>
-                  <th className="p-3 text-center">Due Date</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-right pr-4">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {childFees.map((fee) => {
-                  const billedAmt = parseFloat(String(fee.amount || "0"));
-                  const paidAmt = parseFloat(String(fee.paid_amount || "0"));
-                  const balanceDue = Math.max(0, billedAmt - paidAmt);
-                  const isPaid = balanceDue === 0 || fee.status === "paid";
+          <>
+            {/* Desktop Full Invoices Table (>= md) */}
+            <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-100">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
+                  <tr>
+                    <th className="p-3 pl-4">Fee Category</th>
+                    <th className="p-3">Billing Cycle</th>
+                    <th className="p-3 text-right">Billed Amount</th>
+                    <th className="p-3 text-right">Amount Paid</th>
+                    <th className="p-3 text-right">Balance Due</th>
+                    <th className="p-3 text-center">Due Date</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-right pr-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {childFees.map((fee) => {
+                    const billedAmt = parseFloat(String(fee.amount || "0"));
+                    const paidAmt = parseFloat(String(fee.paid_amount || "0"));
+                    const balanceDue = Math.max(0, billedAmt - paidAmt);
+                    const isPaid = balanceDue === 0 || fee.status === "paid";
 
-                  return (
-                    <tr key={fee.id} className="hover:bg-blue-50/20 transition">
-                      <td className="p-3 pl-4 font-bold text-slate-800">
-                        {capitalizeWords(fee.feetype_name || "Academic Tuition Fee")}
-                      </td>
-                      <td className="p-3 text-slate-500">
-                        {capitalizeWords(fee.fee_billing_cycle || "Annual")}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-700">
-                        ₹{billedAmt.toLocaleString()}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-600">
-                        ₹{paidAmt.toLocaleString()}
-                      </td>
-                      <td className="p-3 text-right font-mono font-black text-slate-900">
-                        ₹{balanceDue.toLocaleString()}
-                      </td>
-                      <td className="p-3 text-center text-slate-500 font-medium">
-                        {formatDate(fee.due_date)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            isPaid
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : balanceDue < billedAmt
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
-                          }`}
-                        >
-                          {isPaid ? "Paid in Full" : balanceDue < billedAmt ? "Partially Paid" : "Payment Pending"}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right pr-4">
-                        {!isPaid ? (
-                          <Button
-                            size="sm"
-                            onClick={() => handleInitiatePayment(fee)}
-                            className="h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs px-3"
+                    return (
+                      <tr key={fee.id} className="hover:bg-blue-50/20 transition">
+                        <td className="p-3 pl-4 font-bold text-slate-800">
+                          {capitalizeWords(fee.feetype_name || "Academic Tuition Fee")}
+                        </td>
+                        <td className="p-3 text-slate-500">
+                          {capitalizeWords(fee.fee_billing_cycle || "Annual")}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-700">
+                          ₹{billedAmt.toLocaleString()}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-emerald-600">
+                          ₹{paidAmt.toLocaleString()}
+                        </td>
+                        <td className="p-3 text-right font-mono font-black text-slate-900">
+                          ₹{balanceDue.toLocaleString()}
+                        </td>
+                        <td className="p-3 text-center text-slate-500 font-medium">
+                          {formatDate(fee.due_date)}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              isPaid
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : balanceDue < billedAmt
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}
                           >
-                            Pay Fees Now
-                          </Button>
-                        ) : (
-                          <span className="text-[11px] font-bold text-emerald-600 inline-flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Settled
+                            {isPaid ? "Paid in Full" : balanceDue < billedAmt ? "Partially Paid" : "Payment Pending"}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="p-3 text-right pr-4">
+                          {!isPaid ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleInitiatePayment(fee)}
+                              className="h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs px-3"
+                            >
+                              Pay Fees Now
+                            </Button>
+                          ) : (
+                            <span className="text-[11px] font-bold text-emerald-600 inline-flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Settled
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Fee Invoices Cards (< md): 100% Width, Zero Horizontal Scroll */}
+            <div className="md:hidden divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-2xs">
+              {childFees.map((fee) => {
+                const billedAmt = parseFloat(String(fee.amount || "0"));
+                const paidAmt = parseFloat(String(fee.paid_amount || "0"));
+                const balanceDue = Math.max(0, billedAmt - paidAmt);
+                const isPaid = balanceDue === 0 || fee.status === "paid";
+
+                return (
+                  <div key={fee.id} className="p-3.5 space-y-3 hover:bg-slate-50/40 transition">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900">
+                          {capitalizeWords(fee.feetype_name || "Academic Tuition Fee")}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          {capitalizeWords(fee.fee_billing_cycle || "Annual")} · Due: {formatDate(fee.due_date)}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                          isPaid
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : balanceDue < billedAmt
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-rose-50 text-rose-700 border-rose-200"
+                        }`}
+                      >
+                        {isPaid ? "Paid" : balanceDue < billedAmt ? "Partial" : "Pending"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 font-mono">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">Billed</span>
+                        <span className="font-bold text-slate-700">₹{billedAmt.toLocaleString()}</span>
+                      </div>
+                      <div className="h-6 w-px bg-slate-200" />
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">Paid</span>
+                        <span className="font-bold text-emerald-600">₹{paidAmt.toLocaleString()}</span>
+                      </div>
+                      <div className="h-6 w-px bg-slate-200" />
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">Balance</span>
+                        <span className="font-black text-slate-900 text-sm">₹{balanceDue.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {!isPaid ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleInitiatePayment(fee)}
+                        className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20"
+                      >
+                        Pay Fees Now (₹{balanceDue.toLocaleString()})
+                      </Button>
+                    ) : (
+                      <div className="w-full py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold text-center border border-emerald-100 flex items-center justify-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4" /> Fee Settled in Full
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -706,60 +761,109 @@ export default function ParentFeesPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
-                <tr>
-                  <th className="p-3 pl-4">Receipt / Reference</th>
-                  <th className="p-3">Fee Category</th>
-                  <th className="p-3">Payment Date</th>
-                  <th className="p-3">Payment Mode</th>
-                  <th className="p-3 text-right">Amount Paid</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-right pr-4">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {childHistory.map((h) => (
-                  <tr key={h.id} className="hover:bg-blue-50/20 transition">
-                    <td className="p-3 pl-4 font-mono font-bold text-slate-800">
-                      {h.receipt_no || `REC-${h.id}`}
-                    </td>
-                    <td className="p-3 font-semibold text-slate-800">
-                      {capitalizeWords(h.feetype_name || "Academic Tuition Fee")}
-                    </td>
-                    <td className="p-3 text-slate-500 font-medium">
-                      {formatDate(h.payment_date)}
-                    </td>
-                    <td className="p-3">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+          <>
+            {/* Desktop Full Payment History Table (>= md) */}
+            <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-100">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
+                  <tr>
+                    <th className="p-3 pl-4">Receipt / Reference</th>
+                    <th className="p-3">Fee Category</th>
+                    <th className="p-3">Payment Date</th>
+                    <th className="p-3">Payment Mode</th>
+                    <th className="p-3 text-right">Amount Paid</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-right pr-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {childHistory.map((h) => (
+                    <tr key={h.id} className="hover:bg-blue-50/20 transition">
+                      <td className="p-3 pl-4 font-mono font-bold text-slate-800">
+                        {h.receipt_no || `REC-${h.id}`}
+                      </td>
+                      <td className="p-3 font-semibold text-slate-800">
+                        {capitalizeWords(h.feetype_name || "Academic Tuition Fee")}
+                      </td>
+                      <td className="p-3 text-slate-500 font-medium">
+                        {formatDate(h.payment_date)}
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                          {formatPaymentMode(h.payment_mode)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono font-black text-emerald-600 text-sm">
+                        ₹{Number(h.amount).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Cleared & Verified
+                        </span>
+                      </td>
+                      <td className="p-3 text-right pr-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handlePrintReceipt(h)}
+                          className="h-8 rounded-xl border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 gap-1.5"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          Print Receipt
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Payment History Cards (< md): 100% Width, Zero Horizontal Scroll */}
+            <div className="md:hidden divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white overflow-hidden shadow-2xs">
+              {childHistory.map((h) => (
+                <div key={h.id} className="p-3.5 space-y-2.5 hover:bg-slate-50/40 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono font-bold text-xs text-blue-700 block">
+                        {h.receipt_no || `REC-${h.id}`}
+                      </span>
+                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 mt-0.5">
+                        {capitalizeWords(h.feetype_name || "Academic Tuition Fee")}
+                      </h4>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-mono font-black text-emerald-600 text-sm block">
+                        ₹{Number(h.amount).toLocaleString()}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700">
+                        Cleared
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <span>{formatDate(h.payment_date)}</span>
+                      <span>·</span>
+                      <span className="px-2 py-0.2 rounded-md bg-slate-100 text-slate-700 font-medium">
                         {formatPaymentMode(h.payment_mode)}
                       </span>
-                    </td>
-                    <td className="p-3 text-right font-mono font-black text-emerald-600 text-sm">
-                      ₹{Number(h.amount).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Cleared & Verified
-                      </span>
-                    </td>
-                    <td className="p-3 text-right pr-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePrintReceipt(h)}
-                        className="h-8 rounded-xl border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 gap-1.5"
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                        Print Receipt
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrintReceipt(h)}
+                      className="h-7.5 px-2.5 rounded-lg border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 gap-1 shrink-0"
+                    >
+                      <Printer className="h-3 w-3" />
+                      Receipt
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

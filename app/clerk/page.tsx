@@ -333,7 +333,7 @@ export default function ClerkDashboard() {
       </div>
 
       {/* ─── Search Bar ─────────────────────────────────────────────────── */}
-      <div className="relative z-30">
+      <div className="relative z-10">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs px-4 py-3 flex items-center gap-3 focus-within:ring-2 focus-within:ring-[#5826df]/20 focus-within:border-[#5826df]/40 transition-all">
           <Search className="h-5 w-5 text-[#5826df] shrink-0" />
                     <input
@@ -370,7 +370,7 @@ export default function ClerkDashboard() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 max-h-96 overflow-y-auto"
+                className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-20 max-h-96 overflow-y-auto"
               >
                 <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
                   <span>Search Results ({searchResults.length})</span>
