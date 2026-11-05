@@ -64,41 +64,8 @@ function LoginFormInner() {
   }, [searchParams]);
 
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
+    const val = e.target.value;
     setError("");
-
-    // Identify if the user is typing purely numbers (mobile) vs text/email
-    const isPureDigits = /^\d+$/.test(val);
-
-    if (isPureDigits) {
-      // Must start with 6, 7, 8, or 9
-      if (val.length === 1 && !/^[6-9]/.test(val)) {
-        setError("Mobile number must start with 6, 7, 8, or 9.");
-        return;
-      }
-      if (!/^[6-9]/.test(val)) {
-        setError("Mobile number must start with 6, 7, 8, or 9.");
-      }
-      // Maximum 10 digits allowed when typing a number
-      if (val.length > 10) {
-        val = val.slice(0, 10);
-      }
-    } else {
-      // If user pasted a phone number with country code like +91 9876543210
-      const digitsOnly = val.replace(/[\s()\-+]/g, "");
-      if (/^\d+$/.test(digitsOnly)) {
-        let clean = digitsOnly;
-        if (clean.startsWith("91") && clean.length === 12 && /^[6-9]/.test(clean.slice(2))) {
-          clean = clean.slice(2);
-        } else if (clean.startsWith("0") && clean.length === 11 && /^[6-9]/.test(clean.slice(1))) {
-          clean = clean.slice(1);
-        }
-        if (clean.length === 10 && /^[6-9]/.test(clean)) {
-          val = clean;
-        }
-      }
-    }
-
     setUsername(val);
   };
 
@@ -113,22 +80,10 @@ function LoginFormInner() {
     }
 
     const isEmail = identifier.includes("@");
-    const isPureDigits = /^\d+$/.test(identifier);
-
-    if (isPureDigits) {
-      if (identifier.length !== 10) {
-        setError("Mobile number must be exactly 10 digits.");
-        return;
-      }
-      if (!/^[6-9]/.test(identifier)) {
-        setError("Mobile number must start with 6, 7, 8, or 9.");
-        return;
-      }
-    }
-
     const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
-    const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
-    const isMobile = /^[6-9][0-9]{9}$/.test(cleanMobile);
+    const normalizedDigits = digitsOnly.replace(/[+]/g, "");
+    const possibleMobile = normalizedDigits.length >= 10 ? normalizedDigits.slice(-10) : normalizedDigits;
+    const isMobile = /^[6-9][0-9]{9}$/.test(possibleMobile) && (identifier.length === 10 || /[\s()+\-.]/.test(identifier));
 
     setIsLoading(true);
 
@@ -136,8 +91,8 @@ function LoginFormInner() {
     if (isEmail) {
       payload.email = identifier;
     } else if (isMobile) {
-      payload.mobile = cleanMobile;
-      payload.username = cleanMobile;
+      payload.mobile = possibleMobile;
+      payload.username = possibleMobile;
     } else {
       payload.username = identifier;
     }
@@ -226,10 +181,9 @@ function LoginFormInner() {
             <Input
               id="username"
               type="text"
-              placeholder="Enter 10-digit mobile, email, or username"
+              placeholder="Enter mobile, GR number, email, or username"
               required
               value={username}
-              maxLength={/^\d+$/.test(username) ? 10 : undefined}
               onChange={handleIdentifierChange}
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}

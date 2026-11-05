@@ -951,7 +951,7 @@ export function
                 className={cn(
                   "relative hidden lg:flex h-9 w-9 items-center justify-center rounded-full transition-colors cursor-pointer",
                   roleTitle === "Student"
-                    ? "text-white hover:bg-white/10"
+                    ? "text-white hover:bg-white/10 lg:text-slate-600 lg:hover:bg-slate-50"
                     : "text-slate-600 hover:bg-slate-50"
                 )}
               >
