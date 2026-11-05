@@ -73,13 +73,17 @@ import {
   patchFieldValues,
   patchDocuments,
   assignGrNumber,
+  assignStudentDivision,
+  assignStudentPlacement,
   getClasses,
+  getDivisions,
 } from "@/lib/clerk";
 import { openAuthenticatedDocument } from "@/lib/document-viewer";
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import type { Admission } from "@/types/clerk";
+import type { Division } from "@/types/clerk";
 
 // ─── StatusBadge ──────────────────────────────────────────────────────────────
 
@@ -149,6 +153,8 @@ function StudentAvatar({ name }: { name: string }) {
 interface GrDialogProps {
   admission: Admission | null;
   studentName: string;
+  classes: { id: number; school_class: string }[];
+  divisions: Division[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -156,25 +162,49 @@ interface GrDialogProps {
 function GrNumberDialog({
   admission,
   studentName,
+  classes,
+  divisions,
   onClose,
   onSuccess,
 }: GrDialogProps) {
   const [grNo, setGrNo] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [classId, setClassId] = useState("");
+  const [division, setDivision] = useState("");
+
+  const appliedClassValue = admission?.field_values.find((field) =>
+    /applying for class|class|standard|grade/i.test(field.field_label)
+  )?.value;
+  const resolvedAppliedClass = classes.find((cls) =>
+    String(cls.id) === String(appliedClassValue) || cls.school_class.toLowerCase() === String(appliedClassValue || "").toLowerCase()
+  );
+  const availableDivisions = divisions.filter((item) => String(item.SchoolClass) === classId);
 
   useEffect(() => {
     if (!admission) {
       setGrNo("");
       setConfirmed(false);
+      setClassId("");
+      setDivision("");
+    } else {
+      const initialClass = admission.student_details?.school_class || resolvedAppliedClass?.id;
+      setClassId(initialClass ? String(initialClass) : "");
+      const initialDivision = admission.student_details?.division || admission.division || "";
+      setDivision(initialDivision);
     }
-  }, [admission]);
+  }, [admission, resolvedAppliedClass?.id]);
+
+  useEffect(() => {
+    if (availableDivisions.length === 1) setDivision(String(availableDivisions[0].division || ""));
+    else if (!availableDivisions.some((item) => String(item.division) === division)) setDivision("");
+  }, [classId, availableDivisions, division]);
 
   const handleSubmit = async () => {
-    if (!admission || !grNo.trim()) return;
+    if (!admission || !grNo.trim() || !classId || !division) return;
     setIsSaving(true);
     try {
-      await assignGrNumber(admission.admission_number, grNo.trim());
+      await assignGrNumber(admission.admission_number, grNo.trim(), { school_class_id: Number(classId), division });
       toast.success(`GR number assigned successfully to ${studentName}`);
       onSuccess();
       onClose();
@@ -187,7 +217,23 @@ function GrNumberDialog({
     }
   };
 
-  const canSubmit = grNo.trim().length > 0 && confirmed && !isSaving;
+  const handleSavePlacement = async () => {
+    if (!admission || !classId || !division) return;
+    setIsSaving(true);
+    try {
+      await assignStudentPlacement(admission.admission_number, { school_class_id: Number(classId), division });
+      toast.success(`Class ${classes.find((item) => String(item.id) === classId)?.school_class || "placement"} / ${division} assigned. You can add the GR number later.`);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign class placement");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const canSubmit = grNo.trim().length > 0 && !!classId && !!division && confirmed && !isSaving;
+  const canSavePlacement = !!classId && !!division && confirmed && !isSaving;
 
   return (
     <Dialog open={!!admission} onOpenChange={(open) => !open && onClose()}>
@@ -198,7 +244,7 @@ function GrNumberDialog({
               <GraduationCap className="h-4 w-4 text-white" />
             </div>
             <DialogTitle className="text-white text-base font-semibold m-0 p-0">
-              Assign GR Number
+              Class Placement & GR Number
             </DialogTitle>
           </div>
           <DialogDescription className="text-slate-300 text-xs mt-1">
@@ -215,23 +261,22 @@ function GrNumberDialog({
             </div>
             <div className="space-y-0.5">
               <p className="text-sm font-semibold text-amber-900">
-                Permanent action — cannot be undone
+                Class placement can be saved now — cannot be undone
               </p>
               <p className="text-xs text-amber-700 leading-relaxed">
-                Once a GR number is assigned, it is <strong>permanent</strong>{" "}
-                and cannot be modified later.
+                Assign the student to the applying class and its division now. You can save this step before entering the GR number; GR assignment stays permanent.
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-700">
-              GR Number <span className="text-red-500">*</span>
+              GR Number <span className="text-xs font-normal text-slate-400">(optional for class placement)</span>
             </label>
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="e.g. GR-2024-001"
+                placeholder="Enter now or assign later"
                 value={grNo}
                 onChange={(e) => setGrNo(e.target.value)}
                 className="pl-9 bg-slate-50 border-slate-200 font-mono text-sm h-10 focus:ring-2 focus:ring-slate-900/10 rounded-xl"
@@ -239,6 +284,25 @@ function GrNumberDialog({
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1.5 text-sm font-semibold text-slate-700">
+              Applying class <span className="text-red-500">*</span>
+              <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm disabled:opacity-70" value={classId} disabled={!!resolvedAppliedClass} onChange={(event) => { setClassId(event.target.value); setDivision(""); }}>
+                <option value="">Select class</option>
+                {classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.school_class}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm font-semibold text-slate-700">
+              Division <span className="text-red-500">*</span>
+              <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={division} onChange={(event) => setDivision(event.target.value)} disabled={!classId || availableDivisions.length === 0}>
+                <option value="">{availableDivisions.length ? "Select division" : "No divisions"}</option>
+                {availableDivisions.map((item) => <option key={item.id} value={item.division || ""}>{item.division}</option>)}
+              </select>
+            </label>
+          </div>
+          {availableDivisions.length > 1 && <p className="text-xs text-amber-700">Select the student’s division to confirm admission.</p>}
+          {availableDivisions.length === 0 && classId && <p className="text-xs text-red-600">Create a division for this class before confirming admission.</p>}
 
           <div
             className={cn(
@@ -274,20 +338,17 @@ function GrNumberDialog({
               )}
             </div>
             <span className="text-xs text-slate-600 leading-relaxed">
-              I confirm that GR number{" "}
+              I confirm the selected class and division{grNo.trim() ? " and GR number " : "."}{" "}
               {grNo.trim() ? (
                 <span className="font-mono font-bold text-slate-900">
                   "{grNo.trim()}"
                 </span>
-              ) : (
-                <span className="text-slate-400">[not entered]</span>
-              )}{" "}
-              is correct.
+              ) : null}{grNo.trim() ? " are correct." : null}
             </span>
           </div>
         </div>
 
-        <DialogFooter className="px-6 pb-6 pt-2 gap-3 sm:gap-3 flex flex-row">
+        <DialogFooter className="px-6 pb-6 pt-2 gap-2 sm:gap-2 grid grid-cols-1 sm:grid-cols-3">
           <Button
             variant="outline"
             onClick={onClose}
@@ -295,6 +356,15 @@ function GrNumberDialog({
             className="flex-1 h-10 border-2 border-slate-300 bg-white text-slate-700 font-semibold rounded-xl"
           >
             Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleSavePlacement}
+            disabled={!canSavePlacement}
+            className="h-10 border-2 border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-100"
+          >
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <School className="mr-2 h-4 w-4" />}
+            Save Class Without GR
           </Button>
           <Button
             onClick={handleSubmit}
@@ -870,7 +940,7 @@ function StudentDetailsModal({
           </Button>
 
           <div className="flex items-center gap-2">
-            {!admission.gr_no && (
+            {(!admission.gr_no || !admission.student_details?.school_class || !admission.student_details?.division) && (
               <Button
                 size="sm"
                 onClick={() => {
@@ -879,7 +949,7 @@ function StudentDetailsModal({
                 }}
                 className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs gap-1.5 shadow-sm"
               >
-                <Hash className="h-3.5 w-3.5" /> Assign GR No.
+                {admission.student_details?.school_class && admission.student_details?.division ? <Hash className="h-3.5 w-3.5" /> : <School className="h-3.5 w-3.5" />} Class / Division / GR
               </Button>
             )}
             <Button
@@ -903,7 +973,10 @@ function StudentDetailsModal({
 
 export default function StudentRecordsPage() {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
+  const [registeredStudentCount, setRegisteredStudentCount] = useState<number | null>(null);
+  const [rosterStudents, setRosterStudents] = useState<{ id: number; school_class?: number | string | null; class_name?: string; division?: string | null }[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -935,6 +1008,7 @@ export default function StudentRecordsPage() {
     custom_fields: {} as Record<string, { label: string; value: string }>,
   });
   const [isSavingFields, setIsSavingFields] = useState(false);
+  const studentFormDivisions = divisions.filter((item) => String(item.SchoolClass) === studentForm.school_class);
 
   // document-edit dialog
   const [editingDocAdmission, setEditingDocAdmission] = useState<Admission | null>(null);
@@ -951,6 +1025,31 @@ export default function StudentRecordsPage() {
   const [isAssigningDiv, setIsAssigningDiv] = useState(false);
   const [singleStudentForDiv, setSingleStudentForDiv] = useState<Admission | null>(null);
 
+  const divisionTargets = singleStudentForDiv
+    ? [singleStudentForDiv]
+    : admissions.filter((admission) => selectedStudentIds.includes(admission.id));
+  const divisionOptions = (() => {
+    const classIds = divisionTargets.map((admission) => {
+      if (admission.student_details?.school_class) return String(admission.student_details.school_class);
+      const appliedClass = admission.field_values.find((field) =>
+        /applying for class|class|standard|grade/i.test(field.field_label)
+      )?.value;
+      const className = String(appliedClass || "").toLowerCase();
+      return String(classes.find((item) => String(item.school_class || "").toLowerCase() === className)?.id || "");
+    });
+    if (!classIds.length || classIds.some((id) => !id)) return [];
+    return divisions
+      .filter((item) => classIds.every((id) => id === String(item.SchoolClass)))
+      .map((item) => String(item.division || "").trim())
+      .filter((value, index, values) => value && values.indexOf(value) === index);
+  })();
+
+  useEffect(() => {
+    if (targetDivision !== "AUTO_ROUND_ROBIN" && !divisionOptions.includes(targetDivision)) {
+      setTargetDivision(divisionOptions[0] || "");
+    }
+  }, [divisionOptions.join("|"), targetDivision]);
+
   // Handle Division Assignment (Single or Bulk)
   const handleAssignDivision = async () => {
     const targets = singleStudentForDiv
@@ -961,35 +1060,37 @@ export default function StudentRecordsPage() {
       toast.error("Please select at least one student.");
       return;
     }
+    if (targets.some((admission) => !admission.student_id)) {
+      toast.error("Assign the applicant to a class and division first. Only enrolled students can be moved between divisions.");
+      return;
+    }
 
     setIsAssigningDiv(true);
     try {
       let successCount = 0;
+      const nextDivisionByClass = new Map<string, number>();
 
       for (let i = 0; i < targets.length; i++) {
         const adm = targets[i];
+        const classId = String(adm.student_details?.school_class || classes.find(
+          (item) => String(item.school_class || "").toLowerCase() === getStudentClass(adm).toLowerCase()
+        )?.id || "");
+        if (!classId) throw new Error(`Assign a class to ${getStudentName(adm)} before assigning a division.`);
+        const classDivisions = divisions
+          .filter((item) => String(item.SchoolClass) === classId)
+          .map((item) => String(item.division || "").trim())
+          .filter(Boolean);
+        if (!classDivisions.length) throw new Error(`No divisions are configured for ${getStudentClass(adm)}.`);
+
         let chosenDiv = targetDivision;
 
-        // If Round-Robin option chosen:
         if (targetDivision === "AUTO_ROUND_ROBIN") {
-          const divList = ["A", "B", "C", "D"];
-          chosenDiv = divList[i % divList.length];
+          const next = nextDivisionByClass.get(classId) || 0;
+          chosenDiv = classDivisions[next % classDivisions.length];
+          nextDivisionByClass.set(classId, next + 1);
         }
-
-        // Find existing division field or update fields
-        const divFieldValue = adm.field_values.find((fv) =>
-          ["division", "section", "sec", "div"].some((l) => fv.field_label.toLowerCase().includes(l))
-        );
-
-        if (divFieldValue) {
-          await patchFieldValues(adm.admission_number, [
-            { field_id: divFieldValue.field, value: chosenDiv },
-          ]);
-        } else if (adm.field_values.length > 0) {
-          await patchFieldValues(adm.admission_number, [
-            { field_id: adm.field_values[0].field, value: adm.field_values[0].value },
-          ]);
-        }
+        if (!classDivisions.includes(chosenDiv)) throw new Error(`Division ${chosenDiv} does not belong to ${getStudentClass(adm)}.`);
+        await assignStudentDivision(adm.admission_number, chosenDiv);
         successCount++;
       }
 
@@ -1014,12 +1115,24 @@ export default function StudentRecordsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [admissionsData, classData] = await Promise.all([
+      const [admissionsData, classData, divisionData, studentResponse] = await Promise.all([
         getAdmissions(),
         getClasses(),
+        getDivisions(),
+        fetchWithAuth(`${API_BASE_URL}/get-student/`).catch(() => null),
       ]);
       setAdmissions(admissionsData || []);
       setClasses(classData || []);
+      setDivisions(divisionData || []);
+      if (studentResponse?.ok) {
+        const studentData = await studentResponse.json();
+        const roster = Array.isArray(studentData) ? studentData : [];
+        setRosterStudents(roster);
+        setRegisteredStudentCount(roster.length);
+      } else {
+        setRosterStudents([]);
+        setRegisteredStudentCount(null);
+      }
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Failed to load student records";
@@ -1212,6 +1325,15 @@ export default function StudentRecordsPage() {
     return true;
   });
 
+  const selectedClassId = classes.find(
+    (item) => String(item.school_class || "").toLowerCase() === selectedClass.toLowerCase()
+  )?.id;
+  const rosterClassStrength = rosterStudents.filter((student) => {
+    if (selectedClass !== "ALL" && String(student.school_class || "") !== String(selectedClassId || "")) return false;
+    if (selectedDivision !== "ALL" && String(student.division || "").replace(/^div\s*/i, "").trim().toLowerCase() !== selectedDivision.toLowerCase()) return false;
+    return true;
+  }).length;
+
   // ── Standardized Field Editing ─────────────────────────────────────────────
 
   const openFieldEdit = (adm: Admission) => {
@@ -1274,6 +1396,15 @@ export default function StudentRecordsPage() {
 
   const handleSaveFields = async () => {
     if (!editingAdmission) return;
+
+    if (!studentForm.school_class) {
+      toast.error("Select a class before assigning a division.");
+      return;
+    }
+    if (!studentForm.division || !studentFormDivisions.some((item) => String(item.division) === studentForm.division)) {
+      toast.error("Select a division that belongs to the chosen class.");
+      return;
+    }
 
     if (studentForm.aadhar_number) {
       const cleanAadhaar = studentForm.aadhar_number.replace(/\s+|-/g, "");
@@ -1404,7 +1535,7 @@ export default function StudentRecordsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-zinc-100">
-              {admissions.length}
+              {registeredStudentCount ?? admissions.length}
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">All enrolled students</p>
           </CardContent>
@@ -1419,7 +1550,7 @@ export default function StudentRecordsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-indigo-900 dark:text-indigo-200">
-              {filteredAdmissions.length}
+              {registeredStudentCount === null ? filteredAdmissions.length : rosterClassStrength}
             </div>
             <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1">
               {selectedClass === "ALL" ? "Showing all classes" : `Class: ${selectedClass}`}
@@ -1600,7 +1731,7 @@ export default function StudentRecordsPage() {
               {selectedDivision !== "ALL" && <span>· Division {selectedDivision}</span>}
             </h3>
             <p className="text-xs text-indigo-200">
-              Showing <span className="font-bold text-white">{filteredAdmissions.length}</span> students in current selection
+              Showing <span className="font-bold text-white">{filteredAdmissions.length}</span> admission records in current selection
             </p>
           </div>
         </div>
@@ -1701,7 +1832,7 @@ export default function StudentRecordsPage() {
             >
               <Edit3 className="h-3.5 w-3.5" />
             </Button>,
-            ...(adm.gr_no
+            ...(adm.gr_no && adm.student_details?.school_class && adm.student_details?.division
               ? []
               : [
                   <Button
@@ -1710,10 +1841,10 @@ export default function StudentRecordsPage() {
                     variant="outline"
                     onClick={() => setGrAdmission(adm)}
                     className="h-10 w-10 cursor-pointer rounded-lg p-0 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                    title="Assign GR Number"
-                    aria-label={`Assign GR Number: ${getStudentName(adm)}`}
+                    title="Assign class placement or GR number"
+                    aria-label={`Assign class placement or GR number: ${getStudentName(adm)}`}
                   >
-                    <Hash className="h-3.5 w-3.5" />
+                    {adm.student_details?.school_class && adm.student_details?.division ? <Hash className="h-3.5 w-3.5" /> : <School className="h-3.5 w-3.5" />}
                   </Button>,
                 ]),
           ]}
@@ -1811,15 +1942,15 @@ export default function StudentRecordsPage() {
                     >
                       <Edit3 className="h-3.5 w-3.5" />
                     </Button>
-                    {!adm.gr_no && (
+                    {(!adm.gr_no || !adm.student_details?.school_class || !adm.student_details?.division) && (
                       <Button
                         size="xs"
                         variant="outline"
                         onClick={() => setGrAdmission(adm)}
                         className="h-8 w-8 p-0 rounded-xl text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50"
-                        title="Assign GR Number"
+                        title="Assign class placement or GR number"
                       >
-                        <Hash className="h-3.5 w-3.5" />
+                        {adm.student_details?.school_class && adm.student_details?.division ? <Hash className="h-3.5 w-3.5" /> : <School className="h-3.5 w-3.5" />}
                       </Button>
                     )}
                   </div>
@@ -1852,6 +1983,8 @@ export default function StudentRecordsPage() {
       <GrNumberDialog
         admission={grAdmission}
         studentName={grAdmission ? getStudentName(grAdmission) : ""}
+        classes={classes}
+        divisions={divisions}
         onClose={() => setGrAdmission(null)}
         onSuccess={fetchData}
       />
@@ -1974,7 +2107,11 @@ export default function StudentRecordsPage() {
                     <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Class</label>
                     <Select
                       value={studentForm.school_class || "none"}
-                      onValueChange={(val: any) => setStudentForm((prev) => ({ ...prev, school_class: (!val || val === "none" ? "" : String(val)) }))}
+                      onValueChange={(val: any) => {
+                        const nextClassId = !val || val === "none" ? "" : String(val);
+                        const classDivisions = divisions.filter((item) => String(item.SchoolClass) === nextClassId);
+                        setStudentForm((prev) => ({ ...prev, school_class: nextClassId, division: classDivisions.length === 1 ? String(classDivisions[0].division || "") : "" }));
+                      }}
                     >
                       <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
                         <SelectValue placeholder="Select Class" />
@@ -1991,12 +2128,21 @@ export default function StudentRecordsPage() {
                   </div>
                   <div className="space-y-1 sm:col-span-1">
                     <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Division / Section</label>
-                    <Input
-                      value={studentForm.division}
-                      placeholder="e.g. A"
-                      onChange={(e) => setStudentForm((prev) => ({ ...prev, division: e.target.value.toUpperCase() }))}
-                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
-                    />
+                    <Select
+                      value={studentForm.division || "none"}
+                      onValueChange={(val) => setStudentForm((prev) => ({ ...prev, division: !val || val === "none" ? "" : String(val) }))}
+                      disabled={!studentForm.school_class || studentFormDivisions.length === 0}
+                    >
+                      <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
+                        <SelectValue placeholder={studentForm.school_class ? "Select Division" : "Select class first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select Division</SelectItem>
+                        {studentFormDivisions.map((item) => (
+                          <SelectItem key={item.id} value={String(item.division)}>{item.division}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1 sm:col-span-1">
                     <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Roll Number</label>
@@ -2148,7 +2294,7 @@ export default function StudentRecordsPage() {
                 Target Division / Section
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {["A", "B", "C", "D"].map((div) => (
+                {divisionOptions.map((div) => (
                   <button
                     key={div}
                     type="button"
@@ -2181,7 +2327,7 @@ export default function StudentRecordsPage() {
               >
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-purple-600" />
-                  Auto-Distribute Evenly (A, B, C, D)
+                  Auto-Distribute Across This Class's Divisions
                 </span>
                 {targetDivision === "AUTO_ROUND_ROBIN" && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
               </button>
@@ -2192,7 +2338,7 @@ export default function StudentRecordsPage() {
               <p>
                 Students will be placed into{" "}
                 <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                  {targetDivision === "AUTO_ROUND_ROBIN" ? "Equal Divisions (A/B/C/D)" : `Division ${targetDivision}`}
+                  {targetDivision === "AUTO_ROUND_ROBIN" ? "Available divisions for each selected class" : `Division ${targetDivision}`}
                 </span>
                 . All timetable, roll numbers & division rosters will update automatically.
               </p>
@@ -2214,7 +2360,7 @@ export default function StudentRecordsPage() {
             <Button
               type="button"
               onClick={handleAssignDivision}
-              disabled={isAssigningDiv}
+              disabled={isAssigningDiv || (!divisionOptions.length && targetDivision !== "AUTO_ROUND_ROBIN")}
               className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs gap-1.5 shadow-sm"
             >
               {isAssigningDiv ? (

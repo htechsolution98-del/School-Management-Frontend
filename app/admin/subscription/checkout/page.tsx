@@ -2,11 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { loadRazorpayScript } from "@/lib/razorpay";
 import {
   getPublicPlans,
   checkoutCalculate,
   recordSubscriptionPayment,
   getCurrentSchoolSubscription,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
   SubscriptionPlan,
   SchoolSubscription,
 } from "@/lib/subscriptions";
@@ -96,22 +99,53 @@ export default function SubscriptionCheckoutPage() {
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
+    let checkoutOpened = false;
 
     try {
       if (paymentMethod === "ONLINE") {
-        // Trigger Online Razorpay Order Creation via backend
-        const res = await recordSubscriptionPayment(currentSub.id, {
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded || !window.Razorpay) {
+          throw new Error("Razorpay could not load. Check your internet connection and try again.");
+        }
+        const order = await createRazorpayOrder({
+          school_id: currentSub.school,
           plan_id: selectedPlan?.id,
           billing_cycle: billingCycle,
-          payment_method: "ONLINE",
-          payment_reference: `RAZORPAY_DEMO_${Date.now()}`,
-          notes: notes || "Online Subscription Payment",
+          months_count: billingCycle === "QUARTERLY" ? 3 : billingCycle === "HALF_YEARLY" ? 6 : billingCycle === "YEARLY" ? 12 : 1,
         });
-
-        setSuccessMsg(res.message || "Payment processed and subscription activated!");
-        setTimeout(() => {
-          router.push("/admin/subscription");
-        }, 1500);
+        if (!order.key || !order.order_id || !Number(order.amount)) {
+          throw new Error("Razorpay returned incomplete payment details. Please contact support.");
+        }
+        const checkout = new window.Razorpay({
+          key: order.key,
+          amount: Math.round(Number(order.amount) * 100),
+          currency: order.currency || "INR",
+          name: "School Subscription",
+          description: `${billingCycle.replaceAll("_", " ")} subscription payment`,
+          order_id: order.order_id,
+          handler: async (response: any) => {
+            try {
+              const result = await verifyRazorpayPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              setSuccessMsg(result.message || "Payment verified and subscription activated.");
+              setTimeout(() => router.push("/admin/subscription"), 1500);
+            } catch (verificationError: any) {
+              setErrorMsg(verificationError?.message || "Payment verification failed.");
+              setSubmitting(false);
+            }
+          },
+          theme: { color: "#4F46E5" },
+          modal: { ondismiss: () => setSubmitting(false) },
+        });
+        checkout.on("payment.failed", (response: any) => {
+          setErrorMsg(response?.error?.description || "Payment failed. Please try again.");
+          setSubmitting(false);
+        });
+        checkout.open();
+        checkoutOpened = true;
       } else {
         // Bank Transfer / Offline Payment
         if (!paymentReference.trim()) {
@@ -136,7 +170,7 @@ export default function SubscriptionCheckoutPage() {
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to process payment.");
     } finally {
-      setSubmitting(false);
+      if (!checkoutOpened) setSubmitting(false);
     }
   }
 

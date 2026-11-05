@@ -148,6 +148,10 @@ export default function SyllabusPage() {
 
     setLoadingDocId(item.id ?? null);
     try {
+      if (fallbackUrl?.includes("cloudinary.com")) {
+        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       await openAuthenticatedDocument(
         streamUrl,
         `Syllabus - ${getSubjectLabel(item.subject)}`,
@@ -178,11 +182,7 @@ export default function SyllabusPage() {
         cls.school_class
       : "Unknown Class";
 
-    const divSuffix = div.division?.toLowerCase().includes("div")
-      ? div.division
-      : `Div ${div.division}`;
-
-    return `${classLabel} - ${divSuffix}`;
+    return classLabel;
   };
 
   const getDivisionShortName = (divisionId: number | null) => {
@@ -200,7 +200,8 @@ export default function SyllabusPage() {
     return sub ? sub.name : `Subject #${subjectId}`;
   };
 
-  // Form Division toggles
+  // Form class toggles. This state stores class IDs; legacy variable names
+  // remain local to avoid disturbing unrelated directory behavior.
   const toggleDivision = (id: number) => {
     setSelectedDivisionIds((prev) =>
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
@@ -208,36 +209,17 @@ export default function SyllabusPage() {
   };
 
   const selectAllDivisions = () => {
-    const targetDivs = divisionSearchQuery.trim()
-      ? filteredDivisionsForSelect
-      : sortedDivisionsForSelect;
-    const visibleIds = targetDivs.map((d) => d.id!).filter(Boolean) as number[];
+    const visibleIds = schoolClasses.map((cls) => cls.id!).filter(Boolean) as number[];
     setSelectedDivisionIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
   };
 
   const clearAllDivisions = () => {
-    if (divisionSearchQuery.trim()) {
-      const filteredIds = filteredDivisionsForSelect.map((d) => d.id!).filter(Boolean) as number[];
-      setSelectedDivisionIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
-    } else {
-      setSelectedDivisionIds([]);
-      setSelectedSubjectNames([]);
-    }
+    setSelectedDivisionIds([]);
+    setSelectedSubjectNames([]);
   };
 
   const toggleClassDivisions = (classId: number) => {
-    const classDivIds = divisions
-      .filter((d) => d.SchoolClass === classId)
-      .map((d) => d.id!)
-      .filter(Boolean);
-
-    const allSelected = classDivIds.every((id) => selectedDivisionIds.includes(id));
-
-    if (allSelected) {
-      setSelectedDivisionIds((prev) => prev.filter((id) => !classDivIds.includes(id)));
-    } else {
-      setSelectedDivisionIds((prev) => Array.from(new Set([...prev, ...classDivIds])));
-    }
+    setSelectedDivisionIds((prev) => prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]);
   };
 
   // Form Subject multi-selection
@@ -255,7 +237,8 @@ export default function SyllabusPage() {
     setSelectedSubjectNames([]);
   };
 
-  // Available subjects for the selected divisions
+  // Subjects are stored against divisions, so collect the unique subjects
+  // available in each selected class while assigning the syllabus by class.
   const availableSubjectNames = useMemo(() => {
     if (selectedDivisionIds.length === 0) return [];
     return Array.from(
@@ -264,12 +247,12 @@ export default function SyllabusPage() {
           .filter(
             (s) =>
               s.division !== null &&
-              selectedDivisionIds.includes(s.division)
+              divisions.some((d) => d.id === s.division && d.SchoolClass !== null && selectedDivisionIds.includes(d.SchoolClass))
           )
           .map((s) => s.name.trim())
       )
     ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  }, [subjects, selectedDivisionIds]);
+  }, [subjects, selectedDivisionIds, divisions]);
 
   const sortedDivisionsForSelect = useMemo(() => {
     return [...divisions].sort((a, b) => {
@@ -331,7 +314,7 @@ export default function SyllabusPage() {
     e.preventDefault();
 
     if (selectedDivisionIds.length === 0) {
-      toast.error("Please select at least one division");
+      toast.error("Please select at least one class");
       return;
     }
 
@@ -347,38 +330,39 @@ export default function SyllabusPage() {
 
     setIsSaving(true);
     try {
-      const uploadsToMake: { division: number; subject: number }[] = [];
+      const uploadsToMake: { class_group: number; subject: number }[] = [];
 
-      for (const divId of selectedDivisionIds) {
+      for (const classId of selectedDivisionIds) {
         for (const subName of selectedSubjectNames) {
           const matchingSub = subjects.find(
             (s) =>
-              s.division === divId &&
+              s.division !== null && divisions.some((d) => d.id === s.division && d.SchoolClass === classId) &&
               s.name.trim().toLowerCase() === subName.trim().toLowerCase()
           );
 
           if (matchingSub?.id) {
-            uploadsToMake.push({ division: divId, subject: matchingSub.id });
+            uploadsToMake.push({ class_group: classId, subject: matchingSub.id });
           }
         }
       }
 
       if (uploadsToMake.length === 0) {
         toast.error(
-          `None of the selected subjects exist in the selected division(s).`
+          `None of the selected subjects exist in the selected class(es).`
         );
         return;
       }
 
       const replacedCount = uploadsToMake.filter((item) =>
-        syllabuses.some((sy) => sy.division === item.division && sy.subject === item.subject)
+        syllabuses.some((sy) => sy.class_group === item.class_group && sy.subject === item.subject)
       ).length;
 
       await Promise.all(
         uploadsToMake.map((item) =>
           saveSyllabus({
             syllabus_file: selectedFile!,
-            division: item.division,
+            class_group: item.class_group,
+            division: null,
             subject: item.subject,
           })
         )
@@ -447,7 +431,8 @@ export default function SyllabusPage() {
   const filteredSyllabuses = useMemo(() => {
     return syllabuses.filter((s) => {
       const divObj = divisions.find((d) => d.id === s.division);
-      const clsObj = schoolClasses.find((c) => c.id === divObj?.SchoolClass);
+      const classId = s.class_group ?? divObj?.SchoolClass;
+      const clsObj = schoolClasses.find((c) => c.id === classId);
       const subName = getSubjectLabel(s.subject).toLowerCase();
       const divLabel = getDivisionLabel(s.division).toLowerCase();
 
@@ -457,10 +442,6 @@ export default function SyllabusPage() {
       }
 
       // 2. Division filter
-      if (divisionFilter !== "all") {
-        if (!divObj || divObj.id?.toString() !== divisionFilter) return false;
-      }
-
       // 3. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
@@ -488,15 +469,15 @@ export default function SyllabusPage() {
         SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label ||
         cls.school_class;
 
-      const clsDivs = divisions.filter((d) => d.SchoolClass === cls.id);
-      const clsDivIds = clsDivs.map((d) => d.id!);
-
       const classItems = filteredSyllabuses
-        .filter((sy) => clsDivIds.includes(sy.division ?? -1))
+        .filter((sy) => {
+          const legacyDivision = divisions.find((d) => d.id === sy.division);
+          return (sy.class_group ?? legacyDivision?.SchoolClass) === cls.id;
+        })
         .map((sy) => ({
           syllabus: sy,
           subjectName: getSubjectLabel(sy.subject),
-          divisionName: getDivisionShortName(sy.division),
+          divisionName: "",
         }))
         .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
@@ -507,7 +488,7 @@ export default function SyllabusPage() {
       classGroups.push({
         classId: cls.id,
         className: clsName,
-        divisionsCount: clsDivs.length,
+        divisionsCount: 0,
         items: classItems,
       });
     }
@@ -579,7 +560,7 @@ export default function SyllabusPage() {
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Upload, organize, and attach curriculum documents to multiple class divisions.
+            Upload, organize, and attach each curriculum document to a class.
           </p>
         </div>
 
@@ -618,7 +599,7 @@ export default function SyllabusPage() {
                 </Badge>
               </div>
               <CardDescription className="text-xs">
-                Attach a syllabus document to multiple subjects and divisions simultaneously.
+                Attach a syllabus document to subjects across selected classes.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
@@ -627,7 +608,7 @@ export default function SyllabusPage() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-semibold text-gray-800 dark:text-zinc-200 flex items-center gap-1.5">
-                      <Layers className="h-4 w-4 text-indigo-600" /> Target Divisions:
+                      <Layers className="h-4 w-4 text-indigo-600" /> Target Classes:
                     </label>
                     <div className="flex items-center gap-2 text-xs">
                       <button
@@ -635,7 +616,7 @@ export default function SyllabusPage() {
                         onClick={selectAllDivisions}
                         className="text-xs text-gray-500 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
                       >
-                        Select All
+                        Select All Classes
                       </button>
                       <span className="text-gray-300 dark:text-zinc-700">|</span>
                       <button
@@ -652,10 +633,7 @@ export default function SyllabusPage() {
                   {schoolClasses.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {schoolClasses.map((cls) => {
-                        const classDivs = divisions.filter((d) => d.SchoolClass === cls.id);
-                        if (classDivs.length === 0) return null;
-                        const classDivIds = classDivs.map((d) => d.id!).filter(Boolean);
-                        const isFullySelected = classDivIds.every((id) => selectedDivisionIds.includes(id));
+                        const isFullySelected = selectedDivisionIds.includes(cls.id!);
                         const label = SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label || cls.school_class;
 
                         return (
@@ -682,8 +660,9 @@ export default function SyllabusPage() {
                     </div>
                   )}
 
-                  {/* Unified division checklist container */}
-                  <div className="bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-lg p-3 max-h-60 overflow-y-auto">
+                  {/* Division targeting is intentionally removed; class pills above are the assignment targets. */}
+                  <div className="hidden">
+                    <div className="bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-lg p-3 max-h-60 overflow-y-auto">
                     {/* Search Input at the top */}
                     <div className="relative mb-3">
                       <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -737,12 +716,13 @@ export default function SyllabusPage() {
                         })}
                       </div>
                     )}
+                    </div>
                   </div>
 
                   {selectedDivisionIds.length > 0 && (
                     <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      {selectedDivisionIds.length} division{selectedDivisionIds.length > 1 ? "s" : ""} selected
+                      {selectedDivisionIds.length} class{selectedDivisionIds.length > 1 ? "es" : ""} selected
                     </p>
                   )}
                 </div>
@@ -776,12 +756,12 @@ export default function SyllabusPage() {
 
                   {selectedDivisionIds.length === 0 ? (
                     <div className="p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/30 text-center">
-                      <p className="text-xs text-slate-500 font-medium">Please select division(s) above first</p>
+                      <p className="text-xs text-slate-500 font-medium">Please select class(es) above first</p>
                     </div>
                   ) : availableSubjectNames.length === 0 ? (
                     <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-center">
                       <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
-                        No subjects found in selected divisions. Please assign subjects first.
+                        No subjects found in selected classes. Please assign subjects first.
                       </p>
                     </div>
                   ) : (
@@ -844,7 +824,7 @@ export default function SyllabusPage() {
                       type="file"
                       className="hidden"
                       onChange={handleFileChange}
-                      accept=".pdf,.doc,.docx,.jpg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
                     />
                     {selectedFile ? (
                       <div className="flex items-center justify-between gap-2 px-1">
@@ -874,7 +854,7 @@ export default function SyllabusPage() {
                           Click to browse or drop document
                         </p>
                         <p className="text-[10px] text-muted-foreground">
-                          PDF, DOC (Max 2MB) | PNG, JPG (Max 500KB)
+                          PDF (Max 2MB) | JPG, PNG, WEBP images are converted to PDF (Max 500KB)
                         </p>
                       </div>
                     )}
@@ -985,7 +965,7 @@ export default function SyllabusPage() {
                     <SelectItem value="all">All Classes</SelectItem>
                     {schoolClasses.map((cls) => {
                       const classDivs = divisions.filter((d) => d.SchoolClass === cls.id).map((d) => d.id!);
-                      const count = syllabuses.filter((sy) => classDivs.includes(sy.division ?? -1)).length;
+                      const count = syllabuses.filter((sy) => sy.class_group === cls.id || classDivs.includes(sy.division ?? -1)).length;
                       const label =
                         SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label ||
                         cls.school_class;
@@ -998,7 +978,8 @@ export default function SyllabusPage() {
                   </SelectContent>
                 </Select>
 
-                {/* Filter by Division */}
+                <div className="hidden">
+                {/* Legacy division filter hidden for class-wide curriculum. */}
                 <Select
                   value={divisionFilter}
                   onValueChange={(val) => setDivisionFilter(val || "all")}
@@ -1023,6 +1004,7 @@ export default function SyllabusPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                </div>
 
                 {/* Search input */}
                 <div className="relative flex-1 min-w-[150px]">
@@ -1080,7 +1062,7 @@ export default function SyllabusPage() {
                                 </Badge>
                               </div>
                               <span className="text-xs text-muted-foreground font-medium">
-                                {classGroup.divisionsCount} total division{classGroup.divisionsCount !== 1 ? "s" : ""}
+                                Class-wide syllabus
                               </span>
                             </div>
 
@@ -1104,7 +1086,7 @@ export default function SyllabusPage() {
                                           variant="outline"
                                           className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200 text-[10px] px-1.5 py-0 mt-0.5 font-bold"
                                         >
-                                          {divisionName}
+                                          {divisionName || "Class-wide"}
                                         </Badge>
                                       </div>
                                     </div>
@@ -1173,9 +1155,6 @@ export default function SyllabusPage() {
                             Class
                           </TableHead>
                           <TableHead className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
-                            Division
-                          </TableHead>
-                          <TableHead className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5">
                             Document File
                           </TableHead>
                           <TableHead className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider py-3.5 text-right pr-4">
@@ -1190,7 +1169,7 @@ export default function SyllabusPage() {
                             : false;
 
                           const divObj = divisions.find((d) => d.id === item.division);
-                          const clsObj = schoolClasses.find((c) => c.id === divObj?.SchoolClass);
+                          const clsObj = schoolClasses.find((c) => c.id === (item.class_group ?? divObj?.SchoolClass));
                           const classNameStr = clsObj
                             ? SCHOOL_CLASS_OPTIONS.find((o) => o.value === clsObj.school_class)?.label ||
                               clsObj.school_class
@@ -1223,14 +1202,6 @@ export default function SyllabusPage() {
                               </TableCell>
                               <TableCell className="py-3.5 text-xs text-slate-700 dark:text-zinc-300 font-medium">
                                 {classNameStr}
-                              </TableCell>
-                              <TableCell className="py-3.5">
-                                <Badge
-                                  variant="outline"
-                                  className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200 text-xs px-2 py-0.5 font-bold"
-                                >
-                                  {getDivisionShortName(item.division)}
-                                </Badge>
                               </TableCell>
                               <TableCell className="py-3.5">
                                 {item.syllabus_file && typeof item.syllabus_file === "string" ? (

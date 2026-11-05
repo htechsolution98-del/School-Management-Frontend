@@ -48,6 +48,7 @@ export interface Syllabus {
   id?: number;
   syllabus_file: string | File | null;
   division: number | null;
+  class_group?: number | null;
   subject: number | null;
   created_at?: string | null;
 }

@@ -152,12 +152,13 @@ export async function patchDocuments(
 
 export async function assignGrNumber(
   admissionNumber: string,
-  grNo: string
+  grNo: string,
+  placement?: { school_class_id: number; division: string }
 ): Promise<void> {
   const response = await fetchWithAuth(`${API_BASE_URL}/clerk_verify/${admissionNumber}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ gr_no: grNo }),
+    body: JSON.stringify({ ...(grNo.trim() ? { gr_no: grNo.trim() } : {}), ...placement }),
   });
 
   if (!response.ok) {
@@ -170,6 +171,44 @@ export async function assignGrNumber(
       } catch {
         if (text && !text.startsWith("<")) message = text.slice(0, 200);
       }
+    } catch {}
+    throw new Error(message);
+  }
+}
+
+export async function assignStudentPlacement(
+  admissionNumber: string,
+  placement: { school_class_id: number; division: string }
+): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/clerk_verify/${admissionNumber}/placement/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(placement),
+  });
+  if (!response.ok) {
+    let message = "Failed to assign the student's class and division.";
+    try {
+      const error = await response.json();
+      message = extractErrorMessage(error, message);
+    } catch {}
+    throw new Error(message);
+  }
+}
+
+export async function assignStudentDivision(
+  admissionNumber: string,
+  division: string
+): Promise<void> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/clerk_verify/${admissionNumber}/division/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ division }),
+  });
+  if (!response.ok) {
+    let message = "Failed to update the student's division.";
+    try {
+      const error = await response.json();
+      message = extractErrorMessage(error, message);
     } catch {}
     throw new Error(message);
   }
