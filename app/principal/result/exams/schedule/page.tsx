@@ -57,6 +57,13 @@ export default function ExamSchedulePage() {
   const [rooms, setRooms] = useState<ExamRoom[]>([]);
   const [examTerms, setExamTerms] = useState<ExamTerm[]>([]);
   const [weightageComponents, setWeightageComponents] = useState<ResultWeightageComponent[]>([]);
+  const [allWeightageConfigs, setAllWeightageConfigs] = useState<any[]>([]);
+
+  const minExamDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }, []);
 
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedClassId, setSelectedClassId] = useState<string>("ALL");
@@ -91,6 +98,27 @@ export default function ExamSchedulePage() {
     setNewClassId(classId);
     setNewSubjectId("");
     setClassSubjects([]);
+
+    // Update weightage components for chosen class
+    if (classId && allWeightageConfigs.length > 0) {
+      const classConfig =
+        allWeightageConfigs.find((cfg: any) => String(cfg.school_class ?? cfg.class_group ?? "") === String(classId)) ||
+        allWeightageConfigs.find((cfg: any) => !cfg.school_class && !cfg.class_group && (cfg.is_active || cfg.status === "ACTIVE")) ||
+        allWeightageConfigs.find((cfg: any) => cfg.is_active || cfg.status === "ACTIVE") ||
+        allWeightageConfigs[0];
+
+      const examComps = classConfig?.components?.filter((c: any) => c.component_type === "EXAM") || [];
+      setWeightageComponents(examComps);
+      if (examComps.length > 0 && !editingExam) {
+        setNewTermId(String(examComps[0].id));
+        setNewExamTitle(examComps[0].name);
+        if (examComps[0].max_marks) setNewMaxMarks(String(examComps[0].max_marks));
+        if (examComps[0].pass_marks || examComps[0].passing_marks) {
+          setNewPassingMarks(String(examComps[0].pass_marks || examComps[0].passing_marks));
+        }
+      }
+    }
+
     if (!classId) {
       setLoadingClassSubjects(false);
       return;
@@ -184,6 +212,7 @@ export default function ExamSchedulePage() {
         }).catch(() => []),
       ]);
 
+      setAllWeightageConfigs(weightageConfigs || []);
       const activeConfig =
         weightageConfigs.find((cfg: any) => cfg.is_active || cfg.status === "ACTIVE") || weightageConfigs[0];
       const examComponents = activeConfig?.components?.filter((c: any) => c.component_type === "EXAM") || [];
@@ -228,7 +257,39 @@ export default function ExamSchedulePage() {
 
   const handleSaveExam = async () => {
     if (!newExamTitle || !newSubjectId || !newClassId || !newExamDate) {
-      toast.error("Please fill in all required fields (Title, Class, Subject, Exam Date).");
+      toast.error("Please fill in all required fields (Class, Subject, Exam Title, Exam Date).");
+      return;
+    }
+
+    if (newExamDate < minExamDate) {
+      toast.error("Exams cannot be scheduled for today or past dates. Exams must be scheduled at least 1 day in advance.");
+      return;
+    }
+
+    // Timetable Conflict Check: prevent same class/division or same room at overlapping times
+    const conflict = exams.find((ex) => {
+      if (editingExam && ex.id === editingExam.id) return false;
+      if (ex.exam_date !== newExamDate) return false;
+      const s1 = newStartTime;
+      const e1 = newEndTime;
+      const s2 = ex.start_time ? ex.start_time.slice(0, 5) : "";
+      const e2 = ex.end_time ? ex.end_time.slice(0, 5) : "";
+      const timeOverlap = s1 < e2 && e1 > s2;
+      if (!timeOverlap) return false;
+
+      // Same class and division
+      const sameClass = String(ex.class_group) === String(newClassId);
+      const sameDiv = !newDivision || newDivision === "ALL" || !ex.division || ex.division === "ALL" || ex.division === newDivision;
+      if (sameClass && sameDiv) return true;
+
+      // Same room
+      if (newRoomId && ex.room && String(ex.room) === String(newRoomId)) return true;
+
+      return false;
+    });
+
+    if (conflict) {
+      toast.error(`Exam Conflict: Another exam (${conflict.title} - ${conflict.subject_name || "Subject"}) is already scheduled at this time (${conflict.start_time} - ${conflict.end_time}) on ${newExamDate}.`);
       return;
     }
 
@@ -601,87 +662,47 @@ export default function ExamSchedulePage() {
           </DialogHeader>
 
           <div className="space-y-4 py-3 text-xs">
-            {/* Weightage Component Selector */}
+            {/* 1. Class Selection (First & Required) */}
             <div className="space-y-1.5">
-              <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center gap-1 text-xs">
-                <Percent className="h-3.5 w-3.5" /> Select Weightage Exam Component / Term:
+              <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1">
+                  <School className="h-3.5 w-3.5" /> 1. Select Class <span className="text-rose-500">*</span>
+                </span>
+                {newClassId && (
+                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
+                    Data Loaded for {classes.find((cls) => String(cls.id) === newClassId)?.school_class}
+                  </Badge>
+                )}
               </label>
-              <Select
-                value={newTermId}
-                onValueChange={(val) => {
-                  if (val) {
-                    setNewTermId(val);
-                    const t = examTerms.find((term) => String(term.id) === val);
-                    const w = weightageComponents.find((comp) => String(comp.id) === val);
-                    if (t) setNewExamTitle(t.name);
-                    else if (w) setNewExamTitle(w.name);
-                  }
-                }}
-              >
-                <SelectTrigger className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800 border-gray-200 font-semibold text-slate-800">
-                  <SelectValue placeholder="Select EXAM Weightage Component...">
-                    {(() => {
-                      const t = examTerms.find((term) => String(term.id) === newTermId);
-                      if (t) return t.name;
-                      const w = weightageComponents.find((comp) => String(comp.id) === newTermId);
-                      if (w) return `${w.name} (${w.weightage_percentage}% Weightage)`;
-                      return "Select EXAM Weightage Component...";
-                    })()}
+              <Select value={newClassId} onValueChange={(val) => { if (val) handleModalClassChange(val); }}>
+                <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
+                  <SelectValue placeholder="Select Class First...">
+                    {classes.find((cls) => String(cls.id) === newClassId)?.school_class || "Select Class First..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl shadow-xl">
-                  {examTerms.map((t) => (
-                    <SelectItem key={`term-${t.id}`} value={String(t.id)} className="text-xs font-semibold py-2">
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                  {weightageComponents.map((w) => (
-                    <SelectItem key={`weight-${w.id}`} value={String(w.id)} className="text-xs font-semibold py-2">
-                      {w.name} ({w.weightage_percentage}% Weightage)
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={String(cls.id)} className="text-xs font-semibold py-2">
+                      {cls.school_class}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Title / Paper Name:</label>
-              <Input
-                value={newExamTitle}
-                onChange={(e) => setNewExamTitle(e.target.value)}
-                placeholder="e.g. Term 1 Mathematics Examination"
-                className="h-11 text-xs rounded-2xl border-gray-200 bg-white"
-              />
-            </div>
-
+            {/* 2. Subject & Division */}
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-zinc-300">Class:</label>
-                <Select value={newClassId} onValueChange={(val) => { if (val) handleModalClassChange(val); }}>
-                  <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
-                    <SelectValue placeholder="Select Class">
-                      {classes.find((cls) => String(cls.id) === newClassId)?.school_class || "Select Class"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl shadow-xl">
-                    {classes.map((cls) => (
-                      <SelectItem key={cls.id} value={String(cls.id)} className="text-xs font-semibold py-2">
-                        {cls.school_class}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-zinc-300">Subject:</label>
+                <label className="font-bold text-slate-700 dark:text-zinc-300">
+                  Subject <span className="text-rose-500">*</span>:
+                </label>
                 <Select
                   value={newSubjectId}
                   onValueChange={(val) => { if (val) setNewSubjectId(val); }}
                   disabled={!newClassId || loadingClassSubjects}
                 >
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold disabled:opacity-60">
-                  <SelectValue placeholder={loadingClassSubjects ? "Loading subjects..." : !newClassId ? "Select Class first" : modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject"}>
+                    <SelectValue placeholder={loadingClassSubjects ? "Loading subjects..." : !newClassId ? "Select Class first" : modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject"}>
                       {loadingClassSubjects
                         ? "Loading subjects..."
                         : !newClassId
@@ -704,6 +725,93 @@ export default function ExamSchedulePage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-zinc-300">Division (Optional):</label>
+                <Select value={newDivision} onValueChange={(val) => { if (val) setNewDivision(val); }} disabled={!newClassId}>
+                  <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold disabled:opacity-60">
+                    <SelectValue placeholder="All Divisions">
+                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision}` : "All Divisions"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl shadow-xl">
+                    <SelectItem value="ALL" className="text-xs font-semibold py-2">All Divisions</SelectItem>
+                    {modalDivisions.map((divName: string) => (
+                      <SelectItem key={divName} value={divName} className="text-xs font-semibold py-2">
+                        Division {divName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 3. Class Exam Weightage Component / Term */}
+            <div className="space-y-1.5">
+              <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1">
+                  <Percent className="h-3.5 w-3.5" /> Class Exam Weightage Component / Term:
+                </span>
+                {weightageComponents.length > 0 && (
+                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
+                    {weightageComponents.length} Exam Component(s) Found
+                  </Badge>
+                )}
+              </label>
+              <Select
+                value={newTermId}
+                onValueChange={(val) => {
+                  if (val) {
+                    setNewTermId(val);
+                    const t = examTerms.find((term) => String(term.id) === val);
+                    const w = weightageComponents.find((comp) => String(comp.id) === val);
+                    if (t) {
+                      setNewExamTitle(t.name);
+                    } else if (w) {
+                      setNewExamTitle(w.name);
+                      if ((w as any).max_marks) setNewMaxMarks(String((w as any).max_marks));
+                      if ((w as any).pass_marks || (w as any).passing_marks) {
+                        setNewPassingMarks(String((w as any).pass_marks || (w as any).passing_marks));
+                      }
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800 border-gray-200 font-semibold text-slate-800">
+                  <SelectValue placeholder={newClassId ? "Select EXAM Weightage Component..." : "Select Class first to load weightage"}>
+                    {(() => {
+                      const t = examTerms.find((term) => String(term.id) === newTermId);
+                      if (t) return t.name;
+                      const w = weightageComponents.find((comp) => String(comp.id) === newTermId);
+                      if (w) return `${w.name} (${w.weightage_percentage}% Weightage)`;
+                      return newClassId ? "Select EXAM Weightage Component..." : "Select Class first to load weightage";
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl shadow-xl">
+                  {weightageComponents.map((w) => (
+                    <SelectItem key={`weight-${w.id}`} value={String(w.id)} className="text-xs font-semibold py-2">
+                      {w.name} ({w.weightage_percentage}% Weightage)
+                    </SelectItem>
+                  ))}
+                  {examTerms.map((t) => (
+                    <SelectItem key={`term-${t.id}`} value={String(t.id)} className="text-xs font-semibold py-2">
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 4. Exam Title / Paper Name */}
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Title / Paper Name:</label>
+              <Input
+                value={newExamTitle}
+                onChange={(e) => setNewExamTitle(e.target.value)}
+                placeholder="e.g. Term 1 Mathematics Examination"
+                className="h-11 text-xs rounded-2xl border-gray-200 bg-white"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3.5">
@@ -730,6 +838,7 @@ export default function ExamSchedulePage() {
                 <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Date:</label>
                 <Input
                   type="date"
+                  min={minExamDate}
                   value={newExamDate}
                   onChange={(e) => setNewExamDate(e.target.value)}
                   className="h-11 text-xs rounded-2xl border-gray-200 bg-white font-mono"

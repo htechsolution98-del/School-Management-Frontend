@@ -640,8 +640,8 @@ export default function LeaveConfigPage() {
       ];
       await bulkManageLeaveTypes({
         leave_template: first.leave_template,
-        name: first.name || typeName,
-        leave_type: typeName,
+        name: first.name || first.leave_type || typeName.split("_")[0],
+        leave_type: first.leave_type || first.name || typeName.split("_")[0],
         code: first.code || undefined,
         leave_num: first.leave_num,
         allocation_count: first.allocation_count ?? first.leave_num,
@@ -1061,8 +1061,8 @@ export default function LeaveConfigPage() {
                                           Allowed: {allowedCount} days
                                         </Badge>
                                       </div>
-                                      <CardTitle className="text-lg font-bold text-zinc-900 dark:text-zinc-50 truncate" title={typeName}>
-                                        {typeName}
+                                      <CardTitle className="text-lg font-bold text-zinc-900 dark:text-zinc-50 truncate" title={first.name || first.leave_type || typeName.split("_")[0]}>
+                                        {first.name || first.leave_type || typeName.split("_")[0]}
                                       </CardTitle>
                                     </div>
 

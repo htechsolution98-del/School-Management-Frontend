@@ -314,6 +314,12 @@ export async function bulkManageLeaveTypes(
     } catch {}
     throw new Error(message);
   }
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem("sms_leaves_remaining_leaves");
+      sessionStorage.removeItem("sms_leaves_my_leave_requests");
+    } catch {}
+  }
   return response.json();
 }
 

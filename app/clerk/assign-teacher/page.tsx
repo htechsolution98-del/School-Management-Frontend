@@ -221,6 +221,31 @@ export default function AssignTeacherPage() {
 
   const uniqueClassDivisionFilterOptions = useMemo(() => {
     const map = new Map<string, string>();
+
+    // First, populate all school classes and divisions so all classes show in the filter
+    [...divisions]
+      .filter((d) => d && d.id)
+      .sort((a, b) => {
+        const classCompare = (a.class_name ?? "").localeCompare(
+          b.class_name ?? "",
+          undefined,
+          { numeric: true },
+        );
+        if (classCompare !== 0) return classCompare;
+        return (a.division ?? "").localeCompare(b.division ?? "");
+      })
+      .forEach((d) => {
+        const key = String(d.id);
+        const cName = formatClassName(d.class_name);
+        const dName = formatDivisionName(d.division);
+        const label =
+          d.class_name && d.division
+            ? `${cName} - Div ${dName}`
+            : (d.class_name ? cName : `Division #${d.id}`);
+        map.set(key, label);
+      });
+
+    // Also include any assigned teacher divisions if not already covered
     assignedTeachers.forEach((item) => {
       const key = item.division ? String(item.division) : "";
       if (key && !map.has(key)) {

@@ -139,8 +139,8 @@ export function StaffLeavesDesk({
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(true);
+  }, [academicYear]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -223,21 +223,29 @@ export function StaffLeavesDesk({
   }, [startDate, endDate, leaveTypeId, isHalfDay, halfDaySession, saturdayPolicy]);
 
   const fetchData = async (options?: boolean | any) => {
-    const isManual = typeof options === "boolean" ? options : false;
-    if (isManual || balances.length === 0) {
-      setIsLoading(true);
-    }
+    const isManual = options === true || (options && typeof options === "object") || options === undefined;
+    setIsLoading(true);
     setError(null);
     try {
-      const [remainingData, historyData] = await Promise.all([
-        getRemainingLeaves(isManual),
-        getMyLeaveRequests(isManual),
+      const [remainingRes, historyRes] = await Promise.allSettled([
+        getRemainingLeaves(true),
+        getMyLeaveRequests(true),
       ]);
-      setBalances(Array.isArray(remainingData) ? remainingData : []);
-      setHistory(Array.isArray(historyData) ? historyData : []);
+      if (remainingRes.status === "fulfilled" && Array.isArray(remainingRes.value)) {
+        setBalances(remainingRes.value);
+      }
+      if (historyRes.status === "fulfilled" && Array.isArray(historyRes.value)) {
+        setHistory(historyRes.value);
+      }
+      if (remainingRes.status === "rejected" && historyRes.status === "rejected") {
+        throw new Error("Failed to load leave records. Please check connection.");
+      }
       getSaturdayPolicy().then((res) => {
         if (res?.saturday_policy) setSaturdayPolicy(res.saturday_policy);
       }).catch(() => {});
+      if (isManual) {
+        toast.success("Leave records and balances updated!");
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Failed to load leave records. Please check connection.");
@@ -288,6 +296,12 @@ export function StaffLeavesDesk({
 
     if (!startDate || !endDate || !leaveTypeId || !reason.trim() || totalDays <= 0) {
       toast.error("Please fill out all fields correctly.");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (toHTMLDate(startDate) < todayStr) {
+      toast.error("Leave start date cannot be in the past. Please select today or a future date.");
       return;
     }
 
@@ -461,7 +475,7 @@ export function StaffLeavesDesk({
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={fetchData}
+                  onClick={() => fetchData(true)}
                   disabled={isLoading}
                   className="h-9 w-9 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#2563EB] hover:bg-blue-50/50 shadow-2xs shrink-0 cursor-pointer"
                   title="Refresh leaves"
@@ -494,7 +508,7 @@ export function StaffLeavesDesk({
             <Button
               variant="outline"
               size="icon"
-              onClick={fetchData}
+              onClick={() => fetchData(true)}
               disabled={isLoading}
               className="h-9 w-9 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#2563EB] hover:bg-blue-50/50 shadow-2xs shrink-0 cursor-pointer"
               title="Refresh leaves"
@@ -1123,18 +1137,27 @@ export function StaffLeavesDesk({
                 }}
               >
                 <SelectTrigger className="rounded-xl h-10 text-xs">
-                  <SelectValue placeholder="Select leave category" />
+                  <SelectValue placeholder="Select leave category">
+                    {(() => {
+                      const sel = balances.find((b) => String(b.leave_type_id ?? b.leave_type) === String(leaveTypeId));
+                      if (!sel) return "Select leave category";
+                      const name = sel.leave_type_name || (typeof sel.leave_type === "string" && isNaN(Number(sel.leave_type)) ? sel.leave_type : "Leave");
+                      const isHd = (sel as any).leave_unit === "HALF_DAY" || (sel as any).code === "HDL";
+                      return `${name} (${sel.remaining} ${isHd ? "Half-Days" : "Days"} available)`;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   {balances.map((b) => {
                     const isHd = (b as any).leave_unit === "HALF_DAY" || (b as any).code === "HDL";
+                    const name = b.leave_type_name || (typeof b.leave_type === "string" && isNaN(Number(b.leave_type)) ? b.leave_type : "Leave");
                     return (
                       <SelectItem
-                        key={b.leave_type_id || b.leave_type}
+                        key={String(b.leave_type_id ?? b.leave_type)}
                         value={String(b.leave_type_id ?? b.leave_type)}
-                        className="text-xs"
+                        className="text-xs font-medium"
                       >
-                        {b.leave_type_name || b.leave_type} ({b.remaining} {isHd ? "Half-Days" : "Days"} available)
+                        {name} ({b.remaining} {isHd ? "Half-Days" : "Days"} available)
                       </SelectItem>
                     );
                   })}
@@ -1150,6 +1173,7 @@ export function StaffLeavesDesk({
                 </Label>
                 <Input
                   type="date"
+                  min={new Date().toISOString().split("T")[0]}
                   value={toHTMLDate(startDate)}
                   onChange={(e) => setStartDate(toApiDate(e.target.value))}
                   required
@@ -1163,6 +1187,7 @@ export function StaffLeavesDesk({
                 </Label>
                 <Input
                   type="date"
+                  min={toHTMLDate(startDate) || new Date().toISOString().split("T")[0]}
                   value={toHTMLDate(endDate)}
                   onChange={(e) => setEndDate(toApiDate(e.target.value))}
                   disabled={isHalfDay}

@@ -1111,6 +1111,18 @@ export default function StudentRecordsPage() {
 
   // ── fetch ──────────────────────────────────────────────────────────────────
 
+  const cleanClassName = (raw: string | undefined | null) => {
+    if (!raw || raw === "N/A") return "N/A";
+    const cleaned = String(raw).replace(/class/gi, "").trim();
+    return cleaned ? `Class ${cleaned}` : String(raw);
+  };
+
+  const cleanDivisionName = (raw: string | undefined | null) => {
+    if (!raw || raw === "N/A") return "N/A";
+    const cleaned = String(raw).replace(/^(div|division)\s*/i, "").trim().toUpperCase();
+    return cleaned || "N/A";
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
@@ -1121,18 +1133,107 @@ export default function StudentRecordsPage() {
         getDivisions(),
         fetchWithAuth(`${API_BASE_URL}/get-student/`).catch(() => null),
       ]);
-      setAdmissions(admissionsData || []);
-      setClasses(classData || []);
-      setDivisions(divisionData || []);
+      const fetchedClasses = classData || [];
+      const fetchedDivisions = divisionData || [];
+      setClasses(fetchedClasses);
+      setDivisions(fetchedDivisions);
+
+      let roster: any[] = [];
       if (studentResponse?.ok) {
         const studentData = await studentResponse.json();
-        const roster = Array.isArray(studentData) ? studentData : [];
+        roster = Array.isArray(studentData) ? studentData : [];
         setRosterStudents(roster);
         setRegisteredStudentCount(roster.length);
       } else {
         setRosterStudents([]);
         setRegisteredStudentCount(null);
       }
+
+      const rawAdmissions: Admission[] = Array.isArray(admissionsData) ? [...admissionsData] : [];
+      const matchedStudentIds = new Set<number>();
+
+      // Enrich existing admissions with roster data
+      rawAdmissions.forEach((adm) => {
+        const matched = roster.find((st) =>
+          (adm.student_id && st.id === adm.student_id) ||
+          (adm.admission_number && String(st.admission_no || "").trim().toLowerCase() === String(adm.admission_number).trim().toLowerCase()) ||
+          (adm.gr_no && String(st.gr_no || "").trim().toLowerCase() === String(adm.gr_no).trim().toLowerCase())
+        );
+
+        if (matched) {
+          matchedStudentIds.add(matched.id);
+          if (!adm.gr_no && matched.gr_no) adm.gr_no = matched.gr_no;
+          if (!adm.student_id && matched.id) adm.student_id = matched.id;
+          if (!adm.division && matched.division) {
+            adm.division = typeof matched.division === "object" ? matched.division.division : String(matched.division);
+          }
+          if (!adm.student_details) {
+            adm.student_details = {
+              id: matched.id,
+              surname: matched.surname || "",
+              name: matched.name || matched.student_name || "",
+              father_name: matched.father_name || "",
+              mother_name: matched.mother_name || "",
+              date_of_birth: matched.date_of_birth || "",
+              gender: matched.gender || "",
+              mobile: matched.mobile || "",
+              school_class: matched.school_class,
+              school_class_name: matched.class_name || (fetchedClasses.find((c: any) => String(c.id) === String(matched.school_class))?.school_class) || "",
+              division: typeof matched.division === "object" ? matched.division.division : String(matched.division || ""),
+              roll_no: matched.roll_no || "",
+              aadhar_number: matched.aadhar_number || "",
+              address: matched.address || "",
+              gr_no: matched.gr_no || "",
+            };
+          }
+        }
+      });
+
+      // Synthesize admission records for roster students without online admissions
+      roster.forEach((st) => {
+        if (!matchedStudentIds.has(st.id)) {
+          const className = st.class_name || (fetchedClasses.find((c: any) => String(c.id) === String(st.school_class))?.school_class) || "";
+          const divStr = typeof st.division === "object" ? st.division?.division : String(st.division || "");
+          const synthAdmission: Admission = {
+            id: -(st.id || Math.floor(Math.random() * 100000)),
+            admission_number: st.admission_no || st.gr_no || `STU-${st.id}`,
+            status: "approved",
+            submitted_at: st.created_at || new Date().toISOString(),
+            created_at: st.created_at || new Date().toISOString(),
+            gr_no: st.gr_no || null,
+            division: divStr || null,
+            student_id: st.id,
+            student_details: {
+              id: st.id,
+              surname: st.surname || "",
+              name: st.name || st.student_name || "",
+              father_name: st.father_name || "",
+              mother_name: st.mother_name || "",
+              date_of_birth: st.date_of_birth || "",
+              gender: st.gender || "",
+              mobile: st.mobile || "",
+              school_class: st.school_class,
+              school_class_name: className,
+              division: divStr,
+              roll_no: st.roll_no || "",
+              aadhar_number: st.aadhar_number || "",
+              address: st.address || "",
+              gr_no: st.gr_no || "",
+            },
+            field_values: [
+              ...(st.name || st.student_name ? [{ id: 1, field: 1, field_label: "Student Name", value: st.name || st.student_name }] : []),
+              ...(st.father_name ? [{ id: 2, field: 2, field_label: "Father Name", value: st.father_name }] : []),
+              ...(className ? [{ id: 3, field: 3, field_label: "Applying for Class", value: className }] : []),
+              ...(divStr ? [{ id: 4, field: 4, field_label: "Division", value: divStr }] : []),
+              ...(st.mobile ? [{ id: 5, field: 5, field_label: "Mobile", value: st.mobile }] : []),
+            ],
+            documents: [],
+          };
+          rawAdmissions.push(synthAdmission);
+        }
+      });
+
+      setAdmissions(rawAdmissions);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Failed to load student records";
@@ -1179,17 +1280,18 @@ export default function StudentRecordsPage() {
   };
 
   const getStudentClass = (adm: Admission) => {
-    if (adm?.student_details?.school_class_name) return adm.student_details.school_class_name;
+    if (adm?.student_details?.school_class_name) return cleanClassName(adm.student_details.school_class_name);
     const val = getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
     if (!val) return "N/A";
     const match = classes.find((c) => String(c.id) === String(val) || c.school_class.toLowerCase() === val.toLowerCase());
-    return match ? match.school_class : val;
+    return cleanClassName(match ? match.school_class : val);
   };
 
   const getStudentDivision = (adm: Admission) => {
-    if (adm?.student_details?.division) return adm.student_details.division;
-    if (adm?.division) return adm.division;
-    return getFieldValue(adm, "division", "section", "div", "sec") || "N/A";
+    if (adm?.student_details?.division) return cleanDivisionName(adm.student_details.division);
+    if (adm?.division) return cleanDivisionName(adm.division);
+    const val = getFieldValue(adm, "division", "section", "div", "sec");
+    return cleanDivisionName(val) || "N/A";
   };
 
   const getStudentMobile = (adm: Admission) => {
@@ -1207,7 +1309,13 @@ export default function StudentRecordsPage() {
       key: "student",
       header: "Student Name & Adm No",
       sticky: true,
-      search: adm => [getStudentName(adm), adm.admission_number],
+      search: adm => [
+        getStudentName(adm),
+        adm.admission_number,
+        adm.gr_no,
+        adm.student_details?.name,
+        adm.student_details?.surname,
+      ],
       render: adm => (
         <div className="flex min-w-[200px] items-center gap-3">
           <StudentAvatar name={getStudentName(adm)} />
@@ -1221,7 +1329,7 @@ export default function StudentRecordsPage() {
     {
       key: "gr_no",
       header: "GR Number",
-      search: adm => adm.gr_no,
+      search: adm => [adm.gr_no, adm.admission_number, adm.student_details?.gr_no],
       render: adm => adm.gr_no ? (
         <Badge className="whitespace-nowrap px-2 py-0.5 font-mono text-[11px] font-bold text-white shadow-2xs bg-emerald-500">GR: {adm.gr_no}</Badge>
       ) : (
@@ -1236,7 +1344,7 @@ export default function StudentRecordsPage() {
         const sDiv = getStudentDivision(adm);
         return (
           <div className="flex items-center gap-1.5">
-            <Badge variant="outline" className="whitespace-nowrap border-indigo-200 bg-indigo-50 font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">Class {getStudentClass(adm)}</Badge>
+            <Badge variant="outline" className="whitespace-nowrap border-indigo-200 bg-indigo-50 font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">{getStudentClass(adm)}</Badge>
             {sDiv && sDiv !== "N/A" ? (
               <Badge variant="outline" className="whitespace-nowrap border-purple-200 bg-purple-50 font-bold text-purple-700 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300">Div {sDiv}</Badge>
             ) : (
@@ -1270,18 +1378,17 @@ export default function StudentRecordsPage() {
 
   const availableClasses = Array.from(
     new Set([
-      ...classes.map((c) => c.school_class),
+      ...classes.map((c) => cleanClassName(c.school_class)),
       ...admissions.map((a) => getStudentClass(a)).filter((c) => c && c !== "N/A"),
     ])
-  ).sort();
+  ).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const availableDivisions = Array.from(
-    new Set(
-      admissions
-        .map((a) => getStudentDivision(a))
-        .filter((d) => d && d !== "N/A")
-    )
-  ).sort();
+    new Set([
+      ...divisions.map((d) => cleanDivisionName(d.division)),
+      ...admissions.map((a) => getStudentDivision(a)).filter((d) => d && d !== "N/A"),
+    ])
+  ).filter((d) => d && d !== "N/A").sort();
 
   // ── Filtering Logic ────────────────────────────────────────────────────────
 
@@ -1290,19 +1397,27 @@ export default function StudentRecordsPage() {
     const sDiv = getStudentDivision(adm).toLowerCase();
     const sStatus = adm.status.toLowerCase();
     const sName = getStudentName(adm).toLowerCase();
-    const sAdmNo = adm.admission_number.toLowerCase();
+    const sAdmNo = (adm.admission_number || "").toLowerCase();
     const sGrNo = (adm.gr_no || "").toLowerCase();
     const sPhone = getStudentMobile(adm).toLowerCase();
     const q = searchQuery.toLowerCase().trim();
 
     // Class Filter
-    if (selectedClass !== "ALL" && !sClass.includes(selectedClass.toLowerCase())) {
-      return false;
+    if (selectedClass !== "ALL") {
+      const targetClass = selectedClass.toLowerCase().replace(/class/gi, "").trim();
+      const currentClass = sClass.replace(/class/gi, "").trim();
+      if (currentClass !== targetClass && !currentClass.includes(targetClass)) {
+        return false;
+      }
     }
 
     // Division Filter
-    if (selectedDivision !== "ALL" && !sDiv.includes(selectedDivision.toLowerCase())) {
-      return false;
+    if (selectedDivision !== "ALL") {
+      const targetDiv = selectedDivision.toLowerCase().replace(/^(div|division)\s*/i, "").trim();
+      const currentDiv = sDiv.replace(/^(div|division)\s*/i, "").trim();
+      if (currentDiv !== targetDiv) {
+        return false;
+      }
     }
 
     // Status Filter
@@ -1782,6 +1897,13 @@ export default function StudentRecordsPage() {
             adm.gr_no,
             getStudentMobile(adm),
             getStudentGuardian(adm),
+            getStudentClass(adm),
+            getStudentDivision(adm),
+            adm.student_details?.name,
+            adm.student_details?.surname,
+            adm.student_details?.father_name,
+            adm.student_details?.roll_no,
+            adm.student_details?.aadhar_number,
           ]}
           loading={isLoading}
           loadingLabel="Loading class student records…"
@@ -1796,13 +1918,21 @@ export default function StudentRecordsPage() {
               key: "class",
               label: "Class",
               options: availableClasses.map(value => ({ value, label: value })),
-              match: (adm, value) => getStudentClass(adm) === value,
+              match: (adm, value) => {
+                const c1 = getStudentClass(adm).toLowerCase().replace(/class/gi, "").trim();
+                const c2 = String(value).toLowerCase().replace(/class/gi, "").trim();
+                return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+              },
             },
             {
               key: "division",
               label: "Division",
               options: availableDivisions.map(value => ({ value, label: value })),
-              match: (adm, value) => getStudentDivision(adm) === value,
+              match: (adm, value) => {
+                const d1 = getStudentDivision(adm).toLowerCase().replace(/^(div|division)\s*/i, "").trim();
+                const d2 = String(value).toLowerCase().replace(/^(div|division)\s*/i, "").trim();
+                return d1 === d2;
+              },
             },
             {
               key: "status",
