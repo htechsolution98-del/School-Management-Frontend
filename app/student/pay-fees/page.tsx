@@ -14,7 +14,6 @@ import {
   Search,
   Download,
   RefreshCw,
-  MoreVertical,
   CheckCircle2,
   Info,
   ChevronLeft,
@@ -610,7 +609,6 @@ export default function PayFeesPage() {
   // History pagination
   const [historyPage, setHistoryPage] = useState(1);
 
-  // ── Preload Razorpay script on mount ──
   // ── Data Fetch ──
   const fetchFees = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -954,138 +952,86 @@ export default function PayFeesPage() {
             description="There are no pending or assessed fee dues matching the selected filters."
           />
         ) : (
-          <div className="flex flex-col gap-4">
-            {filteredFees.map((fee) => (
-              <div
-                key={fee.id}
-                className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm"
-              >
-                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                  {/* Left: Icon + Title */}
-                  <div className="flex items-start gap-3 w-full lg:w-auto min-w-0">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <svg
-                        className="w-6 h-6 text-blue-600"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <rect
-                          x="3"
-                          y="4"
-                          width="18"
-                          height="18"
-                          rx="2"
-                          strokeWidth={2}
-                          fill="none"
-                        />
-                        <line
-                          x1="16"
-                          y1="2"
-                          x2="16"
-                          y2="6"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                        />
-                        <line
-                          x1="8"
-                          y1="2"
-                          x2="8"
-                          y2="6"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                        />
-                        <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
-                      </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-gray-900 text-base truncate">
-                        {billingPeriodToLabel(fee.billing_period)} Fee
-                      </p>
-                      <p className="text-sm text-gray-400 mb-2 truncate">
-                        {billingPeriodToLabel(fee.billing_period)}
-                      </p>
-                      <StatusBadge status={fee.status as FeeStatus} />
-                    </div>
-                  </div>
-
-                  {/* Middle: Fee Details */}
-                  <div className="w-full lg:flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3 min-w-0">
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Amount</p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {formatINR(fee.amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Discount</p>
-                      <p className="text-sm font-semibold text-red-500">
-                        -{formatINR(fee.discount_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Fine</p>
-                      <p className="text-sm font-semibold text-green-600">
-                        +{formatINR(fee.fine_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">
-                        Payable Amount
-                      </p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {formatINR(fee.actual_payable_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Paid Amount</p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {formatINR(fee.paid_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">
-                        Balance Amount
-                      </p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {formatINR(fee.balance_amount)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Right: Actions */}
-                  <div className="flex flex-row lg:flex-col items-center lg:items-end gap-2 w-full lg:w-auto min-w-0 lg:min-w-[130px] pt-2 lg:pt-0 border-t lg:border-t-0 border-gray-100">
-                    <button className="text-gray-400 hover:text-gray-600 hidden lg:block self-end">
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
-                    {String(fee.status).toLowerCase() === "paid" ? (
-                      <div className="flex-1 lg:w-full bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-center flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span>Paid</span>
-                      </div>
-                    ) : String(fee.status).toLowerCase() === "cancelled" ? (
-                      <div className="flex-1 lg:w-full text-gray-400 text-sm font-medium mt-1 text-center">
-                        Cancelled
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setPayingFee(fee)}
-                        className="flex-1 lg:w-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-center"
-                      >
-                        Pay Now
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setReceiptFee(fee)}
-                      className="flex-1 lg:w-full flex items-center justify-center gap-1.5 sm:gap-2 border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
-                    >
-                      <Download className="w-4 h-4 shrink-0" />
-                      <span>Receipt</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[1080px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[19%]" />
+                <col className="w-[9%]" />
+                <col className="w-[10%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+                <col className="w-[12%]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-3">Fee / Period</th>
+                  <th className="whitespace-nowrap px-3 py-3">Status</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Amount</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Discount</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Fine</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Payable</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Paid</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Balance</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredFees.map((fee) => {
+                  const status = String(fee.status).toLowerCase();
+                  const paidAmount = Number(fee.paid_amount || 0);
+                  const feeName = (fee as any).feetype_name || (fee as any).fee_wise_class_name || "School Fee";
+                  return (
+                    <tr key={fee.id} className="whitespace-nowrap hover:bg-slate-50/70">
+                      <td className="px-4 py-3">
+                        <div className="truncate font-semibold text-slate-900" title={`${feeName} · ${billingPeriodToLabel(fee.billing_period)}`}>
+                          {feeName} · {billingPeriodToLabel(fee.billing_period)}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3"><StatusBadge status={fee.status as FeeStatus} /></td>
+                      <td className="px-3 py-3 text-right font-medium text-slate-700">{formatINR(fee.amount)}</td>
+                      <td className="px-3 py-3 text-right font-medium text-rose-600">-{formatINR(fee.discount_amount)}</td>
+                      <td className="px-3 py-3 text-right font-medium text-emerald-600">+{formatINR(fee.fine_amount)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-slate-900">{formatINR(fee.actual_payable_amount)}</td>
+                      <td className="px-3 py-3 text-right font-medium text-slate-700">{formatINR(fee.paid_amount)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-slate-900">{formatINR(fee.balance_amount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {status === "paid" ? (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">
+                              <CheckCircle2 className="h-4 w-4" /> Paid
+                            </span>
+                          ) : status === "cancelled" ? (
+                            <span className="text-xs font-medium text-slate-400">Cancelled</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPayingFee(fee)}
+                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                            >
+                              Pay Now
+                            </button>
+                          )}
+                          {paidAmount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptFee(fee)}
+                              aria-label="View fee receipt"
+                              title="View receipt"
+                              className="rounded-lg border border-slate-200 p-2 text-slate-600 transition-colors hover:bg-slate-100"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -1100,7 +1046,7 @@ export default function PayFeesPage() {
             You can pay full or partial amount of your pending fees.
           </p>
           <p className="text-sm text-gray-500">
-            After payment, it may take a few minutes to update the status.
+            Fee status and receipts update after your payment is successfully verified.
           </p>
         </div>
         <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">

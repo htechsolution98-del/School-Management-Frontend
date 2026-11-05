@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Script from "next/script";
+import { loadRazorpayScript } from "@/lib/razorpay";
 import {
   getPublicPlans,
   checkoutCalculate,
@@ -32,21 +32,6 @@ import {
   Lock,
 } from "lucide-react";
 import Link from "next/link";
-
-// Helper to dynamically load Razorpay script
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if ((window as any).Razorpay) return resolve(true);
-
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
 
 function CheckoutContent() {
   const router = useRouter();
@@ -147,7 +132,7 @@ function CheckoutContent() {
       if (paymentMethod === "ONLINE") {
         // 1. Ensure Razorpay checkout script is loaded
         const isLoaded = await loadRazorpayScript();
-        if (!isLoaded) {
+        if (!isLoaded || !window.Razorpay) {
           throw new Error("Unable to load Razorpay payment gateway. Please check your internet connection.");
         }
 
@@ -168,7 +153,7 @@ function CheckoutContent() {
 
         // 3. Configure Razorpay modal options
         const options = {
-          key: orderRes.key || "rzp_test_SFctsjgfvcrQ6h",
+          key: orderRes.key,
           amount: Math.round(Number(orderRes.amount) * 100),
           currency: orderRes.currency || "INR",
           name: "VidyaSanchalan Platform",
@@ -218,7 +203,10 @@ function CheckoutContent() {
           },
         };
 
-        const rzp = new (window as any).Razorpay(options);
+        if (!orderRes.key || !orderRes.order_id || !Number(orderRes.amount)) {
+          throw new Error("Razorpay returned incomplete payment details. Please contact support.");
+        }
+        const rzp = new window.Razorpay(options);
         rzp.on("payment.failed", function (response: any) {
           setErrorMsg(
             `Payment Failed: ${response.error?.description || response.error?.reason || "Transaction was declined"}`
@@ -643,7 +631,6 @@ function CheckoutContent() {
 export default function TrusteeCheckoutPage() {
   return (
     <>
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <Suspense fallback={<div className="p-8 text-center text-xs text-slate-500">Loading checkout...</div>}>
         <CheckoutContent />
       </Suspense>

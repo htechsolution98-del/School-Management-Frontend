@@ -40,7 +40,7 @@ export default function ReceiptModal({
 
   const loadReceipt = useCallback(async () => {
     if (initialPayments && initialPayments.length > 0) {
-      setPayments(initialPayments);
+      setPayments(initialPayments.filter((payment) => payment.is_verified && !payment.is_bounced));
       setError("");
       return;
     }
@@ -51,13 +51,18 @@ export default function ReceiptModal({
     setPayments([]);
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL}/student-fee-payment/?receipt_number=${encodeURIComponent(receiptNumber)}`,
+        `${API_BASE_URL}/student-fee-payment/?receipt_number=${encodeURIComponent(receiptNumber)}&is_verified=true&is_bounced=false`,
       );
       if (!res.ok) throw new Error("Failed to fetch receipt");
       const data = await res.json();
       const results: Payment[] = Array.isArray(data) ? data : (data.results || []);
       if (results && results.length > 0) {
-        setPayments(results);
+        const paidResults = results.filter((payment) => payment.is_verified && !payment.is_bounced);
+        if (paidResults.length) {
+          setPayments(paidResults);
+        } else {
+          setError("No completed payment exists for this receipt.");
+        }
       } else {
         setError("Receipt not found");
       }
@@ -71,7 +76,7 @@ export default function ReceiptModal({
   useEffect(() => {
     if (isOpen) {
       if (initialPayments && initialPayments.length > 0) {
-        setPayments(initialPayments);
+        setPayments(initialPayments.filter((payment) => payment.is_verified && !payment.is_bounced));
         setError("");
       } else if (receiptNumber) {
         loadReceipt();
@@ -341,6 +346,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
                 <tr>
                   <th className="p-3 print:p-1.5 print:text-[10px]">#</th>
                   <th className="p-3 print:p-1.5 print:text-[10px]">Fee / Particulars</th>
+                  <th className="p-3 print:p-1.5 print:text-[10px]">Due Date</th>
                   <th className="p-3 print:p-1.5 print:text-[10px] text-right">Base Fee</th>
                   <th className="p-3 print:p-1.5 print:text-[10px] text-right">Late Fee</th>
                   <th className="p-3 print:p-1.5 print:text-[10px] text-right">Discount</th>
@@ -367,6 +373,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
                         {formatBillingPeriod(p.fee_billing_period || "")} {p.is_rte_govt_claim ? "• 🏛️ RTE Claim" : ""}
                       </p>
                     </td>
+                    <td className="p-3 print:p-1.5 text-gray-600 print:text-[10px]">{p.fee_due_date ? formatDate(p.fee_due_date) : "-"}</td>
                     <td className="p-3 print:p-1.5 text-right text-gray-700 print:text-xs">{formatCurrency(p.fee_amount || 0)}</td>
                     <td className="p-3 print:p-1.5 text-right text-red-600 print:text-xs">
                       {parseFloat(p.fee_penalty || "0") > 0 ? `+${formatCurrency(p.fee_penalty || "0")}` : "₹0"}
@@ -381,6 +388,7 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
               <tfoot className="bg-gray-50 font-bold border-t border-gray-200 text-gray-900">
                 <tr>
                   <td colSpan={2} className="p-3 print:p-1.5 text-right print:text-xs">Total Summary:</td>
+                  <td></td>
                   <td className="p-3 print:p-1.5 text-right print:text-xs">{formatCurrency(totalBase)}</td>
                   <td className="p-3 print:p-1.5 text-right text-red-600 print:text-xs">{formatCurrency(totalPenalty)}</td>
                   <td className="p-3 print:p-1.5 text-right text-green-600 print:text-xs">-{formatCurrency(totalDiscount)}</td>
@@ -478,9 +486,9 @@ function ReceiptContent({ payments }: { payments: Payment[] }) {
       <div>
         <SectionTitle icon={CalendarDays} title="Payment Details" />
         <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-3 print:gap-1.5 print:gap-y-1.5 mt-1 print:mt-0.5">
-        <Info label="Payment Date" value={formatDateTime(primaryPayment.payment_date)} />
+        <Info label="Paid Date" value={formatDateTime(primaryPayment.payment_date)} />
         <Info label="Payer Type" value={primaryPayment.payer_type === "government" ? "Government (RTE Claim)" : "Student / Guardian"} />
-        <Info label="Payment Mode" value={primaryPayment.payment_mode === "govt_rte" ? "Govt RTE Direct Credit" : capitalize(primaryPayment.payment_mode)} />
+        <Info label="Payment Type" value={primaryPayment.payment_mode === "govt_rte" ? "Govt RTE Direct Credit" : capitalize(primaryPayment.payment_mode)} />
         <Info label="Reference / Transaction ID" value={refValue} wide />
         <Info label="Collected By" value={primaryPayment.collected_by_username || "-"} />
         <Info label="Verified By" value={primaryPayment.verified_by_username || "-"} />

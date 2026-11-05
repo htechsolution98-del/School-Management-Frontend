@@ -4,6 +4,7 @@ import type { ApiResponse } from "@/types/fees";
 
 export type LedgerTransactionType =
   | "FEE_RECEIPT"
+  | "NON_CASH_FEE_RECEIPT"
   | "EXPENSE"
   | "BANK_DEPOSIT"
   | "MISC_INCOME";
@@ -22,6 +23,7 @@ export interface LedgerTransactionItem {
   class_name?: string;
   category: string;
   source: string;
+  collection_amount?: number;
   inflow: number;
   outflow: number;
   running_balance: number;
@@ -31,6 +33,9 @@ export interface LedgerTransactionItem {
 }
 
 export interface LedgerSummary {
+  total_fee_collected?: number;
+  fee_payment_count?: number;
+  fee_collection_by_mode?: { payment_mode: string; amount: number; count: number }[];
   opening_balance: number;
   total_inflow: number;
   total_outflow: number;

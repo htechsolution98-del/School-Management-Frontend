@@ -12,13 +12,7 @@ import type {
   RazorpayOrderResponse,
   RazorpayVerifyPayload,
 } from "@/types/student";
-
-type RazorpayInstance = {
-  open(): void;
-  on(event: "payment.failed", handler: (response: { error?: { description?: string } }) => void): void;
-};
-
-type RazorpayConstructor = new (options: unknown) => RazorpayInstance;
+import { loadRazorpayScript } from "@/lib/razorpay";
 
 export async function getMyFees(): Promise<MyStudentFee[]> {
   return apiFetch<MyStudentFee[]>("/my-fees/", {}, "Failed to fetch fees.");
@@ -127,36 +121,6 @@ export async function createOfflineStudentFeePayment(
   );
 }
 
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve(false);
-      return;
-    }
-
-    const win = window as typeof window & { Razorpay?: RazorpayConstructor };
-    if (win.Razorpay) {
-      resolve(true);
-      return;
-    }
-
-    const existingScript = document.getElementById("razorpay-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(true));
-      existingScript.addEventListener("error", () => resolve(false));
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "razorpay-script";
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export async function initiateRazorpayPayment({
   studentFeeId,
   partialAmount,
@@ -164,8 +128,7 @@ export async function initiateRazorpayPayment({
   onFailure,
 }: InitiatePaymentOptions): Promise<void> {
   const loaded = await loadRazorpayScript();
-  const win = window as typeof window & { Razorpay?: RazorpayConstructor };
-  if (!loaded || !win.Razorpay) {
+  if (!loaded || !window.Razorpay) {
     onFailure("Failed to load Razorpay. Please check your internet connection.");
     return;
   }
@@ -184,13 +147,20 @@ export async function initiateRazorpayPayment({
     return;
   }
 
-  const rzp = new win.Razorpay({
-    key: orderData.key ?? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "",
+  const orderId = orderData.order_id ?? orderData.id;
+  const key = orderData.key;
+  if (!key || !orderId || !Number(orderData.amount)) {
+    onFailure("Razorpay order is missing its key or payment details. Please contact the school office.");
+    return;
+  }
+
+  const rzp = new window.Razorpay({
+    key,
     amount: orderData.amount,
     currency: orderData.currency ?? "INR",
     name: orderData.name ?? "School Fees",
     description: orderData.description ?? "Fee Payment",
-    order_id: orderData.order_id ?? orderData.id,
+    order_id: orderId,
     handler: async (response: RazorpayCheckoutResponse) => {
       try {
         await verifyRazorpayPayment({
@@ -207,7 +177,7 @@ export async function initiateRazorpayPayment({
     prefill: orderData.prefill ?? {},
     theme: { color: "#7c3aed" },
     modal: {
-      ondismiss: () => {},
+      ondismiss: () => onFailure("Checkout closed before payment completed."),
     },
   });
 

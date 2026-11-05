@@ -32,12 +32,17 @@ import {
   type LedgerTransactionType,
 } from "@/lib/fees/account-ledger";
 
+const toLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function AccountLedgerPage() {
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-  const firstDayOfMonthStr = new Date(today.getFullYear(), today.getMonth(), 1)
-    .toISOString()
-    .split("T")[0];
+  const todayStr = toLocalDateString(today);
+  const firstDayOfMonthStr = toLocalDateString(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const [startDate, setStartDate] = useState(firstDayOfMonthStr);
   const [endDate, setEndDate] = useState(todayStr);
@@ -89,7 +94,7 @@ export default function AccountLedgerPage() {
     } else if (type === "yesterday") {
       const y = new Date();
       y.setDate(y.getDate() - 1);
-      const yStr = y.toISOString().split("T")[0];
+      const yStr = toLocalDateString(y);
       s = yStr;
       e = yStr;
     } else if (type === "this_month") {
@@ -98,7 +103,7 @@ export default function AccountLedgerPage() {
     } else if (type === "last_30_days") {
       const past = new Date();
       past.setDate(past.getDate() - 30);
-      s = past.toISOString().split("T")[0];
+      s = toLocalDateString(past);
       e = todayStr;
     }
 
@@ -128,7 +133,9 @@ export default function AccountLedgerPage() {
     let list = ledgerData.transactions;
 
     if (activeTypeFilter !== "ALL") {
-      list = list.filter((tx) => tx.transaction_type === activeTypeFilter);
+      list = list.filter((tx) => activeTypeFilter === "FEE_RECEIPT"
+        ? tx.transaction_type === "FEE_RECEIPT" || tx.transaction_type === "NON_CASH_FEE_RECEIPT"
+        : tx.transaction_type === activeTypeFilter);
     }
 
     if (searchQuery.trim()) {
@@ -139,6 +146,7 @@ export default function AccountLedgerPage() {
           tx.particulars.toLowerCase().includes(q) ||
           tx.source.toLowerCase().includes(q) ||
           tx.category.toLowerCase().includes(q) ||
+          tx.payment_mode.toLowerCase().includes(q) ||
           tx.recorded_by_name.toLowerCase().includes(q) ||
           tx.notes.toLowerCase().includes(q)
       );
@@ -156,9 +164,16 @@ export default function AccountLedgerPage() {
     () => filteredTransactions.reduce((acc, tx) => acc + (tx.outflow || 0), 0),
     [filteredTransactions]
   );
+  const filteredFeeCollectionTotal = useMemo(
+    () => filteredTransactions.reduce((acc, tx) => acc + (tx.collection_amount || 0), 0),
+    [filteredTransactions]
+  );
 
   // Summary object from API
   const summary = ledgerData?.summary || {
+    total_fee_collected: 0,
+    fee_payment_count: 0,
+    fee_collection_by_mode: [],
     opening_balance: 0,
     total_inflow: 0,
     total_outflow: 0,
@@ -186,6 +201,7 @@ export default function AccountLedgerPage() {
       "Particulars / Details",
       "Category",
       "Source / Student",
+      "Fee Collected (₹)",
       "Inflow (₹)",
       "Outflow (₹)",
       "Running Balance (₹)",
@@ -201,6 +217,7 @@ export default function AccountLedgerPage() {
       `"${tx.particulars.replace(/"/g, '""')}"`,
       `"${tx.category.replace(/"/g, '""')}"`,
       `"${tx.source.replace(/"/g, '""')}"`,
+      Number(tx.collection_amount || 0).toFixed(2),
       tx.inflow.toFixed(2),
       tx.outflow.toFixed(2),
       tx.running_balance.toFixed(2),
@@ -218,6 +235,7 @@ export default function AccountLedgerPage() {
       `Total Inflow: ₹${summary.total_inflow.toFixed(2)}`,
       `Total Outflow: ₹${summary.total_outflow.toFixed(2)}`,
       `Closing Balance: ₹${summary.closing_balance.toFixed(2)}`,
+      filteredFeeCollectionTotal.toFixed(2),
       filteredInflowTotal.toFixed(2),
       filteredOutflowTotal.toFixed(2),
       "",
@@ -277,11 +295,11 @@ export default function AccountLedgerPage() {
                   Account Ledger
                 </h1>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  All Cash Transactions
+                  Cash Ledger + All Fee Payments
                 </span>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Unified chronological cash ledger: fee receipts, daily expenses, bank deposits & misc incomes
+                Cash balance transactions plus verified fee payments from every payment mode
               </p>
             </div>
           </div>
@@ -411,7 +429,7 @@ export default function AccountLedgerPage() {
       </div>
 
       {/* ─── 4 Prominent Summary KPI Cards ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Card 1: Opening Balance */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-500/10 via-slate-50 to-transparent dark:from-indigo-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
@@ -450,11 +468,11 @@ export default function AccountLedgerPage() {
               ₹ {summary.total_inflow.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Fee collections + miscellaneous cash inflows
+              Cash fee receipts + miscellaneous cash inflows
             </p>
           </div>
           <div className="mt-3 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
-            <span>{summary.fee_receipts_count} Fee Receipts</span>
+            <span>{summary.fee_receipts_count} Completed Fee Payments</span>
             <span>+{summary.misc_income_count} Misc Incomes</span>
           </div>
         </div>
@@ -480,6 +498,20 @@ export default function AccountLedgerPage() {
           <div className="mt-3 pt-2 border-t border-rose-100 dark:border-rose-900/40 flex items-center justify-between text-[11px] text-rose-800 dark:text-rose-300 font-medium">
             <span>{summary.expenses_count} Expenses</span>
             <span>{summary.bank_deposits_count} Bank Deposits</span>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-sky-200/80 dark:border-sky-900/50 bg-gradient-to-br from-sky-500/10 via-slate-50 to-transparent dark:from-sky-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Fee Collection · All Modes</span>
+            <div className="h-9 w-9 rounded-xl bg-sky-500/15 text-sky-600 flex items-center justify-center"><Banknote className="h-4 w-4" /></div>
+          </div>
+          <div className="mt-3 text-2xl lg:text-3xl font-extrabold tracking-tight text-sky-700 dark:text-sky-300 font-mono">
+            ₹ {Number(summary.total_fee_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Verified payments from {startDate} to {endDate}</p>
+          <div className="mt-3 border-t border-sky-100 dark:border-sky-900/40 pt-2 text-[11px] font-medium text-sky-800 dark:text-sky-300">
+            {summary.fee_payment_count || 0} completed payments • not added to drawer cash
           </div>
         </div>
 
@@ -523,7 +555,7 @@ export default function AccountLedgerPage() {
         <div className="inline-flex flex-wrap items-center gap-1.5 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xs">
           {[
             { id: "ALL", label: `All (${ledgerData?.transactions?.length || 0})` },
-            { id: "FEE_RECEIPT", label: `Fee Receipts (${summary.fee_receipts_count})` },
+            { id: "FEE_RECEIPT", label: `Fee Payments (${summary.fee_receipts_count})` },
             { id: "EXPENSE", label: `Expenses (${summary.expenses_count})` },
             { id: "BANK_DEPOSIT", label: `Bank Deposits (${summary.bank_deposits_count})` },
             { id: "MISC_INCOME", label: `Misc Incomes (${summary.misc_income_count})` },
@@ -579,7 +611,8 @@ export default function AccountLedgerPage() {
                 <th className="py-3.5 px-4 whitespace-nowrap">Slip / Ref #</th>
                 <th className="py-3.5 px-4 min-w-[260px]">Particulars / Source</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Recorded By</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Inflow (+)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Fee Collected</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Cash Inflow (+)</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Outflow (-)</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Balance (=)</th>
               </tr>
@@ -599,6 +632,7 @@ export default function AccountLedgerPage() {
                 <td className="py-3 px-4 text-slate-400">-</td>
                 <td className="py-3 px-4 text-right text-slate-400">-</td>
                 <td className="py-3 px-4 text-right text-slate-400">-</td>
+                <td className="py-3 px-4 text-right text-slate-400">-</td>
                 <td className="py-3 px-4 text-right font-mono font-bold text-indigo-900 dark:text-indigo-200">
                   ₹ {summary.opening_balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
@@ -607,7 +641,7 @@ export default function AccountLedgerPage() {
               {/* Transaction Items */}
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
                       <span className="text-sm">Fetching ledger records...</span>
@@ -616,7 +650,7 @@ export default function AccountLedgerPage() {
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <img
                         src="/images/empty-folder.png"
@@ -635,6 +669,7 @@ export default function AccountLedgerPage() {
               ) : (
                 filteredTransactions.map((tx) => {
                   const isFee = tx.transaction_type === "FEE_RECEIPT";
+                  const isNonCashFee = tx.transaction_type === "NON_CASH_FEE_RECEIPT";
                   const isIncome = tx.transaction_type === "MISC_INCOME";
                   const isExpense = tx.transaction_type === "EXPENSE";
                   const isDeposit = tx.transaction_type === "BANK_DEPOSIT";
@@ -662,6 +697,11 @@ export default function AccountLedgerPage() {
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                             Fee Receipt
+                          </span>
+                        )}
+                        {isNonCashFee && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                            Fee Receipt · {tx.payment_mode}
                           </span>
                         )}
                         {isIncome && (
@@ -706,6 +746,11 @@ export default function AccountLedgerPage() {
                         {tx.recorded_by_name}
                       </td>
 
+                      {/* Fee collection amount, including non-cash payments */}
+                      <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-semibold text-sky-700 dark:text-sky-300">
+                        {(tx.collection_amount || 0) > 0 ? `₹ ${Number(tx.collection_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-300">-</span>}
+                      </td>
+
                       {/* Inflow (+) */}
                       <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold text-emerald-600 dark:text-emerald-400">
                         {tx.inflow > 0 ? (
@@ -745,6 +790,9 @@ export default function AccountLedgerPage() {
                       Period: {startDate} to {endDate}
                     </span>
                   </div>
+                </td>
+                <td className="py-3.5 px-4 text-right font-mono font-bold text-sky-700 dark:text-sky-300 whitespace-nowrap">
+                  ₹ {filteredFeeCollectionTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                   +₹ {filteredInflowTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

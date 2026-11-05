@@ -5,9 +5,9 @@ import { getErrorMessage, normalizeList } from "./helpers";
 export interface StudentSyllabusItem {
   id: number;
   subject_name: string;
-  divison_name: string;
+  divison_name?: string;
   school_class: string;
-  syllabus_file: string;
+  syllabus_file: string | null;
   school: number;
   division: number;
   subject: number;

@@ -58,12 +58,12 @@ export default function ReceiptHistoryModal({
       setLoading(true);
       try {
         const res = await fetchWithAuth(
-          `${API_BASE_URL}/student-fee-payment/?student=${student.id}`
+          `${API_BASE_URL}/student-fee-payment/?student=${student.id}&is_verified=true&is_bounced=false`
         );
         if (res.ok) {
           const data = await res.json();
           const list: Payment[] = Array.isArray(data) ? data : data.results || [];
-          setPayments(list);
+          setPayments(list.filter((payment) => payment.is_verified && !payment.is_bounced));
         }
       } catch (err) {
         console.error("Failed to load receipts", err);

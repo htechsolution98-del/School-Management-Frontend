@@ -31,8 +31,6 @@ import {
   getParentFees,
   getParentDueFees,
   getParentPaymentHistory,
-  createFeePaymentOrder,
-  verifyFeePayment,
   ParentStudentFee,
   ParentDueFee,
   ParentPaymentHistoryItem,
@@ -42,26 +40,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { capitalizeWords, capitalizeSentence } from "@/lib/utils";
-
-declare global {
-  interface Window {
-    Razorpay?: any;
-  }
-}
-
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
-
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
+import { loadRazorpayScript } from "@/lib/razorpay";
+import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/student/fees";
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "—";
@@ -218,59 +198,52 @@ export default function ParentFeesPage() {
     setIsProcessingPayment(true);
 
     try {
-      const order = await createFeePaymentOrder(payFeeItem.id);
-      const isScriptLoaded = await loadRazorpayScript();
-
-      if (isScriptLoaded && window.Razorpay && order.key) {
-        const options = {
-          key: order.key,
-          amount: Math.round(Number(order.amount_payable) * 100),
-          currency: "INR",
-          name: capitalizeWords(schoolBrand.name),
-          description: `Fee Payment for ${capitalizeWords(payFeeItem.feetype_name || "Tuition Fee")}`,
-          order_id: order.order_id,
-          handler: async (response: any) => {
-            try {
-              await verifyFeePayment({
-                fee_id: payFeeItem.id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              toast.success("Payment Verified & Completed Successfully!");
-              setPayFeeItem(null);
-              void loadData();
-            } catch (vErr: any) {
-              toast.error(vErr?.message || "Payment signature verification failed.");
-            }
-          },
-          prefill: {
-            name: studentFullName,
-          },
-          theme: {
-            color: "#2563EB",
-          },
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } else {
-        // Fallback simulated payment for local/test sandbox
-        toast.info("Razorpay Gateway not configured. Testing simulated payment clearance...");
-        await verifyFeePayment({
-          fee_id: payFeeItem.id,
-          razorpay_order_id: order.order_id || `ORDER_${Date.now()}`,
-          razorpay_payment_id: `PAY_${Date.now()}`,
-          razorpay_signature: "mock_test_signature",
-        }).catch(() => {});
-
-        toast.success("Fee Settlement Processed Successfully!");
-        setPayFeeItem(null);
-        void loadData();
+      const [isScriptLoaded, order] = await Promise.all([
+        loadRazorpayScript(),
+        createRazorpayOrder(payFeeItem.id),
+      ]);
+      if (!isScriptLoaded || !window.Razorpay) {
+        throw new Error("Razorpay could not load. Check your internet connection and try again.");
       }
+      if (!order.key || !order.order_id || !Number(order.amount)) {
+        throw new Error("Razorpay returned incomplete payment details. Please contact the school office.");
+      }
+
+      const checkout = new window.Razorpay({
+        key: order.key,
+        amount: Number(order.amount),
+        currency: order.currency || "INR",
+        name: capitalizeWords(schoolBrand.name),
+        description: `Fee Payment for ${capitalizeWords(payFeeItem.feetype_name || "Tuition Fee")}`,
+        order_id: order.order_id,
+        handler: async (response: any) => {
+          try {
+            await verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              student_fee_id: payFeeItem.id,
+            });
+            toast.success("Payment verified successfully.");
+            setPayFeeItem(null);
+            void loadData();
+          } catch (verificationError: any) {
+            toast.error(verificationError?.message || "Payment verification failed. Contact the school office.");
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        },
+        prefill: { name: studentFullName },
+        theme: { color: "#2563EB" },
+        modal: { ondismiss: () => setIsProcessingPayment(false) },
+      });
+      checkout.on("payment.failed", (response: any) => {
+        toast.error(response?.error?.description || "Payment failed. Please try again.");
+        setIsProcessingPayment(false);
+      });
+      checkout.open();
     } catch (err: any) {
       toast.error(err?.message || "Failed to initiate online transaction.");
-    } finally {
       setIsProcessingPayment(false);
     }
   };

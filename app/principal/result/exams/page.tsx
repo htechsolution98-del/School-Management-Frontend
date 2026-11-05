@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   FileCheck,
   Plus,
@@ -32,7 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getAcademicYearsForPrincipal } from "@/lib/principal/academic-year";
 import { getClasses } from "@/lib/clerk/classes";
 import { getDivisions } from "@/lib/clerk/divisions";
-import { getSubjects, getSubjectsByClass } from "@/lib/clerk/subjects";
+import { getSubjectsByClass } from "@/lib/clerk/subjects";
 import {
   getExamTerms,
   createExamTerm,
@@ -50,7 +50,6 @@ export default function ExamManagementPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
 
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedClassId, setSelectedClassId] = useState<string>("ALL");
@@ -82,6 +81,7 @@ export default function ExamManagementPage() {
   const [newClassId, setNewClassId] = useState("");
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [loadingClassSubjects, setLoadingClassSubjects] = useState(false);
+  const subjectRequestId = useRef(0);
   const [newDivision, setNewDivision] = useState("");
   const [newExamDate, setNewExamDate] = useState("");
   const [newStartTime, setNewStartTime] = useState("09:00");
@@ -91,50 +91,37 @@ export default function ExamManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleModalClassChange = async (classId: string) => {
+    const requestId = ++subjectRequestId.current;
     setNewClassId(classId);
     setNewSubjectId("");
+    setClassSubjects([]);
     if (!classId) {
-      setClassSubjects([]);
+      setLoadingClassSubjects(false);
       return;
     }
     setLoadingClassSubjects(true);
     try {
       const subs = await getSubjectsByClass(Number(classId));
-      if (subs && subs.length > 0) {
-        setClassSubjects(subs);
-      } else {
-        const classDivIds = new Set(
-          divisions
-            .filter((d: any) => String(d.SchoolClass || d.school_class) === String(classId))
-            .map((d: any) => d.id)
-        );
-        let fallback = subjects;
-        if (classDivIds.size > 0) {
-          fallback = subjects.filter(
-            (s: any) => !s.division || classDivIds.has(s.division) || classDivIds.has(s.division_id)
-          );
-        }
-        setClassSubjects(fallback.length > 0 ? fallback : subjects);
+      if (requestId === subjectRequestId.current) {
+        const uniqueSubjects = new Map<string, any>();
+        (subs || []).forEach((subject: any) => {
+          const key = String(subject.name || subject.subject_name || "").trim().toLowerCase();
+          if (key && !uniqueSubjects.has(key)) uniqueSubjects.set(key, subject);
+        });
+        setClassSubjects(Array.from(uniqueSubjects.values()));
       }
-    } catch {
-      const classDivIds = new Set(
-        divisions
-          .filter((d: any) => String(d.SchoolClass || d.school_class) === String(classId))
-          .map((d: any) => d.id)
-      );
-      let fallback = subjects;
-      if (classDivIds.size > 0) {
-        fallback = subjects.filter(
-          (s: any) => !s.division || classDivIds.has(s.division) || classDivIds.has(s.division_id)
-        );
+    } catch (error: any) {
+      if (requestId === subjectRequestId.current) {
+        setClassSubjects([]);
+        toast.error(error?.message || "Could not load subjects for this class.");
       }
-      setClassSubjects(fallback.length > 0 ? fallback : subjects);
     } finally {
-      setLoadingClassSubjects(false);
+      if (requestId === subjectRequestId.current) setLoadingClassSubjects(false);
     }
   };
 
   const resetForm = () => {
+    subjectRequestId.current += 1;
     setEditingExam(null);
     setNewExamTitle("");
     setNewClassId("");
@@ -160,49 +147,24 @@ export default function ExamManagementPage() {
     return Array.from(divSet).sort();
   }, [divisions, newClassId]);
 
-  const modalSubjects = useMemo(() => {
-    if (classSubjects.length > 0) return classSubjects;
-    if (!newClassId) return [];
-    let filtered = subjects;
-    const classDivIds = new Set(
-      divisions
-        .filter((d: any) => String(d.SchoolClass || d.school_class) === String(newClassId))
-        .map((d: any) => d.id)
-    );
-    if (classDivIds.size > 0) {
-      filtered = subjects.filter(
-        (s: any) => !s.division || classDivIds.has(s.division) || classDivIds.has(s.division_id)
-      );
-    }
-    const map = new Map<string, any>();
-    filtered.forEach((s: any) => {
-      const nameKey = (s.name || s.subject_name || "").trim().toLowerCase();
-      if (nameKey && !map.has(nameKey)) {
-        map.set(nameKey, s);
-      }
-    });
-    return Array.from(map.values());
-  }, [classSubjects, subjects, divisions, newClassId]);
+  const modalSubjects = classSubjects;
 
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      const [yearsRes, classesRes, divisionsRes, subjectsRes] = await Promise.allSettled([
+      const [yearsRes, classesRes, divisionsRes] = await Promise.allSettled([
         getAcademicYearsForPrincipal(),
         getClasses(),
         getDivisions(),
-        getSubjects(),
       ]);
 
       const yearsData = yearsRes.status === "fulfilled" ? yearsRes.value : [];
       const classesData = classesRes.status === "fulfilled" ? classesRes.value : [];
       const divisionsData = divisionsRes.status === "fulfilled" ? divisionsRes.value : [];
-      const subjectsData = subjectsRes.status === "fulfilled" ? subjectsRes.value : [];
 
       setAcademicYears(yearsData || []);
       setClasses(classesData || []);
       setDivisions(divisionsData || []);
-      setSubjects(subjectsData || []);
 
       if (yearsData && yearsData.length > 0 && !selectedYearId) {
         const activeYr = yearsData.find((y: any) => y.is_active) || yearsData[0];
@@ -685,18 +647,22 @@ export default function ExamManagementPage() {
                   disabled={!newClassId || loadingClassSubjects}
                 >
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold disabled:opacity-60">
-                    <SelectValue placeholder={loadingClassSubjects ? "Loading subjects..." : !newClassId ? "Select Class first" : "Select Subject"}>
+                    <SelectValue placeholder={loadingClassSubjects ? "Loading subjects..." : !newClassId ? "Select Class first" : modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject"}>
                       {loadingClassSubjects
                         ? "Loading subjects..."
                         : !newClassId
                         ? "Select Class first"
                         : modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.name ||
                           modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.subject_name ||
-                          "Select Subject"}
+                          (modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject")}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
-                    {modalSubjects.map((sub) => (
+                    {modalSubjects.length === 0 ? (
+                      <SelectItem value="no-subjects" disabled className="text-xs text-slate-500">
+                        No subjects assigned to this class
+                      </SelectItem>
+                    ) : modalSubjects.map((sub) => (
                       <SelectItem key={sub.id} value={String(sub.id)} className="text-xs font-semibold py-2">
                         {sub.name || sub.subject_name}
                       </SelectItem>
