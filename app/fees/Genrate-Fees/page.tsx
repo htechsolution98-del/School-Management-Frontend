@@ -2089,7 +2089,7 @@ export default function GenerateFeesPage() {
           fetchStudents(),
           fetchStudentFees({
             class_name: filterClass,
-            billing_period: filterPeriod,
+            billing_period: activeTab === "monthly" ? filterPeriod : "",
             search: searchQuery,
             page: currentPage,
           }),
@@ -2112,21 +2112,56 @@ export default function GenerateFeesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterClass, filterPeriod, searchQuery, currentPage]);
+  }, [activeTab, filterClass, filterPeriod, searchQuery, currentPage]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
 
-  // Client-side filtering for mock data
-  const filteredFees = fees.filter((fee) => {
-    const matchTab =
-      activeTab === "monthly"
-        ? fee.billing_period !== "" && fee.billing_period != null
-        : fee.billing_period === "" || fee.billing_period == null;
-    return matchTab;
-  });
+  // Comprehensive filtering: Tab + Class + Billing Period + Search Query
+  const filteredFees = useMemo(() => {
+    return fees.filter((fee) => {
+      // 1. Tab filter
+      const matchTab =
+        activeTab === "monthly"
+          ? fee.billing_period !== "" && fee.billing_period != null
+          : fee.billing_period === "" || fee.billing_period == null;
+      if (!matchTab) return false;
+
+      // 2. Class filter
+      if (filterClass) {
+        const target = filterClass.trim().toLowerCase().replace(/^class\s*/i, "");
+        const rawCls = (fee.school_class_name || fee.class_name || "").trim().toLowerCase().replace(/^class\s*/i, "");
+        const displayCls = (fee.student_class_display || "").trim().toLowerCase();
+        const isMatch =
+          rawCls === target ||
+          displayCls.includes(target) ||
+          target.includes(rawCls);
+        if (!isMatch) return false;
+      }
+
+      // 3. Billing Period filter (for monthly fees)
+      if (activeTab === "monthly" && filterPeriod) {
+        if (fee.billing_period && fee.billing_period !== filterPeriod) {
+          return false;
+        }
+      }
+
+      // 4. Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const fullName = `${fee.student_name || ""} ${fee.student_surname || ""}`.toLowerCase();
+        const feeType = (fee.feetype_name || "").toLowerCase();
+        const grNo = String((fee as any).gr_no || "").toLowerCase();
+        const rollNo = String((fee as any).roll_number || "").toLowerCase();
+        const isMatch = fullName.includes(q) || feeType.includes(q) || grNo.includes(q) || rollNo.includes(q);
+        if (!isMatch) return false;
+      }
+
+      return true;
+    });
+  }, [fees, activeTab, filterClass, filterPeriod, searchQuery]);
 
   // Student-Centric Grouping for Monthly Fees Tab
   const studentFeeGroups = useMemo(() => {
@@ -2199,17 +2234,44 @@ export default function GenerateFeesPage() {
   );
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
-  // Stats
-  const totalStudents = students.length;
-  const totalOutstanding = fees
-    .filter((f) => f.status !== "paid")
-    .reduce((a, f) => a + parseFloat(f.payable_amount), 0);
-  const totalCollected = fees
-    .filter((f) => f.status === "paid")
-    .reduce((a, f) => a + parseFloat(f.payable_amount), 0);
-  const overdueFees = fees
-    .filter((f) => f.status === "overdue")
-    .reduce((a, f) => a + parseFloat(f.payable_amount), 0);
+  // Stats - Real-time calculations based on active filtered fees
+  const activeStudentsCount = useMemo(() => {
+    if (filterClass) {
+      const target = filterClass.trim().toLowerCase().replace(/^class\s*/i, "");
+      return students.filter((s) => {
+        const sc = (s.class_name || "").trim().toLowerCase().replace(/^class\s*/i, "");
+        return sc === target || target.includes(sc);
+      }).length;
+    }
+    return students.length;
+  }, [students, filterClass]);
+
+  const totalOutstanding = useMemo(() => {
+    return filteredFees.reduce(
+      (sum, f) => sum + parseFloat(f.balance_amount || "0"),
+      0
+    );
+  }, [filteredFees]);
+
+  const totalCollected = useMemo(() => {
+    return filteredFees.reduce(
+      (sum, f) => sum + parseFloat(f.paid_amount || "0"),
+      0
+    );
+  }, [filteredFees]);
+
+  const overdueFees = useMemo(() => {
+    return filteredFees
+      .filter((f) => f.status === "overdue")
+      .reduce((sum, f) => sum + parseFloat(f.balance_amount || "0"), 0);
+  }, [filteredFees]);
+
+  const formatStatCurrency = (num: number) => {
+    if (!num || isNaN(num) || num <= 0) return "₹0";
+    if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
+    if (num >= 100000) return `₹${(num / 100000).toFixed(2)} Lakh`;
+    return `₹${Math.round(num).toLocaleString("en-IN")}`;
+  };
   const totalDiscount = fees.reduce(
     (a, f) => a + (parseFloat(f.discount_amount ?? "0") || 0),
     0,
@@ -2273,30 +2335,30 @@ export default function GenerateFeesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           title="Total Students"
-          value={totalStudents.toLocaleString()}
-          subtitle="Active students"
+          value={activeStudentsCount.toLocaleString("en-IN")}
+          subtitle={filterClass ? `In ${filterClass}` : "Active students"}
           icon={Users}
           iconBg="bg-blue-500"
         />
         <StatCard
           title="Total Outstanding"
-          value={`₹${(totalOutstanding / 100000).toFixed(2)}L`}
-          subtitle="Pending amount"
+          value={formatStatCurrency(totalOutstanding)}
+          subtitle="Pending balance"
           icon={IndianRupee}
           iconBg="bg-purple-500"
           valueColor="text-purple-600"
         />
         <StatCard
           title="Total Collected"
-          value={`₹${(totalCollected / 1000).toFixed(1)}K`}
-          subtitle="This academic year"
+          value={formatStatCurrency(totalCollected)}
+          subtitle="Collected amount"
           icon={TrendingUp}
           iconBg="bg-green-500"
           valueColor="text-green-600"
         />
         <StatCard
           title="Overdue Fees"
-          value={`₹${(overdueFees / 1000).toFixed(1)}K`}
+          value={formatStatCurrency(overdueFees)}
           subtitle="Requires attention"
           icon={AlertCircle}
           iconBg="bg-orange-500"
@@ -2358,17 +2420,31 @@ export default function GenerateFeesPage() {
               <div className="relative flex-1 min-w-0">
                 <CalendarDays
                   size={15}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                 />
                 <input
                   type="month"
-                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full pl-9 pr-8 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   value={filterPeriod}
                   onChange={(e) => {
                     setFilterPeriod(e.target.value);
                     setCurrentPage(1);
                   }}
+                  title="Filter by Month (Clear to view all months)"
                 />
+                {filterPeriod && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterPeriod("");
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-100"
+                    title="Clear month to show all"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             )}
 

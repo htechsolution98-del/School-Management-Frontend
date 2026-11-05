@@ -109,6 +109,7 @@ export interface AssignedTeacher {
   class_name?: string;
   is_class_teacher?: boolean;
   teacher_name?: string;
+  created_at?: string | null;
 }
 
 export interface Admission {

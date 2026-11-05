@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -387,6 +388,24 @@ export function UniversalProfileView({ roleTitle }: UniversalProfileViewProps) {
                       <DetailCard label="Joining Date" value={staff?.joining_date || "—"} icon={Calendar} />
                       <DetailCard label="Status" value="Active Staff Member" icon={ShieldCheck} />
                       <DetailCard label="Institutional School" value={schoolName} icon={Building2} />
+                      {staff?.is_class_teacher && staff?.class_teacher_of && (
+                        <DetailCard
+                          label="Class Teacher Of"
+                          value={`${staff.class_teacher_of.full_class} ⭐ (Primary In-Charge)`}
+                          icon={Sparkles}
+                          className="border-emerald-200 bg-emerald-50/40 text-emerald-900"
+                        />
+                      )}
+                      {staff?.assigned_classes && staff.assigned_classes.length > 0 && (
+                        <DetailCard
+                          label="Assigned Classes & Subjects"
+                          value={staff.assigned_classes
+                            .map((a) => `${a.full_class} • ${a.subject || "General"}${a.is_class_teacher ? " (Class Teacher)" : ""}`)
+                            .join(" | ")}
+                          icon={GraduationCap}
+                          className="sm:col-span-2 md:col-span-3"
+                        />
+                      )}
                     </>
                   )}
                 </div>

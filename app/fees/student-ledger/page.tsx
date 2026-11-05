@@ -1912,7 +1912,11 @@ export default function StudentLedgerPage() {
   const [ledgerFees, setLedgerFees] = useState<StudentFee[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [showLedgerDropdown, setShowLedgerDropdown] = useState(false);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [activeAcademicYearId, setActiveAcademicYearId] = useState<number | null>(null);
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("");
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState<"all" | "pending" | "paid">("all");
+  const [ledgerFeeTypeFilter, setLedgerFeeTypeFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   // Tab Navigation: Fee Ledger vs Inventory Issued
@@ -1943,16 +1947,73 @@ export default function StudentLedgerPage() {
   const [searchedReceiptNumber, setSearchedReceiptNumber] = useState<string | null>(null);
   const [selectedReceiptPayments, setSelectedReceiptPayments] = useState<Payment[] | null>(null);
 
+  const selectStudent = useCallback((s: Student | null) => {
+    setSelectedLedgerStudent(s);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (s) {
+        sessionStorage.setItem("selectedLedgerStudentId", String(s.id));
+        url.searchParams.set("student", String(s.id));
+        const fName = s.name === "null" ? "" : s.name || "";
+        const lName = s.surname === "null" ? "" : s.surname || "";
+        setLedgerSearchQuery([fName, lName].filter(Boolean).join(" "));
+      } else {
+        sessionStorage.removeItem("selectedLedgerStudentId");
+        url.searchParams.delete("student");
+        setLedgerSearchQuery("");
+        setLedgerFees([]);
+        setInventoryIssues([]);
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   useEffect(() => {
     async function loadStudentsAndYears() {
       const [studentsRes, yearsRes] = await Promise.all([
         fetchStudents(),
         fetchAcademicYearsForFee()
       ]);
-      if (studentsRes.success && studentsRes.data) setStudents(studentsRes.data);
-      if (yearsRes.success && yearsRes.data) {
-        const activeYear = yearsRes.data.find(y => y.is_active || y.status === "Active") || yearsRes.data[0];
+
+      let loadedStudents: Student[] = [];
+      if (studentsRes.success && studentsRes.data) {
+        loadedStudents = studentsRes.data;
+        setStudents(loadedStudents);
+      }
+
+      if (yearsRes.success && yearsRes.data && yearsRes.data.length > 0) {
+        setAcademicYears(yearsRes.data);
+        const savedYearId = typeof window !== "undefined" ? sessionStorage.getItem("selectedLedgerYearId") : null;
+        const matchedSaved = savedYearId ? yearsRes.data.find(y => String(y.id) === savedYearId) : null;
+        const activeYear = matchedSaved || yearsRes.data.find(y => y.is_active || y.status === "Active") || yearsRes.data[0];
         if (activeYear) setActiveAcademicYearId(activeYear.id);
+      } else {
+        const fallback = { id: 1, name: "2026-27", is_active: true } as AcademicYear;
+        setAcademicYears([fallback]);
+        setActiveAcademicYearId(1);
+      }
+
+      // Restore saved class filter if any
+      if (typeof window !== "undefined") {
+        const savedClass = sessionStorage.getItem("selectedLedgerClassFilter");
+        if (savedClass) setSelectedClassFilter(savedClass);
+      }
+
+      // Restore student on refresh from URL or sessionStorage
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentIdParam = urlParams.get("student") || sessionStorage.getItem("selectedLedgerStudentId");
+        if (studentIdParam && loadedStudents.length > 0) {
+          const matched = loadedStudents.find(
+            s => String(s.id) === String(studentIdParam) || String(s.gr_no) === String(studentIdParam)
+          );
+          if (matched) {
+            setSelectedLedgerStudent(matched);
+            const fName = matched.name === "null" ? "" : matched.name || "";
+            const lName = matched.surname === "null" ? "" : matched.surname || "";
+            setLedgerSearchQuery([fName, lName].filter(Boolean).join(" "));
+          }
+        }
       }
     }
     loadStudentsAndYears();
@@ -2049,19 +2110,106 @@ export default function StudentLedgerPage() {
     });
   }, [inventoryIssues, inventoryPolicyFilter, inventorySearch]);
 
+  // Memoized unique classes from loaded students
+  const uniqueClasses = useMemo(() => {
+    const map = new Map<string, string>();
+    students.forEach((s) => {
+      if (s.class_name) {
+        const raw = s.class_name.trim();
+        const display = raw.toLowerCase().startsWith("class") ? raw : `Class ${raw}`;
+        map.set(raw.toLowerCase(), display);
+      }
+    });
+    return Array.from(map.entries()).map(([key, label]) => ({ key, label }));
+  }, [students]);
+
+  // Memoized unique fee types from loaded student ledger
+  const uniqueFeeTypes = useMemo(() => {
+    const set = new Set<string>();
+    ledgerFees.forEach((f) => {
+      if (f.feetype_name) set.add(f.feetype_name);
+    });
+    return Array.from(set);
+  }, [ledgerFees]);
+
+  // Pending & Paid counts for status filter pills
+  const pendingFeesCount = useMemo(() => {
+    return ledgerFees.filter((f) => {
+      const studentBal = parseFloat(f.balance_amount || "0");
+      const govtBal = f.is_rte_govt_claim
+        ? Math.max(0, parseFloat(f.rte_govt_claim_amount || f.amount || "0") - parseFloat(f.rte_govt_paid_amount || "0"))
+        : 0;
+      return studentBal > 0 || govtBal > 0 || f.status !== "paid";
+    }).length;
+  }, [ledgerFees]);
+
+  const paidFeesCount = useMemo(() => {
+    return ledgerFees.filter((f) => {
+      const studentBal = parseFloat(f.balance_amount || "0");
+      const govtBal = f.is_rte_govt_claim
+        ? Math.max(0, parseFloat(f.rte_govt_claim_amount || f.amount || "0") - parseFloat(f.rte_govt_paid_amount || "0"))
+        : 0;
+      return f.status === "paid" || (studentBal <= 0 && govtBal <= 0);
+    }).length;
+  }, [ledgerFees]);
+
+  // Displayed ledger fees filtered by Status and Fee Type
+  const displayedLedgerFees = useMemo(() => {
+    return ledgerFees.filter((fee) => {
+      const studentBal = parseFloat(fee.balance_amount || "0");
+      const govtBal = fee.is_rte_govt_claim
+        ? Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount || "0") - parseFloat(fee.rte_govt_paid_amount || "0"))
+        : 0;
+      const isPaid = fee.status === "paid" || (studentBal <= 0 && govtBal <= 0);
+
+      if (ledgerStatusFilter === "pending" && isPaid) return false;
+      if (ledgerStatusFilter === "paid" && !isPaid) return false;
+
+      if (ledgerFeeTypeFilter !== "all" && fee.feetype_name !== ledgerFeeTypeFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [ledgerFees, ledgerStatusFilter, ledgerFeeTypeFilter]);
+
+  // Students matching Class Filter + Search Query
+  const filteredSearchStudents = useMemo(() => {
+    return students.filter((s) => {
+      if (selectedClassFilter) {
+        const sCls = (s.class_name || "").trim().toLowerCase();
+        const target = selectedClassFilter.trim().toLowerCase();
+        const match =
+          sCls === target ||
+          sCls.replace(/^class\s*/i, "") === target.replace(/^class\s*/i, "");
+        if (!match) return false;
+      }
+      if (!ledgerSearchQuery.trim()) {
+        return Boolean(selectedClassFilter);
+      }
+      const fName = s.name === "null" ? "" : s.name || "";
+      const lName = s.surname === "null" ? "" : s.surname || "";
+      const fullName = [fName, lName].filter(Boolean).join(" ").toLowerCase();
+      const className = (s.class_name || "").toLowerCase();
+      const grNo = (s.gr_no || "").toLowerCase();
+      const query = ledgerSearchQuery.toLowerCase();
+      return fullName.includes(query) || className.includes(query) || grNo.includes(query);
+    });
+  }, [students, selectedClassFilter, ledgerSearchQuery]);
+
+
   // Helper to get unique key for fee item
   const getFeeKey = (fee: StudentFee): string => String(fee.id);
 
-  // Compute selectable fees
+  // Compute selectable fees based on displayedLedgerFees
   const selectableFees = useMemo(() => {
-    return ledgerFees.filter((fee: StudentFee) => {
+    return displayedLedgerFees.filter((fee: StudentFee) => {
       const studentBal = parseFloat(fee.balance_amount || "0");
       const govtBal = fee.is_rte_govt_claim
         ? Math.max(0, parseFloat(fee.rte_govt_claim_amount || fee.amount || "0") - parseFloat(fee.rte_govt_paid_amount || "0"))
         : 0;
       return (studentBal > 0 || govtBal > 0 || fee.status !== "paid");
     });
-  }, [ledgerFees]);
+  }, [displayedLedgerFees]);
 
   const isAllSelected = selectableFees.length > 0 && selectedFeeKeys.length === selectableFees.length;
   const isSomeSelected = selectedFeeKeys.length > 0 && selectedFeeKeys.length < selectableFees.length;
@@ -2141,71 +2289,126 @@ export default function StudentLedgerPage() {
 
   const studentLedgerView = (
     <div className="p-5">
-      {/* Search Box */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6 max-w-4xl mx-auto">
+      {/* Search & Filters Row */}
+      <div className="flex flex-col lg:flex-row gap-3 mb-6 max-w-5xl mx-auto">
+        {/* Academic Year Selector */}
+        <div className="w-full lg:w-44 shrink-0">
+          <select
+            value={activeAcademicYearId || ""}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setActiveAcademicYearId(val);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("selectedLedgerYearId", String(val));
+              }
+            }}
+            className="w-full py-3 px-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-gray-700 shadow-xs cursor-pointer"
+            title="Select Academic Year"
+          >
+            {academicYears.length > 0 ? (
+              academicYears.map((ay) => (
+                <option key={ay.id} value={ay.id}>
+                  {ay.name} {ay.is_active ? "★ Current" : ""}
+                </option>
+              ))
+            ) : (
+              <option value="0">2026-27 ★ Current</option>
+            )}
+          </select>
+        </div>
+
+        {/* Class Filter Dropdown */}
+        <div className="w-full lg:w-44 shrink-0">
+          <select
+            value={selectedClassFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedClassFilter(val);
+              setShowLedgerDropdown(true);
+              if (typeof window !== "undefined") {
+                if (val) sessionStorage.setItem("selectedLedgerClassFilter", val);
+                else sessionStorage.removeItem("selectedLedgerClassFilter");
+              }
+            }}
+            className="w-full py-3 px-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-gray-700 shadow-xs cursor-pointer"
+            title="Filter students by class"
+          >
+            <option value="">All Classes</option>
+            {uniqueClasses.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Student Search Box with Dropdown */}
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search student by name, GR no., or class..."
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm font-medium"
+            placeholder={
+              selectedClassFilter
+                ? `Search student in ${uniqueClasses.find(c => c.key === selectedClassFilter)?.label || "class"}...`
+                : "Search student by name, GR no., or class..."
+            }
+            className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm font-medium"
             value={ledgerSearchQuery}
             onChange={(e) => {
               setLedgerSearchQuery(e.target.value);
               setShowLedgerDropdown(true);
-              if (!e.target.value) {
+              if (!e.target.value && !selectedClassFilter) {
                 setSelectedLedgerStudent(null);
               }
             }}
             onFocus={() => setShowLedgerDropdown(true)}
           />
-          {showLedgerDropdown && ledgerSearchQuery && (
+          {(ledgerSearchQuery || selectedLedgerStudent) && (
+            <button
+              type="button"
+              onClick={() => {
+                selectStudent(null);
+                setShowLedgerDropdown(false);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-200/60 transition-colors"
+              title="Clear selection"
+            >
+              <X size={15} />
+            </button>
+          )}
+
+          {showLedgerDropdown && (ledgerSearchQuery || selectedClassFilter) && (
             <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-30 max-h-72 overflow-y-auto">
-              {students
-                .filter((s) => {
-                  const fName = s.name === "null" ? "" : s.name;
-                  const lName = s.surname === "null" ? "" : s.surname;
-                  const fullName = [fName, lName].filter(Boolean).join(" ").toLowerCase();
-                  const className = (s.class_name || "").toLowerCase();
-                  const grNo = (s.gr_no || "").toLowerCase();
-                  const query = ledgerSearchQuery.toLowerCase();
-                  return fullName.includes(query) || className.includes(query) || grNo.includes(query);
-                })
-                .map((s) => {
-                  const fName = s.name === "null" ? "" : s.name;
-                  const lName = s.surname === "null" ? "" : s.surname;
-                  const fullName = [fName, lName].filter(Boolean).join(" ");
-                  return (
-                    <button
-                      key={s.id}
-                      className="w-full text-left px-4 py-3 hover:bg-blue-50/50 border-b border-gray-50 last:border-0 flex items-center gap-3 transition-colors"
-                      onClick={() => {
-                        setSelectedLedgerStudent(s);
-                        setLedgerSearchQuery(fullName);
-                        setShowLedgerDropdown(false);
-                      }}
-                    >
-                      <StudentAvatar name={fullName} />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{fullName}</p>
-                        <p className="text-xs text-gray-500">ID#{String(s.id).padStart(3, '0')} • {s.class_name?.replace(/_/g, " ")} • GR: {s.gr_no || "N/A"}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              {students.filter((s) => {
-                  const fName = s.name === "null" ? "" : s.name;
-                  const lName = s.surname === "null" ? "" : s.surname;
-                  const fullName = [fName, lName].filter(Boolean).join(" ").toLowerCase();
-                  const className = (s.class_name || "").toLowerCase();
-                  const grNo = (s.gr_no || "").toLowerCase();
-                  const query = ledgerSearchQuery.toLowerCase();
-                  return fullName.includes(query) || className.includes(query) || grNo.includes(query);
-              }).length === 0 && (
+              {filteredSearchStudents.map((s) => {
+                const fName = s.name === "null" ? "" : s.name || "";
+                const lName = s.surname === "null" ? "" : s.surname || "";
+                const fullName = [fName, lName].filter(Boolean).join(" ");
+                return (
+                  <button
+                    key={s.id}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50/50 border-b border-gray-50 last:border-0 flex items-center gap-3 transition-colors cursor-pointer"
+                    onClick={() => {
+                      selectStudent(s);
+                      setShowLedgerDropdown(false);
+                    }}
+                  >
+                    <StudentAvatar name={fullName} />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{fullName}</p>
+                      <p className="text-xs text-gray-500">
+                        ID#{String(s.id).padStart(3, '0')} • {s.class_name?.replace(/_/g, " ")} • GR: {s.gr_no || s.gr_number || "N/A"}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+              {filteredSearchStudents.length === 0 && (
                 <div className="p-8 text-center flex flex-col items-center">
                    <UserX size={24} className="text-gray-300 mb-2" />
                    <p className="text-sm font-medium text-gray-600">No students found</p>
-                   <p className="text-xs text-gray-400">Try a different name</p>
+                   <p className="text-xs text-gray-400">
+                     {selectedClassFilter ? "No students in this class match your search" : "Try a different name or GR number"}
+                   </p>
                 </div>
               )}
             </div>
@@ -2213,7 +2416,7 @@ export default function StudentLedgerPage() {
         </div>
 
         {/* Receipt Search Box */}
-        <div className="relative w-full sm:w-64 shrink-0">
+        <div className="relative w-full lg:w-56 shrink-0">
           <input
             type="text"
             placeholder="Find Receipt No..."
@@ -2286,9 +2489,7 @@ export default function StudentLedgerPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  setSelectedLedgerStudent(null);
-                  setLedgerFees([]);
-                  setInventoryIssues([]);
+                  selectStudent(null);
                   setActiveLedgerTab("fees");
                 }}
                 className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -2509,7 +2710,7 @@ export default function StudentLedgerPage() {
                      </label>
                    )}
                    <span className="text-xs font-medium bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm text-gray-600">
-                     {ledgerFees.length} Records
+                     {displayedLedgerFees.length !== ledgerFees.length ? `${displayedLedgerFees.length} of ${ledgerFees.length} Records` : `${ledgerFees.length} Records`}
                    </span>
                    {(selectedLedgerStudent?.is_rte || ledgerFees.some(f => f.is_rte_student || f.is_rte_govt_claim)) && (
                      <span className="text-xs font-semibold bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
@@ -2554,6 +2755,70 @@ export default function StudentLedgerPage() {
                 </div>
              </div>
 
+              {/* Status Filter Pills & Fee Type Toolbar */}
+              {ledgerFees.length > 0 && (
+                <div className="bg-white px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                  {/* Status Pills */}
+                  <div className="flex items-center gap-1.5 bg-gray-100/80 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setLedgerStatusFilter("all")}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        ledgerStatusFilter === "all"
+                          ? "bg-white text-gray-900 shadow-xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      All ({ledgerFees.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLedgerStatusFilter("pending")}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        ledgerStatusFilter === "pending"
+                          ? "bg-amber-500 text-white shadow-xs"
+                          : "text-amber-700 hover:text-amber-900"
+                      }`}
+                    >
+                      Pending ({pendingFeesCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLedgerStatusFilter("paid")}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        ledgerStatusFilter === "paid"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-emerald-700 hover:text-emerald-900"
+                      }`}
+                    >
+                      Paid ({paidFeesCount})
+                    </button>
+                  </div>
+
+                  {/* Fee Type Dropdown */}
+                  {uniqueFeeTypes.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 font-medium">Fee Type:</span>
+                      <select
+                        value={ledgerFeeTypeFilter}
+                        onChange={(e) => setLedgerFeeTypeFilter(e.target.value)}
+                        className="text-xs font-semibold py-1.5 px-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">All Fee Types</option>
+                        {uniqueFeeTypes.map((ft) => {
+                          const count = ledgerFees.filter((f) => f.feetype_name === ft).length;
+                          return (
+                            <option key={ft} value={ft}>
+                              {ft} ({count})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
              {ledgerLoading ? (
                 <div className="flex justify-center py-12"><Loader2 size={32} className="animate-spin text-blue-500" /></div>
              ) : ledgerFees.length === 0 ? (
@@ -2565,7 +2830,7 @@ export default function StudentLedgerPage() {
                 /* Cards View */
                 <div className="p-5 pb-12">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {ledgerFees.map(fee => {
+                    {displayedLedgerFees.map(fee => {
                       const isPaid = fee.status === "paid";
                       const isSelectable = !isPaid;
                       const isSelected = selectedFeeKeys.includes(getFeeKey(fee));
@@ -2747,7 +3012,7 @@ export default function StudentLedgerPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                      {ledgerFees.map((fee) => {
+                      {displayedLedgerFees.map((fee) => {
                         const isPaid = fee.status === "paid";
                         const isSelectable = !isPaid;
                         const isSelected = selectedFeeKeys.includes(getFeeKey(fee));

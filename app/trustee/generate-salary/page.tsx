@@ -216,9 +216,11 @@ const StatCard = ({
 const ReceiptModal = ({
   data,
   onClose,
+  onDownloadPdf,
 }: {
   data: SalaryPayment;
   onClose: () => void;
+  onDownloadPdf?: () => void;
 }) => {
   const breakdown: PayrollComponentBreakdown = useMemo(() => {
     if (data.component_breakdown && typeof data.component_breakdown === "object") {
@@ -517,8 +519,11 @@ const ReceiptModal = ({
           >
             Close
           </button>
-          <button className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200">
-            <Download size={14} /> Download PDF
+          <button
+            onClick={onDownloadPdf}
+            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200 cursor-pointer"
+          >
+            <Download size={14} /> Download / Print Payslip
           </button>
         </div>
       </div>
@@ -2059,7 +2064,43 @@ export default function GenerateSalaryPage() {
         />
       )}
       {receiptData && (
-        <ReceiptModal data={receiptData} onClose={() => setReceiptData(null)} />
+        <ReceiptModal
+          data={receiptData}
+          onClose={() => setReceiptData(null)}
+          onDownloadPdf={() => {
+            const bDown: any = receiptData.component_breakdown || {};
+            const pDays = parseFloat(receiptData.present_days || "0");
+            const hDays = receiptData.half_days || 0;
+            const payable = pDays + hDays * 0.5;
+            const payslipObj: any = {
+              id: receiptData.id,
+              school: receiptData.school,
+              staff: receiptData.staff,
+              staff_name: receiptData.staff_name,
+              staff_category: receiptData.staff_category || "Staff",
+              designation: receiptData.staff_category || "Staff",
+              department: (receiptData as any).department || "General",
+              salary_month: receiptData.salary_month,
+              basic_salary: receiptData.basic_salary,
+              gross_earnings: receiptData.total_earnings || bDown.gross_earnings || receiptData.basic_salary,
+              total_earnings: receiptData.total_earnings || bDown.gross_earnings || receiptData.basic_salary,
+              total_deductions: receiptData.total_deductions || bDown.total_deductions || "0.00",
+              net_salary: receiptData.net_salary,
+              payment_mode: receiptData.payment_mode || "offline",
+              payment_status: receiptData.payment_status || "paid",
+              receipt_number: receiptData.receipt_number || `SAL-${receiptData.id}`,
+              working_days: receiptData.working_days || bDown.working_days,
+              present_days: receiptData.present_days ?? bDown.present_days ?? "0",
+              paid_leaves: bDown.paid_leaves ?? (receiptData as any).paid_leaves ?? 0,
+              unpaid_leaves: bDown.unpaid_leaves ?? (receiptData as any).unpaid_leaves ?? 0,
+              component_breakdown: bDown,
+              payment_date: receiptData.payment_date,
+              created_at: receiptData.created_at || receiptData.payment_date,
+            };
+            setActivePayslip(payslipObj);
+            setShowPayslipModal(true);
+          }}
+        />
       )}
     </div>
   );

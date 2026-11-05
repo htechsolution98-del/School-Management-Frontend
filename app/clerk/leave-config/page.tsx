@@ -191,26 +191,46 @@ export default function LeaveConfigPage() {
       .join(" ");
   };
 
-  // Available staff categories dynamically bound to PREDEFINED_STAFF_ROLES with DB feature IDs
+  // Available staff categories: ONLY roles that SuperAdmin has enabled (turned on) for this school
   const availableCategories = useMemo(() => {
-    return PREDEFINED_STAFF_ROLES.map((role) => {
-      const roleUpper = role.name.toUpperCase();
-      const match = (dbCategories || []).find((cat: any) => {
-        const rawName = cat.feature_name || cat.name || cat.feature?.name || "";
-        const formatted = formatRoleLabel(rawName).toUpperCase();
-        return formatted === roleUpper;
-      });
+    if (!dbCategories || dbCategories.length === 0) {
+      return [];
+    }
+
+    const enabledList: Array<{ id: number; name: string }> = [];
+
+    dbCategories.forEach((cat: any) => {
+      // Must not be explicitly disabled
+      if (cat.is_enabled === false) return;
+
+      const rawName = cat.feature_name || cat.name || cat.feature?.name || "";
+      if (!rawName) return;
+
+      const formattedName = formatRoleLabel(rawName);
+      const roleUpper = formattedName.toUpperCase();
+
+      // Find matching predefined role metadata if any
+      const predefined = PREDEFINED_STAFF_ROLES.find(
+        (r) => r.name.toUpperCase() === roleUpper
+      );
 
       const resolvedId =
-        match && match.id != null && !isNaN(Number(match.id)) && Number(match.id) > 0
-          ? Number(match.id)
-          : role.id;
+        cat.id != null && !isNaN(Number(cat.id)) && Number(cat.id) > 0
+          ? Number(cat.id)
+          : predefined?.id ?? cat.id;
 
-      return {
-        id: resolvedId,
-        name: role.name,
-      };
+      const finalDisplayName = predefined?.name || formattedName;
+
+      // Ensure no duplicate roles
+      if (!enabledList.some((item) => item.id === resolvedId || item.name.toUpperCase() === roleUpper)) {
+        enabledList.push({
+          id: resolvedId,
+          name: finalDisplayName,
+        });
+      }
     });
+
+    return enabledList;
   }, [dbCategories]);
 
   const allAvailableCategoryIds = useMemo(
@@ -313,6 +333,8 @@ export default function LeaveConfigPage() {
     if (roleId != null) {
       const matched = availableCategories.find((r) => r.id === roleId);
       if (matched) return matched.name;
+      const predefinedMatch = PREDEFINED_STAFF_ROLES.find((r) => r.id === roleId);
+      if (predefinedMatch) return predefinedMatch.name;
     }
 
     if (typeof catInput === "object") {
@@ -1578,39 +1600,45 @@ export default function LeaveConfigPage() {
                 </div>
 
                 <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 divide-y divide-zinc-200 dark:divide-zinc-800 max-h-40 overflow-y-auto">
-                  {/* Select All Roles Option */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={toggleSelectAllCategories}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleSelectAllCategories();
-                      }
-                    }}
-                    className={`flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors text-xs font-bold border-b border-zinc-200 dark:border-zinc-800 select-none ${
-                      isAllCategoriesSelected
-                        ? "bg-primary/10 text-primary"
-                        : "bg-zinc-100/70 dark:bg-zinc-800/70 hover:bg-zinc-200/60 text-zinc-800 dark:text-zinc-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded accent-primary pointer-events-none"
-                        checked={isAllCategoriesSelected}
-                        readOnly
-                      />
-                      <span>Select All Roles</span>
+                  {availableCategories.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      No active staff roles have been enabled by SuperAdmin for your school.
                     </div>
-                    <span className="text-[10px] font-normal text-muted-foreground">
-                      ({selectedCategories.length}/{availableCategories.length})
-                    </span>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Select All Roles Option */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={toggleSelectAllCategories}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSelectAllCategories();
+                          }
+                        }}
+                        className={`flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors text-xs font-bold border-b border-zinc-200 dark:border-zinc-800 select-none ${
+                          isAllCategoriesSelected
+                            ? "bg-primary/10 text-primary"
+                            : "bg-zinc-100/70 dark:bg-zinc-800/70 hover:bg-zinc-200/60 text-zinc-800 dark:text-zinc-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded accent-primary pointer-events-none"
+                            checked={isAllCategoriesSelected}
+                            readOnly
+                          />
+                          <span>Select All Roles</span>
+                        </div>
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          ({selectedCategories.length}/{availableCategories.length})
+                        </span>
+                      </div>
 
-                  {/* Individual Role Options */}
-                  {availableCategories.map((role) => {
+                      {/* Individual Role Options */}
+                      {availableCategories.map((role) => {
                     const roleId = String(role.id);
                     const isChecked = selectedCategories.includes(roleId);
 
@@ -1643,6 +1671,8 @@ export default function LeaveConfigPage() {
                       </div>
                     );
                   })}
+                    </>
+                  )}
                 </div>
               </div>
 
