@@ -23,6 +23,7 @@ export async function saveSyllabus(payload: Syllabus): Promise<void> {
   if (payload.syllabus_file instanceof File) {
     formData.append("syllabus_file", payload.syllabus_file);
   }
+  if (payload.class_group) formData.append("class_group", payload.class_group.toString());
   if (payload.division) formData.append("division", payload.division.toString());
   if (payload.subject) formData.append("subject", payload.subject.toString());
 

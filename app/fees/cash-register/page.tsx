@@ -110,8 +110,15 @@ const MISC_INCOME_SOURCES = [
   "Other Income",
 ];
 
+const toLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function DailyCashRegisterPage() {
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => toLocalDateString(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [loading, setLoading] = useState<boolean>(true);
   const [reportData, setReportData] = useState<DailyCashAuditData | null>(null);
@@ -165,10 +172,13 @@ export default function DailyCashRegisterPage() {
   const handleQuickDate = (offsetDays: number) => {
     const d = new Date();
     d.setDate(d.getDate() + offsetDays);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toLocalDateString(d));
   };
 
   const summary = reportData?.summary || {
+    total_fee_collected: 0,
+    fee_payment_count: 0,
+    fee_collection_by_mode: [],
     opening_balance: 0,
     gross_cash_collected: 0,
     total_change_returned: 0,
@@ -327,9 +337,14 @@ export default function DailyCashRegisterPage() {
         tx.student_name.toLowerCase().includes(q) ||
         tx.student_admission_number.toLowerCase().includes(q) ||
         tx.class_name.toLowerCase().includes(q) ||
+        tx.payment_mode.toLowerCase().includes(q) ||
         tx.collected_by_name.toLowerCase().includes(q)
     );
   }, [reportData, searchQuery]);
+
+  const tableReceivedTotal = filteredTransactions.reduce((sum, tx) => sum + tx.total_received, 0);
+  const tableChangeTotal = filteredTransactions.reduce((sum, tx) => sum + tx.return_change, 0);
+  const tableNetTotal = filteredTransactions.reduce((sum, tx) => sum + tx.net_amount, 0);
 
   const filteredOutflows = useMemo(() => {
     if (!reportData?.outflows) return [];
@@ -451,7 +466,20 @@ export default function DailyCashRegisterPage() {
       </div>
 
       {/* ─── 3 Prominent Summary Cards ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
+        <div className="relative overflow-hidden rounded-2xl border border-blue-200/80 dark:border-blue-900/50 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 p-5 shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Total Fee Collection</span>
+            <div className="h-10 w-10 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center"><BadgeDollarSign className="h-5 w-5" /></div>
+          </div>
+          <div className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white font-mono">
+            ₹ {Number(summary.total_fee_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">All verified payments for {reportData?.date || selectedDate}</p>
+          <div className="mt-4 border-t border-blue-100 pt-3 text-xs font-medium text-blue-800 dark:text-blue-300">
+            {summary.fee_payment_count || 0} completed fee payments • all modes
+          </div>
+        </div>
         {/* Card 1: Gross Cash Collected */}
         <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 p-5 shadow-xs transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
@@ -709,7 +737,7 @@ export default function DailyCashRegisterPage() {
                 }`}
               >
                 <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Cash Receipts ({filteredTransactions.length})</span>
+                <span>Fee Payment Entries ({filteredTransactions.length})</span>
               </button>
               <button
                 type="button"
@@ -742,11 +770,11 @@ export default function DailyCashRegisterPage() {
           </div>
         </div>
 
-        {/* Tab 1: Cash Receipts Table (Rendered ONLY when Receipts tab is active) */}
+        {/* Tab 1: Completed fee payment entries */}
         {activeTab === "receipts" && (
           <div className="overflow-x-auto print:block">
             <div className="hidden print:block px-4 py-2.5 bg-slate-100 font-bold text-slate-900 text-xs uppercase tracking-wider border-b border-slate-300">
-              Cash Receipts Report ({filteredTransactions.length} Transactions)
+              Fee Payment Entries ({filteredTransactions.length} Transactions)
             </div>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -754,7 +782,8 @@ export default function DailyCashRegisterPage() {
                 <th className="py-3 px-4">Receipt #</th>
                 <th className="py-3 px-4">Student & Class</th>
                 <th className="py-3 px-4">Fee Head</th>
-                <th className="py-3 px-4 text-right">Cash Received</th>
+                <th className="py-3 px-4">Payment Mode</th>
+                <th className="py-3 px-4 text-right">Amount Received</th>
                 <th className="py-3 px-4 text-right">Change Ret.</th>
                 <th className="py-3 px-4 text-right">Net Fee Paid</th>
                 <th className="py-3 px-4">Denomination Breakdown</th>
@@ -764,21 +793,21 @@ export default function DailyCashRegisterPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-600 mb-2" />
                     <span>Loading cash register records...</span>
                   </td>
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <img
                       src="/images/empty-folder.png"
-                      alt="No cash receipts"
+                      alt="No fee payments"
                       className="mx-auto mb-2 h-20 w-20 object-contain"
                     />
                     <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No cash receipts found for this date
+                      No completed fee payments found for this date
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       Change the date filter or collect cash payments via the Student Ledger.
@@ -811,6 +840,11 @@ export default function DailyCashRegisterPage() {
                         {tx.feetype_name}
                       </span>
                     </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold capitalize text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
+                        {tx.payment_mode.replaceAll("_", " ")}
+                      </span>
+                    </td>
                     <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
                       ₹ {tx.total_received.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
@@ -841,19 +875,20 @@ export default function DailyCashRegisterPage() {
               <tfoot>
                 <tr className="border-t-2 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-slate-100">
                   <td colSpan={3} className="py-3 px-4 text-right uppercase tracking-wider text-xs">
-                    Total Fee Receipts:
+                    Total Received:
                   </td>
+                  <td className="py-3 px-4 text-xs text-slate-500">All modes</td>
                   <td className="py-3 px-4 text-right font-mono text-xs">
-                    ₹ {summary.gross_cash_collected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    ₹ {tableReceivedTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-xs text-rose-600 dark:text-rose-400">
-                    - ₹ {summary.total_change_returned.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    - ₹ {tableChangeTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                    ₹ {(summary.net_fee_cash_collected || (summary.gross_cash_collected - summary.total_change_returned)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    ₹ {tableNetTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </td>
                   <td colSpan={2} className="py-3 px-4 text-xs font-normal text-slate-500">
-                    {filteredTransactions.length} Cash Receipts Processed
+                    {filteredTransactions.length} completed payments
                   </td>
                 </tr>
               </tfoot>

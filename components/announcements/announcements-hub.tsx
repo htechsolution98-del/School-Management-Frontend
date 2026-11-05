@@ -63,6 +63,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MobileBottomDrawer } from "@/components/ui/mobile-bottom-drawer";
+import ResponsiveSelect from "@/components/ui/responsive-select";
 
 export interface AnnouncementsHubProps {
   roleTitle: string;
@@ -1165,8 +1166,10 @@ function AnnouncementFormModal({
   const [selectedClassId, setSelectedClassId] = useState<string>(
     announcement?.target_class ? String(announcement.target_class) : ""
   );
-  const [selectedDivision, setSelectedDivision] = useState<string>(
-    announcement?.target_division ? String(announcement.target_division) : ""
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>(
+    announcement?.target_division
+      ? String(announcement.target_division).split(",").map((division) => division.trim().toUpperCase()).filter(Boolean)
+      : []
   );
 
   // Particular Individual Target State (For ANY role)
@@ -1200,8 +1203,23 @@ function AnnouncementFormModal({
   const [recipientsList, setRecipientsList] = useState<AnnouncementRecipient[]>([]);
   const [recipientsLoading, setRecipientsLoading] = useState(false);
 
+  const toggleAudienceRole = (role: string) => {
+    const currentRoles = isAllRoles ? TARGET_ROLE_OPTIONS.map((option) => option.value) : selectedRoles;
+    const nextRoles = currentRoles.includes(role)
+      ? currentRoles.filter((selectedRole) => selectedRole !== role)
+      : [...currentRoles, role];
+    setIsAllRoles(false);
+    setSelectedRoles(nextRoles);
+    if (individualRole === role && !nextRoles.includes(role)) {
+      setIndividualRole(nextRoles[nextRoles.length - 1] || TARGET_ROLE_OPTIONS[0].value);
+    } else if (nextRoles.includes(role)) {
+      setIndividualRole(role);
+    }
+    setSelectedRecipient(null);
+  };
+
   // Dynamic scope calculation based on selected roles
-  const canTargetClass = isAllRoles || selectedRoles.includes("STUDENT") || selectedRoles.includes("PARENT");
+  const canTargetClass = isAllRoles || selectedRoles.includes("STUDENT") || selectedRoles.includes("PARENT") || selectedRoles.includes("TEACHER");
 
   // Parent Guided Target State (Class -> Division -> Student -> Parent)
   const [parentClassId, setParentClassId] = useState<string>("");
@@ -1416,6 +1434,10 @@ function AnnouncementFormModal({
       setError("Please select a target standard / class.");
       return;
     }
+    if (!isAllRoles && selectedRoles.length === 0) {
+      setError("Please select at least one audience role.");
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -1453,9 +1475,9 @@ function AnnouncementFormModal({
         payload.target_division = null;
       } else if (targetScope === "CLASS") {
         payload.is_everyone = false;
-        payload.announcement_for = isAllRoles ? "STUDENT,PARENT" : selectedRoles.join(",");
+        payload.announcement_for = isAllRoles ? "STUDENT,PARENT,TEACHER" : selectedRoles.join(",");
         payload.target_class = Number(selectedClassId);
-        payload.target_division = selectedDivision && selectedDivision !== "ALL" ? selectedDivision : null;
+        payload.target_division = selectedDivisions.length ? selectedDivisions.join(",") : null;
         payload.target_student = null;
         payload.target_user = null;
       } else {
@@ -1497,10 +1519,10 @@ function AnnouncementFormModal({
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 15 }}
-        className="relative bg-white dark:bg-zinc-900 w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-7 overflow-y-auto z-10 border-0 sm:border sm:border-slate-200 dark:border-zinc-800 space-y-5"
+        className="relative bg-white dark:bg-zinc-900 w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-3xl shadow-2xl px-4 pb-4 pt-0 sm:px-7 sm:pb-7 overflow-y-auto z-10 border-0 sm:border sm:border-slate-200 dark:border-zinc-800 space-y-5"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-zinc-800 sticky top-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm z-20 -mx-4 px-4 pt-1 sm:pt-0 sm:mx-0 sm:px-0">
+        <div className="sticky top-0 z-20 -mx-4 px-4 pt-0 flex items-center justify-between pb-3 border-b border-slate-100 bg-white dark:bg-zinc-900 dark:border-zinc-800 sm:-mx-7 sm:px-7 sm:pb-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
@@ -1684,36 +1706,7 @@ function AnnouncementFormModal({
                   <div
                     key={`mobile_role_${item.value}`}
                     onClick={() => {
-                      if (isAllRoles) {
-                        setIsAllRoles(false);
-                        setSelectedRoles([item.value]);
-                        setIndividualRole(item.value);
-                        setSelectedRecipient(null);
-                      } else {
-                        if (selectedRoles.includes(item.value)) {
-                          const updated = selectedRoles.filter((r) => r !== item.value);
-                          if (updated.length === 0) {
-                            setIsAllRoles(true);
-                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
-                            setIndividualRole(TARGET_ROLE_OPTIONS[0].value);
-                            setSelectedRecipient(null);
-                          } else {
-                            setSelectedRoles(updated);
-                            setIndividualRole(updated[updated.length - 1]);
-                            setSelectedRecipient(null);
-                          }
-                        } else {
-                          const updated = [...selectedRoles, item.value];
-                          if (updated.length === TARGET_ROLE_OPTIONS.length) {
-                            setIsAllRoles(true);
-                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
-                          } else {
-                            setSelectedRoles(updated);
-                          }
-                          setIndividualRole(item.value);
-                          setSelectedRecipient(null);
-                        }
-                      }
+                      toggleAudienceRole(item.value);
                     }}
                     className={`p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
                       isSelected ? "bg-blue-50/40 dark:bg-blue-950/20" : ""
@@ -1762,36 +1755,7 @@ function AnnouncementFormModal({
                   <div
                     key={item.value}
                     onClick={() => {
-                      if (isAllRoles) {
-                        setIsAllRoles(false);
-                        setSelectedRoles([item.value]);
-                        setIndividualRole(item.value);
-                        setSelectedRecipient(null);
-                      } else {
-                        if (selectedRoles.includes(item.value)) {
-                          const updated = selectedRoles.filter((r) => r !== item.value);
-                          if (updated.length === 0) {
-                            setIsAllRoles(true);
-                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
-                            setIndividualRole(TARGET_ROLE_OPTIONS[0].value);
-                            setSelectedRecipient(null);
-                          } else {
-                            setSelectedRoles(updated);
-                            setIndividualRole(updated[updated.length - 1]);
-                            setSelectedRecipient(null);
-                          }
-                        } else {
-                          const updated = [...selectedRoles, item.value];
-                          if (updated.length === TARGET_ROLE_OPTIONS.length) {
-                            setIsAllRoles(true);
-                            setSelectedRoles(TARGET_ROLE_OPTIONS.map((r) => r.value));
-                          } else {
-                            setSelectedRoles(updated);
-                          }
-                          setIndividualRole(item.value);
-                          setSelectedRecipient(null);
-                        }
-                      }
+                      toggleAudienceRole(item.value);
                     }}
                     className={`cursor-pointer p-2.5 rounded-2xl border transition-all flex flex-col justify-between gap-1.5 ${
                       isSelected
@@ -2252,12 +2216,15 @@ function AnnouncementFormModal({
                       </span>
                     )}
                   </label>
-                  <select
+                  <ResponsiveSelect
+                    drawerTitle="Select Class"
+                    drawerSubtitle="Choose the class for this announcement"
                     value={selectedClassId}
                     onChange={(e) => {
                       setSelectedClassId(e.target.value);
-                      setSelectedDivision("");
+                      setSelectedDivisions([]);
                     }}
+                    aria-label="Select Standard / Class"
                     className="w-full h-11 px-3.5 text-xs rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB]"
                   >
                     <option value="">-- Choose Standard / Class --</option>
@@ -2266,7 +2233,7 @@ function AnnouncementFormModal({
                         {c.school_class}
                       </option>
                     ))}
-                  </select>
+                  </ResponsiveSelect>
                 </div>
 
                 <div className="space-y-1.5">
@@ -2292,9 +2259,9 @@ function AnnouncementFormModal({
                     <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-slate-100/90 dark:bg-zinc-800/80 rounded-2xl">
                       <button
                         type="button"
-                        onClick={() => setSelectedDivision("")}
+                        onClick={() => setSelectedDivisions([])}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          !selectedDivision || selectedDivision === "ALL"
+                          selectedDivisions.length === 0
                             ? "bg-[#2563EB] text-white shadow-xs"
                             : "bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50"
                         }`}
@@ -2303,12 +2270,12 @@ function AnnouncementFormModal({
                       </button>
 
                       {availableDivisions.map((divName) => {
-                        const isSelected = selectedDivision.toUpperCase() === divName;
+                        const isSelected = selectedDivisions.includes(divName);
                         return (
                           <button
                             key={divName}
                             type="button"
-                            onClick={() => setSelectedDivision(divName)}
+                            onClick={() => setSelectedDivisions((current) => current.includes(divName) ? current.filter((division) => division !== divName) : [...current, divName])}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                               isSelected
                                 ? "bg-[#2563EB] text-white shadow-xs"
@@ -2323,12 +2290,12 @@ function AnnouncementFormModal({
                       {availableDivisions.length === 0 && (
                         <>
                           {["A", "B", "C", "D"].map((divName) => {
-                            const isSelected = selectedDivision.toUpperCase() === divName;
+                            const isSelected = selectedDivisions.includes(divName);
                             return (
                               <button
                                 key={divName}
                                 type="button"
-                                onClick={() => setSelectedDivision(divName)}
+                                onClick={() => setSelectedDivisions((current) => current.includes(divName) ? current.filter((division) => division !== divName) : [...current, divName])}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                   isSelected
                                     ? "bg-[#2563EB] text-white shadow-xs"
@@ -2403,7 +2370,7 @@ function AnnouncementFormModal({
               {targetScope === "CLASS" && selectedClassId && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-bold">
                   <School className="w-3 h-3" />
-                  Class #{selectedClassId} {selectedDivision ? `(Div ${selectedDivision})` : ""}
+                  Class #{selectedClassId} {selectedDivisions.length ? `(Div ${selectedDivisions.join(", ")})` : "(All Divisions)"}
                 </span>
               )}
             </div>

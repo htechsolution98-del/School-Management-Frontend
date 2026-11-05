@@ -12,8 +12,8 @@ function capitalizeWords(str: string): string {
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Script from "next/script";
 import { toast } from "sonner";
+import { loadRazorpayScript } from "@/lib/razorpay";
 import { aadhaarSchema, isAadhaarField, AADHAAR_ERROR } from "@/lib/student-profile-validation";
 import {
   User,
@@ -1392,15 +1392,23 @@ function MultiStepForm({
   };
 
   const payNow = async () => {
+    setSubmitting(true);
     try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error("Razorpay could not load. Check your internet connection and try again.");
+      }
       const amount = feeAmount ?? (formData?.fees ? Number(formData.fees) : 0);
       const admission_number = applicationId;
       const orderData = await createRazorOrder({ amount, admission_number });
+      if (!orderData.key || !orderData.id || !Number(orderData.amount)) {
+        throw new Error("Razorpay returned incomplete payment details. Please contact the school office.");
+      }
 
       const options = {
         key: orderData.key,
         amount: orderData.amount,
-        currency: orderData.currency,
+        currency: orderData.currency || "INR",
         order_id: orderData.id,
         name: "School Admission",
         description: "Admission Fee Payment",
@@ -1414,32 +1422,31 @@ function MultiStepForm({
             });
             if (verifyData.status === "success") {
               toast.success("Online Payment Successful! 🎉");
+              setSubmitting(false);
               setTimeout(() => onPaymentSuccess(admission_number), 500);
             } else {
               toast.error("Payment Verification Failed");
+              setSubmitting(false);
             }
           } catch (error) {
-            console.log(error);
-            toast.error("Payment Verification Failed");
+            toast.error(error instanceof Error ? error.message : "Payment verification failed.");
+            setSubmitting(false);
           }
         },
         prefill: { name: child.name, email: "", contact: "" },
         theme: { color: "#6366f1" },
+        modal: { ondismiss: () => setSubmitting(false) },
       };
 
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", function () {
         toast.error("Payment Cancelled");
-        onBack();
-      });
-      rzp.on("modal.closed", function () {
-        toast.error("Payment Not Completed");
-        onBack();
+        setSubmitting(false);
       });
       rzp.open();
     } catch (error) {
-      console.log(error);
       toast.error(error instanceof Error ? error.message : "Payment Failed");
+      setSubmitting(false);
     }
   };
 
@@ -1456,14 +1463,6 @@ function MultiStepForm({
       toast.error(error instanceof Error ? error.message : "Offline payment failed");
     }
   };
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-    return () => { document.body.removeChild(script); };
-  }, []);
 
   const handleStepOneSubmit = async () => {
     if (submitting) return;

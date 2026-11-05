@@ -36,6 +36,7 @@ import {
   type FeeVerifyRecord,
 } from "@/lib/fees";
 import { getClasses } from "@/lib/clerk";
+import { fetchDailyCashAudit } from "@/lib/fees/cash-register";
 import { cn } from "@/lib/utils";
 
 /* ─── Animated counter ───────────────────────────────────────────────────── */
@@ -86,6 +87,13 @@ const STAT_CONFIG = {
     glow: "group-hover:shadow-indigo-500/10",
     badge: "Verified Revenue",
     badgeColor: "bg-indigo-50 text-indigo-700",
+  },
+  daily: {
+    iconBg: "bg-sky-50 text-sky-600 ring-1 ring-sky-500/15",
+    accent: "bg-gradient-to-r from-sky-500 to-cyan-500",
+    glow: "group-hover:shadow-sky-500/10",
+    badge: "Today · All Modes",
+    badgeColor: "bg-sky-50 text-sky-700",
   },
 };
 
@@ -615,6 +623,8 @@ export default function ClerkDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "verified">("all");
+  const [dailyCollectionAmount, setDailyCollectionAmount] = useState(0);
+  const [dailyPaymentCount, setDailyPaymentCount] = useState(0);
 
   const fetchClasses = useCallback(async () => {
     try {
@@ -646,6 +656,17 @@ export default function ClerkDashboard() {
     fetchRecords();
     fetchClasses();
   }, [fetchRecords, fetchClasses]);
+
+  useEffect(() => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    fetchDailyCashAudit(today).then((result) => {
+      if (result.success && result.data) {
+        setDailyCollectionAmount(Number(result.data.summary.total_fee_collected || 0));
+        setDailyPaymentCount(Number(result.data.summary.fee_payment_count || 0));
+      }
+    });
+  }, []);
 
   const handleVerify = async (record: FeeVerifyRecord) => {
     setVerifyingId(record.id);
@@ -743,12 +764,14 @@ export default function ClerkDashboard() {
 
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3">
           <StatCard label="Total" value={records.length} icon={User} variant="total" delay={0.08} />
           <StatCard label="Pending" value={pending} icon={Clock} variant="pending" delay={0.14} />
           <StatCard label="Verified" value={verified} icon={ShieldCheck} variant="verified" delay={0.2} />
           <StatCard label="Verified Amount" value={verifiedAmount} prefix="₹" icon={Banknote} variant="amount" delay={0.26} />
+          <StatCard label="Today's Fee Collection" value={dailyCollectionAmount} prefix="₹" icon={IndianRupee} variant="daily" delay={0.32} />
         </div>
+        <p className="-mt-4 text-right text-[11px] text-slate-500">{dailyPaymentCount} completed payments across all payment modes</p>
 
         {/* ── Search + Filter bar ── */}
         {!loading && !error && records.length > 0 && (

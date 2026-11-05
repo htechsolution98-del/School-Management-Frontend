@@ -1,7 +1,7 @@
 "use client";
 
 import { StudentEmptyState } from "@/components/student/student-empty-state";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -19,15 +19,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getStudentSyllabus, type StudentSyllabusItem } from "@/lib/student";
-import { getClasses, getDivisions, getSubjects } from "@/lib/clerk";
-import type { Division, SchoolClass, Subject } from "@/types/clerk";
 import { API_BASE_URL } from "@/lib/config";
 import {
   getSyllabusStreamUrl,
   openAuthenticatedDocument,
   getDocumentBlobUrl,
 } from "@/lib/document-viewer";
-import { SCHOOL_CLASS_OPTIONS } from "@/lib/form-builder-config";
 
 // ─────────────────────────────────────────────
 // Subject Theme Matcher (Icons and Soft Colors)
@@ -69,14 +66,12 @@ function getSubjectTheme(subjectName: string = "") {
 
 export default function StudentSyllabusPage() {
   const [syllabuses, setSyllabuses] = useState<StudentSyllabusItem[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [divisions, setDivisions] = useState<Division[]>([]);
-  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(9);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = async (url: string, fileName: string, id: number) => {
     setDownloadingId(id);
@@ -84,13 +79,13 @@ export default function StudentSyllabusPage() {
       const blobUrl = await getDocumentBlobUrl(url, url);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = fileName;
+      link.download = `${fileName.replace(/\.[^.]+$/, "")}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-    } catch {
-      window.open(url, "_blank");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not download this PDF.");
     } finally {
       setDownloadingId(null);
     }
@@ -100,22 +95,7 @@ export default function StudentSyllabusPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [syllabusRes, subjectsRes, divisionsRes, classesRes] = await Promise.allSettled([
-        getStudentSyllabus(),
-        getSubjects(),
-        getDivisions(),
-        getClasses(),
-      ]);
-
-      if (syllabusRes.status === "fulfilled") {
-        setSyllabuses(syllabusRes.value);
-      } else {
-        throw new Error(syllabusRes.reason?.message || "Failed to load syllabus items.");
-      }
-
-      if (subjectsRes.status === "fulfilled") setSubjects(subjectsRes.value);
-      if (divisionsRes.status === "fulfilled") setDivisions(divisionsRes.value);
-      if (classesRes.status === "fulfilled") setSchoolClasses(classesRes.value);
+      setSyllabuses(await getStudentSyllabus());
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load syllabus data.");
@@ -129,6 +109,10 @@ export default function StudentSyllabusPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    setVisibleCount(9);
+  }, [searchQuery, syllabuses]);
+
   const resolveSyllabusUrl = (url: string | null): string => {
     if (!url) return "";
     if (url.includes("127.0.0.1:8000") || url.includes("localhost:8000")) {
@@ -136,20 +120,6 @@ export default function StudentSyllabusPage() {
       return url.replace(/http:\/\/(127\.0\.0\.1|localhost):8000/, domain);
     }
     return url;
-  };
-
-  const getDivisionLabel = (divisionId: number | null) => {
-    if (divisionId === null) return "All Divisions";
-    const div = divisions.find((d) => d.id === divisionId);
-    if (!div) return `Division #${divisionId}`;
-
-    const cls = schoolClasses.find((c) => c.id === div.SchoolClass);
-    const classLabel = cls
-      ? SCHOOL_CLASS_OPTIONS.find((o) => o.value === cls.school_class)?.label ||
-        cls.school_class
-      : "Unknown Class";
-
-    return `${classLabel} - Div ${div.division}`;
   };
 
   const filteredSyllabuses = useMemo(() => {
@@ -167,13 +137,23 @@ export default function StudentSyllabusPage() {
 
     return uniqueList.filter((s) => {
       const subName = (s.subject_name || "General Subject").toLowerCase();
-      const divLabel = s.school_class && s.divison_name
-        ? `${s.school_class} (${s.divison_name})`.toLowerCase()
-        : getDivisionLabel(s.division).toLowerCase();
+      const classLabel = (s.school_class || "").toLowerCase();
       const query = searchQuery.toLowerCase();
-      return subName.includes(query) || divLabel.includes(query);
+      return subName.includes(query) || classLabel.includes(query);
     });
-  }, [syllabuses, searchQuery, divisions, schoolClasses]);
+  }, [syllabuses, searchQuery]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || visibleCount >= filteredSyllabuses.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((count) => Math.min(count + 9, filteredSyllabuses.length));
+      }
+    }, { rootMargin: "240px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [visibleCount, filteredSyllabuses.length]);
 
   return (
     <div className="flex flex-col gap-3.5 sm:gap-4 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden pb-12">
@@ -232,7 +212,7 @@ export default function StudentSyllabusPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search by subject, class, or division..."
+            placeholder="Search by subject or class..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-12 bg-white border border-slate-100 rounded-full pl-11 pr-4 text-xs sm:text-sm text-slate-700 shadow-2xs placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
@@ -307,7 +287,7 @@ export default function StudentSyllabusPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {filteredSyllabuses.map((item, index) => {
+            {filteredSyllabuses.slice(0, visibleCount).map((item, index) => {
               const theme = getSubjectTheme(item.subject_name);
               const ThemeIcon = theme.Icon;
               const resolvedUrl = resolveSyllabusUrl(item.syllabus_file);
@@ -316,10 +296,7 @@ export default function StudentSyllabusPage() {
                 : "syllabus_material.pdf";
               const fileName = rawFileName.includes(".") ? rawFileName : `${rawFileName}.pdf`;
 
-              const classDivisionLabel =
-                item.school_class && item.divison_name
-                  ? `${item.school_class} (${item.divison_name})`
-                  : getDivisionLabel(item.division);
+              const classDivisionLabel = item.school_class || "Class";
 
               return (
                 <motion.div
@@ -373,13 +350,17 @@ export default function StudentSyllabusPage() {
                   <div className="flex items-center gap-2.5 sm:gap-3 w-full pt-1 mt-auto">
                     <button
                       type="button"
-                      onClick={() =>
-                        openAuthenticatedDocument(
+                      onClick={() => {
+                        if (/^https?:\/\//i.test(resolvedUrl) && resolvedUrl.includes("cloudinary.com")) {
+                          window.open(resolvedUrl, "_blank", "noopener,noreferrer");
+                          return;
+                        }
+                        void openAuthenticatedDocument(
                           item.id ? getSyllabusStreamUrl(item.id) : resolvedUrl,
                           item.subject_name,
                           resolvedUrl
-                        )
-                      }
+                        );
+                      }}
                       className="flex-1 py-2.5 px-3 sm:px-4 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 transition-all cursor-pointer whitespace-nowrap"
                     >
                       <ExternalLink size={14} className="text-slate-600" />
@@ -390,7 +371,7 @@ export default function StudentSyllabusPage() {
                       type="button"
                       onClick={() =>
                         handleDownload(
-                          item.id ? getSyllabusStreamUrl(item.id) : resolvedUrl,
+                          item.id ? `${getSyllabusStreamUrl(item.id)}?download=1` : resolvedUrl,
                           fileName,
                           item.id
                         )
@@ -411,6 +392,9 @@ export default function StudentSyllabusPage() {
             })}
           </AnimatePresence>
         </div>
+      )}
+      {!isLoading && !error && visibleCount < filteredSyllabuses.length && (
+        <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
       )}
     </div>
   );

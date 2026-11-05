@@ -11,6 +11,9 @@ export interface DenominationItem {
 }
 
 export interface CashRegisterSummary {
+  total_fee_collected?: number;
+  fee_payment_count?: number;
+  fee_collection_by_mode?: { payment_mode: string; amount: number; count: number }[];
   opening_balance?: number;
   gross_cash_collected: number;
   total_change_returned: number;
@@ -33,6 +36,7 @@ export interface CashRegisterTransaction {
   student_admission_number: string;
   class_name: string;
   feetype_name: string;
+  payment_mode: string;
   net_amount: number;
   total_received: number;
   return_change: number;
