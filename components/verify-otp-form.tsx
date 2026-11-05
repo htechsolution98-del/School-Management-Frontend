@@ -1,4 +1,5 @@
 "use client";
+import { validateStrongPassword, validateIndianMobile } from "@/lib/password-validation";
 
 import { useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,22 +43,42 @@ function VerifyOtpInner() {
     setIsLoading(true);
     setError("");
 
+    const pwdErr = validateStrongPassword(password);
+    if (pwdErr) {
+      setError(pwdErr);
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       setIsLoading(false);
       return;
     }
 
+    if (type !== "email") {
+      const mobErr = validateIndianMobile(identifier);
+      if (mobErr) {
+        setError(mobErr);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
+      const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
+      const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+      const cleanIdentifier = type === "email" ? identifier.trim() : cleanMobile;
+
       const payload: any = {
         otp: otp.trim(),
-        password: password,
+        password: password.trim(),
       };
 
       if (type === "email") {
-        payload.email = identifier;
+        payload.email = cleanIdentifier;
       } else {
-        payload.mobile = identifier;
+        payload.mobile = cleanMobile;
       }
 
       if (typeof window !== "undefined") {
@@ -69,7 +90,7 @@ function VerifyOtpInner() {
 
       await verifyOtp(payload);
       
-      router.push(`/login?identifier=${encodeURIComponent(identifier)}`);
+      router.push(`/login?identifier=${encodeURIComponent(cleanIdentifier)}`);
     } catch (err: any) {
       setError(err.message || "Verification failed. Please check your OTP and try again.");
     } finally {

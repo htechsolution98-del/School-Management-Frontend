@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getCurrentUserProfile } from "@/lib/current-user";
+import { getAccessToken } from "@/lib/auth";
 
 export interface SchoolContextType {
   schoolName: string | null;
@@ -34,6 +35,11 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
 
   const refreshProfile = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const token = getAccessToken();
+      const hasCookieToken = document.cookie.includes("access_token");
+      if (!token && !hasCookieToken) return;
+    }
     try {
       const data = await getCurrentUserProfile();
       const shortName = data?.short_display_name || data?.school_short_name || data?.school?.short_name || null;

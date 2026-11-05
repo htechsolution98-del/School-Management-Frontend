@@ -98,7 +98,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
       } else {
         const errData = await response.clone().json();
         const errorDesc = extractErrorMessage(errData, "Request failed");
-        
+
         if (!errorDesc.includes("Refresh token is required") && errorDesc.trim()) {
           toast.error(errorDesc, { id: API_ERROR_TOAST_ID });
         }
@@ -427,6 +427,30 @@ export async function refreshToken(): Promise<boolean> {
   }
 }
 
+const PROTECTED_ROUTE_PREFIXES = [
+  "/teacher",
+  "/principal",
+  "/trustee",
+  "/clerk",
+  "/librarian",
+  "/inventory",
+  "/fees",
+  "/student",
+  "/parent",
+  "/superadmin",
+  "/admin",
+  "/user",
+];
+
+export function isProtectedRoute(pathname?: string): boolean {
+  if (!pathname || pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/signup")) {
+    return false;
+  }
+  return PROTECTED_ROUTE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 // ─── Authenticated Fetch ──────────────────────────────────────────────────────
 
 export async function fetchWithAuth(
@@ -443,23 +467,30 @@ export async function fetchWithAuth(
   };
   const response = await sendRequest();
 
-  // SUCCESS
+  // ACCOUNT INACTIVE / SCHOOL DEACTIVATED / DISABLED → force logout immediately
+  if (response.status === 401 || response.status === 403) {
+    try {
+      const errBody = await response.clone().json();
+      const msg = String(errBody?.detail || errBody?.message || "");
+      const isDeactivated =
+        /deactivated|suspended|disabled|school.*inactive/i.test(msg) ||
+        errBody?.code === "user_inactive" ||
+        errBody?.code === "school_deactivated";
+
+      if (isDeactivated) {
+        clearAuthSession();
+        if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
+          window.location.href = `/login?reason=${encodeURIComponent(msg || "school_deactivated")}`;
+        }
+        return response;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // SUCCESS / NON-401 RESPONSES
   if (response.status !== 401) {
     return response;
   }
-
-  // SCHOOL DEACTIVATED / ACCOUNT DISABLED → force logout
-  try {
-    const errBody = await response.clone().json();
-    const msg = errBody?.detail || errBody?.message || "";
-    if (/deactivated|disabled/i.test(msg)) {
-      clearAuthSession();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      return response;
-    }
-  } catch { /* ignore */ }
 
   // Parallel dashboard requests share one refresh, including token rotation.
   if (!refreshPromise) {
@@ -470,6 +501,9 @@ export async function fetchWithAuth(
   // REFRESH FAILED
   if (!refreshed) {
     clearAuthSession();
+    if (typeof window !== "undefined" && isProtectedRoute(window.location.pathname)) {
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+    }
     return response;
   }
 
@@ -616,4 +650,3 @@ export async function verifyFace(imageBlob: Blob): Promise<any> {
 
   return response.json();
 }
-

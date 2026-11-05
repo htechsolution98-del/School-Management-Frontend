@@ -50,6 +50,17 @@ import {
   SubscriptionSummary,
 } from "@/lib/subscriptions";
 
+const formatDateSafe = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return dateStr || "";
+  }
+};
+
 export default function SuperAdminSubscriptionsPage() {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"subscriptions" | "invoices">("subscriptions");
@@ -85,6 +96,7 @@ export default function SuperAdminSubscriptionsPage() {
 
   const [flatAmount, setFlatAmount] = useState<string>("5000");
   const [perStudentRate, setPerStudentRate] = useState<string>("15");
+  const [startDate, setStartDate] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
   const [graceDays, setGraceDays] = useState<number>(0);
   const [autoLock, setAutoLock] = useState<boolean>(true);
@@ -139,7 +151,8 @@ export default function SuperAdminSubscriptionsPage() {
     setBillingCycle(sub.billing_cycle);
     setFlatAmount(String(sub.flat_amount || "5000"));
     setPerStudentRate(String(sub.per_student_rate || "15"));
-    setDueDate(sub.due_date);
+    setStartDate(sub.start_date || (sub as any).subscription_start_date || "");
+    setDueDate(sub.due_date || (sub as any).subscription_end_date || "");
     setGraceDays(sub.grace_period_days || 0);
     setAutoLock(sub.auto_lock_on_due ?? true);
     setPlanNotes(sub.notes || "");
@@ -157,7 +170,10 @@ export default function SuperAdminSubscriptionsPage() {
         billing_cycle: billingCycle,
         flat_amount: parseFloat(flatAmount) || 0,
         per_student_rate: parseFloat(perStudentRate) || 0,
+        start_date: startDate,
+        subscription_start_date: startDate,
         due_date: dueDate,
+        subscription_end_date: dueDate,
         grace_period_days: Number(graceDays) || 0,
         auto_lock_on_due: autoLock,
         status: planType === "TRIAL" ? "TRIAL" : "ACTIVE",
@@ -470,13 +486,14 @@ export default function SuperAdminSubscriptionsPage() {
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 tracking-wider border-b border-slate-100">
                     <tr>
-                      <th className="py-4 px-5">School & Code</th>
-                      <th className="py-4 px-5">Plan Type</th>
-                      <th className="py-4 px-5">Billing Model & Fee Calculation</th>
-                      <th className="py-4 px-5 text-center">Next Due Date</th>
-                      <th className="py-4 px-5 text-center">Days Remaining</th>
-                      <th className="py-4 px-5 text-center">Licensing Status</th>
-                      <th className="py-4 px-5 text-right">Actions</th>
+                      <th className="py-4 px-4">School & Code</th>
+                      <th className="py-4 px-3">Plan Type</th>
+                      <th className="py-4 px-4">Billing Model & Fee</th>
+                      <th className="py-4 px-3 text-center">Start Date</th>
+                      <th className="py-4 px-3 text-center">End Date (Due)</th>
+                      <th className="py-4 px-3 text-center">Days Remaining</th>
+                      <th className="py-4 px-3 text-center">Licensing Status</th>
+                      <th className="py-4 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -537,8 +554,17 @@ export default function SuperAdminSubscriptionsPage() {
                             )}
                           </td>
 
-                          <td className="py-4 px-5 text-center font-mono font-bold text-slate-800">
-                            {sub.due_date}
+                          <td className="py-4 px-3 text-center font-mono text-xs text-slate-700">
+                            {formatDateSafe(sub.start_date || (sub as any).subscription_start_date) || "—"}
+                          </td>
+
+                          <td className="py-4 px-3 text-center font-mono font-bold text-slate-800 text-xs">
+                            <div>{formatDateSafe(sub.due_date || (sub as any).subscription_end_date) || "—"}</div>
+                            {isExpired && (
+                              <span className="text-[10px] text-rose-600 font-bold block whitespace-nowrap">
+                                Overdue: {Math.abs(sub.days_left)}d
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-4 px-5 text-center">
@@ -891,9 +917,20 @@ export default function SuperAdminSubscriptionsPage() {
                   </div>
 
                   {/* Dates & Auto Lock */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">Due Date / Expiration Date *</Label>
+                      <Label className="text-xs font-semibold text-slate-700">Start Date *</Label>
+                      <Input
+                        type="date"
+                        required
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-10 text-xs rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-700">End Date (Due) *</Label>
                       <Input
                         type="date"
                         required
@@ -904,7 +941,7 @@ export default function SuperAdminSubscriptionsPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">Grace Period (Days)</Label>
+                      <Label className="text-xs font-semibold text-slate-700">Grace Days</Label>
                       <Input
                         type="number"
                         min="0"

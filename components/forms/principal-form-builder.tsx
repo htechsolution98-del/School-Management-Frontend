@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2,
@@ -746,22 +746,61 @@ export default function PrincipalFormBuilder({
               ),
             })),
           );
-          const initialFees: Record<number, string> = {};
-          sortedData.forEach((cls) => { initialFees[cls.id] = ""; });
-          setIndividualFees(initialFees);
+                    setIndividualFees((prev) => {
+            const nextFees = { ...prev };
+            sortedData.forEach((cls) => {
+              if (nextFees[cls.id] === undefined) {
+                nextFees[cls.id] = "";
+              }
+            });
+            return nextFees;
+          });
         }
-      } catch (err) {
+            } catch (err) {
         console.error("Failed to fetch classes:", err);
       }
     }
     fetchClasses();
   }, []);
 
-  // ─── Data Prefilling for Edit Mode ──────────────────────────────────────────
+  // Sync fee amounts when classes or cached form data arrives
+  useEffect(() => {
+    if (cachedFormDataRef.current?.fee_structures && classes.length > 0) {
+      const feeMap: Record<number, string> = {};
+      cachedFormDataRef.current.fee_structures.forEach((fs: any) => {
+        if (!fs) return;
+        const cId = typeof fs.class_name === "object" ? fs.class_name?.id : fs.class_name;
+        const amt = fs.fee_amount != null ? String(fs.fee_amount) : "";
+        if (cId != null) {
+          const numId = Number(cId);
+          if (!isNaN(numId) && numId > 0) {
+            feeMap[numId] = amt;
+          } else if (typeof cId === "string") {
+            const matchedClass = classes.find(
+              (c) => c.school_class.toLowerCase().trim() === cId.toLowerCase().trim()
+            );
+            if (matchedClass) feeMap[matchedClass.id] = amt;
+          }
+        }
+        if (fs.class_label || fs.class_name_display || fs.school_class) {
+          const labelStr = (fs.class_name_display || fs.class_label || fs.school_class || "").toLowerCase().trim();
+          const matchedClass = classes.find(
+            (c) => c.school_class.toLowerCase().trim() === labelStr
+          );
+          if (matchedClass) feeMap[matchedClass.id] = amt;
+        }
+      });
+      setIndividualFees((prev) => ({ ...prev, ...feeMap }));
+    }
+  }, [classes]);
+
+    // ─── Data Prefilling for Edit Mode ──────────────────────────────────────────
   const [dataLoaded, setDataLoaded] = useState(false);
+  const cachedFormDataRef = useRef<AdmissionFormResponse | null>(null);
 
   const populateFormData = useCallback((formData: AdmissionFormResponse) => {
       if (!formData) return;
+      cachedFormDataRef.current = formData;
       if (formData.title) setTitle(formData.title);
       if (formData.description) setDescription(formData.description);
 
@@ -770,8 +809,10 @@ export default function PrincipalFormBuilder({
       }
 
       setFeesEnabled(Boolean(formData.fees_enable));
-      setFeeType((formData.fee_type as "general" | "individual") || "general");
-      setFeesAmount(formData.fees ? String(formData.fees) : "");
+      const rawFeeType = String(formData.fee_type || "").toLowerCase();
+      const isIndividual = rawFeeType === "individual" || rawFeeType === "per_class" || (Array.isArray(formData.fee_structures) && formData.fee_structures.length > 0);
+      setFeeType(isIndividual ? "individual" : "general");
+      setFeesAmount(formData.fees != null ? String(formData.fees) : "");
       if (formData.payment_mode) {
         setPaymentMode(formData.payment_mode);
       }
@@ -779,9 +820,15 @@ export default function PrincipalFormBuilder({
       // Fee structures
       if (formData.fee_structures && Array.isArray(formData.fee_structures)) {
         const feeMap: Record<number, string> = {};
-        formData.fee_structures.forEach((fs: { class_name: number | string; fee_amount: number | string | null }) => {
-          if (fs.class_name) {
-            feeMap[Number(fs.class_name)] = String(fs.fee_amount || "");
+        formData.fee_structures.forEach((fs: any) => {
+          if (!fs) return;
+          const cId = typeof fs.class_name === "object" ? fs.class_name?.id : fs.class_name;
+          const amt = fs.fee_amount != null ? String(fs.fee_amount) : "";
+          if (cId != null) {
+            const numId = Number(cId);
+            if (!isNaN(numId) && numId > 0) {
+              feeMap[numId] = amt;
+            }
           }
         });
         setIndividualFees((prev) => ({ ...prev, ...feeMap }));
@@ -969,13 +1016,13 @@ export default function PrincipalFormBuilder({
       }
       if (formId) {
         getAdmissionFormById(formId)
-          .then((fetched) => {
+          .then((fetched: any) => {
             if (fetched) {
               populateFormData(fetched);
               setDataLoaded(true);
             }
           })
-          .catch((err) => {
+          .catch((err: any) => {
             console.error("Failed to fetch fresh admission form details:", err);
           });
       }
@@ -1845,4 +1892,4 @@ export default function PrincipalFormBuilder({
       </div>
     </div>
   );
-} 
+}

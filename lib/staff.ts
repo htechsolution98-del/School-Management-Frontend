@@ -2,6 +2,45 @@ import { API_BASE_URL, API_ENDPOINTS } from "./config";
 import { fetchWithAuth } from "./auth";
 import { CreateStaffPayload, Staff } from "../types";
 
+async function extractApiError(response: Response, defaultMessage: string): Promise<string> {
+  try {
+    const text = await response.text();
+    if (!text || !text.trim()) {
+      return response.statusText ? `Error ${response.status}: ${response.statusText}` : defaultMessage;
+    }
+    try {
+      const json = JSON.parse(text);
+      if (typeof json === "string") return json;
+      if (Array.isArray(json)) return json.map(item => typeof item === "string" ? item : JSON.stringify(item)).join(", ");
+      if (typeof json === "object" && json !== null) {
+        if (json.detail) return String(json.detail);
+        if (json.message) return String(json.message);
+        if (json.error) return String(json.error);
+        const parts: string[] = [];
+        for (const [key, val] of Object.entries(json)) {
+          if (Array.isArray(val)) {
+            parts.push(`${key}: ${val.join(", ")}`);
+          } else if (typeof val === "object" && val !== null) {
+            parts.push(`${key}: ${JSON.stringify(val)}`);
+          } else if (val) {
+            parts.push(`${key}: ${val}`);
+          }
+        }
+        if (parts.length > 0) return parts.join(" | ");
+      }
+    } catch {
+      // Non-JSON response
+      if (!text.includes("<!DOCTYPE") && text.length < 300) {
+        return text.trim();
+      }
+      return `Server error (${response.status}): ${response.statusText || "Unable to complete request"}`;
+    }
+  } catch {
+    // Stream error
+  }
+  return defaultMessage;
+}
+
 const STAFF_URL = `${API_BASE_URL}${API_ENDPOINTS.STAFF}`;
 
 export async function getStaffList(): Promise<Staff[]> {
@@ -12,7 +51,8 @@ export async function getStaffList(): Promise<Staff[]> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch staff.");
+    const message = await extractApiError(response, "Failed to fetch staff.");
+    throw new Error(message);
   }
 
   const data = await response.json();
@@ -27,7 +67,8 @@ export async function getStaffById(id: number): Promise<Staff> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch staff details.");
+    const message = await extractApiError(response, "Failed to fetch staff details.");
+    throw new Error(message);
   }
 
   return response.json();
@@ -41,16 +82,7 @@ export async function createStaff(payload: CreateStaffPayload): Promise<Staff> {
   });
 
   if (!response.ok) {
-    let message = "Failed to create staff.";
-    try {
-      const err = await response.json();
-      const fieldErrors = Object.values(err || {})
-        .flat()
-        .filter((value): value is string => typeof value === "string");
-      message = err?.detail || err?.message || fieldErrors[0] || message;
-    } catch {
-      // Ignore malformed error bodies.
-    }
+    const message = await extractApiError(response, "Failed to create staff.");
     throw new Error(message);
   }
 
@@ -65,16 +97,7 @@ export async function updateStaff(id: number, payload: Partial<CreateStaffPayloa
   });
 
   if (!response.ok) {
-    let message = "Failed to update staff.";
-    try {
-      const err = await response.json();
-      const fieldErrors = Object.values(err || {})
-        .flat()
-        .filter((value): value is string => typeof value === "string");
-      message = err?.detail || err?.message || fieldErrors[0] || message;
-    } catch {
-      // Ignore
-    }
+    const message = await extractApiError(response, "Failed to update staff.");
     throw new Error(message);
   }
 

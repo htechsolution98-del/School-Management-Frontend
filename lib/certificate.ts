@@ -12,6 +12,8 @@ export interface CertificateRequestItem {
   student_name: string;
   student_gr_no?: string;
   student_class?: string;
+  student_division?: string;
+  student_roll_no?: string;
   certificate_type: number | string;
   certificate_type_name?: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
@@ -50,6 +52,8 @@ export async function getMyCertificateRequests(studentId?: number): Promise<Cert
     student_name: item.student_name || "Student",
     student_gr_no: item.student_gr_no || "",
     student_class: item.student_class || "",
+    student_division: item.student_division || "",
+    student_roll_no: item.student_roll_no || "",
     certificate_type: item.certificate_type,
     certificate_type_name: item.certificate_type_name || (typeof item.certificate_type === "string" ? item.certificate_type : "Certificate"),
     status: item.status || "PENDING",
@@ -92,7 +96,12 @@ export async function getClerkCertificateRequests(status?: string): Promise<Cert
     : `${API_BASE_URL}/certificate-requests/`;
   const res = await fetchWithAuth(url);
   if (!res.ok) {
-    throw new Error("Failed to fetch school certificate requests.");
+    let message = "Failed to fetch school certificate requests.";
+    try {
+      const err = await res.json();
+      message = err?.detail || err?.message || (Array.isArray(err) ? err[0] : null) || message;
+    } catch {}
+    throw new Error(message);
   }
   const data = await res.json();
   const list = Array.isArray(data) ? data : data.results ?? data.data ?? [];
@@ -102,6 +111,8 @@ export async function getClerkCertificateRequests(status?: string): Promise<Cert
     student_name: item.student_name || "Student",
     student_gr_no: item.student_gr_no || "",
     student_class: item.student_class || "",
+    student_division: item.student_division || "",
+    student_roll_no: item.student_roll_no || "",
     certificate_type: item.certificate_type_id || item.certificate_type,
     certificate_type_name: item.certificate_type || "Certificate",
     status: item.status || "PENDING",

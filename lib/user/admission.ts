@@ -144,7 +144,27 @@ export async function submitDocuments(payload: {
     let message = "Document submission failed"
     try {
       const err = await response.json()
-      message = err?.detail || err?.message || message
+      if (typeof err === "string") {
+        message = err
+      } else if (err?.detail) {
+        message = err.detail
+      } else if (err?.message) {
+        message = err.message
+      } else if (err?.error) {
+        message = err.error
+      } else if (typeof err === "object") {
+        const firstVal = Object.values(err)[0]
+        if (Array.isArray(firstVal) && firstVal.length > 0) {
+          const item = firstVal[0]
+          if (typeof item === "string") message = item
+          else if (typeof item === "object") {
+            const nested = Object.values(item)[0]
+            message = Array.isArray(nested) ? nested[0] : String(nested)
+          }
+        } else if (typeof firstVal === "string") {
+          message = firstVal
+        }
+      }
     } catch { }
     throw new Error(message)
   }

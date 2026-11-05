@@ -49,11 +49,58 @@ function LoginFormInner() {
   const [pendingRoute, setPendingRoute] = useState("");
 
   useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason) {
+      if (/deactivated|suspended|inactive/i.test(reason)) {
+        setError("Your school account has been deactivated or suspended. All users have been logged out. Please contact the administrator.");
+      } else {
+        setError(decodeURIComponent(reason));
+      }
+    }
     const identifier = searchParams.get("identifier");
     if (identifier) {
       setUsername(identifier);
     }
   }, [searchParams]);
+
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    setError("");
+
+    // Identify if the user is typing purely numbers (mobile) vs text/email
+    const isPureDigits = /^\d+$/.test(val);
+
+    if (isPureDigits) {
+      // Must start with 6, 7, 8, or 9
+      if (val.length === 1 && !/^[6-9]/.test(val)) {
+        setError("Mobile number must start with 6, 7, 8, or 9.");
+        return;
+      }
+      if (!/^[6-9]/.test(val)) {
+        setError("Mobile number must start with 6, 7, 8, or 9.");
+      }
+      // Maximum 10 digits allowed when typing a number
+      if (val.length > 10) {
+        val = val.slice(0, 10);
+      }
+    } else {
+      // If user pasted a phone number with country code like +91 9876543210
+      const digitsOnly = val.replace(/[\s()\-+]/g, "");
+      if (/^\d+$/.test(digitsOnly)) {
+        let clean = digitsOnly;
+        if (clean.startsWith("91") && clean.length === 12 && /^[6-9]/.test(clean.slice(2))) {
+          clean = clean.slice(2);
+        } else if (clean.startsWith("0") && clean.length === 11 && /^[6-9]/.test(clean.slice(1))) {
+          clean = clean.slice(1);
+        }
+        if (clean.length === 10 && /^[6-9]/.test(clean)) {
+          val = clean;
+        }
+      }
+    }
+
+    setUsername(val);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,17 +113,31 @@ function LoginFormInner() {
     }
 
     const isEmail = identifier.includes("@");
+    const isPureDigits = /^\d+$/.test(identifier);
+
+    if (isPureDigits) {
+      if (identifier.length !== 10) {
+        setError("Mobile number must be exactly 10 digits.");
+        return;
+      }
+      if (!/^[6-9]/.test(identifier)) {
+        setError("Mobile number must start with 6, 7, 8, or 9.");
+        return;
+      }
+    }
+
     const digitsOnly = identifier.replace(/[\s()\-.]/g, "");
-    const is10DigitMobile = /^[0-9]{10}$/.test(digitsOnly);
+    const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+    const isMobile = /^[6-9][0-9]{9}$/.test(cleanMobile);
 
     setIsLoading(true);
 
-    const payload: LoginRequest = { password };
+    const payload: LoginRequest = { password: password.trim() };
     if (isEmail) {
       payload.email = identifier;
-    } else if (is10DigitMobile) {
-      payload.mobile = digitsOnly;
-      payload.username = digitsOnly;
+    } else if (isMobile) {
+      payload.mobile = cleanMobile;
+      payload.username = cleanMobile;
     } else {
       payload.username = identifier;
     }
@@ -165,10 +226,11 @@ function LoginFormInner() {
             <Input
               id="username"
               type="text"
-              placeholder="Enter 10-digit mobile, GR number, or username"
+              placeholder="Enter 10-digit mobile, email, or username"
               required
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              maxLength={/^\d+$/.test(username) ? 10 : undefined}
+              onChange={handleIdentifierChange}
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}
               suppressHydrationWarning
@@ -192,12 +254,12 @@ function LoginFormInner() {
             >
               Password
             </Label>
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] transition-colors underline-offset-2 hover:underline"
             >
               Forgot password?
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <Lock

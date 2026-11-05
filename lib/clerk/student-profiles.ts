@@ -18,7 +18,10 @@ export async function getStudentProfiles(signal?: AbortSignal): Promise<StudentP
   return students;
 }
 export const getStudentProfile = (id: number, signal?: AbortSignal) => apiFetch<StudentProfileData>(`/students/${id}/`, { signal }, "Student profile could not be loaded.");
-export const updateStudentProfile = (id: number, data: Partial<Pick<StudentProfileData, "aadhar_number" | "abc_id" | "udise_no" | "is_verified" | "custom_id_values">>) => apiFetch<StudentProfileData>(`/students/${id}/`, { method: "PATCH", body: JSON.stringify(data) }, "Unable to update this student.");
+export const updateStudentProfile = (
+  id: number,
+  data: Partial<Pick<StudentProfileData, "aadhar_number" | "abc_id" | "udise_no" | "is_verified" | "custom_id_values">> & Record<string, any>
+) => apiFetch<StudentProfileData>(`/students/${id}/`, { method: "PATCH", body: JSON.stringify(data) }, "Unable to update this student.");
 
 export class DocumentRequestError extends Error {
   constructor(message: string, public status: number) { super(message); }

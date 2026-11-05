@@ -6,6 +6,8 @@ import { Building2, Edit2, Eye, Loader2, RefreshCw, UserPlus, Users, UserCheck, 
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge } from "@/components/superadmin/status-badge";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import { StaffRecordForm, type StaffRole } from "@/components/clerk/staff-record-form";
 import { createStaff, getStaffCategories, getStaffList, updateStaff, getDepartments } from "@/lib/staff";
 import { toHTMLDate, toApiDate } from "@/lib/dateUtils";
@@ -21,7 +23,7 @@ import { getUserRoles, getUserRole } from "@/lib/auth";
 import "../clerk-workspace.css";
 
 interface StaffFeature { id?: number; feature_id?: number; feature_name?: string }
-const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, attendance_setting: undefined, leave_template: undefined, salary_structure: undefined, address: "", date_of_birth: "", joining_date: "", exit_date: "", salary: "", is_active: true };
+const EMPTY_FORM: CreateStaffPayload = { name: "", email: "", mobile: "", category: "", department: undefined, departments: [], attendance_setting: undefined, leave_template: undefined, salary_structure: undefined, address: "", date_of_birth: "", joining_date: "", exit_date: "", salary: "", is_active: true };
 const ALLOWED_ROLES = ["TEACHER", "CLERK", "ASSISTANT CLERK", "LIBRARIAN", "FEES MANAGEMENT", "PRINCIPAL", "VICE PRINCIPAL", "TRANSPORTATION", "INVENTORY"];
 const message = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 const title = (value: string) => value.toLowerCase().replace(/\b\w/g, character => character.toUpperCase());
@@ -94,12 +96,91 @@ export default function ClerkStaffDashboard() {
     return title(match?.feature_name || String(category || "-"));
   }, [features]);
 
+  const [togglingStaffId, setTogglingStaffId] = useState<number | null>(null);
+
+  const handleToggleStaffStatus = useCallback(async (member: Staff, nextActive: boolean) => {
+    if (busy.current || togglingStaffId === member.id) return;
+    setTogglingStaffId(member.id);
+
+    const previousStaff = [...staff];
+    setStaff((prev) =>
+      prev.map((s) =>
+        s.id === member.id
+          ? {
+              ...s,
+              is_active: nextActive,
+              exit_date: nextActive ? null : s.exit_date,
+            }
+          : s
+      )
+    );
+
+    try {
+      const payload: Partial<CreateStaffPayload> = {
+        is_active: nextActive,
+        ...(nextActive ? { exit_date: null } : {}),
+      };
+      await updateStaff(member.id, payload);
+      toast.success(
+        nextActive
+          ? `"${member.name || "Staff member"}" marked as Active.`
+          : `"${member.name || "Staff member"}" marked as Inactive.`
+      );
+    } catch (err: any) {
+      setStaff(previousStaff);
+      const msg = err?.message || "Failed to update staff status.";
+      toast.error(msg);
+    } finally {
+      setTogglingStaffId(null);
+    }
+  }, [staff, togglingStaffId]);
+
   const activeStaff = useMemo(() => staff.filter(member => member.is_active), [staff]);
   const inactiveStaff = useMemo(() => staff.filter(member => !member.is_active), [staff]);
 
   const activeColumns = useMemo<DataTableColumn<Staff>[]>(() => [
     { key: "name", header: "Staff member", sticky: true, search: member => [member.name, member.id], render: member => <div className="flex items-center gap-3"><span className="hr-avatar">{(member.name || "S").charAt(0).toUpperCase()}</span><span className="font-medium">{member.name || "-"} <span className="ml-2 text-xs font-normal text-slate-400">#{member.id}</span></span></div> },
-    { key: "department", header: "Department", search: member => departments.find(item => item.id === member.department)?.name || "-", camelCase: false },
+    {
+      key: "department",
+      header: "Department(s)",
+      search: member => {
+        const memberDeptIds: number[] = Array.isArray(member.departments) && member.departments.length > 0
+          ? member.departments
+          : (member.department ? [member.department] : []);
+        const names = memberDeptIds
+          .map(id => departments.find(item => item.id === id)?.name)
+          .filter(Boolean) as string[];
+        return names.length > 0 ? names.join(", ") : (departments.find(item => item.id === member.department)?.name || "-");
+      },
+      render: member => {
+        const memberDeptIds: number[] = Array.isArray(member.departments) && member.departments.length > 0
+          ? member.departments
+          : (member.department ? [member.department] : []);
+        let names = memberDeptIds
+          .map(id => departments.find(item => item.id === id)?.name)
+          .filter(Boolean) as string[];
+        if (names.length === 0 && Array.isArray(member.department_names) && member.department_names.length > 0) {
+          names = member.department_names;
+        }
+        if (names.length === 0 && member.department_name) {
+          names = member.department_name.split(",").map(s => s.trim()).filter(Boolean);
+        }
+        if (names.length === 0) {
+          const single = departments.find(item => item.id === member.department)?.name;
+          return <span className="text-slate-400 italic">{single || "-"}</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1.5 max-w-xs">
+            {names.map(name => (
+              <span key={name} className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
+                {name}
+              </span>
+            ))}
+          </div>
+        );
+      },
+      camelCase: false
+    },
     { key: "category", header: "Role", search: member => roleLabel(member.category), camelCase: false },
     { key: "email", header: "Email", search: member => member.email, camelCase: false },
     { key: "mobile", header: "Mobile", search: member => member.mobile, camelCase: false },
@@ -109,13 +190,92 @@ export default function ClerkStaffDashboard() {
     { key: "shift", header: "Shift", search: member => attendanceSettings.find(s => s.id === member.attendance_setting)?.name || "-", camelCase: false },
     { key: "structure", header: "Structure", search: member => salaryStructures.find(s => s.id === member.salary_structure)?.name || "-", camelCase: false },
     { key: "address", header: "Address", search: member => member.address, camelCase: false },
-    { key: "status", header: "Status", search: () => "Active", render: () => <StatusBadge active={true} /> },
-  ], [departments, roleLabel, attendanceSettings, salaryStructures]);
+    {
+      key: "status",
+      header: "Status",
+      search: (member) => (member.is_active ? "Active" : "Inactive"),
+      render: (member) => {
+        const isBusy = togglingStaffId === member.id;
+        return (
+          <div
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Switch
+              checked={!!member.is_active}
+              disabled={isBusy || loading || saving}
+              onCheckedChange={(checked) => handleToggleStaffStatus(member, checked)}
+              aria-label={`Toggle active status for ${member.name || "staff"}`}
+              className="data-checked:bg-emerald-600"
+            />
+            <span
+              className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                member.is_active
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                  : "bg-slate-100 text-slate-500 border border-slate-200/60"
+              }`}
+            >
+              {isBusy ? (
+                <Loader2 size={11} className="animate-spin mr-1 text-slate-500" />
+              ) : (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                    member.is_active ? "bg-emerald-500" : "bg-slate-400"
+                  }`}
+                />
+              )}
+              {member.is_active ? "Active" : "Inactive"}
+            </span>
+          </div>
+        );
+      },
+    },
+  ], [departments, roleLabel, attendanceSettings, salaryStructures, togglingStaffId, loading, saving, handleToggleStaffStatus]);
 
   const inactiveColumns = useMemo<DataTableColumn<Staff>[]>(() => [
     { key: "name", header: "Staff member", sticky: true, search: member => [member.name, member.id], render: member => <div className="flex items-center gap-3"><span className="hr-avatar bg-slate-200 text-slate-700">{(member.name || "S").charAt(0).toUpperCase()}</span><span className="font-medium text-slate-800">{member.name || "-"} <span className="ml-2 text-xs font-normal text-slate-400">#{member.id}</span></span></div> },
     { key: "exit", header: "Exit Date", sticky: false, search: member => member.exit_date || "", render: member => member.exit_date ? <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">{formatDDMMYYYY(member.exit_date)}</span> : <span className="text-slate-400 italic">Not set</span> },
-    { key: "department", header: "Department", search: member => departments.find(item => item.id === member.department)?.name || "-", camelCase: false },
+    {
+      key: "department",
+      header: "Department(s)",
+      search: member => {
+        const memberDeptIds: number[] = Array.isArray(member.departments) && member.departments.length > 0
+          ? member.departments
+          : (member.department ? [member.department] : []);
+        const names = memberDeptIds
+          .map(id => departments.find(item => item.id === id)?.name)
+          .filter(Boolean) as string[];
+        return names.length > 0 ? names.join(", ") : (departments.find(item => item.id === member.department)?.name || "-");
+      },
+      render: member => {
+        const memberDeptIds: number[] = Array.isArray(member.departments) && member.departments.length > 0
+          ? member.departments
+          : (member.department ? [member.department] : []);
+        let names = memberDeptIds
+          .map(id => departments.find(item => item.id === id)?.name)
+          .filter(Boolean) as string[];
+        if (names.length === 0 && Array.isArray(member.department_names) && member.department_names.length > 0) {
+          names = member.department_names;
+        }
+        if (names.length === 0 && member.department_name) {
+          names = member.department_name.split(",").map(s => s.trim()).filter(Boolean);
+        }
+        if (names.length === 0) {
+          const single = departments.find(item => item.id === member.department)?.name;
+          return <span className="text-slate-400 italic">{single || "-"}</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1.5 max-w-xs">
+            {names.map(name => (
+              <span key={name} className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
+                {name}
+              </span>
+            ))}
+          </div>
+        );
+      },
+      camelCase: false
+    },
     { key: "category", header: "Role", search: member => roleLabel(member.category), camelCase: false },
     { key: "joining", header: "Joined", search: member => member.joining_date || member.created_at || "", render: member => formatDDMMYYYY(member.joining_date || member.created_at) },
     { key: "email", header: "Email", search: member => member.email, camelCase: false },
@@ -123,20 +283,64 @@ export default function ClerkStaffDashboard() {
     { key: "dob", header: "Date of birth", search: member => member.date_of_birth, render: member => formatDDMMYYYY(member.date_of_birth) },
     { key: "salary", header: "Salary (INR)", search: member => member.salary, numeric: true, render: member => member.salary == null ? "-" : Number(member.salary).toLocaleString("en-IN", { minimumFractionDigits: 2 }) },
     { key: "address", header: "Address", search: member => member.address, camelCase: false },
-    { key: "status", header: "Status", search: () => "Inactive", render: () => <StatusBadge active={false} /> },
-  ], [departments, roleLabel]);
+    {
+      key: "status",
+      header: "Status",
+      search: (member) => (member.is_active ? "Active" : "Inactive"),
+      render: (member) => {
+        const isBusy = togglingStaffId === member.id;
+        return (
+          <div
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Switch
+              checked={!!member.is_active}
+              disabled={isBusy || loading || saving}
+              onCheckedChange={(checked) => handleToggleStaffStatus(member, checked)}
+              aria-label={`Toggle active status for ${member.name || "staff"}`}
+              className="data-checked:bg-emerald-600"
+            />
+            <span
+              className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                member.is_active
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                  : "bg-slate-100 text-slate-500 border border-slate-200/60"
+              }`}
+            >
+              {isBusy ? (
+                <Loader2 size={11} className="animate-spin mr-1 text-slate-500" />
+              ) : (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                    member.is_active ? "bg-emerald-500" : "bg-slate-400"
+                  }`}
+                />
+              )}
+              {member.is_active ? "Active" : "Inactive"}
+            </span>
+          </div>
+        );
+      },
+    },
+  ], [departments, roleLabel, togglingStaffId, loading, saving, handleToggleStaffStatus]);
 
   const closeForm = () => { if (busy.current) return; setFormOpen(false); setEditing(null); setReadOnly(false); setErrors({}); };
 
   const openForm = (member?: Staff, isReadOnly = false) => {
     setError(""); setSuccess(""); setErrors({}); setEditing(member || null); setReadOnly(isReadOnly);
     const feature = member && features.find(item => String(item.feature_id || item.id) === String(member.category) || String(item.feature_name || "").toUpperCase().trim() === String(member.category).toUpperCase().trim());
+    const memberDepts: number[] = Array.isArray(member?.departments) && member.departments.length > 0
+      ? (member.departments as number[])
+      : (member?.department ? [Number(member.department)] : []);
+
     setForm(member ? {
       name: member.name || "",
       email: member.email || "",
       mobile: member.mobile || "",
       category: feature ? String(feature.feature_id || feature.id) : String(member.category),
-      department: member.department ?? undefined,
+      department: member.department ?? memberDepts[0] ?? undefined,
+      departments: memberDepts,
       attendance_setting: member.attendance_setting ?? undefined,
       leave_template: member.leave_template ?? undefined,
       salary_structure: member.salary_structure ?? undefined,
@@ -149,6 +353,38 @@ export default function ClerkStaffDashboard() {
     } : { ...EMPTY_FORM });
     setFormOpen(true);
   };
+
+  const applyExistingStaff = useCallback((matched: Staff) => {
+    const memberDepts: number[] = Array.isArray(matched.departments) && matched.departments.length > 0
+      ? (matched.departments as number[])
+      : (matched.department ? [Number(matched.department)] : []);
+
+    const feature = features.find(
+      (item) =>
+        String(item.feature_id || item.id) === String(matched.category) ||
+        String(item.feature_name || "").toUpperCase().trim() === String(matched.category).toUpperCase().trim()
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      name: matched.name || prev.name,
+      email: matched.email || prev.email,
+      mobile: matched.mobile || prev.mobile,
+      address: matched.address || prev.address,
+      date_of_birth: toHTMLDate(matched.date_of_birth) || prev.date_of_birth,
+      joining_date: toHTMLDate(matched.joining_date) || prev.joining_date,
+      exit_date: toHTMLDate(matched.exit_date) || prev.exit_date,
+      salary: matched.salary != null ? String(matched.salary) : prev.salary,
+      category: feature ? String(feature.feature_id || feature.id) : (matched.category ? String(matched.category) : prev.category),
+      departments: memberDepts.length > 0 ? memberDepts : prev.departments,
+      department: memberDepts[0] || matched.department || prev.department,
+      attendance_setting: matched.attendance_setting ?? prev.attendance_setting,
+      leave_template: matched.leave_template ?? prev.leave_template,
+      salary_structure: matched.salary_structure ?? prev.salary_structure,
+      is_active: typeof matched.is_active === "boolean" ? matched.is_active : prev.is_active,
+    }));
+    toast.info(`Auto-filled details for "${matched.name}". Select new department(s) to assign.`);
+  }, [features]);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -178,6 +414,10 @@ export default function ClerkStaffDashboard() {
         }
       }
 
+      const selectedDepts = (form.departments && form.departments.length > 0)
+        ? form.departments
+        : (form.department ? [Number(form.department)] : []);
+
       const payload = {
         ...form,
         name: form.name.trim(),
@@ -188,17 +428,37 @@ export default function ClerkStaffDashboard() {
         date_of_birth: toApiDate(form.date_of_birth),
         joining_date: formattedJoiningDate,
         exit_date: formattedExitDate,
-        department: form.department ? Number(form.department) : null,
+        department: selectedDepts[0] ? Number(selectedDepts[0]) : null,
+        departments: selectedDepts.map(Number),
         attendance_setting: form.attendance_setting ? Number(form.attendance_setting) : null,
         leave_template: form.leave_template ? Number(form.leave_template) : null,
         salary_structure: form.salary_structure ? Number(form.salary_structure) : null,
         is_active: isActive,
       };
-      if (editing) await updateStaff(editing.id, payload); else await createStaff(payload);
-      setSuccess(editing ? "Staff record updated successfully." : "Staff member created successfully.");
+      const existingStaff = staff.find(
+        (s) =>
+          (!editing) && (
+            (form.email && s.email?.trim().toLowerCase() === form.email.trim().toLowerCase()) ||
+            (form.mobile && normalizePhone(s.mobile || "") === normalizePhone(form.mobile))
+          )
+      );
+
+      const targetId = editing ? editing.id : (existingStaff ? existingStaff.id : null);
+      if (targetId) {
+        await updateStaff(targetId, payload);
+      } else {
+        await createStaff(payload);
+      }
+      const successMsg = targetId ? "Staff record updated successfully." : "Staff member created successfully.";
+      setSuccess(successMsg);
+      toast.success(successMsg);
       setFormOpen(false); setEditing(null); setReadOnly(false); setForm({ ...EMPTY_FORM });
       await load();
-    } catch (err) { setError(message(err, "Could not save the staff record.")); }
+    } catch (err: any) {
+      const errMsg = err?.message || message(err, "Could not save the staff record.");
+      setError(errMsg);
+      toast.error(errMsg);
+    }
     finally { busy.current = false; setSaving(false); }
   };
 
@@ -312,6 +572,7 @@ export default function ClerkStaffDashboard() {
           errors={errors}
           departments={departments}
           roles={roles}
+          staff={staff}
           attendanceSettings={attendanceSettings}
           leaveTemplates={leaveTemplates}
           salaryStructures={salaryStructures}
@@ -319,6 +580,7 @@ export default function ClerkStaffDashboard() {
           saving={saving}
           readOnly={readOnly}
           onEdit={() => setReadOnly(false)}
+          onApplyExisting={applyExistingStaff}
           onClose={closeForm}
           onSubmit={save}
           onDepartmentCreated={handleDepartmentCreated}

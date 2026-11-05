@@ -18,6 +18,9 @@ import {
   User,
   X,
   ChevronRight,
+  Award,
+  CreditCard,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAnnouncementSocket } from "@/hooks/useAnnouncementSocket";
@@ -59,6 +62,9 @@ export function NotificationsHub({
 
   const getNotificationCategory = (item: AnnouncementResponse): string => {
     const text = `${item.title} ${item.description}`.toLowerCase();
+    if (text.includes("fee") || text.includes("payment") || text.includes("invoice") || text.includes("dues") || text.includes("receipt")) return "FEES";
+    if (text.includes("result") || text.includes("marksheet") || text.includes("report card") || text.includes("grade") || text.includes("evaluation")) return "ACADEMICS";
+    if (text.includes("certificate") || text.includes("bonafide") || text.includes("leaving")) return "CERTIFICATES";
     if (text.includes("leave") || text.includes("absent") || text.includes("attendance")) return "LEAVES";
     if (text.includes("payslip") || text.includes("salary") || text.includes("payroll")) return "SALARY";
     if (text.includes("event") || text.includes("holiday") || text.includes("exam")) return "EVENTS";
@@ -68,6 +74,12 @@ export function NotificationsHub({
 
   const getCategoryMeta = (category: string) => {
     switch (category) {
+      case "FEES":
+        return { label: "Fees & Payment", icon: CreditCard, color: "text-amber-800 bg-amber-50 border-amber-200" };
+      case "ACADEMICS":
+        return { label: "Academic Result", icon: Award, color: "text-blue-800 bg-blue-50 border-blue-200" };
+      case "CERTIFICATES":
+        return { label: "Certificate", icon: FileText, color: "text-indigo-800 bg-indigo-50 border-indigo-200" };
       case "LEAVES":
         return { label: "Leave & Attendance", icon: CalendarCheck, color: "text-emerald-700 bg-emerald-50 border-emerald-200" };
       case "SALARY":
@@ -112,9 +124,9 @@ export function NotificationsHub({
           </div>
         </div>
 
-        {/* Action Buttons: Mark All Read, Refresh, Clear */}
+        {/* Action Buttons: Mark All Read, Refresh */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-start sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end">
-          {unreadCount > 0 && (
+          {unreadCount > 0 ? (
             <button
               type="button"
               onClick={() => markAllAsRead()}
@@ -124,6 +136,11 @@ export function NotificationsHub({
               <CheckCheck className="w-3.5 h-3.5" />
               <span>Mark all read</span>
             </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-[11px] sm:text-xs font-semibold border border-slate-200">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span>All caught up</span>
+            </span>
           )}
 
           <button
@@ -136,18 +153,6 @@ export function NotificationsHub({
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#2563EB]" : "text-slate-600"}`} />
           </button>
-
-          {notifications.length > 0 && (
-            <button
-              type="button"
-              onClick={() => clearNotifications()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 text-[11px] sm:text-xs font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
-              title="Clear all notifications"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -155,7 +160,7 @@ export function NotificationsHub({
       <div className="space-y-2">
         {notifications.length > 0 ? (
           notifications.map((item) => {
-            const isRead = readIds.some((rId) => String(rId) === String(item.id));
+            const isRead = readIds.some((rId) => String(rId) === String(item.id)) || Boolean((item as any).is_read);
             const priority = (item.priority || "NORMAL").toUpperCase();
             const category = getNotificationCategory(item);
             const catMeta = getCategoryMeta(category);

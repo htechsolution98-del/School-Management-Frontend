@@ -7,6 +7,7 @@ import {
   Megaphone,
   CalendarDays,
   Settings,
+  User,
   CalendarCheck,
   ClipboardList,
   Banknote,
@@ -44,7 +45,14 @@ const sidebarLinks = [
   { title: "My Payslips", href: "/librarian/payslips", icon: Banknote },
   { title: "Announcements", href: "/librarian/announcements", icon: Megaphone },
   { title: "Events & Holidays", href: "/librarian/events", icon: CalendarDays },
-  { title: "Account Settings", href: "/librarian/settings", icon: Settings },
+  {
+    title: "Account Settings",
+    href: "/librarian/settings",
+    icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/librarian/profile", icon: User },
+    ],
+  },
 ];
 
 export default function LibrarianLayout({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,15 @@
 "use client";
 
+function capitalizeWords(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/_/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Script from "next/script";
@@ -13,6 +23,9 @@ import {
   GraduationCap,
   CreditCard,
   CheckCircle2,
+  FileText,
+  FileCheck2,
+  Image,
   Upload,
   Sparkles,
   Shield,
@@ -60,7 +73,19 @@ import {
 // Static Data
 // ─────────────────────────────────────────────
 
-const PARENT_NAME = "Future Student";
+const getApplicantDisplayName = () => {
+  if (typeof window === "undefined") return "Applicant";
+  const stored =
+    localStorage.getItem("user_name") ||
+    localStorage.getItem("full_name") ||
+    localStorage.getItem("username") ||
+    localStorage.getItem("user_phone") ||
+    "Applicant";
+  return stored
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+};
 
 const STEPS = [
   {
@@ -75,14 +100,14 @@ const STEPS = [
     label: "Documents",
     icon: Upload,
     title: "Upload Documents",
-    desc: "Upload PDF (3 MB max) or images (1 MB max).",
+    desc: "Upload PDF (5 MB max) or images (3 MB max).",
   },
   {
     id: 3,
     label: "Review & Pay",
     icon: CreditCard,
     title: "Review & Submit",
-    desc: "Everything looks good! Finalize your payment below.",
+    desc: "Verify your application details and finalize submission.",
   },
 ];
 
@@ -218,7 +243,7 @@ export default function AdmissionPortal() {
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
               >
-                <Loader2 className="h-10 w-10 text-indigo-400" />
+                <Loader2 className="h-10 w-10 text-blue-400" />
               </motion.div>
               <p className="text-slate-400 font-bold text-sm">
                 Loading applications…
@@ -251,11 +276,11 @@ export default function AdmissionPortal() {
 // ─────────────────────────────────────────────
 const AVATAR_COLORS = [
   {
-    bg: "bg-indigo-600",
-    light: "bg-indigo-100",
-    text: "text-indigo-600",
-    bar: "bg-indigo-600",
-    glow: "rgba(99,102,241,0.18)",
+    bg: "bg-blue-600",
+    light: "bg-blue-100",
+    text: "text-blue-600",
+    bar: "bg-blue-600",
+    glow: "rgba(37,99,235,0.18)",
   },
 ];
 
@@ -263,7 +288,7 @@ const STATUS_STYLES: Record<string, string> = {
   Incomplete: "bg-amber-50 text-amber-600 border border-amber-200",
   "Action Required": "bg-rose-50 text-rose-600 border border-rose-200",
   "Under Review": "bg-emerald-50 text-emerald-600 border border-emerald-200",
-  Submitted: "bg-indigo-50 text-indigo-600 border border-indigo-200",
+  Submitted: "bg-blue-50 text-blue-600 border border-blue-200",
   pending: "bg-amber-50 text-amber-600 border border-amber-200",
   completed: "bg-emerald-50 text-emerald-600 border border-emerald-200",
 };
@@ -467,7 +492,7 @@ function ChildrenList({
                 </div>
 
                 {/* Modal header */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] px-5 sm:px-7 py-5 sm:py-6 text-white shrink-0">
+                <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-blue-700 to-blue-900 px-5 sm:px-7 py-5 sm:py-6 text-white shrink-0">
                   <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10" />
                   <div className="absolute right-10 -bottom-8 w-20 h-20 rounded-full bg-white/10" />
                   <div className="relative flex items-center gap-3 sm:gap-4">
@@ -478,7 +503,7 @@ function ChildrenList({
                       <p className="font-black text-base sm:text-lg leading-tight">
                         Payment Confirmed!
                       </p>
-                      <p className="text-purple-200 text-xs font-medium mt-0.5">
+                      <p className="text-blue-100 text-xs font-medium mt-0.5">
                         Admission fee received successfully
                       </p>
                     </div>
@@ -489,7 +514,7 @@ function ChildrenList({
                 <div className="px-5 sm:px-7 py-5 sm:py-6 space-y-4 overflow-y-auto flex-1">
                   {receiptLoading ? (
                     <div className="flex items-center justify-center py-10">
-                      <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
                     </div>
                   ) : receiptData ? (
                     <>
@@ -510,7 +535,7 @@ function ChildrenList({
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                             Admission No.
                           </span>
-                          <span className="text-sm font-black text-indigo-600 font-mono text-right ml-2 break-all">
+                          <span className="text-sm font-black text-blue-600 font-mono text-right ml-2 break-all">
                             {receiptData.admission_number}
                           </span>
                         </div>
@@ -538,7 +563,7 @@ function ChildrenList({
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">
                             Payment Mode
                           </span>
-                          <span className="text-xs font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                          <span className="text-xs font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                             {receiptData.payment_detail?.payment_mode}
                           </span>
                         </div>
@@ -592,7 +617,7 @@ function ChildrenList({
                                 href={doc.file}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-indigo-600 font-bold hover:underline shrink-0"
+                                className="text-xs text-blue-600 font-bold hover:underline shrink-0"
                               >
                                 View
                               </a>
@@ -602,9 +627,9 @@ function ChildrenList({
                       )}
 
                       {/* Info note */}
-                      <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3">
-                        <Shield size={15} className="text-indigo-500 shrink-0 mt-0.5" />
-                        <p className="text-xs text-indigo-600 font-medium leading-relaxed">
+                      <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                        <Shield size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-blue-600 font-medium leading-relaxed">
                           Your official receipt has been generated. Download it
                           for your records or collect it from the school office.
                         </p>
@@ -681,7 +706,7 @@ function ChildrenList({
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-wrap items-center gap-2 mb-3"
             >
-              <span className="inline-flex items-center gap-2 text-xs font-black capitalize tracking-wider text-white bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 rounded-full shadow-md shadow-indigo-100">
+              <span className="inline-flex items-center gap-2 text-xs font-black capitalize tracking-wider text-white bg-gradient-to-r from-blue-600 to-blue-600 px-3.5 py-1.5 rounded-full shadow-md shadow-blue-100">
                 <GraduationCap size={15} />
                 <span>
                   {formData?.[0]?.school_name ||
@@ -710,12 +735,12 @@ function ChildrenList({
             >
               Welcome back,{" "}
               <motion.span
-                className="text-indigo-600 inline-block"
+                className="text-blue-600 inline-block"
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3, duration: 0.4 }}
               >
-                {PARENT_NAME}!
+                {getApplicantDisplayName()}!
               </motion.span>
             </motion.h1>
 
@@ -756,7 +781,7 @@ function ChildrenList({
                     progress: 0,
                   })
                 }
-                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-11 px-5 font-bold shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 transition-all"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-11 px-5 font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all"
               >
                 New Application <ArrowRight size={15} />
               </Button>
@@ -845,7 +870,7 @@ function ChildrenList({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-700 transition-colors truncate">
+                      <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors truncate">
                         {child.name}
                       </h3>
                       <motion.span
@@ -907,7 +932,7 @@ function ChildrenList({
                       Download Receipt
                     </Button>
                   ) : (
-                    <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 h-10 font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-100 transition-all group-hover:shadow-indigo-200 group-hover:shadow-lg">
+                    <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 h-10 font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-100 transition-all group-hover:shadow-blue-200 group-hover:shadow-lg">
                       Open Application
                       <motion.span
                         animate={{ x: [0, 3, 0] }}
@@ -1297,15 +1322,22 @@ function MultiStepForm({
           file: file as File,
         }));
 
+      const targetAdmissionNumber =
+        applicationId ||
+        child?.admission_number ||
+        child?.id ||
+        (typeof window !== "undefined" ? localStorage.getItem("last_admission_number") || "" : "");
+
       if (documents.length > 0) {
         const response = await submitDocuments({
-          admission_number: applicationId,
+          admission_number: String(targetAdmissionNumber),
           documents,
         });
         const fee = response?.["fee amount"] ?? response?.fee_amount ?? null;
         if (fee !== null && fee !== undefined && Number(fee) > 0) {
           setFeeAmount(Number(fee));
         }
+        toast.success("Documents uploaded successfully!");
       }
       setStep(3);
     } catch (error) {
@@ -1502,8 +1534,12 @@ function MultiStepForm({
 
       if (response?.admission_number) {
         setApplicationId(response.admission_number);
+        child.admission_number = response.admission_number;
         child.savedFormValues = formValues;
         child.currentStep = 2;
+        if (typeof window !== "undefined") {
+          localStorage.setItem("last_admission_number", response.admission_number);
+        }
       }
       setStep(2);
     } catch (error) {
@@ -1523,9 +1559,9 @@ function MultiStepForm({
           <motion.button
             onClick={onBack}
             whileHover={{ x: -3 }}
-            className="flex items-center gap-3 text-slate-500 hover:text-indigo-600 font-bold transition-colors group"
+            className="flex items-center gap-3 text-slate-500 hover:text-blue-600 font-bold transition-colors group"
           >
-            <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
               <ArrowLeft size={17} className="transition-transform group-hover:-translate-x-0.5" />
             </div>
             <span className="text-sm">Back to Dashboard</span>
@@ -1565,9 +1601,9 @@ function MultiStepForm({
         <motion.button
           onClick={onBack}
           whileHover={{ x: -3 }}
-          className="flex items-center gap-2 sm:gap-3 text-slate-500 hover:text-indigo-600 font-bold transition-colors group"
+          className="flex items-center gap-2 sm:gap-3 text-slate-500 hover:text-blue-600 font-bold transition-colors group"
         >
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
           </div>
           <span className="hidden sm:block text-sm">Back to Dashboard</span>
@@ -1578,7 +1614,7 @@ function MultiStepForm({
           {STEPS.map((s) => (
             <div
               key={s.id}
-              className={`h-2 rounded-full transition-all duration-300 ${step === s.id ? "w-8 bg-indigo-600" : step > s.id ? "w-2 bg-emerald-500" : "w-2 bg-slate-200"}`}
+              className={`h-2 rounded-full transition-all duration-300 ${step === s.id ? "w-8 bg-blue-600" : step > s.id ? "w-2 bg-emerald-500" : "w-2 bg-slate-200"}`}
             />
           ))}
         </div>
@@ -1589,11 +1625,11 @@ function MultiStepForm({
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">
                 Application ID
               </p>
-              <p className="text-sm font-bold text-indigo-600 font-mono">
+              <p className="text-sm font-bold text-blue-600 font-mono">
                 {applicationId}
               </p>
             </div>
-            <div className="size-8 sm:size-10 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-full flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-md shadow-indigo-200">
+            <div className="size-8 sm:size-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-md shadow-blue-200">
               {child.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
             </div>
           </div>
@@ -1627,10 +1663,10 @@ function MultiStepForm({
                   key={s.id}
                   animate={{ opacity: isCurrent ? 1 : isCompleted ? 0.9 : 0.45 }}
                   transition={{ duration: 0.3 }}
-                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${isCurrent ? "bg-white shadow-md shadow-slate-100 border border-indigo-100" : isCompleted ? "bg-emerald-50/60" : ""}`}
+                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${isCurrent ? "bg-white shadow-md shadow-slate-100 border border-blue-100" : isCompleted ? "bg-emerald-50/60" : ""}`}
                 >
                   <div
-                    className={`size-11 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${isCompleted ? "bg-emerald-500 text-white" : isCurrent ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "bg-slate-200 text-slate-400"}`}
+                    className={`size-11 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${isCompleted ? "bg-emerald-500 text-white" : isCurrent ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "bg-slate-200 text-slate-400"}`}
                   >
                     {isCompleted ? <CheckCircle2 size={20} /> : <s.icon size={20} />}
                   </div>
@@ -1638,12 +1674,12 @@ function MultiStepForm({
                     <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                       Step 0{s.id}
                     </p>
-                    <p className={`text-sm font-bold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
+                    <p className={`text-sm font-bold ${isCurrent ? "text-blue-700" : "text-slate-700"}`}>
                       {s.label}
                     </p>
                   </div>
                   {isCurrent && (
-                    <motion.div layoutId="active-dot" className="size-2 rounded-full bg-indigo-600" />
+                    <motion.div layoutId="active-dot" className="size-2 rounded-full bg-blue-600" />
                   )}
                 </motion.div>
               );
@@ -1652,7 +1688,7 @@ function MultiStepForm({
 
           <div className="p-5 bg-white rounded-3xl border border-slate-100 mt-6 shadow-sm">
             <p className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-1.5">
-              <Shield size={13} className="text-indigo-500" />
+              <Shield size={13} className="text-blue-500" />
               Auto-saved & Secure
             </p>
             <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
@@ -1673,7 +1709,7 @@ function MultiStepForm({
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.22 }}
               >
-                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full mb-1.5">
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full mb-1.5">
                   Step 0{step} of 03
                 </span>
                 <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
@@ -1736,7 +1772,7 @@ function MultiStepForm({
                 onClick={() => (step === 1 ? onBack() : setStep(step - 1))}
                 className={`font-bold rounded-2xl h-10 sm:h-13 px-4 sm:px-7 text-sm transition-all ${step === 1
                   ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                  : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                  : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   }`}
               >
                 {step === 1 ? "Cancel" : <><span className="hidden sm:inline">← Previous Step</span><span className="sm:hidden">← Back</span></>}
@@ -1757,7 +1793,7 @@ function MultiStepForm({
                       else if (step === 2) handleStepTwoSubmit();
                       else setStep(step + 1);
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-10 sm:h-13 px-5 sm:px-10 font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 sm:gap-2.5 text-sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-10 sm:h-13 px-5 sm:px-10 font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 sm:gap-2.5 text-sm"
                   >
                     {step === 1 && submitting ? (
                       <>
@@ -1808,7 +1844,7 @@ function MultiStepForm({
         <DialogContent className="max-w-md rounded-3xl p-6 sm:p-8 bg-white border border-slate-100 shadow-2xl">
           <DialogHeader className="space-y-3 text-center sm:text-left">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 shadow-inner">
                 <KeyRound size={22} />
               </div>
               <div>
@@ -1825,7 +1861,7 @@ function MultiStepForm({
           <div className="space-y-5 my-2">
             <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
               <div className="flex items-center gap-2">
-                <PhoneCall size={14} className="text-indigo-600" />
+                <PhoneCall size={14} className="text-blue-600" />
                 <span className="text-xs font-semibold text-slate-600">Registered Number:</span>
               </div>
               <Badge variant="outline" className="font-mono text-xs font-bold bg-white text-slate-800 px-2.5 py-0.5 border-slate-200">
@@ -1853,7 +1889,7 @@ function MultiStepForm({
                   }
                 }}
                 placeholder="• • • • • •"
-                className="text-center text-2xl font-mono tracking-[0.5em] font-black h-14 rounded-2xl border-slate-200 focus-visible:ring-indigo-500 text-slate-900"
+                className="text-center text-2xl font-mono tracking-[0.5em] font-black h-14 rounded-2xl border-slate-200 focus-visible:ring-blue-500 text-slate-900"
                 autoFocus
               />
               {otpError && (
@@ -1876,7 +1912,7 @@ function MultiStepForm({
                     setOtpValue(devOtp);
                     if (otpError) setOtpError("");
                   }}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2"
                 >
                   Auto-fill
                 </button>
@@ -1888,7 +1924,7 @@ function MultiStepForm({
               <button
                 type="button"
                 onClick={handleResendOtp}
-                className="font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                className="font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
                 <RefreshCw size={12} />
                 <span>Resend OTP</span>
@@ -1910,7 +1946,7 @@ function MultiStepForm({
               type="button"
               onClick={handleVerifyOtpSubmit}
               disabled={verifyingOtp || otpValue.replace(/\D/g, "").length !== 6}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
             >
               {verifyingOtp ? (
                 <>
@@ -1966,7 +2002,7 @@ function MultiStepForm({
                       className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60 last:border-none"
                     >
                       <div className="font-semibold text-slate-800 flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-indigo-600" />
+                        <GraduationCap className="h-4 w-4 text-blue-600" />
                         <span>{sib.name}</span>
                       </div>
                       <div className="flex items-center gap-2 text-slate-500">
@@ -1987,8 +2023,8 @@ function MultiStepForm({
 
             {/* Parent Details Preview Card */}
             {siblingData?.parent && (
-              <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-xs space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900">
+              <div className="p-3.5 rounded-2xl bg-blue-50/50 border border-blue-100 text-xs space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
                   Parent & Address Details to Auto-fill
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-slate-700">
@@ -2050,7 +2086,7 @@ function MultiStepForm({
             <Button
               type="button"
               onClick={handleConfirmSibling}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold px-6 h-11 shadow-sm flex items-center justify-center gap-2"
             >
               <Sparkles size={14} />
               <span>Yes, auto-fill sibling</span>
@@ -2125,7 +2161,7 @@ function StudentDetailsStep({
   if (!formData) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
         <p className="text-slate-500 font-medium">Loading form fields…</p>
       </div>
     );
@@ -2151,14 +2187,14 @@ function StudentDetailsStep({
             className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
           >
             {/* Section header */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-500">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-blue-500">
               <div className="flex items-center gap-2.5">
                 <div className="w-1 h-4 rounded-full bg-white/60" />
                 <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-white">
                   {section.title}
                 </h3>
               </div>
-              <span className="text-[10px] font-bold text-indigo-100 bg-white/15 px-2.5 py-1 rounded-full">
+              <span className="text-[10px] font-bold text-blue-100 bg-white/15 px-2.5 py-1 rounded-full">
                 {fields.length} fields
               </span>
             </div>
@@ -2229,7 +2265,7 @@ function SectionCompletionBar({
         <motion.div
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className={`h-full rounded-full transition-colors duration-500 ${allDone ? "bg-emerald-400" : "bg-indigo-400"}`}
+          className={`h-full rounded-full transition-colors duration-500 ${allDone ? "bg-emerald-400" : "bg-blue-400"}`}
         />
       </div>
       <span
@@ -2307,33 +2343,36 @@ function DocumentsStep({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
-      className="space-y-3 sm:space-y-4"
+      className="space-y-4"
     >
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 sm:p-5 flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
-          <Upload size={16} className="text-indigo-600" />
+      {/* Upload Guidelines Banner */}
+      <div className="bg-gradient-to-r from-blue-50 to-blue-50/40 border border-blue-200/80 rounded-3xl p-5 sm:p-6 flex items-start gap-4 shadow-sm">
+        <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+          <FileCheck2 size={20} />
         </div>
-        <div>
-          <p className="text-sm font-bold text-indigo-800 mb-1">Upload Guidelines</p>
-          <p className="text-xs text-indigo-600/80 font-medium leading-relaxed">
-            Accepted formats: PDF (up to 3 MB), JPG, PNG or WebP (up to 1 MB). Ensure documents are clear and legible.
+        <div className="flex-1">
+          <h4 className="text-sm font-bold text-blue-900 mb-1">
+            Official Document Submission Guidelines
+          </h4>
+          <p className="text-xs text-blue-700/80 font-medium leading-relaxed">
+            Accepted file formats: PDF (up to 5 MB), JPG, PNG or WebP (up to 3 MB). Ensure all documents are sharp, well-lit, and clearly readable.
           </p>
         </div>
       </div>
 
       {docs.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-          <Upload size={28} className="opacity-40" />
-          <p className="font-semibold text-sm">No documents required.</p>
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 bg-white rounded-3xl border border-slate-100">
+          <Upload size={32} className="opacity-40 text-blue-500" />
+          <p className="font-bold text-sm text-slate-600">No Documents Required For This Form.</p>
         </div>
       )}
 
       {docs.map((doc, i) => (
         <motion.div
           key={doc.id}
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.07 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.06 }}
         >
           <DocRow
             doc={doc}
@@ -2350,7 +2389,7 @@ function DocumentsStep({
 }
 
 function isFileField(label: string) {
-  const l = label.toLowerCase();
+  const l = (label || "").toLowerCase();
   return l.includes("file") || l.includes("photo") || l.includes("image");
 }
 
@@ -2369,62 +2408,83 @@ function DocRow({
   onText: (v: string) => void;
   onClearError?: () => void;
 }) {
-  const [focused, setFocused] = useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const isFilled = !!value;
-  const fileName = value instanceof File ? value.name : null;
+  const fileName = value instanceof File ? value.name : typeof value === "string" && value ? value.split("/").pop() : null;
+  const fileSize = value instanceof File ? `${(value.size / 1024).toFixed(1)} KB` : null;
+  const isPhoto = (doc?.label || "").toLowerCase().includes("photo") || (doc?.label || "").toLowerCase().includes("image");
+  const capitalizedTitle = capitalizeWords(doc?.label || "Document");
 
   return (
     <div
-      className={`flex items-center justify-between p-4 sm:p-6 border-2 rounded-3xl group transition-all duration-200 gap-3 ${error
-        ? "bg-rose-50 border-rose-400"
-        : isFilled
-          ? "bg-emerald-50 border-emerald-200"
-          : focused
-            ? "border-indigo-300 bg-white"
-            : "bg-white border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30"
-        }`}
+      className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 sm:p-6 border rounded-3xl transition-all duration-200 gap-4 ${
+        error
+          ? "bg-rose-50/70 border-rose-300 ring-2 ring-rose-100"
+          : isFilled
+            ? "bg-white border-blue-200 shadow-sm hover:border-blue-300"
+            : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm"
+      }`}
     >
-      <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
         <div
-          className={`size-12 sm:size-14 rounded-2xl flex items-center justify-center transition-colors shadow-sm shrink-0 ${isFilled
-            ? "bg-emerald-500 text-white"
-            : "bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600"
-            }`}
+          className={`size-12 sm:size-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+            isFilled
+              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+              : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
+          }`}
         >
-          {isFilled ? <CheckCircle2 size={22} /> : <Upload size={20} />}
+          {isFilled ? (
+            <CheckCircle2 size={24} className="text-white" />
+          ) : isPhoto ? (
+            <Image size={22} />
+          ) : (
+            <FileText size={22} />
+          )}
         </div>
+
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
-            <span className="block font-bold text-slate-800 text-sm sm:text-base truncate">
-              {doc.label}
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight truncate">
+              {capitalizedTitle}
             </span>
-            {doc.is_required && (
-              <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 shrink-0">
+            {doc.is_required ? (
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
                 Required
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                Optional
               </span>
             )}
             {isFilled && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 shrink-0"
-              >
-                ✓ Done
-              </motion.span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                <CheckCircle2 size={12} className="text-emerald-600" /> Attached
+              </span>
             )}
           </div>
-          <span className="text-xs font-medium text-slate-400 truncate block">
-            {fileName
-              ? `📎 ${fileName}`
-              : doc.is_required
-                ? "Required document"
-                : "Optional document"}
-          </span>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
+            {fileName ? (
+              <>
+                <span className="font-semibold text-slate-700 truncate max-w-[200px] sm:max-w-xs">
+                  {fileName}
+                </span>
+                {fileSize && (
+                  <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                    {fileSize}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-slate-400 font-medium">
+                {doc.is_required ? "Required official document" : "Optional document upload"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <>
+      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
         <input
           ref={fileRef}
           type="file"
@@ -2434,23 +2494,37 @@ function DocRow({
             const f = e.target.files?.[0];
             if (f) {
               const error = validateAdmissionFile(f);
-              if (error) { toast.error(error); e.target.value = ""; return; }
+              if (error) {
+                toast.error(error);
+                e.target.value = "";
+                return;
+              }
               onFile(f);
               onClearError?.();
             }
           }}
         />
+
         <Button
-          variant={isFilled ? "ghost" : "outline"}
-          className={`rounded-xl font-bold h-10 sm:h-11 px-3 sm:px-6 text-xs sm:text-sm transition-all min-w-[90px] sm:min-w-[110px] shrink-0 ${isFilled
-            ? "text-emerald-600 hover:bg-emerald-100"
-            : "border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600"
-            }`}
+          variant={isFilled ? "outline" : "default"}
           onClick={() => fileRef.current?.click()}
+          className={`rounded-2xl font-bold h-11 px-5 text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            isFilled
+              ? "border-slate-300 text-slate-700 hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50"
+              : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+          }`}
         >
-          {isFilled ? "✓ Uploaded" : "Choose File"}
+          {isFilled ? (
+            <>
+              <Upload size={14} /> Replace File
+            </>
+          ) : (
+            <>
+              <Upload size={14} /> Choose File
+            </>
+          )}
         </Button>
-      </>
+      </div>
     </div>
   );
 }
@@ -2487,7 +2561,7 @@ function ReviewStep({
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-5 sm:p-6 text-white shadow-xl shadow-purple-200"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-blue-900 p-5 sm:p-6 text-white shadow-xl shadow-blue-500/20"
       >
         <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10" />
         <div className="absolute -right-4 -bottom-10 w-28 h-28 rounded-full bg-white/10" />
@@ -2509,7 +2583,7 @@ function ReviewStep({
               transition={{ delay: 0.25 }}
               className="font-black text-lg sm:text-xl mb-0.5 tracking-tight"
             >
-              Application Complete! 🎉
+              Application Complete!
             </motion.p>
             <motion.p
               initial={{ opacity: 0 }}
@@ -2538,7 +2612,7 @@ function ReviewStep({
               type="button"
               onClick={() => setPaymentMode("online")}
               className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border-2 font-bold transition-all text-sm ${paymentMode === "online"
-                ? "bg-indigo-600 text-white border-indigo-600"
+                ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white text-slate-600 border-slate-200"
                 }`}
             >
@@ -2559,8 +2633,8 @@ function ReviewStep({
           {/* Card header */}
           <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-slate-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
-                <CreditCard size={17} className="text-indigo-600" />
+              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                <CreditCard size={17} className="text-blue-600" />
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Breakdown</p>
@@ -2583,8 +2657,8 @@ function ReviewStep({
                 className="flex items-center justify-between py-3 sm:py-3.5 border-b border-slate-50 last:border-0 group"
               >
                 <div className="flex items-center gap-3 sm:gap-3.5">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-indigo-400" />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-blue-400" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-700">
@@ -2607,10 +2681,10 @@ function ReviewStep({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.45 }}
-            className="mx-4 sm:mx-5 mb-4 sm:mb-5 rounded-2xl bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between"
+            className="mx-4 sm:mx-5 mb-4 sm:mb-5 rounded-2xl bg-gradient-to-r from-blue-50 to-violet-50 border border-blue-100 px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between"
           >
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-0.5">Amount Payable</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-0.5">Amount Payable</p>
               <p className="text-base sm:text-lg font-black text-slate-900">Total Due</p>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Inclusive of all taxes & fees</p>
             </div>
@@ -2619,11 +2693,11 @@ function ReviewStep({
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                className="text-2xl sm:text-3xl font-black text-indigo-600 tracking-tight"
+                className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight"
               >
                 ₹{Number(total).toLocaleString("en-IN")}
               </motion.p>
-              <p className="text-[10px] font-bold text-indigo-400 mt-0.5">INR</p>
+              <p className="text-[10px] font-bold text-blue-400 mt-0.5">INR</p>
             </div>
           </motion.div>
         </motion.div>
@@ -2634,10 +2708,10 @@ function ReviewStep({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
-            className="group relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4F46E5] via-[#6366F1] to-[#8B5CF6] p-6 sm:p-7 text-white shadow-2xl shadow-indigo-200/50"
+            className="group relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4F46E5] via-[#6366F1] to-[#8B5CF6] p-6 sm:p-7 text-white shadow-2xl shadow-blue-200/50"
           >
             <div className="absolute -right-4 -top-4 h-40 w-40 rounded-full bg-white/10 blur-2xl transition-transform duration-700 group-hover:scale-110" />
-            <div className="absolute -bottom-10 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full bg-indigo-400/20 blur-3xl" />
+            <div className="absolute -bottom-10 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full bg-blue-400/20 blur-3xl" />
 
             <div className="relative z-10">
               <div className="mb-5 sm:mb-6 flex items-center gap-4">
@@ -2651,7 +2725,7 @@ function ReviewStep({
                 </div>
               </div>
 
-              <p className="mb-5 sm:mb-6 text-sm font-medium leading-relaxed text-indigo-50/90">
+              <p className="mb-5 sm:mb-6 text-sm font-medium leading-relaxed text-blue-50/90">
                 Your payment is protected by industry-standard encryption. We do not store your sensitive card information.
               </p>
 
@@ -2711,14 +2785,14 @@ function UploadRow({
     <div
       className={`flex items-center justify-between p-4 sm:p-6 border-2 rounded-3xl group transition-all duration-200 gap-3 ${uploaded
         ? "bg-emerald-50 border-emerald-200"
-        : "bg-white border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30"
+        : "bg-white border-slate-100 hover:border-blue-200 hover:bg-blue-50/30"
         }`}
     >
       <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0">
         <div
           className={`size-12 sm:size-14 rounded-2xl flex items-center justify-center transition-colors shadow-sm shrink-0 ${uploaded
             ? "bg-emerald-500 text-white"
-            : "bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600"
+            : "bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600"
             }`}
         >
           {uploaded ? <CheckCircle2 size={22} /> : <Upload size={20} />}
@@ -2741,7 +2815,7 @@ function UploadRow({
         variant={uploaded ? "ghost" : "outline"}
         className={`rounded-xl font-bold h-10 sm:h-11 px-3 sm:px-6 text-xs sm:text-sm transition-all min-w-[90px] sm:min-w-[110px] shrink-0 ${uploaded
           ? "text-emerald-600 hover:bg-emerald-100"
-          : "border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600"
+          : "border-slate-200 hover:bg-blue-600 hover:text-white hover:border-blue-600"
           }`}
         onClick={() => setUploaded(!uploaded)}
       >

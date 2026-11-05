@@ -7,6 +7,8 @@ export interface ChildProfile {
   surname: string;
   gr_no: string;
   roll_no: string;
+  father_name?: string;
+  mother_name?: string;
   school_class_id?: number;
   school_class_name: string;
   division: string;
@@ -51,11 +53,58 @@ export interface AttendanceNotificationItem {
 export interface ParentDueFee {
   id: number;
   student: number;
+  student_name?: string;
   academic_year?: number;
+  academic_year_name?: string;
+  feetype?: number;
+  feetype_name?: string;
+  amount: number | string;
+  paid_amount: number | string;
+  payable_amount?: number | string;
+  due_date?: string;
+  status: string;
+}
+
+export interface ParentStudentFee {
+  id: number;
+  student: number;
+  student_name?: string;
+  student_gr_no?: string;
+  student_class_display?: string;
+  feetype?: number;
+  feetype_name?: string;
+  fee_billing_cycle?: string;
   amount: number | string;
   paid_amount: number | string;
   due_date?: string;
   status: string;
+  created_at?: string;
+}
+
+export interface ParentPaymentHistoryItem {
+  id: number;
+  receipt_no?: string;
+  transaction_id?: string;
+  student?: number;
+  student_name?: string;
+  student_gr_no?: string;
+  student_class?: string;
+  student_division?: string;
+  feetype_name?: string;
+  amount: number | string;
+  payment_date: string;
+  payment_mode?: string;
+  school_name?: string;
+  school_logo?: string;
+  school_address?: string;
+  school_phone?: string;
+  school_email?: string;
+  academic_year_name?: string;
+  fee_billing_cycle?: string;
+  fee_amount?: number | string;
+  payment_details?: any;
+  remarks?: string;
+  is_bounced?: boolean;
 }
 
 export interface ParentExamNotification {
@@ -90,6 +139,71 @@ export async function getParentDueFees(): Promise<{ total_due: number; fees: Par
 
   if (!res.ok) {
     return { total_due: 0, fees: [] };
+  }
+
+  return res.json();
+}
+
+export async function getParentFees(): Promise<ParentStudentFee[]> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/fee-payment/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getParentPaymentHistory(): Promise<ParentPaymentHistoryItem[]> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/payment-history/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createFeePaymentOrder(feeId: number): Promise<{ order_id: string; amount_payable: number; key: string }> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/fee-payment/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fee_id: feeId }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.detail || "Failed to initiate payment order.");
+  }
+
+  return res.json();
+}
+
+export async function verifyFeePayment(payload: {
+  fee_id: number;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<any> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/verify-payment/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.detail || "Payment verification failed.");
   }
 
   return res.json();
@@ -140,3 +254,18 @@ export async function getParentAttendanceNotifications(): Promise<AttendanceNoti
   return Array.isArray(data) ? data : [];
 }
 
+export async function getParentChildResults(studentId?: number): Promise<any[]> {
+  const query = studentId ? `?student_id=${studentId}` : "";
+  const res = await fetchWithAuth(`${API_BASE_URL}/results/my-results/${query}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : data.results || [];
+}

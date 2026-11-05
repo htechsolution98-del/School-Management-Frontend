@@ -23,21 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const menuItems: SidebarLink[] = [
-  { title: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
-  { title: "Features Manager", href: "/admin/features", icon: GraduationCap },
-  { title: "Modules Manager", href: "/admin/modules", icon: CreditCard },
-  { title: "Why Choose Us", href: "/admin/why-choose-us", icon: Sparkles },
-  { title: "Stats Manager", href: "/admin/stats", icon: TrendingUp },
-  { title: "Mobile App Roles", href: "/admin/mobile-app", icon: Smartphone },
-  { title: "Mobile Infrastructure", href: "/admin/mobile-infrastructure", icon: Cpu },
-  { title: "Modules Hero Tags", href: "/admin/modules-hero-tags", icon: CheckSquare },
-  { title: "Modules Grid Cards", href: "/admin/modules-grid", icon: LayoutGrid },
-  { title: "Testimonials Manager", href: "/admin/testimonials", icon: Sparkles },
-  { title: "About Manager", href: "/admin/about", icon: Sparkles },
-  { title: "Why Choose Us", href: "/admin/why-choose", icon: HelpCircle },
-  { title: "Counters Manager", href: "/admin/stats", icon: TrendingUp },
-  { title: "Mobile Ecosystem", href: "/admin/mobile", icon: Smartphone },
-  { title: "Capabilities Manager", href: "/admin/capabilities", icon: ListCollapse },
   { title: "Contact Inquiries", href: "/admin/inquiries", icon: MessageSquare },
 ];
 

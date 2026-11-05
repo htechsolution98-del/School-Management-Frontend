@@ -286,8 +286,17 @@ export function AnnouncementsHub({
   pageTitle,
   pageSubtitle,
 }: AnnouncementsHubProps) {
-  const [announcements, setAnnouncements] = useState<AnnouncementResponse[]>(() => getStoredAnnouncements());
-  const [loading, setLoading] = useState(() => getStoredAnnouncements().length === 0);
+  const isAudienceManager = [
+    "clerk",
+    "trustee",
+    "principal",
+    "vice principal",
+    "admin",
+    "superadmin",
+  ].some((r) => roleTitle.toLowerCase().includes(r));
+
+  const [announcements, setAnnouncements] = useState<AnnouncementResponse[]>(() => getStoredAnnouncements(roleTitle));
+  const [loading, setLoading] = useState(() => getStoredAnnouncements(roleTitle).length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAudience, setSelectedAudience] = useState<string>("ALL_FILTER");
@@ -313,7 +322,7 @@ export function AnnouncementsHub({
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const data = await getAnnouncements();
+      const data = await getAnnouncements(roleTitle);
       const sorted = [...data].sort((a, b) => {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
@@ -377,6 +386,32 @@ export function AnnouncementsHub({
         const itemPriority = (item.priority || "NORMAL").toUpperCase();
         if (itemPriority !== selectedPriority) return false;
       }
+      // Non-audience managers (students, parents, teachers, etc.) strictly only see announcements intended for their role or ALL
+      if (!isAudienceManager) {
+        const roleLower = roleTitle.toLowerCase();
+        const isEveryone = String(item.is_everyone) === "true" || item.is_everyone === true;
+        const forUpper = (item.announcement_for || "").toUpperCase();
+        const isCreatedByMe = Boolean(item.is_created_by_me);
+
+        if (!isCreatedByMe && !isEveryone && forUpper !== "ALL") {
+          if (roleLower.includes("student")) {
+            if (!forUpper.includes("STUDENT")) return false;
+          } else if (roleLower.includes("parent")) {
+            if (!forUpper.includes("PARENT")) return false;
+          } else if (roleLower.includes("teacher")) {
+            if (!forUpper.includes("TEACHER")) return false;
+          } else if (roleLower.includes("librarian")) {
+            if (!forUpper.includes("LIBRARIAN")) return false;
+          } else if (roleLower.includes("fee")) {
+            if (!forUpper.includes("FEE") && !forUpper.includes("ACCOUNTANT")) return false;
+          } else if (roleLower.includes("transport")) {
+            if (!forUpper.includes("TRANSPORT")) return false;
+          } else if (roleLower.includes("inventory")) {
+            if (!forUpper.includes("INVENTORY")) return false;
+          }
+        }
+      }
+
       // Audience filter
       if (selectedAudience !== "ALL_FILTER") {
         const isAll =
@@ -691,6 +726,9 @@ export function AnnouncementsHub({
           </div>
         </div>
 
+        {/* Audience Filter (Only shown for Clerk, Trustee, and Principal) */}
+        {isAudienceManager && (
+          <>
         {/* Mobile Audience Selection Trigger (Opens Bottom Drawer) */}
         <div className="sm:hidden pt-2 border-t border-slate-100 dark:border-zinc-800">
           <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 mb-1.5">
@@ -845,6 +883,8 @@ export function AnnouncementsHub({
             );
           })}
         </div>
+          </>
+        )}
       </div>
 
       {/* ─── ANNOUNCEMENTS FEED LIST ───────────────────────────────────── */}
@@ -1076,6 +1116,14 @@ function AnnouncementFormModal({
   onSaved: () => void;
 }) {
   const isEdit = !!announcement;
+  const isAudienceManager = [
+    "clerk",
+    "trustee",
+    "principal",
+    "vice principal",
+    "admin",
+    "superadmin",
+  ].some((r) => roleTitle.toLowerCase().includes(r));
   const [title, setTitle] = useState(announcement?.title ?? "");
   const [description, setDescription] = useState(announcement?.description ?? "");
   const [priority, setPriority] = useState<string>(announcement?.priority ?? "NORMAL");
@@ -1177,6 +1225,12 @@ function AnnouncementFormModal({
     } catch {
       return "";
     }
+  };
+
+    const getMinDateTime = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const [expiresAt, setExpiresAt] = useState<string>(
@@ -1367,7 +1421,14 @@ function AnnouncementFormModal({
     setError(null);
 
     try {
-      const payload: AnnouncementPayload = {
+      if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+      setError("Expiry date and time must be in the future. Previous dates are not allowed.");
+      toast.error("Expiry date and time must be in the future.");
+      setSaving(false);
+      return;
+    }
+
+    const payload: AnnouncementPayload = {
         title: capitalizeFirstLetter(title.trim()),
         description: capitalizeFirstLetter(description.trim()),
         priority: priority,
@@ -1530,7 +1591,8 @@ function AnnouncementFormModal({
             </div>
           </div>
 
-          {/* Target Audience: 10-Role Multi-Selection */}
+          {/* Target Audience: 10-Role Multi-Selection (Only for Clerk, Trustee, and Principal) */}
+          {isAudienceManager && (
           <div className="space-y-2.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1758,6 +1820,7 @@ function AnnouncementFormModal({
               })}
             </div>
           </div>
+          )}
 
           {/* Delivery Scope Selector */}
           <div className="p-4 rounded-3xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700/80 space-y-3.5">
@@ -2294,7 +2357,15 @@ function AnnouncementFormModal({
             <Input
               type="datetime-local"
               value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
+              min={getMinDateTime()}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && new Date(val).getTime() < Date.now() - 60000) {
+                  toast.error("Cannot select previous date or time for announcement expiry.");
+                  return;
+                }
+                setExpiresAt(val);
+              }}
               className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium focus-visible:border-[#2563EB] focus-visible:ring-2 focus-visible:ring-[#2563EB]/20"
             />
           </div>

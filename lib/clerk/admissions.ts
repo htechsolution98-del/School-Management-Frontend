@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, extractErrorMessage } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import type { Admission } from "@/types/clerk";
 
@@ -10,14 +10,50 @@ export async function fetchAdmissions(): Promise<Admission[]> {
   if (!response.ok) {
     let message = "Failed to fetch admissions.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }
 
   const data = await response.json();
   return Array.isArray(data) ? data : data.data ?? data.results ?? [];
+}
+
+export async function patchStudentDetails(
+  admissionNumber: string,
+  payload: Record<string, any>
+) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/updatesubmition/${admissionNumber}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `Failed to update student information (${response.status})`;
+    try {
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) {
+          message = text.slice(0, 200);
+        } else if (response.status === 500) {
+          message = "Server error occurred while updating student.";
+        }
+      }
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response.json();
 }
 
 export async function patchFieldValues(
@@ -34,10 +70,19 @@ export async function patchFieldValues(
   });
 
   if (!response.ok) {
-    let message = "Failed to update student information.";
+    let message = `Failed to update student information (${response.status})`;
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) {
+          message = text.slice(0, 200);
+        } else if (response.status === 500) {
+          message = "Server error occurred while updating student.";
+        }
+      }
     } catch {}
     throw new Error(message);
   }
@@ -55,8 +100,13 @@ export async function patchStudentDivision(admissionNumber: string, division: st
   if (!response.ok) {
     let message = "Failed to update student division.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }
@@ -86,8 +136,13 @@ export async function patchDocuments(
   if (!response.ok) {
     let message = "Failed to update documents.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }
@@ -108,8 +163,13 @@ export async function assignGrNumber(
   if (!response.ok) {
     let message = "Failed to assign GR number.";
     try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        message = extractErrorMessage(err, message);
+      } catch {
+        if (text && !text.startsWith("<")) message = text.slice(0, 200);
+      }
     } catch {}
     throw new Error(message);
   }

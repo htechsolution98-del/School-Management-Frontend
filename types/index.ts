@@ -128,6 +128,9 @@ export interface Staff {
   mobile: string | null;
   category: StaffCategory;
   department: number | null;
+  departments?: number[] | null;
+  department_names?: string[] | null;
+  department_name?: string | null;
   designation?: string | null;
   attendance_setting?: number | null;
   leave_template?: number | null;
@@ -149,6 +152,7 @@ export interface CreateStaffPayload {
   mobile: string;
   category: StaffCategory | string;
   department?: number | null;
+  departments?: number[] | null;
   designation?: string;
   attendance_setting?: number | null;
   leave_template?: number | null;

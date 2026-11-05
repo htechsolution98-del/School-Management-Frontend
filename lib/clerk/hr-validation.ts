@@ -45,21 +45,31 @@ export function validateStaffRecord(
   const normMobile = normalizePhone(data.mobile || "");
   if (!normMobile) {
     errors.mobile = "Mobile number is required.";
-  } else if (normMobile.length !== 10 || !/^\d{10}$/.test(normMobile)) {
-    errors.mobile = "Mobile number must be exactly 10 digits.";
+  } else if (normMobile.length !== 10 || !/^[6-9]\d{9}$/.test(normMobile)) {
+    errors.mobile = "Mobile number must be a 10-digit number starting with 6, 7, 8, or 9.";
   }
 
   const others = staff.filter(member => member.id !== editingId);
-  if (trimmedEmail && others.some(member => member.email?.trim().toLowerCase() === trimmedEmail)) {
-    errors.email = "This email is already assigned to a staff member.";
-  }
-  if (normMobile && others.some(member => normalizePhone(member.mobile || "") === normMobile)) {
-    errors.mobile = "This mobile number is already assigned to a staff member.";
-  }
+  const existingStaffByEmail = trimmedEmail ? others.find(member => member.email?.trim().toLowerCase() === trimmedEmail) : null;
+  const existingStaffByMobile = normMobile ? others.find(member => normalizePhone(member.mobile || "") === normMobile) : null;
+  const existingMember = existingStaffByEmail || existingStaffByMobile;
 
-  if (!data.department) {
-    errors.department = "Department is required.";
-  } else if (!departments.some(item => item.id === data.department)) {
+  const selectedDepts = (data.departments && data.departments.length > 0)
+    ? data.departments
+    : (data.department ? [data.department] : []);
+
+  // When an existing staff member is detected, their email & phone are valid for re-assignment/updating
+
+  const selectedRole = roles?.find(r => String(r.id) === String(data.category));
+  const isClerk = selectedRole
+    ? selectedRole.label.toLowerCase().includes("clerk")
+    : (typeof data.category === "string" && data.category.toLowerCase().includes("clerk"));
+
+  if (!isClerk) {
+    if (selectedDepts.length === 0 || !selectedDepts.some(id => departments.some(item => item.id === id))) {
+      errors.department = "Select at least one available department.";
+    }
+  } else if (selectedDepts.length > 0 && !selectedDepts.some(id => departments.some(item => item.id === id))) {
     errors.department = "Select an available department.";
   }
 

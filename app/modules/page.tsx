@@ -194,43 +194,6 @@ export default function ModulesPage() {
     };
   }, [mouseX, mouseY]);
 
-  // Load dynamic ecosystem content from API
-  useEffect(() => {
-    fetch(`/api/landing/settings?t=${Date.now()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.settings) {
-          if (data.settings.moduleHeroBadge) setHeroBadge(data.settings.moduleHeroBadge);
-          if (data.settings.moduleHeroTitle) setHeroTitle(data.settings.moduleHeroTitle);
-          if (data.settings.moduleHeroDesc) setHeroDesc(data.settings.moduleHeroDesc);
-          
-          if (data.settings.modulePoints && data.settings.modulePoints.length > 0) {
-            setModulePoints(data.settings.modulePoints);
-          }
-          if (Array.isArray(data.settings.modulesHeroTags) && data.settings.modulesHeroTags.length > 0) {
-            setHeroTags(data.settings.modulesHeroTags);
-          }
-
-          if (data.settings.moduleScreens && data.settings.moduleScreens.length > 0) {
-            setModuleScreens(data.settings.moduleScreens);
-          } else if (data.settings.modulesHeroImage) {
-            setModuleScreens([data.settings.modulesHeroImage]);
-          }
-
-          if (data.settings.modulesHeroImage) {
-            setHeroImage(data.settings.modulesHeroImage);
-          }
-
-          if (data.settings.gridModules && data.settings.gridModules.length > 0) {
-            setGridModules(data.settings.gridModules);
-          }
-          if (Array.isArray(data.settings.modulesGridCards) && data.settings.modulesGridCards.length > 0) {
-            setGridCards(data.settings.modulesGridCards);
-          }
-        }
-      })
-      .catch((err) => console.log("Failed to load ecosystem modules settings", err));
-  }, []);
 
   // Autoplay slider interval for screenshots slideshow
   useEffect(() => {

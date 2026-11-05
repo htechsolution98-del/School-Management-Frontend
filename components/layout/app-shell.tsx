@@ -37,7 +37,7 @@ import { getCurrentUserProfile } from "@/lib/current-user";
 import { ProfileDialog } from "@/components/profile/profile-dialog";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { PageTutorialDialog } from "@/components/tutorial/page-tutorial-dialog";
-import { cn } from "@/lib/utils";
+import { cn, capitalizeWords } from "@/lib/utils";
 import type { CurrentUserProfile } from "@/types";
 import { useSchool, SCHOOL_PROFILE_UPDATED_EVENT } from "@/context/school-context";
 
@@ -872,20 +872,14 @@ export function
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden print:h-auto print:overflow-visible print:block">
         {/* Top Header Bar: Premium blue-purple gradient for Student, mobile gradient / desktop clean for others */}
         <header className={cn(
-          "flex h-16 shrink-0 items-center justify-between gap-2 border-b px-3.5 sm:px-6 shadow-sm z-20 print:hidden",
+          "flex h-16 shrink-0 items-center justify-between gap-2 border-b px-3.5 sm:px-6 shadow-sm z-50 print:hidden",
           roleTitle === "Student"
             ? "border-blue-700/30 bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] text-white lg:border-[#E5EAF4] lg:bg-none lg:bg-white lg:text-[#142044]"
             : "border-blue-700/30 lg:border-[#E5EAF4] bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#4338CA] lg:bg-none lg:bg-white text-white lg:text-[#142044]"
         )}>
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 border border-white/25 shadow-xs overflow-hidden">
-              {roleTitle === "Student" && profile?.avatar ? (
-                <img
-                  src={profile.avatar}
-                  alt={currentUserName}
-                  className="h-full w-full object-cover rounded-full"
-                />
-              ) : !logoImgError && activeLogo ? (
+              {!logoImgError && activeLogo ? (
                 <img
                   src={activeLogo}
                   alt={currentSchoolDisplayName}
@@ -902,16 +896,14 @@ export function
               <span className={cn(
                 "block truncate text-sm sm:text-base font-bold tracking-tight leading-tight",
                 roleTitle === "Student" ? "text-white lg:text-[#142044]" : "text-white lg:text-[#142044]"
-              )} title={roleTitle === "Student" ? (currentUserName || currentSchoolDisplayName) : currentSchoolDisplayName}>
-                {roleTitle === "Student"
-                  ? (currentUserName ? currentUserName.split(" ").slice(0, 2).join(" ") : "Student")
-                  : currentSchoolDisplayName}
+              )} title={currentSchoolDisplayName}>
+                {currentSchoolDisplayName}
               </span>
               <span className={cn(
                 "block truncate text-[11px] sm:text-xs leading-tight mt-0.5",
                 roleTitle === "Student" ? "text-indigo-100/90 font-medium lg:text-[#7183A6]" : "text-white/80 lg:text-[#7183A6] font-normal"
               )}>
-                {roleTitle === "Student" ? "Student" : (roleTitle || "Teacher")}
+                {roleTitle === "Student" ? "Student Portal" : (roleTitle || "Teacher")}
               </span>
             </div>
           </div>
@@ -1070,43 +1062,45 @@ export function
             {/* Profile Pill */}
             <button
               type="button"
-              onClick={() => setProfileOpen(true)}
+              onClick={() => {
+                const rolePrefix = (pathname || "").split("/")[1]?.toLowerCase();
+                if (rolePrefix && !rolePrefix.startsWith("(") && rolePrefix !== "login" && rolePrefix !== "forgot-password") {
+                  router.push(`/${rolePrefix}/profile`);
+                } else {
+                  setProfileOpen(true);
+                }
+              }}
               aria-label="Open my profile"
               title="View my profile"
               className="flex items-center gap-2 pl-1 text-left transition-opacity hover:opacity-90 focus-visible:outline-none cursor-pointer"
             >
               <span className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-full font-bold text-xs sm:text-sm shadow-xs border border-white/25",
+                "flex h-9 w-9 items-center justify-center rounded-full font-bold text-xs sm:text-sm shadow-xs border border-white/25 overflow-hidden shrink-0",
                 roleTitle === "Student"
-                  ? "bg-white/20 text-white"
+                  ? "bg-blue-600 text-white lg:bg-blue-600 lg:text-white"
                   : "bg-[#1D4ED8] text-white lg:bg-[#2563EB]"
               )}>
-                {userInitials || "ST"}
+                {profile?.avatar ? (
+                  <img src={profile.avatar} alt={currentUserName} className="h-full w-full object-cover rounded-full" />
+                ) : (
+                  userInitials || "ST"
+                )}
               </span>
               <div className="text-left hidden md:flex items-center gap-1">
                 <div>
                   <span
                     title={currentUserName}
-                    className={cn(
-                      "block max-w-[120px] sm:max-w-[160px] truncate text-xs sm:text-sm font-semibold leading-tight",
-                      roleTitle === "Student" ? "text-white" : "text-white lg:text-[#142044]"
-                    )}
+                    className="block max-w-[120px] sm:max-w-[160px] truncate text-xs sm:text-sm font-semibold leading-tight text-white lg:text-[#142044]"
                   >
-                    {currentUserName || "Student"}
+                    {capitalizeWords(currentUserName) || "Student"}
                   </span>
-                  <span className={cn(
-                    "block truncate text-[11px] font-normal leading-tight",
-                    roleTitle === "Student" ? "text-white/80" : "text-white/75 lg:text-[#7183A6]"
-                  )}>
-                    {profile?.role?.toLowerCase() || (roleTitle || "student").toLowerCase()}
+                  <span className="block truncate text-[11px] font-normal leading-tight text-white/80 lg:text-[#7183A6]">
+                    {capitalizeWords(profile?.role || roleTitle || "Student")}
                   </span>
                 </div>
-                <ChevronDown className={cn(
-                  "w-3.5 h-3.5 shrink-0",
-                  roleTitle === "Student" ? "text-white/80" : "text-white/80 lg:text-slate-400"
-                )} />
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-white/80 lg:text-slate-400" />
               </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 md:hidden", roleTitle === "Student" ? "text-white/80" : "text-white/80")} />
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 md:hidden text-white/80 lg:text-slate-400" />
             </button>
           </div>
         </header>

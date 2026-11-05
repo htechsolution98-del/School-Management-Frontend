@@ -69,12 +69,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   fetchAdmissions as getAdmissions,
+  patchStudentDetails,
   patchFieldValues,
   patchDocuments,
   assignGrNumber,
   getClasses,
 } from "@/lib/clerk";
 import { openAuthenticatedDocument } from "@/lib/document-viewer";
+import { fetchWithAuth } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/config";
 import { DataTable, dynamicOptions, type DataTableColumn } from "@/components/data-table";
 import type { Admission } from "@/types/clerk";
 
@@ -345,11 +348,49 @@ function StudentDetailsModal({
 
   if (!admission) return null;
 
-  const handleViewDoc = async (url: string, title?: string) => {
+  const handleViewDoc = async (
+    docOrUrl: string | { id?: number; file?: string; document_field?: number; document_label?: string; document_file?: string; document_name?: string },
+    title?: string
+  ) => {
+    let url = typeof docOrUrl === "string" ? docOrUrl : (docOrUrl.file || docOrUrl.document_file || "");
+    const docId = typeof docOrUrl === "object" ? docOrUrl.id : undefined;
+    const docFieldId = typeof docOrUrl === "object" ? docOrUrl.document_field : undefined;
+    const docLabel = (typeof docOrUrl === "object" ? (docOrUrl.document_label || docOrUrl.document_name) : title) || "Document";
+
     if (!url) return;
     setLoadingViewDoc(url);
     try {
-      await openAuthenticatedDocument(url, title || "Document", url);
+      let targetUrl = url;
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/updateDocument/view-url/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            document_id: docId,
+            file_url: url,
+            admission_number: admission?.admission_number,
+            document_field_id: docFieldId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.cloudinary_url || data.url) {
+            targetUrl = data.cloudinary_url || data.url;
+            if (typeof docOrUrl === "object") {
+              if (docOrUrl.file) docOrUrl.file = targetUrl;
+              if (docOrUrl.document_file) docOrUrl.document_file = targetUrl;
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Could not resolve Cloudinary URL via API:", apiErr);
+      }
+
+      if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      } else {
+        await openAuthenticatedDocument(targetUrl, docLabel, targetUrl);
+      }
     } finally {
       setLoadingViewDoc(null);
     }
@@ -704,7 +745,7 @@ function StudentDetailsModal({
                               {doc.file && (
                                 <button
                                   type="button"
-                                  onClick={() => handleViewDoc(doc.file, doc.document_label)}
+                                  onClick={() => handleViewDoc(doc)}
                                   disabled={loadingViewDoc === doc.file}
                                   className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 text-xs font-medium flex items-center gap-1 cursor-pointer"
                                   title="View Document"
@@ -878,7 +919,21 @@ export default function StudentRecordsPage() {
 
   // field-edit dialog
   const [editingAdmission, setEditingAdmission] = useState<Admission | null>(null);
-  const [editedFields, setEditedFields] = useState<Record<string, string>>({});
+  const [studentForm, setStudentForm] = useState({
+    surname: "",
+    name: "",
+    father_name: "",
+    mother_name: "",
+    school_class: "",
+    division: "",
+    date_of_birth: "",
+    gender: "",
+    mobile: "",
+    roll_no: "",
+    aadhar_number: "",
+    address: "",
+    custom_fields: {} as Record<string, { label: string; value: string }>,
+  });
   const [isSavingFields, setIsSavingFields] = useState(false);
 
   // document-edit dialog
@@ -990,7 +1045,12 @@ export default function StudentRecordsPage() {
   };
 
   const getStudentName = (adm: Admission) => {
-    if (!adm || !adm.field_values) return adm?.admission_number || "Student";
+    if (!adm) return "Student";
+    if (adm.student_details) {
+      const parts = [adm.student_details.surname, adm.student_details.name, adm.student_details.father_name].filter(Boolean);
+      if (parts.length > 0) return parts.join(" ");
+    }
+    if (!adm.field_values) return adm?.admission_number || "Student";
 
     const surname = getFieldValue(adm, "surname", "last name", "lastname");
     const studentName = getFieldValue(adm, "student name", "first name", "firstname", "candidate name");
@@ -1006,21 +1066,26 @@ export default function StudentRecordsPage() {
   };
 
   const getStudentClass = (adm: Admission) => {
+    if (adm?.student_details?.school_class_name) return adm.student_details.school_class_name;
     const val = getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
     if (!val) return "N/A";
-    const match = classes.find((c) => String(c.id) === String(val) || c.school_class === val);
+    const match = classes.find((c) => String(c.id) === String(val) || c.school_class.toLowerCase() === val.toLowerCase());
     return match ? match.school_class : val;
   };
 
   const getStudentDivision = (adm: Admission) => {
+    if (adm?.student_details?.division) return adm.student_details.division;
+    if (adm?.division) return adm.division;
     return getFieldValue(adm, "division", "section", "div", "sec") || "N/A";
   };
 
   const getStudentMobile = (adm: Admission) => {
+    if (adm?.student_details?.mobile) return adm.student_details.mobile;
     return getFieldValue(adm, "mobile", "phone", "contact", "parent mobile", "father mobile");
   };
 
   const getStudentGuardian = (adm: Admission) => {
+    if (adm?.student_details?.father_name) return adm.student_details.father_name;
     return getFieldValue(adm, "father", "guardian", "parent", "mother");
   };
 
@@ -1147,37 +1212,114 @@ export default function StudentRecordsPage() {
     return true;
   });
 
-  // ── Field Editing ──────────────────────────────────────────────────────────
+  // ── Standardized Field Editing ─────────────────────────────────────────────
 
   const openFieldEdit = (adm: Admission) => {
     setEditingAdmission(adm);
-    const init: Record<string, string> = {};
-    adm.field_values.forEach((fv) => {
-      init[String(fv.field)] = fv.value;
+    const sd = adm.student_details;
+
+    // Resolve class ID or name for the dropdown
+    let resolvedClass = "";
+    if (sd?.school_class) {
+      resolvedClass = String(sd.school_class);
+    } else {
+      const rawClass = getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
+      const matched = classes.find(
+        (c) => String(c.id) === String(rawClass) || c.school_class.toLowerCase() === rawClass.toLowerCase()
+      );
+      resolvedClass = matched ? String(matched.id) : rawClass;
+    }
+
+    // Isolate extra custom admission form fields (skip standard fields & empty labels)
+    const custom: Record<string, { label: string; value: string }> = {};
+    const standardKeys = [
+      "surname", "last name", "lastname",
+      "student name", "first name", "firstname", "candidate name",
+      "father name", "father", "middle name", "middlename",
+      "mother name", "mother",
+      "class", "standard", "applying for class", "grade",
+      "division", "section", "sec", "div",
+      "mobile", "phone", "contact", "emergency",
+      "birth", "dob", "date of birth",
+      "gender", "sex",
+      "aadhaar", "aadhar",
+      "roll", "address", "city"
+    ];
+
+    (adm.field_values || []).forEach((fv) => {
+      const lbl = (fv.field_label || "").trim();
+      if (!lbl) return; // Skip unlabeled blank inputs
+      const lblLower = lbl.toLowerCase();
+      if (!standardKeys.some((k) => lblLower.includes(k))) {
+        custom[String(fv.field)] = { label: lbl, value: fv.value || "" };
+      }
     });
-    setEditedFields(init);
+
+    setStudentForm({
+      surname: sd?.surname || getFieldValue(adm, "surname", "last name", "lastname") || "",
+      name: sd?.name || getFieldValue(adm, "student name", "first name", "firstname", "candidate name") || "",
+      father_name: sd?.father_name || getFieldValue(adm, "father name", "father", "middle name") || "",
+      mother_name: sd?.mother_name || getFieldValue(adm, "mother name", "mother") || "",
+      school_class: resolvedClass,
+      division: sd?.division || adm.division || getFieldValue(adm, "division", "section", "div", "sec") || "",
+      date_of_birth: sd?.date_of_birth || getFieldValue(adm, "date of birth", "dob", "birth") || "",
+      gender: sd?.gender || getFieldValue(adm, "gender", "sex") || "",
+      mobile: sd?.mobile || getFieldValue(adm, "mobile", "phone", "contact", "parent mobile") || "",
+      roll_no: sd?.roll_no || getFieldValue(adm, "roll no", "roll number", "roll") || "",
+      aadhar_number: sd?.aadhar_number || getFieldValue(adm, "aadhaar", "aadhar") || "",
+      address: sd?.address || getFieldValue(adm, "address", "city") || "",
+      custom_fields: custom,
+    });
   };
 
   const handleSaveFields = async () => {
     if (!editingAdmission) return;
-    for (const field of editingAdmission.field_values) {
-      if (isAadhaarField({ label: field.field_label || "" }) && !aadhaarSchema.safeParse(editedFields[String(field.field)] ?? field.value ?? "").success) { toast.error(AADHAAR_ERROR); return; }
+
+    if (studentForm.aadhar_number) {
+      const cleanAadhaar = studentForm.aadhar_number.replace(/\s+|-/g, "");
+      if (cleanAadhaar && !aadhaarSchema.safeParse(cleanAadhaar).success) {
+        toast.error(AADHAAR_ERROR);
+        return;
+      }
     }
+
+    if (studentForm.mobile) {
+      const cleanMobile = studentForm.mobile.replace(/\D/g, "");
+      if (cleanMobile.length > 0 && (cleanMobile.length !== 10 || !["6", "7", "8", "9"].includes(cleanMobile[0]))) {
+        toast.error("Mobile number must start with 6, 7, 8, or 9 and be exactly 10 digits");
+        return;
+      }
+    }
+
     setIsSavingFields(true);
     try {
-      await patchFieldValues(
-        editingAdmission.admission_number,
-        Object.entries(editedFields).map(([id, value]) => ({
-          field_id: parseInt(id),
-          value,
-        }))
-      );
-      toast.success("Student information updated successfully");
+      const customFieldValues = Object.entries(studentForm.custom_fields).map(([field_id, item]) => ({
+        field_id: parseInt(field_id),
+        value: item.value,
+      }));
+
+      await patchStudentDetails(editingAdmission.admission_number, {
+        surname: studentForm.surname,
+        name: studentForm.name,
+        father_name: studentForm.father_name,
+        mother_name: studentForm.mother_name,
+        school_class: studentForm.school_class,
+        division: studentForm.division,
+        date_of_birth: studentForm.date_of_birth,
+        gender: studentForm.gender,
+        mobile: studentForm.mobile,
+        roll_no: studentForm.roll_no,
+        aadhar_number: studentForm.aadhar_number,
+        address: studentForm.address,
+        field_values: customFieldValues.length > 0 ? customFieldValues : undefined,
+      });
+
+      toast.success("Student details updated successfully");
       setEditingAdmission(null);
       await fetchData();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to save changes"
+        err instanceof Error ? err.message : "Failed to save student details"
       );
     } finally {
       setIsSavingFields(false);
@@ -1714,53 +1856,131 @@ export default function StudentRecordsPage() {
         onSuccess={fetchData}
       />
 
-      {/* Field Edit Dialog */}
+      {/* Standardized Student Edit Dialog */}
       <Dialog open={!!editingAdmission} onOpenChange={(open) => !open && setEditingAdmission(null)}>
-        <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-2xl p-6">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-3xl p-6 sm:p-7 max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0 pb-2 border-b dark:border-zinc-800">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Edit3 className="h-5 w-5 text-primary" />
+              <Edit3 className="h-5 w-5 text-indigo-600" />
               Edit Student Details
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Updating information for <span className="font-semibold text-slate-900 dark:text-zinc-100">{editingAdmission ? getStudentName(editingAdmission) : ""}</span>
+              Updating official student records for <span className="font-semibold text-slate-900 dark:text-zinc-100">{editingAdmission ? getStudentName(editingAdmission) : ""}</span> (Adm: {editingAdmission?.admission_number})
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[350px] pr-3 my-2 space-y-3">
-            {editingAdmission?.field_values.map((fv) => {
-              const isClassField =
-                fv.field_label.toLowerCase().includes("class") ||
-                fv.field_label.toLowerCase().includes("standard");
-
-              const currentValue = editedFields[String(fv.field)] ?? fv.value;
-
-              if (isClassField && classes.length > 0) {
-                const matchedClass = classes.find(
-                  (c) => String(c.id) === String(currentValue) || c.school_class === currentValue
-                );
-                const selectedVal = matchedClass ? String(matchedClass.id) : String(currentValue);
-
-                return (
-                  <div key={fv.field} className="space-y-1 mb-3">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                      {fv.field_label}
-                    </label>
+          <ScrollArea className="flex-1 pr-3 my-3">
+            <div className="space-y-5 pb-2">
+              {/* Personal Details Section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" /> Personal Information
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Surname</label>
+                    <Input
+                      value={studentForm.surname}
+                      placeholder="e.g. Patel"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, surname: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Student Name</label>
+                    <Input
+                      value={studentForm.name}
+                      placeholder="e.g. Karan"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Father Name</label>
+                    <Input
+                      value={studentForm.father_name}
+                      placeholder="e.g. Ashokbhai"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, father_name: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Mother Name</label>
+                    <Input
+                      value={studentForm.mother_name}
+                      placeholder="e.g. Gitaben"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, mother_name: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Date of Birth</label>
+                    <Input
+                      type="date"
+                      value={studentForm.date_of_birth}
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, date_of_birth: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Gender</label>
                     <Select
-                      value={selectedVal}
-                      onValueChange={(val) =>
-                        setEditedFields((prev) => ({
-                          ...prev,
-                          [String(fv.field)]: val || "",
-                        }))
-                      }
+                      value={studentForm.gender || "none"}
+                      onValueChange={(val: any) => setStudentForm((prev) => ({ ...prev, gender: (!val || val === "none" ? "" : String(val)) }))}
                     >
                       <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
-                        <SelectValue placeholder="Select Class">
-                          {matchedClass ? matchedClass.school_class : currentValue || "Select Class"}
-                        </SelectValue>
+                        <SelectValue placeholder="Select Gender" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">Not Specified</SelectItem>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Mobile Number</label>
+                    <Input
+                      value={studentForm.mobile}
+                      maxLength={10}
+                      inputMode="numeric"
+                      placeholder="10-digit mobile"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Aadhaar Number</label>
+                    <Input
+                      value={studentForm.aadhar_number}
+                      maxLength={12}
+                      inputMode="numeric"
+                      placeholder="12-digit Aadhaar"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, aadhar_number: e.target.value.replace(/\D/g, "").slice(0, 12) }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Academic Placement Section */}
+              <div className="pt-2 border-t dark:border-zinc-800">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-1.5">
+                  <School className="h-3.5 w-3.5" /> Academic Placement
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="space-y-1 sm:col-span-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Class</label>
+                    <Select
+                      value={studentForm.school_class || "none"}
+                      onValueChange={(val: any) => setStudentForm((prev) => ({ ...prev, school_class: (!val || val === "none" ? "" : String(val)) }))}
+                    >
+                      <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
+                        <SelectValue placeholder="Select Class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select Class</SelectItem>
                         {classes.map((cls) => (
                           <SelectItem key={cls.id} value={String(cls.id)}>
                             {cls.school_class}
@@ -1769,29 +1989,74 @@ export default function StudentRecordsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                );
-              }
+                  <div className="space-y-1 sm:col-span-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Division / Section</label>
+                    <Input
+                      value={studentForm.division}
+                      placeholder="e.g. A"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, division: e.target.value.toUpperCase() }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-1">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Roll Number</label>
+                    <Input
+                      value={studentForm.roll_no}
+                      placeholder="e.g. 1"
+                      onChange={(e) => setStudentForm((prev) => ({ ...prev, roll_no: e.target.value }))}
+                      className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                    />
+                  </div>
+                </div>
+              </div>
 
-              return (
-                <div key={fv.field} className="space-y-1 mb-3">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                    {fv.field_label}
-                  </label>
+              {/* Address Section */}
+              <div className="pt-2 border-t dark:border-zinc-800">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" /> Address Details
+                </h4>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Residential Address</label>
                   <Input
-                    value={editedFields[String(fv.field)] ?? fv.value}
-                    maxLength={isAadhaarField({ label: fv.field_label }) ? 12 : undefined}
-                    inputMode={isAadhaarField({ label: fv.field_label }) ? "numeric" : undefined}
-                    onChange={(e) =>
-                      setEditedFields((prev) => ({
-                        ...prev,
-                        [String(fv.field)]: e.target.value,
-                      }))
-                    }
-                    className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl"
+                    value={studentForm.address}
+                    placeholder="Full residential address"
+                    onChange={(e) => setStudentForm((prev) => ({ ...prev, address: e.target.value }))}
+                    className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
                   />
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Additional Custom Form Fields (if any extra specific fields exist) */}
+              {Object.keys(studentForm.custom_fields).length > 0 && (
+                <div className="pt-2 border-t dark:border-zinc-800">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-3 flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5" /> Additional Form Fields
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {Object.entries(studentForm.custom_fields).map(([fieldId, item]) => (
+                      <div key={fieldId} className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {item.label}
+                        </label>
+                        <Input
+                          value={item.value}
+                          onChange={(e) =>
+                            setStudentForm((prev) => ({
+                              ...prev,
+                              custom_fields: {
+                                ...prev.custom_fields,
+                                [fieldId]: { ...item, value: e.target.value },
+                              },
+                            }))
+                          }
+                          className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </ScrollArea>
 
           <DialogFooter className="pt-4 border-t dark:border-zinc-800 flex items-center gap-3">

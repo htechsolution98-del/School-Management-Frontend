@@ -11,6 +11,7 @@ import {
   Megaphone,
   CalendarDays,
   Settings,
+  User,
   Clock,
   Banknote,
   Boxes,
@@ -94,6 +95,9 @@ const sidebarLinks = [
     title: "Account Settings", 
     href: "/fees/settings", 
     icon: Settings,
+    subLinks: [
+      { title: "My Profile", href: "/fees/profile", icon: User },
+    ],
   },
 ];
 
