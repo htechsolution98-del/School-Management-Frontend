@@ -67,14 +67,14 @@ export async function getAttendanceSettings(): Promise<AttendanceSetting[]> {
   const primaryRole = getUserRole();
   const attendanceAdminRoles = [
     "principal", "vice principal", "admin", "superadmin", "super_admin",
-    "trustee", "hr", "hr_admin", "attendance_admin",
+    "trustee", "hr", "hr_admin", "attendance_admin", "clerk", "assistant clerk", "fees_clerk"
   ];
   const isAllowed =
     roles.some((r) => attendanceAdminRoles.includes(r)) ||
     attendanceAdminRoles.includes(primaryRole);
 
-  // Clerks do not have permission to view or manage attendance settings (HTTP 403)
-  if (!isAllowed && (roles.includes("clerk") || primaryRole === "clerk")) {
+  // Clerks, Principals, and Admins can view and manage attendance settings
+  if (!isAllowed) {
     return [];
   }
 

@@ -170,6 +170,7 @@ export interface LeaveCalculationPreview {
   excluded_holidays: number;
   is_half_day: boolean;
   half_day_session: string;
+  saturday_policy?: "OFF" | "HALF_DAY" | "FULL_DAY" | string;
   day_breakdown: DayBreakdownItem[];
   balance: {
     allocated: number;

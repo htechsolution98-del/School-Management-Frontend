@@ -29,6 +29,7 @@ export function StaffRecordForm({
   onApplyExisting,
   onSubmit,
   onClose,
+  onDepartmentCreated,
 }: {
   value: CreateStaffPayload;
   onChange: (field: keyof CreateStaffPayload, value: string | number | boolean | undefined) => void;
@@ -46,6 +47,7 @@ export function StaffRecordForm({
   onApplyExisting?: (matched: Staff) => void;
   onSubmit: (event: React.FormEvent) => void;
   onClose: () => void;
+  onDepartmentCreated?: (department: Department) => void;
 }) {
   const existingMember = useMemo(() => {
     if (editing || !staff || staff.length === 0) return null;
@@ -72,11 +74,7 @@ export function StaffRecordForm({
 
   const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
   const maxDob = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
-  const selectedRole = roles.find(role => String(role.id) === String(value.category));
-  const isClerk = selectedRole
-    ? selectedRole.label.toLowerCase().includes("clerk")
-    : (typeof value.category === "string" && value.category.toLowerCase().includes("clerk"));
-  const isDepartmentRequired = !isClerk;
+  const isDepartmentRequired = true;
   const attrs = (field: keyof CreateStaffPayload) => ({ id: `staff-${field}`, "aria-invalid": !!errors[field], "aria-describedby": errors[field] ? `staff-${field}-error` : undefined });
   const error = (field: keyof CreateStaffPayload) => errors[field] && <p id={`staff-${field}-error`} className="hr-field-error">{errors[field]}</p>;
 

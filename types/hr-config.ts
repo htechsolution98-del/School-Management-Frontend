@@ -70,6 +70,7 @@ export interface LeaveTransaction {
   staff_name?: string;
   leave_type: number;
   leave_type_name?: string;
+  leave_unit?: "FULL_DAY" | "HALF_DAY";
   leave_cycle: number;
   leave_cycle_name?: string;
   leave_request?: number | null;
@@ -130,13 +131,13 @@ export interface DynamicLeaveType {
   template_name?: string | null;
   name?: string | null;
   code?: string | null;
+  leave_unit?: "FULL_DAY" | "HALF_DAY";
   leave_type?: string | null;
   is_paid: boolean;
   allocation_count: number | string;
   allocation_period: "Monthly" | "Quarterly" | "Yearly" | string;
   carry_forward: boolean;
   max_carry_forward: number;
-  allow_encashment: boolean;
   category?: number | null;
   created_at?: string;
 }

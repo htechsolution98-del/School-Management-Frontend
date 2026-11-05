@@ -24,6 +24,7 @@ import {
   Trash2,
   Pencil,
   Layers,
+  Calculator,
   Building2,
   UserCheck,
 } from "lucide-react";
@@ -187,16 +188,16 @@ function EditModal({
   onUpdated: (id: number, calcType: CalcType, value: string) => void;
 }) {
   const [calcType, setCalcType] = useState<CalcType>("fixed");
+  const [calculateOn, setCalculateOn] = useState<"Basic Salary" | "Total Gross">("Basic Salary");
   const [value, setValue] = useState("");
   const [formErr, setFormErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-
 
   // Pre-fill form when assignment changes
   useEffect(() => {
     if (assignment) {
       setCalcType(assignment.calculation_type);
+      setCalculateOn((assignment.calc_base as any) === "Total Gross" ? "Total Gross" : "Basic Salary");
       setValue(assignment.value);
       setFormErr("");
     }
@@ -217,6 +218,7 @@ function EditModal({
     try {
       await updateStaffSalaryComponent(assignment!.id, {
         calculation_type: calcType,
+        calc_base: calcType === "percentage" ? calculateOn : undefined,
         value: v,
       });
       onUpdated(assignment!.id, calcType, v);
@@ -314,28 +316,46 @@ function EditModal({
                 </div>
 
                 {/* Calculation type toggle */}
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                    Calculation Type
-                  </label>
-                  <div className="flex rounded-xl border-2 border-slate-100 bg-slate-50 p-1 gap-1">
-                    {(["fixed", "percentage"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => { setCalcType(t); setFormErr(""); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold capitalize transition-all"
-                        style={
-                          calcType === t
-                            ? { background: "white", color: "#d97706", boxShadow: "0 2px 8px rgba(217,119,6,0.15)" }
-                            : { color: "#94a3b8" }
-                        }
-                      >
-                        {t === "fixed" ? <IndianRupee className="h-3 w-3" /> : <Percent className="h-3 w-3" />}
-                        {t}
-                      </button>
-                    ))}
+                <div className={`grid grid-cols-1 ${calcType === "percentage" ? "sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      Calculation Type
+                    </label>
+                    <div className="flex rounded-xl border-2 border-slate-100 bg-slate-50 p-1 gap-1">
+                      {(["fixed", "percentage"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setCalcType(t); setFormErr(""); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold capitalize transition-all"
+                          style={
+                            calcType === t
+                              ? { background: "white", color: "#d97706", boxShadow: "0 2px 8px rgba(217,119,6,0.15)" }
+                              : { color: "#94a3b8" }
+                          }
+                        >
+                          {t === "fixed" ? <IndianRupee className="h-3 w-3" /> : <Percent className="h-3 w-3" />}
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {calcType === "percentage" && (
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                        Calculate On <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={calculateOn}
+                        onChange={(e) => setCalculateOn(e.target.value as "Basic Salary" | "Total Gross")}
+                        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-50 transition-all cursor-pointer"
+                      >
+                        <option value="Basic Salary">Basic Salary</option>
+                        <option value="Total Gross">Total Gross</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Value input */}
@@ -451,6 +471,7 @@ function AssignModal({
   const [selectedStaff, setSelectedStaff] = useState<number | "">("");
   const [selComponent, setSelComponent] = useState<number | "">("");
   const [calcType, setCalcType] = useState<CalcType>("fixed");
+  const [calculateOn, setCalculateOn] = useState<"Basic Salary" | "Total Gross">("Basic Salary");
   const [value, setValue] = useState("");
   const [formErr, setFormErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -471,6 +492,7 @@ function AssignModal({
       setSelectedStaff("");
       setSelComponent("");
       setCalcType("fixed");
+      setCalculateOn("Basic Salary");
       setValue("");
       setFormErr("");
       setOpenDropdown(null);
@@ -492,6 +514,7 @@ function AssignModal({
         staff: selectedStaff as number,
         component: selComponent as number,
         calculation_type: calcType,
+        calc_base: calcType === "percentage" ? calculateOn : undefined,
         value: v,
       });
       const comp = components.find((c) => c.id === selComponent)!;
@@ -504,6 +527,7 @@ function AssignModal({
         componentName: comp.name,
         componentType: comp.component_type,
         calculation_type: calcType,
+        calc_base: calcType === "percentage" ? calculateOn : undefined,
         value: v,
         isActive: true,
       });
@@ -665,7 +689,7 @@ function AssignModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={`grid grid-cols-1 ${calcType === "percentage" ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Calculation</label>
                     <div className="flex rounded-xl border-2 border-slate-100 bg-slate-50 p-1 gap-1">
@@ -685,6 +709,26 @@ function AssignModal({
                       ))}
                     </div>
                   </div>
+
+                  {calcType === "percentage" && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                        Calculate On <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={calculateOn}
+                        onChange={(e) => setCalculateOn(e.target.value as "Basic Salary" | "Total Gross")}
+                        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3.5 py-3 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all cursor-pointer"
+                      >
+                        <option value="Basic Salary">Basic Salary</option>
+                        <option value="Total Gross">Total Gross</option>
+                      </select>
+                    </motion.div>
+                  )}
 
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
@@ -806,6 +850,52 @@ function CreateStructureModal({
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
   };
+
+  const baseSalaryNum = Math.max(0, Number(baseSalary) || 0);
+
+  // Live real-time CTC calculation
+  const ctcMetrics = useMemo(() => {
+    let projectedGross = baseSalaryNum;
+    const selectedList = components.filter((c) => selectedComponents.includes(c.id));
+
+    // First pass: Earnings
+    selectedList
+      .filter((c) => c.component_type === "earning")
+      .forEach((c) => {
+        const val = Number(c.value) || 0;
+        const cType = (c.calc_type || "").toLowerCase();
+        if (cType === "percentage") {
+          const base = (c.calc_base || "").toLowerCase().includes("gross") ? projectedGross : baseSalaryNum;
+          projectedGross += (val / 100) * base;
+        } else {
+          projectedGross += val;
+        }
+      });
+
+    // Second pass: Deductions
+    let totalDeductions = 0;
+    selectedList
+      .filter((c) => c.component_type === "deduction")
+      .forEach((c) => {
+        const val = Number(c.value) || 0;
+        const cType = (c.calc_type || "").toLowerCase();
+        if (cType === "percentage") {
+          const base = (c.calc_base || "").toLowerCase().includes("gross") ? projectedGross : baseSalaryNum;
+          totalDeductions += (val / 100) * base;
+        } else {
+          totalDeductions += val;
+        }
+      });
+
+    const projectedNet = Math.max(0, projectedGross - totalDeductions);
+
+    return {
+      baseSalary: baseSalaryNum,
+      projectedGross: Math.round(projectedGross),
+      totalDeductions: Math.round(totalDeductions),
+      projectedNet: Math.round(projectedNet),
+    };
+  }, [baseSalaryNum, selectedComponents, components]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -956,6 +1046,36 @@ function CreateStructureModal({
                     <AlertCircle className="h-3.5 w-3.5" /> {formErr}
                   </p>
                 )}
+
+                {/* ── Live CTC Calculator Summary Footer ── */}
+                <div className="rounded-2xl bg-gradient-to-br from-indigo-50/90 via-slate-50 to-purple-50/70 border border-indigo-100 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5 text-indigo-700">
+                      <Calculator className="w-3.5 h-3.5" /> Live CTC Preview
+                    </span>
+                    <span className="text-slate-400 font-semibold">{selectedComponents.length} component(s) included</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center pt-0.5">
+                    <div className="bg-white p-2 rounded-xl border border-slate-200/60 shadow-2xs">
+                      <span className="text-[10px] font-semibold text-slate-400 block uppercase">Base Salary</span>
+                      <span className="text-xs sm:text-sm font-black text-slate-800 mt-0.5 block truncate">
+                        ₹{ctcMetrics.baseSalary.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="bg-emerald-50/80 p-2 rounded-xl border border-emerald-200/60 shadow-2xs text-emerald-800">
+                      <span className="text-[10px] font-semibold text-emerald-600 block uppercase">Total Gross</span>
+                      <span className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5 block truncate">
+                        ₹{ctcMetrics.projectedGross.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="bg-indigo-50/80 p-2 rounded-xl border border-indigo-200/60 shadow-2xs text-indigo-900">
+                      <span className="text-[10px] font-semibold text-indigo-600 block uppercase">Net Payable</span>
+                      <span className="text-xs sm:text-sm font-black text-indigo-700 mt-0.5 block truncate">
+                        ₹{ctcMetrics.projectedNet.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex gap-3 pt-2">
                   <button

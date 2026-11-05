@@ -773,6 +773,12 @@ export default function ClerkLeaveRequestsPage() {
                               </div>
 
                               <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+                                {((request as any).is_half_day || Number(totalDays) === 0.5) && (
+                                  <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 font-bold px-2 py-1 text-xs rounded-md flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                    {(request as any).half_day_session === "SECOND_HALF" || (request as any).half_day_period === "SECOND_HALF" ? "2nd Half (Afternoon)" : "1st Half (Morning)"}
+                                  </Badge>
+                                )}
                                 <Badge variant="outline" className={cn("font-bold px-3 py-1 border text-xs tracking-wider rounded-md", getLeaveTypeBadgeClass(leaveType, request))}>
                                   {getLeaveTypeDisplay(leaveType, request)}
                                 </Badge>
@@ -819,6 +825,41 @@ export default function ClerkLeaveRequestsPage() {
                               <span className="font-semibold text-zinc-500 mr-2 text-[10px] uppercase tracking-wider">Reason:</span>
                               <span className="italic">&quot;{reason}&quot;</span>
                             </div>
+
+                            {/* Real-time Remaining Leave Balance Banner */}
+                            {(() => {
+                              const currentRem = (request as any).current_leave_remaining !== undefined 
+                                ? Number((request as any).current_leave_remaining) 
+                                : null;
+                              const currentTot = (request as any).current_leave_total !== undefined 
+                                ? Number((request as any).current_leave_total) 
+                                : null;
+                              if (currentRem === null) return null;
+                              return (
+                                <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground font-medium">Leave Quota Balance:</span>
+                                    <span className={cn(
+                                      "font-extrabold px-2 py-0.5 rounded text-xs",
+                                      currentRem > 0 
+                                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                        : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                                    )}>
+                                      {currentRem} {((request as any).leave_unit === "HALF_DAY" || (request as any).leave_type_code === "HDL") ? "Half-Days" : (currentRem === 1 ? 'Day' : 'Days')} left {currentTot !== null && currentTot > 0 ? `/ ${currentTot}` : ''}
+                                    </span>
+                                  </div>
+                                  {currentRem <= 0 ? (
+                                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700">
+                                      Balance is 0: LWP on approval
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                      Quota available
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
                             {/* Direct Actions (Bulk) */}
                             {isPending && (

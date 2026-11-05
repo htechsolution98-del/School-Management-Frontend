@@ -505,11 +505,14 @@ export default function ManualAdmissionPage() {
       admission_number?: string;
     }[];
     mobile: string;
+    fieldId?: number;
+    fieldLabel?: string;
   } | null>(null);
 
-  const [mobileStatus, setMobileStatus] = useState<MobileVerificationStatus>("unchecked");
-  const [verifyingMobile, setVerifyingMobile] = useState(false);
-  const [verifiedMobileNumber, setVerifiedMobileNumber] = useState<string>("");
+  // Independent verification states per mobile field
+  const [mobileStatuses, setMobileStatuses] = useState<Record<number, MobileVerificationStatus>>({});
+  const [verifyingMobileIds, setVerifyingMobileIds] = useState<Record<number, boolean>>({});
+  const [verifiedMobileNumbers, setVerifiedMobileNumbers] = useState<Record<number, string>>({});
   const [linkedParent, setLinkedParent] = useState<{
     parentId: number | string;
     parentName: string;
@@ -518,13 +521,35 @@ export default function ManualAdmissionPage() {
 
   const firstInputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
-  const phoneField = useMemo(() => {
-    if (!activeForm) return null;
-    return admissionFields(activeForm).find(isPhoneField) || null;
+  const allPhoneFields = useMemo(() => {
+    if (!activeForm) return [];
+    return admissionFields(activeForm).filter(isPhoneField);
   }, [activeForm]);
 
-  const hasPhoneField = Boolean(phoneField);
-  const isMobileVerified = !hasPhoneField || mobileStatus === "verified_new" || mobileStatus === "sibling_linked";
+  const hasPhoneField = allPhoneFields.length > 0;
+
+  // Track any phone fields that require verification
+  const unverifiedPhoneFields = useMemo(() => {
+    return allPhoneFields.filter((f) => {
+      const rawVal = dynamicValues[f.id];
+      const clean = String(rawVal || "").replace(/\D/g, "");
+      const isRequired = Boolean(f.is_required ?? f.required);
+      const status = mobileStatuses[f.id];
+      const isVerified = status === "verified_new" || status === "sibling_linked";
+
+      // If required, it must be verified
+      if (isRequired) {
+        return !isVerified;
+      }
+      // If optional but user entered digits, it must be verified
+      if (clean.length > 0) {
+        return !isVerified;
+      }
+      return false;
+    });
+  }, [allPhoneFields, dynamicValues, mobileStatuses]);
+
+  const isMobileVerified = unverifiedPhoneFields.length === 0;
 
   useEffect(() => {
     async function loadData() {
@@ -584,49 +609,49 @@ export default function ManualAdmissionPage() {
   }, [submitting]);
   useEffect(() => { const refresh = () => { void refreshForms(); }; window.addEventListener("focus", refresh); return () => window.removeEventListener("focus", refresh); }, [refreshForms]);
 
-  const handleVerifyMobile = useCallback(async (field?: FormField) => {
-    let phoneVal = "";
-    if (field && dynamicValues[field.id]) {
-      phoneVal = String(dynamicValues[field.id]);
-    } else if (phoneField && dynamicValues[phoneField.id]) {
-      phoneVal = String(dynamicValues[phoneField.id]);
-    }
+  const handleVerifyMobile = useCallback(async (field: FormField) => {
+    if (!field) return;
 
+    const rawVal = dynamicValues[field.id];
+    const phoneVal = String(rawVal || "");
     const clean = phoneVal.replace(/\D/g, "");
+    const fieldLabel = field.label || "Mobile number";
+
     if (clean.length !== 10) {
-      toast.error("Please enter a valid 10-digit mobile number before verifying.");
+      toast.error(`Please enter a valid 10-digit mobile number for ${fieldLabel} before verifying.`);
       return;
     }
 
-    setVerifyingMobile(true);
+    setVerifyingMobileIds((prev) => ({ ...prev, [field.id]: true }));
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/check-parent/?mobile=${clean}`);
       if (res.ok) {
         const data = await res.json();
-        setVerifiedMobileNumber(clean);
+        setVerifiedMobileNumbers((prev) => ({ ...prev, [field.id]: clean }));
         if (data.exists && (data.parent || (data.siblings && data.siblings.length > 0))) {
-          setMobileStatus("duplicate_found");
+          setMobileStatuses((prev) => ({ ...prev, [field.id]: "duplicate_found" }));
           setSiblingData({
             parent: data.parent || null,
             siblings: data.siblings || [],
             mobile: clean,
+            fieldId: field.id,
+            fieldLabel,
           });
           setSiblingModalOpen(true);
         } else {
-          setMobileStatus("verified_new");
-          setSiblingData(null);
-          toast.success("Mobile number verified as new (No existing records found).");
+          setMobileStatuses((prev) => ({ ...prev, [field.id]: "verified_new" }));
+          toast.success(`${fieldLabel} verified as new (No existing records found).`);
         }
       } else {
-        toast.error("Failed to verify mobile number. Please try again.");
+        toast.error(`Failed to verify ${fieldLabel}. Please try again.`);
       }
     } catch (e) {
       console.error("Error verifying mobile:", e);
-      toast.error("Network error while verifying mobile number.");
+      toast.error(`Network error while verifying ${fieldLabel}.`);
     } finally {
-      setVerifyingMobile(false);
+      setVerifyingMobileIds((prev) => ({ ...prev, [field.id]: false }));
     }
-  }, [phoneField, dynamicValues]);
+  }, [dynamicValues]);
 
   // Real-time Field Validator
   const validateSingleField = (field: FormField, value: any): string => {
@@ -668,9 +693,17 @@ export default function ManualAdmissionPage() {
 
     if (isPhoneField(field)) {
       const clean = String(processedValue || "").replace(/\D/g, "");
-      if (clean !== verifiedMobileNumber) {
-        setMobileStatus("unchecked");
-        if (linkedParent) setLinkedParent(null);
+      const previouslyVerified = verifiedMobileNumbers[field.id];
+      if (clean !== previouslyVerified) {
+        setMobileStatuses((prev) => {
+          if (!prev[field.id] || prev[field.id] === "unchecked") return prev;
+          const updated = { ...prev };
+          delete updated[field.id];
+          return updated;
+        });
+        if (siblingData?.fieldId === field.id && linkedParent) {
+          setLinkedParent(null);
+        }
       }
     }
   };
@@ -680,8 +713,11 @@ export default function ManualAdmissionPage() {
   };
 
   const handleDismissSibling = () => {
+    const targetId = siblingData?.fieldId;
+    if (targetId) {
+      setMobileStatuses((prev) => ({ ...prev, [targetId]: "duplicate_found" }));
+    }
     setSiblingModalOpen(false);
-    setMobileStatus("duplicate_found");
     toast.error("Mobile number is already registered. Please enter a different mobile number or link as sibling.");
   };
 
@@ -772,7 +808,10 @@ export default function ManualAdmissionPage() {
     });
 
     toast.success("Parent & address details auto-filled for sibling!");
-    setMobileStatus("sibling_linked");
+    const targetId = siblingData.fieldId;
+    if (targetId) {
+      setMobileStatuses((prev) => ({ ...prev, [targetId]: "sibling_linked" }));
+    }
     setSiblingModalOpen(false);
   };
 
@@ -840,11 +879,13 @@ export default function ManualAdmissionPage() {
     if (academicYears.length && !academicYears.some(year => String(year.id) === selectedAcademicYear)) { setErrorMsg("Select an available academic year."); return; }
  
     if (hasPhoneField && !isMobileVerified) {
-      const msg = "Please verify the mobile number before submitting the application.";
+      const names = unverifiedPhoneFields.map(f => f.label || "mobile").join(", ");
+      const msg = `Please verify all required mobile numbers (${names}) before submitting the application.`;
       setErrorMsg(msg);
       toast.error(msg);
-      if (phoneField) {
-        const el = document.getElementById(`field-input-${phoneField.id}`);
+      if (unverifiedPhoneFields.length > 0) {
+        const firstUnverified = unverifiedPhoneFields[0];
+        const el = document.getElementById(`field-input-${firstUnverified.id}`);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
           el.focus();
@@ -991,8 +1032,9 @@ export default function ManualAdmissionPage() {
     setRteDocument(null);
     setLinkedParent(null);
     setSiblingData(null);
-    setMobileStatus("unchecked");
-    setVerifiedMobileNumber("");
+    setMobileStatuses({});
+    setVerifyingMobileIds({});
+    setVerifiedMobileNumbers({});
     setSiblingModalOpen(false);
   };
 
@@ -1181,6 +1223,8 @@ export default function ManualAdmissionPage() {
               <CardContent className="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
                 {section.fields?.map(field => {
                   const isPhone = isPhoneField(field);
+                  const fieldMobileStatus = isPhone ? (mobileStatuses[field.id] || "unchecked") : undefined;
+                  const isVerifying = isPhone ? Boolean(verifyingMobileIds[field.id]) : undefined;
                   return (
                     <AdmissionFieldInput
                       key={field.id}
@@ -1191,8 +1235,8 @@ export default function ManualAdmissionPage() {
                       error={fieldErrors[field.id]}
                       disabled={submitting}
                       classes={classes}
-                      mobileStatus={isPhone ? mobileStatus : undefined}
-                      isVerifyingMobile={isPhone ? verifyingMobile : undefined}
+                      mobileStatus={fieldMobileStatus}
+                      isVerifyingMobile={isVerifying}
                       onVerifyMobile={isPhone ? () => void handleVerifyMobile(field) : undefined}
                     />
                   );
@@ -1394,9 +1438,9 @@ export default function ManualAdmissionPage() {
               {hasPhoneField && !isMobileVerified && (
                 <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  {mobileStatus === "duplicate_found"
-                    ? "Existing mobile! Link as sibling or change number."
-                    : "Verify mobile number to enable submission."}
+                  {unverifiedPhoneFields.some(f => mobileStatuses[f.id] === "duplicate_found")
+                    ? "Existing mobile found! Link as sibling or change number."
+                    : `Verify mobile number (${unverifiedPhoneFields.map(f => f.label || "mobile").join(", ")}) to enable submission.`}
                 </span>
               )}
 

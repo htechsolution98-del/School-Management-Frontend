@@ -24,6 +24,7 @@ export async function createStaffSalaryComponent(payload: {
   staff: number;
   component: number;
   calculation_type: CalcType;
+  calc_base?: string;
   value: string;
 }): Promise<StaffSalaryComponent> {
   const response = await fetchWithAuth(`${API_BASE_URL}/staff-salary-component/`, {
@@ -48,6 +49,7 @@ export async function getAllStaffSalaryComponents(): Promise<StaffSalaryAssignme
     componentName: String(item.component_name ?? "Unknown"),
     componentType: (item.component_type ?? "earning") as StaffSalaryAssignment["componentType"],
     calculation_type: item.calculation_type as CalcType,
+    calc_base: String(item.calc_base ?? "Basic Salary"),
     value: String(item.value ?? ""),
     isActive: Boolean(item.is_active ?? true),
   }));
@@ -62,7 +64,7 @@ export async function deleteStaffSalaryComponent(id: number): Promise<void> {
 
 export async function updateStaffSalaryComponent(
   id: number,
-  payload: { calculation_type: CalcType; value: string }
+  payload: { calculation_type: CalcType; calc_base?: string; value: string }
 ): Promise<void> {
   const response = await fetchWithAuth(`${API_BASE_URL}/staff-salary-component/${id}/`, {
     method: "PATCH",
