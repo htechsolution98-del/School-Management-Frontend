@@ -67,6 +67,21 @@ export interface CurrentUserProfile {
     date_of_birth: string | null;
     joining_date: string | null;
     department: string | null;
+    is_class_teacher?: boolean;
+    class_teacher_of?: {
+      class_name: string;
+      division: string;
+      full_class: string;
+      subject?: string | null;
+    } | null;
+    assigned_classes?: Array<{
+      id: number;
+      class_name: string;
+      division: string;
+      full_class: string;
+      subject?: string | null;
+      is_class_teacher: boolean;
+    }>;
   } | null;
   student_profile: {
     id: number;
