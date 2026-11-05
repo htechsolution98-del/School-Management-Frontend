@@ -96,3 +96,96 @@ export async function unlockPayrollRun(runId: number): Promise<void> {
   });
   if (!response.ok) throw new Error("Failed to unlock payroll run.");
 }
+
+export interface SalaryPreviewData {
+  status: string;
+  staff_id: number;
+  staff_name: string;
+  staff_category?: string;
+  salary_month: string;
+  working_days: number;
+  eligible_working_days?: number;
+  present_days: number;
+  paid_leaves: number;
+  unpaid_leaves: number;
+  lwp_days: number;
+  per_day_salary: string;
+  lwp_deduction: string;
+  absent_days?: number;
+  payable_days?: number;
+  basic_salary: string;
+  gross_earnings: string;
+  total_deductions: string;
+  net_salary: string;
+  requires_regularization?: boolean;
+  message?: string;
+  missing_punch_dates?: string[];
+  breakdown?: any;
+}
+
+export async function getSalaryPreview(
+  staffId: number,
+  salaryMonth: string
+): Promise<SalaryPreviewData> {
+  const url = `${API_BASE_URL}/payroll/preview/?staff=${staffId}&salary_month=${salaryMonth}`;
+  const response = await fetchWithAuth(url);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error || data?.message || "Failed to fetch salary preview.");
+  }
+  return data;
+}
+
+export async function bulkGenerateSalaries(
+  salaryMonth: string,
+  paymentMode: string = "offline"
+): Promise<PayrollGenerationResult> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/payroll/bulk-generate/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ salary_month: salaryMonth, payment_mode: paymentMode }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error || data?.detail || data?.message || "Failed to bulk generate salaries.");
+  }
+  return data;
+}
+
+export function getPayslipViewUrl(
+  paymentId: number,
+  format: "html" | "json" = "html",
+  salaryMonth?: string,
+  token?: string,
+  staffId?: number
+): string {
+  const params = new URLSearchParams();
+  params.set("format", format);
+  if (salaryMonth) params.set("salary_month", salaryMonth);
+  if (token) params.set("token", token);
+  if (staffId) params.set("staff_id", String(staffId));
+  return `${API_BASE_URL}/payroll/payslip/${paymentId}/?${params.toString()}`;
+}
+
+export async function bulkDisburseSalaries(
+  salaryMonth: string,
+  paymentIds?: number[],
+  staffIds?: number[],
+  paymentMode: string = "offline"
+): Promise<{ status: string; disbursed_count: number; message: string }> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/payroll/bulk-disburse/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      salary_month: salaryMonth,
+      payment_ids: paymentIds,
+      staff_ids: staffIds,
+      payment_mode: paymentMode,
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error || data?.detail || data?.message || "Failed to disburse salaries.");
+  }
+  return data;
+}

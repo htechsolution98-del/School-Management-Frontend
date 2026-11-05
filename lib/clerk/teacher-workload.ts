@@ -90,3 +90,54 @@ export async function bulkUpdateTeacherWorkloads(payload: {
 
   return await response.json();
 }
+
+
+export interface SaturdayPolicy {
+  saturday_policy: "OFF" | "HALF_DAY" | "FULL_DAY";
+  max_periods: number;
+  is_locked: boolean;
+  label: string;
+  source?: string;
+}
+
+export async function getSaturdayPolicy(): Promise<SaturdayPolicy> {
+  try {
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}${API_ENDPOINTS.TEACHER_WORKLOAD}saturday-policy/`
+    );
+    if (!response.ok) {
+      return {
+        saturday_policy: "HALF_DAY",
+        max_periods: 3,
+        is_locked: false,
+        label: "Half Day (3 periods max)",
+      };
+    }
+    return await response.json();
+  } catch {
+    return {
+      saturday_policy: "HALF_DAY",
+      max_periods: 3,
+      is_locked: false,
+      label: "Half Day (3 periods max)",
+    };
+  }
+}
+
+export async function updateSaturdayPolicy(
+  policy: "OFF" | "HALF_DAY" | "FULL_DAY",
+  autoApply: boolean = false
+): Promise<SaturdayPolicy> {
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}${API_ENDPOINTS.TEACHER_WORKLOAD}saturday-policy/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ saturday_policy: policy, auto_apply_to_staff: autoApply }),
+    }
+  );
+  if (!response.ok) {
+    throw new Error("Failed to update Saturday working policy.");
+  }
+  return await response.json();
+}

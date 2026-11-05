@@ -999,18 +999,18 @@ function MultiStepForm({
     );
   }, [formData]);
 
-  const [mobileStatus, setMobileStatus] = useState<MobileVerificationStatus>(() => {
-    if (child?.admission_number && !String(child.admission_number).startsWith("NEW-")) {
-      return "verified_new";
+  const [mobileStatuses, setMobileStatuses] = useState<Record<number, MobileVerificationStatus>>(() => {
+    if (child?.admission_number && !String(child.admission_number).startsWith("NEW-") && primaryPhoneField) {
+      return { [primaryPhoneField.id]: "verified_new" };
     }
-    return "unchecked";
+    return {};
   });
-  const [verifyingMobile, setVerifyingMobile] = useState(false);
-  const [verifiedMobileNumber, setVerifiedMobileNumber] = useState<string>(() => {
+  const [verifyingMobileIds, setVerifyingMobileIds] = useState<Record<number, boolean>>({});
+  const [verifiedMobileNumbers, setVerifiedMobileNumbers] = useState<Record<number, string>>(() => {
     if (primaryPhoneField && child?.savedFormValues?.[primaryPhoneField.id]) {
-      return String(child.savedFormValues[primaryPhoneField.id]).replace(/\D/g, "");
+      return { [primaryPhoneField.id]: String(child.savedFormValues[primaryPhoneField.id]).replace(/\D/g, "") };
     }
-    return "";
+    return {};
   });
 
   const [otpModalOpen, setOtpModalOpen] = useState(false);
@@ -1035,13 +1035,14 @@ function MultiStepForm({
 
       const rawVal = formValues[targetField.id];
       const clean = String(rawVal || "").replace(/\D/g, "");
+      const fieldLabel = targetField.label || "Mobile number";
 
       if (clean.length !== 10) {
-        toast.error("Please enter a valid 10-digit mobile number before verifying.");
+        toast.error(`Please enter a valid 10-digit mobile number for ${fieldLabel} before verifying.`);
         return;
       }
 
-      setVerifyingMobile(true);
+      setVerifyingMobileIds((prev) => ({ ...prev, [targetField.id]: true }));
       setActivePhoneFieldId(targetField.id);
       try {
         const data = await checkPublicParent(clean);
@@ -1051,21 +1052,21 @@ function MultiStepForm({
           setDevOtp(data.otp || null);
           setOtpValue("");
           setOtpError("");
-          setMobileStatus("duplicate_found");
+          setMobileStatuses((prev) => ({ ...prev, [targetField.id]: "duplicate_found" }));
           setOtpModalOpen(true);
-          toast.info("This mobile number is already registered. Please enter the 6-digit OTP sent to your number.");
+          toast.info(`This mobile number (${clean}) is already registered. Please enter the 6-digit OTP sent to your number.`);
         } else {
-          setMobileStatus("verified_new");
-          setVerifiedMobileNumber(clean);
+          setMobileStatuses((prev) => ({ ...prev, [targetField.id]: "verified_new" }));
+          setVerifiedMobileNumbers((prev) => ({ ...prev, [targetField.id]: clean }));
           setSiblingData(null);
           setDevOtp(null);
-          toast.success("Mobile number verified as new (No existing records found).");
+          toast.success(`${fieldLabel} verified as new (No existing records found).`);
         }
       } catch (err: any) {
         console.error("Error verifying mobile:", err);
-        toast.error(err?.message || "Failed to check mobile number. Please try again.");
+        toast.error(err?.message || `Failed to check ${fieldLabel}. Please try again.`);
       } finally {
-        setVerifyingMobile(false);
+        setVerifyingMobileIds((prev) => ({ ...prev, [targetField.id]: false }));
       }
     },
     [primaryPhoneField, formValues]
@@ -1075,11 +1076,13 @@ function MultiStepForm({
     (field: AdmissionField) => {
       const rawVal = formValues[field.id];
       const clean = String(rawVal || "").replace(/\D/g, "");
-      if (clean.length === 10 && clean !== verifiedMobileNumber && mobileStatus === "unchecked") {
+      const prevVerified = verifiedMobileNumbers[field.id];
+      const status = mobileStatuses[field.id] || "unchecked";
+      if (clean.length === 10 && clean !== prevVerified && status === "unchecked") {
         void handleVerifyMobile(field);
       }
     },
-    [formValues, verifiedMobileNumber, mobileStatus, handleVerifyMobile]
+    [formValues, verifiedMobileNumbers, mobileStatuses, handleVerifyMobile]
   );
 
   const handlePhoneChange = useCallback(
@@ -1088,12 +1091,18 @@ function MultiStepForm({
       const changedField = allFields.find((f: any) => f.id === fieldId);
       if (changedField && isPhoneField(changedField)) {
         const clean = String(value || "").replace(/\D/g, "");
-        if (clean !== verifiedMobileNumber) {
-          setMobileStatus("unchecked");
+        const prevVerified = verifiedMobileNumbers[fieldId];
+        if (clean !== prevVerified) {
+          setMobileStatuses((prev) => {
+            if (!prev[fieldId] || prev[fieldId] === "unchecked") return prev;
+            const updated = { ...prev };
+            delete updated[fieldId];
+            return updated;
+          });
         }
       }
     },
-    [formData, verifiedMobileNumber]
+    [formData, verifiedMobileNumbers]
   );
 
   const handleCancelOtp = () => {
@@ -1104,9 +1113,17 @@ function MultiStepForm({
     const targetId = activePhoneFieldId || primaryPhoneField?.id;
     if (targetId) {
       setFormValues((prev: any) => ({ ...prev, [targetId]: "" }));
+      setMobileStatuses((prev) => {
+        const updated = { ...prev };
+        delete updated[targetId];
+        return updated;
+      });
+      setVerifiedMobileNumbers((prev) => {
+        const updated = { ...prev };
+        delete updated[targetId];
+        return updated;
+      });
     }
-    setMobileStatus("unchecked");
-    setVerifiedMobileNumber("");
     toast.error("Mobile number cleared. Please use a different number or verify OTP to link as sibling.");
   };
 
@@ -1139,7 +1156,9 @@ function MultiStepForm({
       const res = await verifyParentOTP(tempOtpMobile, cleanOtp);
       if (res.success) {
         setOtpModalOpen(false);
-        setVerifiedMobileNumber(tempOtpMobile);
+        if (activePhoneFieldId) {
+          setVerifiedMobileNumbers((prev) => ({ ...prev, [activePhoneFieldId]: tempOtpMobile }));
+        }
         setSiblingData({
           parent: res.parent,
           siblings: res.siblings || [],
@@ -1217,7 +1236,9 @@ function MultiStepForm({
 
     setFormValues((prev: any) => ({ ...prev, ...updates }));
     setErrors(clearedErrors);
-    setMobileStatus("sibling_linked");
+    if (activePhoneFieldId) {
+      setMobileStatuses((prev) => ({ ...prev, [activePhoneFieldId]: "sibling_linked" }));
+    }
     setSiblingConfirmModalOpen(false);
     toast.success("Parent & address details auto-filled successfully!");
   };
@@ -1227,9 +1248,17 @@ function MultiStepForm({
     const targetId = activePhoneFieldId || primaryPhoneField?.id;
     if (targetId) {
       setFormValues((prev: any) => ({ ...prev, [targetId]: "" }));
+      setMobileStatuses((prev) => {
+        const updated = { ...prev };
+        delete updated[targetId];
+        return updated;
+      });
+      setVerifiedMobileNumbers((prev) => {
+        const updated = { ...prev };
+        delete updated[targetId];
+        return updated;
+      });
     }
-    setMobileStatus("unchecked");
-    setVerifiedMobileNumber("");
     setSiblingData(null);
     setDevOtp(null);
     toast.info("Mobile number cleared. Please use a different number.");
@@ -1443,12 +1472,13 @@ function MultiStepForm({
         setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Valid 10-digit mobile number is required" }));
         return;
       }
-      if (mobileStatus !== "verified_new" && mobileStatus !== "sibling_linked") {
+      const primaryStatus = mobileStatuses[primaryPhoneField.id];
+      if (primaryStatus !== "verified_new" && primaryStatus !== "sibling_linked") {
         toast.error("Please verify your mobile number before proceeding.");
         setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Mobile number must be verified" }));
         return;
       }
-      if (phoneVal !== verifiedMobileNumber) {
+      if (phoneVal !== verifiedMobileNumbers[primaryPhoneField.id]) {
         toast.error("Mobile number was changed. Please re-verify before proceeding.");
         setErrors((prev: any) => ({ ...prev, [primaryPhoneField.id]: "Mobile number re-verification required" }));
         return;
@@ -1669,8 +1699,8 @@ function MultiStepForm({
                     setFormValues={setFormValues}
                     errors={errors}
                     setErrors={setErrors}
-                    mobileStatus={mobileStatus}
-                    verifyingMobile={verifyingMobile}
+                    mobileStatuses={mobileStatuses}
+                    verifyingMobileIds={verifyingMobileIds}
                     onVerifyMobile={handleVerifyMobile}
                     onPhoneBlur={handlePhoneBlur}
                     onPhoneChange={handlePhoneChange}
@@ -2042,8 +2072,8 @@ function StudentDetailsStep({
   setFormValues,
   errors,
   setErrors,
-  mobileStatus,
-  verifyingMobile,
+  mobileStatuses,
+  verifyingMobileIds,
   onVerifyMobile,
   onPhoneBlur,
   onPhoneChange,
@@ -2054,8 +2084,8 @@ function StudentDetailsStep({
   setFormValues: any;
   errors: any;
   setErrors: any;
-  mobileStatus?: MobileVerificationStatus;
-  verifyingMobile?: boolean;
+  mobileStatuses?: Record<number, MobileVerificationStatus>;
+  verifyingMobileIds?: Record<number, boolean>;
   onVerifyMobile?: (field?: AdmissionField) => void;
   onPhoneBlur?: (field: AdmissionField) => void;
   onPhoneChange?: (fieldId: number, value: string) => void;
@@ -2157,8 +2187,8 @@ function StudentDetailsStep({
                         error={errors[field.id]}
                         onChange={(value: string) => handleChange(field.id, value)}
                         onBlur={isPhone && onPhoneBlur ? () => onPhoneBlur(updatedField) : undefined}
-                        mobileStatus={isPhone ? mobileStatus : undefined}
-                        isVerifyingMobile={isPhone ? verifyingMobile : undefined}
+                        mobileStatus={isPhone ? (mobileStatuses?.[field.id] || "unchecked") : undefined}
+                        isVerifyingMobile={isPhone ? Boolean(verifyingMobileIds?.[field.id]) : undefined}
                         onVerifyMobile={isPhone && onVerifyMobile ? () => onVerifyMobile(updatedField) : undefined}
                       />
                     </motion.div>

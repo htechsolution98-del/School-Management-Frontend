@@ -55,7 +55,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { toHTMLDate, toApiDate, calculateDaysBetween } from "@/lib/dateUtils";
+import { toHTMLDate, toApiDate, calculateDaysBetween, parseDateString } from "@/lib/dateUtils";
+import { getSaturdayPolicy } from "@/lib/clerk/teacher-workload";
 
 import {
   getRemainingLeaves,
@@ -105,6 +106,12 @@ export function StaffLeavesDesk({
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDaySession, setHalfDaySession] = useState<"FIRST_HALF" | "SECOND_HALF">("FIRST_HALF");
   const [totalDays, setTotalDays] = useState(0);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [saturdayPolicy, setSaturdayPolicy] = useState<"OFF" | "HALF_DAY" | "FULL_DAY">("HALF_DAY");
+
+  const startDateObj = useMemo(() => parseDateString(startDate), [startDate]);
+  const isSaturday = startDateObj ? startDateObj.getDay() === 6 : false;
+  const isSunday = startDateObj ? startDateObj.getDay() === 0 : false;
   const [previewData, setPreviewData] = useState<LeaveCalculationPreview | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -148,10 +155,33 @@ export function StaffLeavesDesk({
   useEffect(() => {
     if (!startDate || (!isHalfDay && !endDate) || !leaveTypeId) {
       setPreviewData(null);
+      setCalendarError(null);
       if (isHalfDay) setTotalDays(0.5);
       else if (startDate && endDate) setTotalDays(calculateDaysBetween(startDate, endDate));
       else setTotalDays(0);
       return;
+    }
+
+    // Client-side instant check for single-day Sunday or Saturday rules
+    const sDate = parseDateString(startDate);
+    const isSingle = isHalfDay || startDate === endDate;
+    if (isSingle && sDate) {
+      if (sDate.getDay() === 0) {
+        setCalendarError("Selected date is an official holiday/off-day. Leave application is not permitted.");
+        setPreviewData(null);
+        setTotalDays(0);
+        return;
+      }
+      if (sDate.getDay() === 6 && saturdayPolicy === "OFF") {
+        setCalendarError("Saturday is an institutional off-day. Leave application is not permitted.");
+        setPreviewData(null);
+        setTotalDays(0);
+        return;
+      }
+      if (sDate.getDay() === 6 && saturdayPolicy === "HALF_DAY" && isHalfDay) {
+        setIsHalfDay(false);
+        setTotalDays(1.0);
+      }
     }
 
     let active = true;
@@ -169,24 +199,28 @@ export function StaffLeavesDesk({
         if (active) {
           setPreviewData(preview);
           setTotalDays(preview.total_effective_days);
+          setCalendarError(null);
+          if (preview.saturday_policy) {
+            setSaturdayPolicy(preview.saturday_policy as any);
+          }
         }
       } catch (err: any) {
         if (active) {
-          console.warn("Could not calculate live server preview, falling back to local calculation:", err);
           setPreviewData(null);
-          if (isHalfDay) setTotalDays(0.5);
-          else setTotalDays(calculateDaysBetween(startDate, endDate));
+          const msg = err?.message || "Selected date is not permitted for leave.";
+          setCalendarError(msg);
+          setTotalDays(0);
         }
       } finally {
         if (active) setIsPreviewLoading(false);
       }
-    }, 350);
+    }, 300);
 
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [startDate, endDate, leaveTypeId, isHalfDay, halfDaySession]);
+  }, [startDate, endDate, leaveTypeId, isHalfDay, halfDaySession, saturdayPolicy]);
 
   const fetchData = async (options?: boolean | any) => {
     const isManual = typeof options === "boolean" ? options : false;
@@ -201,6 +235,9 @@ export function StaffLeavesDesk({
       ]);
       setBalances(Array.isArray(remainingData) ? remainingData : []);
       setHistory(Array.isArray(historyData) ? historyData : []);
+      getSaturdayPolicy().then((res) => {
+        if (res?.saturday_policy) setSaturdayPolicy(res.saturday_policy);
+      }).catch(() => {});
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Failed to load leave records. Please check connection.");
@@ -219,6 +256,7 @@ export function StaffLeavesDesk({
     setIsHalfDay(false);
     setHalfDaySession("FIRST_HALF");
     setTotalDays(0);
+    setCalendarError(null);
     setIsDialogOpen(true);
   };
 
@@ -243,6 +281,11 @@ export function StaffLeavesDesk({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (calendarError) {
+      toast.error(calendarError);
+      return;
+    }
+
     if (!startDate || !endDate || !leaveTypeId || !reason.trim() || totalDays <= 0) {
       toast.error("Please fill out all fields correctly.");
       return;
@@ -260,17 +303,21 @@ export function StaffLeavesDesk({
       previewData?.balance?.available ?? selectedBal?.remaining ?? (selectedBal as any)?.remaining_leaves ?? 0
     );
     if (selectedBal && selectedBal.is_paid !== false && totalDays > available) {
-      toast.error(`Insufficient leave balance. You have ${available} days available, requested ${totalDays}.`);
-      return;
+      if (!isHalfDay) {
+        toast.error(`Insufficient leave balance. You have ${available} days available, requested ${totalDays}.`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
     const payload = {
       start_date: startDate,
       end_date: isHalfDay ? startDate : endDate,
-      total_days: totalDays,
+      total_days: isHalfDay ? 0.5 : totalDays,
+      days_count: isHalfDay ? 0.5 : totalDays,
       is_half_day: isHalfDay,
       half_day_session: isHalfDay ? halfDaySession : "FULL_DAY",
+      half_day_period: isHalfDay ? halfDaySession : undefined,
       reason: reason.trim(),
       leave_type: Number(leaveTypeId),
       dynamic_leave_type: Number(leaveTypeId),
@@ -602,13 +649,13 @@ export function StaffLeavesDesk({
                       </Badge>
                     </div>
 
-                    {/* Big count + / quota left */}
+                    {/* Big count + / quota left formatted by leave_unit */}
                     <div className="flex items-baseline gap-1 mt-2.5">
                       <span className={cn("text-2xl sm:text-3xl font-black leading-none", numberColor)}>
                         {remaining}
                       </span>
                       <span className="text-[11px] sm:text-xs font-semibold text-slate-400">
-                        / {totalQuota} left
+                        / {totalQuota} {((b as any).leave_unit === "HALF_DAY" || (b as any).code === "HDL") ? "Half-Days" : "Days"} left
                       </span>
                     </div>
 
@@ -1063,20 +1110,34 @@ export function StaffLeavesDesk({
               <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Leave Type <span className="text-rose-500">*</span>
               </Label>
-              <Select value={leaveTypeId} onValueChange={(val: any) => setLeaveTypeId(val ?? "")}>
+              <Select
+                value={leaveTypeId}
+                onValueChange={(val: any) => {
+                  setLeaveTypeId(val ?? "");
+                  const sel = balances.find((b) => String(b.leave_type_id ?? b.leave_type) === String(val));
+                  if (sel && ((sel as any).leave_unit === "HALF_DAY" || (sel as any).code === "HDL")) {
+                    setIsHalfDay(true);
+                    setTotalDays(0.5);
+                    if (startDate) setEndDate(startDate);
+                  }
+                }}
+              >
                 <SelectTrigger className="rounded-xl h-10 text-xs">
                   <SelectValue placeholder="Select leave category" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {balances.map((b) => (
-                    <SelectItem
-                      key={b.leave_type_id || b.leave_type}
-                      value={String(b.leave_type_id ?? b.leave_type)}
-                      className="text-xs"
-                    >
-                      {b.leave_type_name || b.leave_type} ({b.remaining} days available)
-                    </SelectItem>
-                  ))}
+                  {balances.map((b) => {
+                    const isHd = (b as any).leave_unit === "HALF_DAY" || (b as any).code === "HDL";
+                    return (
+                      <SelectItem
+                        key={b.leave_type_id || b.leave_type}
+                        value={String(b.leave_type_id ?? b.leave_type)}
+                        className="text-xs"
+                      >
+                        {b.leave_type_name || b.leave_type} ({b.remaining} {isHd ? "Half-Days" : "Days"} available)
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -1111,29 +1172,92 @@ export function StaffLeavesDesk({
               </div>
             </div>
 
-            {/* Half Day Option */}
-            <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Half Day Leave</div>
-                  <div className="text-[11px] text-slate-400">Deducts 0.5 day from available balance</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={isHalfDay}
-                  onChange={(e) => setIsHalfDay(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
+            {/* Duration Selector (Full Day 1.0 vs Half Day 0.5) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Leave Duration <span className="text-rose-500">*</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHalfDay(false);
+                    setTotalDays(1.0);
+                  }}
+                  className={cn(
+                    "py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5",
+                    !isHalfDay
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  )}
+                >
+                  Full Day (1.0)
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaturday && saturdayPolicy === "HALF_DAY"}
+                  onClick={() => {
+                    if (isSaturday && saturdayPolicy === "HALF_DAY") {
+                      toast.error("Saturday operates on half-day hours; taking leave requires a Full Day absence.");
+                      return;
+                    }
+                    setIsHalfDay(true);
+                    setTotalDays(0.5);
+                    if (startDate) setEndDate(startDate);
+                  }}
+                  className={cn(
+                    "py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5",
+                    isHalfDay
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900",
+                    isSaturday && saturdayPolicy === "HALF_DAY" && "opacity-40 cursor-not-allowed pointer-events-none"
+                  )}
+                  title={isSaturday && saturdayPolicy === "HALF_DAY" ? "Saturday operates on half-day hours; taking leave requires a Full Day absence." : undefined}
+                >
+                  Half Day (0.5)
+                </button>
               </div>
+            </div>
 
-              {isHalfDay && (
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex gap-2">
+            {/* Saturday Policy Notice */}
+            {isSaturday && saturdayPolicy === "HALF_DAY" && (
+              <div className="p-3 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl flex items-start gap-2.5 text-blue-900 dark:text-blue-200 text-xs shadow-xs">
+                <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold block mb-0.5">Saturday Half-Day Schedule Notice</span>
+                  Saturday operates on half-day hours; taking leave requires a Full Day absence.
+                </div>
+              </div>
+            )}
+
+            {/* Calendar & Holiday Policy Alert */}
+            {calendarError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 rounded-2xl flex items-start gap-2.5 text-rose-900 dark:text-rose-200 text-xs shadow-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold block mb-0.5">Leave Application Not Permitted</span>
+                  {calendarError}
+                </div>
+              </div>
+            )}
+
+            {/* When Half Day is selected: Session selector */}
+            {isHalfDay && (
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                  <span>Half-Day Session</span>
+                  <span className="text-[11px] text-blue-600 font-semibold">0.5 Day</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant={halfDaySession === "FIRST_HALF" ? "default" : "outline"}
                     onClick={() => setHalfDaySession("FIRST_HALF")}
-                    className="flex-1 rounded-xl text-xs h-8"
+                    className={cn(
+                      "rounded-xl text-xs h-9 font-semibold",
+                      halfDaySession === "FIRST_HALF" && "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    )}
                   >
                     First Half (Morning)
                   </Button>
@@ -1142,13 +1266,34 @@ export function StaffLeavesDesk({
                     size="sm"
                     variant={halfDaySession === "SECOND_HALF" ? "default" : "outline"}
                     onClick={() => setHalfDaySession("SECOND_HALF")}
-                    className="flex-1 rounded-xl text-xs h-8"
+                    className={cn(
+                      "rounded-xl text-xs h-9 font-semibold",
+                      halfDaySession === "SECOND_HALF" && "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    )}
                   >
                     Second Half (Afternoon)
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Real-time Balance Check & Warning Banner */}
+            {(() => {
+              const sel = balances.find((b) => String(b.leave_type_id ?? b.leave_type) === String(leaveTypeId));
+              const rem = Number(sel?.remaining ?? sel?.remaining_leaves ?? 0);
+              if (isHalfDay && rem <= 0) {
+                return (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 rounded-2xl flex items-start gap-2.5 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <span className="font-bold block mb-0.5">Warning: Leave Without Pay (LWP)</span>
+                      Your Half-Day leave balance is 0. Applying this will be treated as Leave Without Pay (LWP) and 0.5 day&apos;s wage will be deducted from your monthly salary upon approval.
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Total Duration Display */}
             <div className="flex items-center justify-between px-3 py-2 bg-blue-50/60 dark:bg-blue-950/20 rounded-xl text-xs font-semibold text-blue-800 dark:text-blue-300">
@@ -1255,7 +1400,7 @@ export function StaffLeavesDesk({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || totalDays <= 0}
+                disabled={isSubmitting || !!calendarError || totalDays <= 0}
                 className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 flex-1"
               >
                 {isSubmitting ? (

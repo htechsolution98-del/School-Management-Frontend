@@ -57,16 +57,9 @@ export function validateStaffRecord(
     errors.mobile = "This mobile number is already assigned to a staff member.";
   }
 
-  const selectedRole = roles?.find(r => String(r.id) === String(data.category));
-  const isClerk = selectedRole
-    ? selectedRole.label.toLowerCase().includes("clerk")
-    : (typeof data.category === "string" && data.category.toLowerCase().includes("clerk"));
-
-  if (!isClerk) {
-    if (!departments.some(item => item.id === data.department)) {
-      errors.department = "Select an available department.";
-    }
-  } else if (data.department && !departments.some(item => item.id === data.department)) {
+  if (!data.department) {
+    errors.department = "Department is required.";
+  } else if (!departments.some(item => item.id === data.department)) {
     errors.department = "Select an available department.";
   }
 

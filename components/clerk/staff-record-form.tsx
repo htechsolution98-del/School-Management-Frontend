@@ -4,6 +4,7 @@ import { Loader2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { DepartmentCombobox } from "@/components/clerk/department-combobox";
 import type { CreateStaffPayload, Department, AttendanceSetting, SalaryStructure } from "@/types";
 import type { LeaveTemplate } from "@/lib/clerk/leaves";
 import type { StaffErrors } from "@/lib/clerk/hr-validation";
@@ -25,6 +26,7 @@ export function StaffRecordForm({
   onEdit,
   onSubmit,
   onClose,
+  onDepartmentCreated,
 }: {
   value: CreateStaffPayload;
   onChange: (field: keyof CreateStaffPayload, value: string | number | boolean | undefined) => void;
@@ -40,14 +42,11 @@ export function StaffRecordForm({
   onEdit?: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onClose: () => void;
+  onDepartmentCreated?: (department: Department) => void;
 }) {
   const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
   const maxDob = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
-  const selectedRole = roles.find(role => String(role.id) === String(value.category));
-  const isClerk = selectedRole
-    ? selectedRole.label.toLowerCase().includes("clerk")
-    : (typeof value.category === "string" && value.category.toLowerCase().includes("clerk"));
-  const isDepartmentRequired = !isClerk;
+  const isDepartmentRequired = true;
   const attrs = (field: keyof CreateStaffPayload) => ({ id: `staff-${field}`, "aria-invalid": !!errors[field], "aria-describedby": errors[field] ? `staff-${field}-error` : undefined });
   const error = (field: keyof CreateStaffPayload) => errors[field] && <p id={`staff-${field}-error`} className="hr-field-error">{errors[field]}</p>;
 
@@ -96,7 +95,25 @@ export function StaffRecordForm({
           <div className="hr-field-wide"><label htmlFor="staff-address">Address</label><textarea {...attrs("address")} rows={2} autoComplete="street-address" value={value.address} placeholder="Street, area and city" onChange={e => onChange("address", e.target.value)} className="hr-textarea" required />{error("address")}</div>
         </div></div>
         <div className="hr-form-section"><div><span>02</span><h3>Employment details</h3><p>Department, role, compensation, and policy assignments.</p></div><div className="hr-form-fields">
-          <div><label htmlFor="staff-department">Department {isDepartmentRequired && <span className="text-red-500">*</span>}</label><select {...attrs("department")} value={value.department ?? ""} onChange={e => onChange("department", e.target.value ? Number(e.target.value) : undefined)} required={isDepartmentRequired}><option value="">Select department{isDepartmentRequired ? "" : " (Optional)"}</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("department")}</div>
+          <div>
+            <label htmlFor="staff-department">
+              Department {isDepartmentRequired && <span className="text-red-500">*</span>}
+            </label>
+            <DepartmentCombobox
+              id="staff-department"
+              value={value.department}
+              onChange={(deptId) => onChange("department", deptId)}
+              departments={departments}
+              onDepartmentCreated={onDepartmentCreated}
+              error={errors.department}
+              disabled={saving || readOnly}
+              required={isDepartmentRequired}
+              placeholder={isDepartmentRequired ? "Select department..." : "Select department (Optional)"}
+              aria-invalid={!!errors.department}
+              aria-describedby={errors.department ? "staff-department-error" : undefined}
+            />
+            {error("department")}
+          </div>
           <div><label htmlFor="staff-category">Role</label><select {...attrs("category")} value={value.category} onChange={e => onChange("category", e.target.value)} required><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}</select>{error("category")}</div>
           <div><label htmlFor="staff-joining_date">Joining date</label><DatePicker {...attrs("joining_date")} value={value.joining_date ?? ""} onChange={date => onChange("joining_date", date)} className="w-full" />{error("joining_date")}</div>
           <div><label htmlFor="staff-exit_date">Exit date (Last working date)</label><DatePicker {...attrs("exit_date")} value={value.exit_date ?? ""} onChange={handleExitDateChange} className="w-full" />{error("exit_date")}</div>

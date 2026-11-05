@@ -1,5 +1,5 @@
-import PrincipalLeaveRequestsPage from "@/app/principal/leave-requests/page";
+import { PrincipalLeaveRequestsDesk } from "@/components/leaves/PrincipalLeaveRequestsDesk";
 
 export default function TrusteeLeaveRequestsPage() {
-  return <PrincipalLeaveRequestsPage roleTitle="Trustee" />;
+  return <PrincipalLeaveRequestsDesk roleTitle="Trustee" />;
 }

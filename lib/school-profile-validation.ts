@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 export const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-const BANK_ACC_REGEX = /^\d{9,18}$/;
+export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+export const BANK_ACC_REGEX = /^\d{9,20}$/;
+export const BANK_NAME_PUNCTUATION_REGEX = /^[A-Za-z\s.\-]+$/;
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const CURRENT_YEAR = new Date().getFullYear();
@@ -104,7 +105,7 @@ export const schoolProfileSchema = z.object({
         return BANK_ACC_REGEX.test(val);
       },
       {
-        message: "Bank account number must be numeric characters only (between 9 and 18 digits).",
+        message: "Account number must be between 9 and 20 digits.",
       }
     ),
   bank_ifsc: z
@@ -117,7 +118,7 @@ export const schoolProfileSchema = z.object({
         return IFSC_REGEX.test(val);
       },
       {
-        message: "IFSC code must exactly match standard Indian format (e.g. HDFC0001234: 4 letters, 0, 6 alphanumeric).",
+        message: "Invalid format. Must be 11 characters with the 5th character as '0' (zero).",
       }
     ),
   website_url: z
@@ -180,4 +181,60 @@ export function getTabForField(fieldName: string): "basic" | "billing" | "brandi
   if (brandingFields.has(fieldName)) return "branding";
   if (documentFields.has(fieldName)) return "documents";
   return "basic";
+}
+
+
+// ── Multi-Bank Account Strict Unified Validation Schema ──
+export const schoolBankAccountSchema = z.object({
+  account_holder_name: z
+    .string()
+    .trim()
+    .min(3, "Account holder name must be between 3 and 100 characters.")
+    .max(100, "Account holder name must be between 3 and 100 characters.")
+    .refine((val) => BANK_NAME_PUNCTUATION_REGEX.test(val), {
+      message: "Account holder name can only contain alphabets, spaces, dots, and hyphens.",
+    }),
+  bank_name: z
+    .string()
+    .trim()
+    .min(3, "Bank name must be between 3 and 100 characters.")
+    .max(100, "Bank name must be between 3 and 100 characters.")
+    .refine((val) => BANK_NAME_PUNCTUATION_REGEX.test(val), {
+      message: "Bank name can only contain alphabets, spaces, dots, and hyphens.",
+    }),
+  account_number: z
+    .string()
+    .trim()
+    .min(1, "Account number must be between 9 and 20 digits.")
+    .refine((val) => BANK_ACC_REGEX.test(val), {
+      message: "Account number must be between 9 and 20 digits.",
+    }),
+  ifsc_code: z
+    .string()
+    .trim()
+    .transform((val) => val.toUpperCase())
+    .refine((val) => IFSC_REGEX.test(val), {
+      message: "Invalid format. Must be 11 characters with the 5th character as '0' (zero).",
+    }),
+  branch_name: z.string().trim().max(100).optional(),
+  account_purpose: z.enum(["FEES", "SALARY", "GRANTS", "GENERAL"]).default("FEES"),
+  is_primary: z.boolean().default(false),
+});
+
+export function validateSchoolBankAccountFields(data: any): {
+  isValid: boolean;
+  errors: Record<string, string>;
+} {
+  const result = schoolBankAccountSchema.safeParse(data);
+  if (result.success) {
+    return { isValid: true, errors: {} };
+  }
+  const errors: Record<string, string> = {};
+  for (const issue of result.error.issues) {
+    const field = String(issue.path[0] || "");
+    if (field && !errors[field]) {
+      errors[field] = issue.message;
+    }
+  }
+  return { isValid: false, errors };
 }

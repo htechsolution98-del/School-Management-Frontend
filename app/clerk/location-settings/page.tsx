@@ -24,8 +24,13 @@ import {
   Layers,
   ArrowRight,
   Info,
+  Fingerprint,
+  ScanFace,
+  Power,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateAttendanceCache } from "@/lib/teacher/attendance";
 
 import {
   Card,
@@ -642,14 +647,60 @@ function DataView({
   data,
   onDelete,
   onEdit,
+  onRefresh,
 }: {
   data: LocationSettingsRecord;
   onDelete: () => void;
   onEdit: () => void;
+  onRefresh?: () => void;
 }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isTogglingBiometric, setIsTogglingBiometric] = useState(false);
+
+  const isBiometricActive = Boolean((data as any)?.biometric_required);
+
+  const handleToggleBiometric = async () => {
+    setIsTogglingBiometric(true);
+    try {
+      const existingSettings = await getAttendanceSettings();
+      const primarySetting = existingSettings[0];
+      const newStatus = !isBiometricActive;
+
+      const dynamicPayload = {
+        name: (data as any)?.shift_name || "General Shift",
+        check_in_time: data.start_time || "09:00:00",
+        check_out_time: data.end_time || "17:00:00",
+        grace_period_mins: Number((data as any)?.grace_period_mins) || 15,
+        half_day_threshold_mins: Number((data as any)?.half_day_threshold_mins) || 120,
+        geo_radius_meters: Number(data.radius) || 100,
+        geo_required: true,
+        biometric_required: newStatus,
+        is_active: true,
+      };
+
+      if (primarySetting?.id) {
+        await updateAttendanceSetting(primarySetting.id, dynamicPayload);
+      } else {
+        await createAttendanceSetting(dynamicPayload);
+      }
+
+      invalidateAttendanceCache();
+      toast.success(
+        newStatus
+          ? "Face Biometric Verification is now ENABLED! Compulsory for all staff punches."
+          : "Face Biometric Verification is now DISABLED. Staff can punch with GPS only."
+      );
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update biometric status.");
+    } finally {
+      setIsTogglingBiometric(false);
+    }
+  };
 
   const fmt = (t?: string) => {
     if (!t || String(t).trim() === "") return "N/A";
@@ -675,7 +726,7 @@ function DataView({
   };
 
   return (
-    <>
+    <div className="space-y-6">
       {showDeleteDialog && (
         <DeleteConfirmDialog
           onConfirm={handleDeleteConfirm}
@@ -696,6 +747,97 @@ function DataView({
           </div>
         </div>
       )}
+
+            {/* Face Biometric Verification Card */}
+                <Card
+                  className={cn(
+                    "rounded-2xl border transition-all shadow-2xs overflow-hidden",
+                    isBiometricActive
+                      ? "border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/20 dark:border-emerald-900/60 dark:bg-zinc-900"
+                      : "border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+                  )}
+                >
+                  <CardHeader className="pb-3 border-b dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <Fingerprint className={cn("h-4 w-4", isBiometricActive ? "text-emerald-600" : "text-slate-400")} />
+                        Face Biometric Attendance Verification
+                      </CardTitle>
+                      <Badge
+                        className={cn(
+                          "font-semibold text-[11px] gap-1.5",
+                          isBiometricActive
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200"
+                            : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-zinc-800 dark:text-zinc-400"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            isBiometricActive ? "bg-emerald-600 animate-pulse" : "bg-slate-400"
+                          )}
+                        />
+                        {isBiometricActive ? "LIVE ENFORCING • COMPULSORY" : "DISABLED • GPS ONLY"}
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs">
+                      {isBiometricActive
+                        ? "Live camera face matching is mandatory for all teachers, clerks, and leadership staff check-in and check-out punches."
+                        : "Attendance is recorded using School Geofence GPS location only. Face camera verification is currently bypassed."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "h-11 w-11 rounded-xl flex items-center justify-center shrink-0 border",
+                          isBiometricActive
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-900"
+                            : "bg-slate-50 border-slate-200 text-slate-400 dark:bg-zinc-800/60 dark:border-zinc-700"
+                        )}
+                      >
+                        <ScanFace className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-zinc-100">
+                          {isBiometricActive ? "Compulsory Face Verification Enabled" : "GPS Geofence Only Mode Active"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Clerk Authority: Toggle biometric requirement for the entire school anytime.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isTogglingBiometric}
+                      onClick={handleToggleBiometric}
+                      className={cn(
+                        "rounded-xl text-xs font-bold h-9 px-4 gap-1.5 shrink-0 transition-all cursor-pointer",
+                        isBiometricActive
+                          ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      )}
+                    >
+                      {isTogglingBiometric ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Updating...
+                        </>
+                      ) : isBiometricActive ? (
+                        <>
+                          <Power className="h-3.5 w-3.5" />
+                          Turn OFF Biometric
+                        </>
+                      ) : (
+                        <>
+                          <Power className="h-3.5 w-3.5" />
+                          Turn ON Biometric (Compulsory)
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Left: Location & Geofence Card */}
@@ -764,6 +906,8 @@ function DataView({
 
         {/* Right: Working Hours & Management */}
         <div className="space-y-6">
+
+
           <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
             <CardHeader className="pb-3 border-b dark:border-zinc-800">
               <CardTitle className="text-xs font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -866,7 +1010,7 @@ function DataView({
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -940,6 +1084,7 @@ function LocationForm({
         }
       }
 
+      invalidateAttendanceCache();
       toast.success("Attendance zone & policy settings saved successfully!");
       onSaved(form);
     } catch (err: any) {
@@ -1083,6 +1228,7 @@ function LocationForm({
         </Card>
 
         {/* Right Column: Working Hours & Summary */}
+
         <div className="space-y-6">
           {/* Card: Working Hours */}
           <Card className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
@@ -1125,7 +1271,7 @@ function LocationForm({
                 </div>
 
                 {canManageAttendanceSettings && (
-                  <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-sm dark:border-indigo-900 dark:bg-indigo-950/30">
+                  <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3.5 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
                     <input
                       type="checkbox"
                       checked={form.biometric_required}
@@ -1133,8 +1279,8 @@ function LocationForm({
                       className="mt-0.5 h-4 w-4 accent-indigo-600"
                     />
                     <span>
-                      <span className="block font-semibold text-slate-800 dark:text-zinc-100">Require face verification for staff punches</span>
-                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">Staff must enroll and verify their face for check-in and check-out.</span>
+                      <span className="block font-semibold text-slate-800 dark:text-zinc-100">Require Face Biometric verification for staff punches (Compulsory for All Staff)</span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">When enabled, all staff (Teachers, Clerks, Principal) must verify their live face via camera + GPS geofence for check-in and check-out.</span>
                     </span>
                   </label>
                 )}
@@ -1327,7 +1473,20 @@ function LocationForm({
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function LocationSettingsPage() {
-  const attendanceAdminRoles = ["principal", "vice principal", "admin", "superadmin", "super_admin", "trustee", "hr", "hr_admin", "attendance_admin"];
+  const attendanceAdminRoles = [
+    "principal",
+    "vice principal",
+    "admin",
+    "superadmin",
+    "super_admin",
+    "trustee",
+    "hr",
+    "hr_admin",
+    "attendance_admin",
+    "clerk",
+    "assistant clerk",
+    "fees_clerk",
+  ];
   const currentRoles = getUserRoles();
   const canManageAttendanceSettings =
     currentRoles.some((role) => attendanceAdminRoles.includes(role)) ||
@@ -1478,6 +1637,7 @@ export default function LocationSettingsPage() {
             setPageState("empty");
           }}
           onEdit={() => setPageState("form")}
+          onRefresh={loadData}
         />
       )}
 

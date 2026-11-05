@@ -1,3 +1,21 @@
+export type BankAccountPurpose = "FEES" | "SALARY" | "GRANTS" | "GENERAL";
+
+export interface SchoolBankAccount {
+  id?: number;
+  school_profile?: number;
+  school_id?: number;
+  account_holder_name: string;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch_name?: string;
+  account_purpose: BankAccountPurpose;
+  purpose_label?: string;
+  is_primary: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 import { API_BASE_URL } from "./config";
 import { fetchWithAuth, extractErrorMessage } from "./auth";
 
@@ -28,6 +46,8 @@ export interface SchoolProfileData {
   bank_account_no: string;
   bank_ifsc: string;
   bank_name: string;
+  bank_accounts?: SchoolBankAccount[];
+  primary_bank_account?: SchoolBankAccount | null;
 
   // Media & Branding (Cloudinary URLs)
   main_logo_url: string;
@@ -62,6 +82,8 @@ export const DEFAULT_SCHOOL_PROFILE: SchoolProfileData = {
   bank_account_no: "",
   bank_ifsc: "",
   bank_name: "",
+  bank_accounts: [],
+  primary_bank_account: null,
   main_logo_url: "",
   print_logo_url: "",
   favicon_url: "",
@@ -140,6 +162,8 @@ export async function getSchoolProfile(): Promise<SchoolProfileData> {
         normalized.phone_numbers = normalizePhoneNumbers(value);
       } else if (key === "board_affiliation") {
         normalized.board_affiliation = normalizeBoardAffiliation(value);
+      } else if (key === "bank_accounts") {
+        normalized.bank_accounts = Array.isArray(value) ? value : [];
       } else {
         (normalized as any)[key] = value ?? (DEFAULT_SCHOOL_PROFILE as any)[key] ?? "";
       }
@@ -187,4 +211,97 @@ export async function updateSchoolProfile(
 
   const json = await res.json();
   return json.data || json;
+}
+
+
+export async function getSchoolBankAccounts(): Promise<SchoolBankAccount[]> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/school-bank-accounts/`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw new Error(extractErrorMessage(errorBody, "Failed to load bank accounts."));
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : data.results || [];
+}
+
+function extractBankFieldErrors(errorBody: any, defaultMsg: string, status: number): ProfileApiError {
+  const fieldErrors: Record<string, string> = {};
+  if (errorBody && typeof errorBody === "object") {
+    for (const [k, v] of Object.entries(errorBody)) {
+      if (Array.isArray(v) && v.length > 0) {
+        fieldErrors[k] = String(v[0]);
+      } else if (typeof v === "string") {
+        fieldErrors[k] = v;
+      }
+    }
+  }
+  const message = extractErrorMessage(errorBody, defaultMsg);
+  return new ProfileApiError(message, status, fieldErrors);
+}
+
+export async function createSchoolBankAccount(
+  payload: Partial<SchoolBankAccount>
+): Promise<SchoolBankAccount> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/school-bank-accounts/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw extractBankFieldErrors(errorBody, "Failed to create bank account.", res.status);
+  }
+
+  return res.json();
+}
+
+export async function updateSchoolBankAccount(
+  id: number,
+  payload: Partial<SchoolBankAccount>
+): Promise<SchoolBankAccount> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/school-bank-accounts/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw extractBankFieldErrors(errorBody, "Failed to update bank account.", res.status);
+  }
+
+  return res.json();
+}
+
+export async function deleteSchoolBankAccount(id: number): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/school-bank-accounts/${id}/`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw new Error(extractErrorMessage(errorBody, "Failed to delete bank account."));
+  }
+}
+
+export async function setPrimarySchoolBankAccount(id: number): Promise<SchoolBankAccount> {
+  const res = await fetchWithAuth(`${API_BASE_URL}/school-bank-accounts/${id}/set-primary/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw new Error(extractErrorMessage(errorBody, "Failed to set primary bank account."));
+  }
+
+  const data = await res.json();
+  return data.data || data;
 }

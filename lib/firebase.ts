@@ -129,7 +129,7 @@ export function listenToForegroundMessages(
 
   getClientMessaging().then((messaging) => {
     if (!messaging) return;
-    unsubscribe = onMessage(messaging, (payload) => {
+    unsubscribe = onMessage(messaging, (payload: any) => {
       console.log("[FCM Client] Foreground message received:", payload);
       const title = payload.notification?.title || payload.data?.title || "Absent Alert";
       const body = payload.notification?.body || payload.data?.message || payload.data?.body || "Student marked absent";

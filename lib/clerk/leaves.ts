@@ -101,12 +101,24 @@ export async function approveAllLeaveDays(
   }
 }
 
+export interface CycleBlock {
+  label: string;
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+}
+
 // Leave Templates API Helpers
 export interface LeaveTemplate {
   id: number;
   name?: string | null;
   time_line?: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | string;
   is_active?: boolean;
+  academic_year?: number | null;
+  academic_year_name?: string | null;
+  academic_year_range?: string | null;
+  current_cycle?: CycleBlock | null;
+  cycle_blocks?: CycleBlock[];
   created_at?: string;
 }
 
@@ -192,11 +204,17 @@ export interface LeaveTypePayload {
   is_carry_forward?: boolean;
   carry_forward?: boolean;
   max_carry_forward?: number;
-  allow_encashment?: boolean;
 }
 
 export interface LeaveTypeRecord extends LeaveTypePayload {
   id: number;
+  academic_year?: number | null;
+  academic_year_name?: string | null;
+  session_dates?: {
+    start?: string;
+    end?: string;
+    range?: string;
+  } | null;
 }
 
 export async function getLeaveTypes(): Promise<LeaveTypeRecord[]> {
@@ -264,7 +282,8 @@ export async function deleteLeaveType(id: number): Promise<void> {
 }
 
 export interface BulkManageLeaveTypesPayload {
-  leave_template: number;
+  leave_template?: number;
+  academic_year?: number | null;
   category_ids: number[];
   name: string;
   leave_type?: string;
@@ -273,7 +292,6 @@ export interface BulkManageLeaveTypesPayload {
   allocation_count?: number;
   allocation_period?: string;
   is_paid?: boolean;
-  allow_encashment?: boolean;
   is_carry_forward?: boolean;
   carry_forward?: boolean;
   max_carry_forward?: number;
