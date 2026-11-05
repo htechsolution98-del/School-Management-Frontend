@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -48,7 +48,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
-import { toHTMLDate, toApiDate, calculateDaysBetween } from "@/lib/dateUtils";
+import { toHTMLDate, toApiDate, calculateDaysBetween, parseDateString } from "@/lib/dateUtils";
+import { getSaturdayPolicy } from "@/lib/clerk/teacher-workload";
 
 import {
   getRemainingLeaves,
@@ -58,6 +59,8 @@ import {
   deleteLeaveRequest,
   withdrawLeaveRequest,
   requestCancellation,
+  calculateLeaveDays,
+  type LeaveCalculationPreview,
   type RemainingLeave,
   type MyLeaveRequest,
 } from "@/lib/teacher";
@@ -83,6 +86,14 @@ export default function MyLeavesPage() {
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDaySession, setHalfDaySession] = useState<"FIRST_HALF" | "SECOND_HALF">("FIRST_HALF");
   const [totalDays, setTotalDays] = useState(0);
+  const [previewData, setPreviewData] = useState<LeaveCalculationPreview | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [saturdayPolicy, setSaturdayPolicy] = useState<"OFF" | "HALF_DAY" | "FULL_DAY">("HALF_DAY");
+
+  const startDateObj = useMemo(() => parseDateString(startDate), [startDate]);
+  const isSaturday = startDateObj ? startDateObj.getDay() === 6 : false;
+  const isSunday = startDateObj ? startDateObj.getDay() === 0 : false;
 
   // Cancellation Dialog State
   const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
@@ -110,18 +121,76 @@ export default function MyLeavesPage() {
     fetchData();
   }, []);
 
-  // Compute total days automatically when start/end dates change
-  // Note: startDate/endDate are stored as DD-MM-YYYY (API format)
+  // Compute total days automatically using authoritative backend preview
   useEffect(() => {
-    if (isHalfDay) {
-      setTotalDays(0.5);
-    } else if (startDate && endDate) {
-      const days = calculateDaysBetween(startDate, endDate);
-      setTotalDays(days);
-    } else {
-      setTotalDays(0);
+    if (!startDate || (!isHalfDay && !endDate) || !leaveTypeId) {
+      setPreviewData(null);
+      setCalendarError(null);
+      if (isHalfDay) setTotalDays(0.5);
+      else if (startDate && endDate) setTotalDays(calculateDaysBetween(startDate, endDate));
+      else setTotalDays(0);
+      return;
     }
-  }, [startDate, endDate, isHalfDay]);
+
+    // Client-side instant check for single-day Sunday or Saturday rules
+    const sDate = parseDateString(startDate);
+    const isSingle = isHalfDay || startDate === endDate;
+    if (isSingle && sDate) {
+      if (sDate.getDay() === 0) {
+        setCalendarError("Selected date is an official holiday/off-day. Leave application is not permitted.");
+        setPreviewData(null);
+        setTotalDays(0);
+        return;
+      }
+      if (sDate.getDay() === 6 && saturdayPolicy === "OFF") {
+        setCalendarError("Saturday is an institutional off-day. Leave application is not permitted.");
+        setPreviewData(null);
+        setTotalDays(0);
+        return;
+      }
+      if (sDate.getDay() === 6 && saturdayPolicy === "HALF_DAY" && isHalfDay) {
+        setIsHalfDay(false);
+        setTotalDays(1.0);
+      }
+    }
+
+    let active = true;
+    setIsPreviewLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const preview = await calculateLeaveDays({
+          start_date: startDate,
+          end_date: isHalfDay ? startDate : endDate,
+          leave_type: leaveTypeId,
+          is_half_day: isHalfDay,
+          half_day_session: halfDaySession,
+        });
+        if (active) {
+          setPreviewData(preview);
+          setTotalDays(preview.total_effective_days);
+          setCalendarError(null);
+          if (preview.saturday_policy) {
+            setSaturdayPolicy(preview.saturday_policy as any);
+          }
+        }
+      } catch (err: any) {
+        if (active) {
+          setPreviewData(null);
+          const msg = err?.message || "Selected date is not permitted for leave.";
+          setCalendarError(msg);
+          setTotalDays(0);
+        }
+      } finally {
+        if (active) setIsPreviewLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [startDate, endDate, leaveTypeId, isHalfDay, halfDaySession, saturdayPolicy]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -133,6 +202,9 @@ export default function MyLeavesPage() {
       ]);
       setBalances(Array.isArray(remainingData) ? remainingData : []);
       setHistory(Array.isArray(historyData) ? historyData : []);
+      getSaturdayPolicy().then((res) => {
+        if (res?.saturday_policy) setSaturdayPolicy(res.saturday_policy);
+      }).catch(() => {});
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Failed to load leave records. Please try again.");
@@ -151,6 +223,7 @@ export default function MyLeavesPage() {
     setIsHalfDay(false);
     setHalfDaySession("FIRST_HALF");
     setTotalDays(0);
+    setCalendarError(null);
     setIsDialogOpen(true);
   };
 
@@ -172,6 +245,11 @@ export default function MyLeavesPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (calendarError) {
+      toast.error(calendarError);
+      return;
+    }
+
     if (!startDate || !endDate || !leaveTypeId || !reason || totalDays <= 0) {
       toast.error("Please fill out all fields correctly.");
       return;
@@ -182,17 +260,21 @@ export default function MyLeavesPage() {
     );
     const available = Number(selectedBal?.remaining ?? (selectedBal as any)?.remaining_leaves ?? 0);
     if (selectedBal && selectedBal.is_paid !== false && totalDays > available) {
-      toast.error(`Insufficient leave balance. You have ${available} days available.`);
-      return;
+      if (!isHalfDay) {
+        toast.error(`Insufficient leave balance. You have ${available} days available.`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
     const payload = {
       start_date: startDate,
       end_date: isHalfDay ? startDate : endDate,
-      total_days: totalDays,
+      total_days: isHalfDay ? 0.5 : totalDays,
+      days_count: isHalfDay ? 0.5 : totalDays,
       is_half_day: isHalfDay,
       half_day_session: isHalfDay ? halfDaySession : "FULL_DAY",
+      half_day_period: isHalfDay ? halfDaySession : undefined,
       reason,
       leave_type: Number(leaveTypeId),
       dynamic_leave_type: Number(leaveTypeId),
@@ -955,42 +1037,147 @@ export default function MyLeavesPage() {
               </div>
             </div>
 
-            {/* Half Day Option */}
-            <div className="flex items-center space-x-2 pt-0.5 pb-0.5">
-              <input
-                type="checkbox"
-                id="half-day"
-                checked={isHalfDay}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setIsHalfDay(checked);
-                  if (checked && startDate) {
-                    setEndDate(startDate);
-                  }
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <Label htmlFor="half-day" className="text-xs font-medium cursor-pointer">
-                Half Day Request (0.5 Day)
-              </Label>
+            {/* Duration Selector (Full Day 1.0 vs Half Day 0.5) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Leave Duration <span className="text-destructive">*</span></Label>
+              <div className="grid grid-cols-2 gap-2 bg-zinc-100 dark:bg-zinc-800/60 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHalfDay(false);
+                    setTotalDays(1.0);
+                  }}
+                  className={cn(
+                    "py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5",
+                    !isHalfDay
+                      ? "bg-white dark:bg-zinc-900 text-primary shadow-sm"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                  )}
+                >
+                  Full Day (1.0)
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaturday && saturdayPolicy === "HALF_DAY"}
+                  onClick={() => {
+                    if (isSaturday && saturdayPolicy === "HALF_DAY") {
+                      toast.error("Saturday operates on half-day hours; taking leave requires a Full Day absence.");
+                      return;
+                    }
+                    setIsHalfDay(true);
+                    setTotalDays(0.5);
+                    if (startDate) setEndDate(startDate);
+                  }}
+                  className={cn(
+                    "py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5",
+                    isHalfDay
+                      ? "bg-white dark:bg-zinc-900 text-primary shadow-sm"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900",
+                    isSaturday && saturdayPolicy === "HALF_DAY" && "opacity-40 cursor-not-allowed pointer-events-none"
+                  )}
+                  title={isSaturday && saturdayPolicy === "HALF_DAY" ? "Saturday operates on half-day hours; taking leave requires a Full Day absence." : undefined}
+                >
+                  Half Day (0.5)
+                </button>
+              </div>
             </div>
 
+            {/* Saturday Policy Notice */}
+            {isSaturday && saturdayPolicy === "HALF_DAY" && (
+              <div className="p-3 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-xl flex items-start gap-2.5 text-blue-900 dark:text-blue-200 text-xs shadow-xs">
+                <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold block mb-0.5">Saturday Half-Day Schedule Notice</span>
+                  Saturday operates on half-day hours; taking leave requires a Full Day absence.
+                </div>
+              </div>
+            )}
+
+            {/* Calendar & Holiday Policy Alert */}
+            {calendarError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 rounded-xl flex items-start gap-2.5 text-rose-900 dark:text-rose-200 text-xs shadow-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold block mb-0.5">Leave Application Not Permitted</span>
+                  {calendarError}
+                </div>
+              </div>
+            )}
+
+            {/* When Half Day is selected: Session selector */}
             {isHalfDay && (
-              <div className="space-y-1.5 pl-6 pt-0.5">
-                <Label htmlFor="session-select" className="text-xs font-semibold">Half Day Session</Label>
-                <ResponsiveSelect id="session-select" drawerTitle="Half Day Session" value={halfDaySession} onChange={(event) => setHalfDaySession(event.target.value as any)} className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
+              <div className="space-y-1.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border dark:border-zinc-800">
+                <Label htmlFor="session-select" className="text-xs font-semibold flex items-center justify-between">
+                  <span>Half Day Session</span>
+                  <span className="text-[11px] text-primary font-bold">0.5 Day</span>
+                </Label>
+                <ResponsiveSelect id="session-select" drawerTitle="Half Day Session" value={halfDaySession} onChange={(event) => setHalfDaySession(event.target.value as any)} className="w-full rounded-lg bg-white dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
                   <option value="FIRST_HALF">First Half (Morning Session)</option>
                   <option value="SECOND_HALF">Second Half (Afternoon Session)</option>
                 </ResponsiveSelect>
               </div>
             )}
 
-            {totalDays > 0 && (
+            {/* Real-time Balance Check & Warning Banner */}
+            {(() => {
+              const sel = balances.find((b) => String(b.leave_type_id ?? b.leave_type) === leaveTypeId);
+              const rem = Number(sel?.remaining ?? (sel as any)?.remaining_leaves ?? 0);
+              if (isHalfDay && rem <= 0) {
+                return (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 rounded-xl flex items-start gap-2.5 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <span className="font-bold block mb-0.5">Warning: Leave Without Pay (LWP)</span>
+                      Your Half-Day leave balance is 0. Applying this will be treated as Leave Without Pay (LWP) and 0.5 day&apos;s wage will be deducted from your monthly salary upon approval.
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Live Calculation Preview Breakdown */}
+            {isPreviewLoading ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>Checking school calendar holidays & working days...</span>
+              </div>
+            ) : previewData ? (
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200/70 dark:border-zinc-700/60 text-xs space-y-1.5">
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="text-zinc-700 dark:text-zinc-300">Effective Working Days:</span>
+                  <span className="text-primary font-bold text-sm">
+                    {previewData.total_effective_days} {previewData.total_effective_days === 1 ? "Day" : "Days"}
+                  </span>
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  {previewData.summary_message}
+                </div>
+                {previewData.day_breakdown.length > 0 && (
+                  <div className="pt-1.5 border-t border-zinc-200/60 dark:border-zinc-700/50 flex flex-wrap gap-1">
+                    {previewData.day_breakdown.map((d, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "px-2 py-0.5 rounded-md text-[10px] font-semibold",
+                          d.is_effective
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                            : "bg-zinc-100 text-zinc-500 line-through dark:bg-zinc-800 dark:text-zinc-400"
+                        )}
+                        title={`${d.date} (${d.day_name}): ${d.reason}`}
+                      >
+                        {d.day_name.slice(0, 3)}: {d.weight > 0 ? `${d.weight}d` : "Off"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : totalDays > 0 ? (
               <div className="text-xs font-medium text-primary flex items-center gap-1.5 bg-primary/5 dark:bg-primary/20 p-2.5 rounded-lg border border-primary/20">
                 <Info className="h-4 w-4" />
                 <span>Calculated leave duration: <strong>{totalDays} {totalDays === 1 ? "day" : "days"}</strong></span>
               </div>
-            )}
+            ) : null}
 
             <div className="space-y-1.5">
               <Label htmlFor="leave-type" className="text-xs font-semibold">Leave Type</Label>
@@ -1076,7 +1263,7 @@ export default function MyLeavesPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || totalDays <= 0}
+                disabled={isSubmitting || !!calendarError || totalDays <= 0}
                 className="rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
               >
                 {isSubmitting ? (

@@ -310,6 +310,7 @@ export type StaffSalaryComponent = {
   staff: number;
   component: number;
   calculation_type: CalcType;
+  calc_base?: string;
   value: string;
 };
 
@@ -321,6 +322,7 @@ export interface StaffSalaryAssignment {
   componentName: string;
   componentType: ComponentType;
   calculation_type: CalcType;
+  calc_base?: string;
   value: string;
   isActive: boolean;
 }

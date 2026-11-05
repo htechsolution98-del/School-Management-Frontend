@@ -18,6 +18,7 @@ import {
   CalendarDays,
   UserCheck,
   ChevronDown,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -44,6 +45,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import {
@@ -82,13 +89,44 @@ export default function LeaveConfigPage() {
   const [isTypeSubmitting, setIsTypeSubmitting] = useState(false);
   const [editingType, setEditingType] = useState<LeaveTypeRecord | null>(null);
   const [editingGroupRecords, setEditingGroupRecords] = useState<LeaveTypeRecord[] | null>(null);
+
+  const getTimelineDisplay = (timeline?: string | null) => {
+    if (!timeline) return "";
+    const t = String(timeline).toUpperCase();
+    if (t === "MONTHLY") return "MONTHLY (1 Month)";
+    if (t === "QUARTERLY") return "QUARTERLY (3 Months / Quarter)";
+    if (t === "SEMI_ANNUAL") return "SEMI_ANNUAL (6 Months)";
+    if (t === "ANNUAL") return "ANNUAL (1 Year)";
+    return timeline;
+  };
+
+  const timelineToPeriod = (timeline?: string | null): string => {
+    if (!timeline) return "";
+    const t = String(timeline).toUpperCase();
+    if (t === "MONTHLY") return "Monthly";
+    if (t === "QUARTERLY") return "Quarterly";
+    return "Yearly";
+  };
+
   const [typeName, setTypeName] = useState("");
   const [typeCode, setTypeCode] = useState("");
+  const [leaveUnit, setLeaveUnit] = useState<"FULL_DAY" | "HALF_DAY">("FULL_DAY");
   const [typeTemplateId, setTypeTemplateId] = useState("");
+
+  const currentTemplate = useMemo(() => {
+    if (typeTemplateId) {
+      const match = templates.find((t) => String(t.id) === String(typeTemplateId));
+      if (match) return match;
+    }
+    return templates.find((t) => t.is_active !== false) || templates[0] || null;
+  }, [typeTemplateId, templates]);
+
+  const currentTemplateTimelineDisplay = useMemo(() => {
+    return currentTemplate ? getTimelineDisplay(currentTemplate.time_line) : null;
+  }, [currentTemplate]);
   const [typeNum, setTypeNum] = useState<number>(0);
   const [typeAllocationPeriod, setTypeAllocationPeriod] = useState<string>("Yearly");
   const [typeIsPaid, setTypeIsPaid] = useState(true);
-  const [typeAllowEncashment, setTypeAllowEncashment] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   // Alias for backward compatibility if referenced elsewhere
   const typeCategoryIds = selectedCategories.map(Number).filter((n) => !isNaN(n) && n > 0);
@@ -415,16 +453,25 @@ export default function LeaveConfigPage() {
 
   // ─── Leave Types CRUD Actions ──────────────────────────────────────────────
 
-  const handleOpenCreateType = () => {
+  const handleOpenCreateType = (preferredTemplateId?: number | string) => {
+    if (templates.length === 0) {
+      toast.error("Please create a Leave Template first.");
+      return;
+    }
     setEditingType(null);
     setEditingGroupRecords(null);
     setTypeName("");
     setTypeCode("");
-    setTypeTemplateId(templates[0] ? String(templates[0].id) : "");
+    setLeaveUnit("FULL_DAY");
+    const matchedTmpl = preferredTemplateId
+      ? templates.find((t) => String(t.id) === String(preferredTemplateId))
+      : null;
+    const activeTemplate = matchedTmpl || templates.find((t) => t.is_active !== false) || templates[0] || null;
+    const defaultTemplateId = activeTemplate ? String(activeTemplate.id) : "";
+    setTypeTemplateId(defaultTemplateId);
     setTypeNum(1);
-    setTypeAllocationPeriod("Yearly");
+    setTypeAllocationPeriod(activeTemplate ? timelineToPeriod(activeTemplate.time_line) : "");
     setTypeIsPaid(true);
-    setTypeAllowEncashment(false);
     setSelectedCategories([]);
     setTypeCarryForward(false);
     setMaxCarryForward(0);
@@ -437,12 +484,19 @@ export default function LeaveConfigPage() {
     setEditingGroupRecords(recordsToUse);
     setTypeName(typeRec.name || typeRec.leave_type || "");
     setTypeCode(typeRec.code || "");
-    setTypeTemplateId(String(typeRec.leave_template || ""));
+    setLeaveUnit(((typeRec as any).leave_unit as any) || (typeRec.code === "HDL" ? "HALF_DAY" : "FULL_DAY"));
+    const initialTmplId = typeRec.leave_template
+      ? String(typeRec.leave_template)
+      : (templates[0] ? String(templates[0].id) : "");
+    setTypeTemplateId(initialTmplId);
+    const matchedTmpl = templates.find((t) => String(t.id) === initialTmplId);
+    const period = matchedTmpl
+      ? timelineToPeriod(matchedTmpl.time_line)
+      : (typeRec.allocation_period || "Yearly");
     const count = Number(typeRec.allocation_count ?? typeRec.leave_num ?? 0);
     setTypeNum(isNaN(count) ? 0 : count);
-    setTypeAllocationPeriod(typeRec.allocation_period || "Yearly");
+    setTypeAllocationPeriod(period);
     setTypeIsPaid(typeRec.is_paid !== false);
-    setTypeAllowEncashment(!!typeRec.allow_encashment);
 
     // Sanitize and deduplicate incoming category IDs from backend
     const extractedIds: number[] = [];
@@ -484,7 +538,7 @@ export default function LeaveConfigPage() {
 
   const handleTypeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!typeName || !typeTemplateId || typeNum < 0) {
+    if (!typeName.trim() || typeNum < 0) {
       toast.error("Please fill out all fields correctly.");
       return;
     }
@@ -492,19 +546,30 @@ export default function LeaveConfigPage() {
       toast.error("Please select at least one staff category.");
       return;
     }
+    if (!currentTemplate && !typeTemplateId && templates.length === 0) {
+      toast.error("Please create a Leave Template first.");
+      return;
+    }
     setIsTypeSubmitting(true);
 
     try {
+      const activeTemplate = templates.find((t) => t.is_active !== false) || templates[0];
+      const targetTemplateId = typeTemplateId || (activeTemplate ? String(activeTemplate.id) : undefined);
+      const targetTemplate = templates.find((t) => String(t.id) === String(targetTemplateId));
+      const period = targetTemplate
+        ? timelineToPeriod(targetTemplate.time_line)
+        : (typeAllocationPeriod || "Yearly");
+
       const basePayload = {
         name: typeName.trim(),
         leave_type: typeName.trim().toUpperCase(),
         code: typeCode.trim().toUpperCase() || undefined,
-        leave_template: Number(typeTemplateId),
+        leave_unit: leaveUnit,
+        leave_template: targetTemplateId ? Number(targetTemplateId) : undefined,
         leave_num: typeNum,
         allocation_count: typeNum,
-        allocation_period: typeAllocationPeriod,
+        allocation_period: period,
         is_paid: typeIsPaid,
-        allow_encashment: typeAllowEncashment,
         is_carry_forward: typeCarryForward,
         carry_forward: typeCarryForward,
         max_carry_forward: typeCarryForward ? maxCarryForward : 0,
@@ -512,6 +577,7 @@ export default function LeaveConfigPage() {
 
       const bulkPayload = {
         ...basePayload,
+        academic_year: targetTemplate?.academic_year || undefined,
         category_ids: typeCategoryIds,
         existing_type_ids: editingType
           ? ((editingGroupRecords && editingGroupRecords.length > 0)
@@ -559,7 +625,6 @@ export default function LeaveConfigPage() {
         allocation_count: first.allocation_count ?? first.leave_num,
         allocation_period: first.allocation_period || "Yearly",
         is_paid: first.is_paid !== false,
-        allow_encashment: !!first.allow_encashment,
         is_carry_forward: first.is_carry_forward,
         carry_forward: first.carry_forward ?? first.is_carry_forward,
         max_carry_forward: first.max_carry_forward ?? 0,
@@ -620,19 +685,12 @@ export default function LeaveConfigPage() {
     );
   };
 
-  const getTimelineDisplay = (timeline?: string | null) => {
-    if (!timeline) return "ANNUAL (1 Year)";
-    const t = String(timeline).toUpperCase();
-    if (t === "MONTHLY") return "MONTHLY (1 Month)";
-    if (t === "QUARTERLY") return "QUARTERLY (4 Months)";
-    if (t === "SEMI_ANNUAL") return "SEMI_ANNUAL (6 Months)";
-    if (t === "ANNUAL") return "ANNUAL (1 Year)";
-    return timeline;
-  };
+// (getTimelineDisplay declared above)
 
   const getTemplateName = (templateId: number) => {
     const tmpl = templates.find((t) => t.id === templateId);
-    return tmpl ? getTimelineDisplay(tmpl.time_line) : `Template ID: ${templateId}`;
+    if (!tmpl) return `Template ID: ${templateId}`;
+    return tmpl.name ? `${tmpl.name} (${getTimelineDisplay(tmpl.time_line)})` : getTimelineDisplay(tmpl.time_line);
   };
 
   return (
@@ -651,14 +709,36 @@ export default function LeaveConfigPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="default"
-            onClick={activeTab === "templates" ? handleOpenCreateTemplate : handleOpenCreateType}
-            className="flex items-center gap-2 shadow-sm hover:shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <Plus className="h-4 w-4" />
-            Add {activeTab === "templates" ? "Template" : "Leave Type"}
-          </Button>
+          {activeTab === "types" && templates.length === 0 ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0} className="inline-block cursor-not-allowed">
+                    <Button
+                      variant="default"
+                      disabled
+                      className="flex items-center gap-2 shadow-sm opacity-50 cursor-not-allowed pointer-events-none"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Leave Type
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Please create a Leave Template first.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <Button
+              variant="default"
+              onClick={activeTab === "templates" ? handleOpenCreateTemplate : () => handleOpenCreateType()}
+              className="flex items-center gap-2 shadow-sm hover:shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" />
+              Add {activeTab === "templates" ? "Template" : "Leave Type"}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -691,7 +771,7 @@ export default function LeaveConfigPage() {
             </TabsTrigger>
             <TabsTrigger value="types" className="px-5 py-2 text-sm font-semibold flex items-center gap-2 rounded-lg transition-all">
               <Layers className="h-4 w-4" />
-              Leave Types ({new Set(leaveTypes.map(t => t.leave_type)).size})
+              Leave Types ({new Set(leaveTypes.map((t) => `${t.leave_type}_${t.leave_template}`)).size})
             </TabsTrigger>
           </TabsList>
         </div>
@@ -745,6 +825,16 @@ export default function LeaveConfigPage() {
                             <Button
                               size="xs"
                               variant="ghost"
+                              onClick={() => handleOpenCreateType(tmpl.id)}
+                              className="h-8 px-2 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10 transition-colors"
+                              title="Add Leave Type to this Template"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              Add Type
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
                               onClick={() => handleOpenEditTemplate(tmpl)}
                               className="h-8 w-8 p-0 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                               title="Edit Template"
@@ -768,13 +858,41 @@ export default function LeaveConfigPage() {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                          {/* Academic Year Information */}
                           <div className="flex items-center justify-between text-xs pt-1 border-t dark:border-zinc-850">
+                            <span className="text-muted-foreground font-medium">Academic Year</span>
+                            <span className="font-semibold text-primary flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 text-primary" />
+                              {tmpl.academic_year_name ? `Academic Year ${tmpl.academic_year_name}` : "Session Linked"}
+                            </span>
+                          </div>
+                          {tmpl.academic_year_range && (
+                            <div className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 text-right -mt-2">
+                              {tmpl.academic_year_range}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground font-medium">Timeline Cycle</span>
                             <span className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                               <CalendarDays className="h-3.5 w-3.5 text-primary" />
                               {getTimelineDisplay(tmpl.time_line)}
                             </span>
                           </div>
+
+                          {/* Active Cycle Block for Quarterly / Monthly / Semi-Annual templates */}
+                          {tmpl.current_cycle && (
+                            <div className="flex items-center justify-between text-xs bg-primary/5 dark:bg-primary/10 px-2.5 py-1.5 rounded-md border border-primary/20">
+                              <span className="text-primary font-semibold flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5" />
+                                Active Cycle
+                              </span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 text-[11px]">
+                                {tmpl.current_cycle.label}
+                              </span>
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground font-medium">Status</span>
                             <Badge
@@ -783,6 +901,12 @@ export default function LeaveConfigPage() {
                             >
                               {tmpl.is_active !== false ? "Active" : "Inactive"}
                             </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-xs pt-1 border-t dark:border-zinc-850">
+                            <span className="text-muted-foreground font-medium">Leave Types</span>
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                              {leaveTypes.filter((lt) => Number(lt.leave_template) === Number(tmpl.id)).length} types
+                            </span>
                           </div>
                         </CardContent>
                       </Card>
@@ -802,15 +926,31 @@ export default function LeaveConfigPage() {
                 <div className="flex flex-col items-center justify-center py-20 border rounded-2xl border-dashed bg-white/40">
                   <Layers className="h-12 w-12 text-muted-foreground/35 mb-3" />
                   <p className="text-zinc-800 dark:text-zinc-200 font-semibold">No Leave Types Defined</p>
-                  <Button size="sm" variant="outline" className="mt-4" onClick={handleOpenCreateType}>
-                    Define First Leave Type
-                  </Button>
+                  {templates.length === 0 ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0} className="inline-block cursor-not-allowed mt-4">
+                            <Button size="sm" variant="outline" disabled className="pointer-events-none opacity-50">
+                              Define First Leave Type
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">
+                          Please create a Leave Template first.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <Button size="sm" variant="outline" className="mt-4" onClick={() => handleOpenCreateType()}>
+                      Define First Leave Type
+                    </Button>
+                  )}
                 </div>
               ) : (() => {
-                // Group leave type records by leave_type name so all categories
-                // for the same leave type appear in ONE single card.
+                // Group leave type records by leave_type name and template
                 const grouped = leaveTypes.reduce<Record<string, LeaveTypeRecord[]>>((acc, rec) => {
-                  const key = rec.leave_type;
+                  const key = `${rec.leave_type}_${rec.leave_template}`;
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(rec);
                   return acc;
@@ -1126,13 +1266,23 @@ export default function LeaveConfigPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="template-timeline" className="text-xs font-semibold">Policy Cycle / Timeline</Label>
-                <Input
-                  id="template-timeline"
-                  placeholder="e.g., 2026-2027, ANNUAL, MONTHLY"
+                <Select
                   value={templateTimeline}
-                  onChange={(e) => setTemplateTimeline(e.target.value)}
-                  className="rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
-                />
+                  onValueChange={(val) => setTemplateTimeline(val || "ANNUAL")}
+                >
+                  <SelectTrigger
+                    id="template-timeline"
+                    className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
+                  >
+                    <SelectValue placeholder="Select cycle" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
+                    <SelectItem value="ANNUAL">ANNUAL (Annual Cycle)</SelectItem>
+                    <SelectItem value="SEMI_ANNUAL">SEMI_ANNUAL (Half-Yearly Cycle)</SelectItem>
+                    <SelectItem value="QUARTERLY">QUARTERLY (Quarterly Cycle)</SelectItem>
+                    <SelectItem value="MONTHLY">MONTHLY (Monthly Cycle)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
@@ -1183,84 +1333,251 @@ export default function LeaveConfigPage() {
 
       {/* Leave Type Modal Form */}
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
-        <DialogContent className="max-w-xl w-full max-h-[92vh] sm:max-h-[88vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-zinc-950 border dark:border-zinc-800 shadow-2xl rounded-2xl gap-0">
-          <DialogHeader className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-950">
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <Layers className="h-5 w-5 text-primary" />
-              {editingType ? "Edit Leave Category" : "Define Leave Type"}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Define the category limits, applicability rules, and carry forward settings.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-2xl w-full max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-2xl gap-0">
+          <DialogHeader className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0 bg-zinc-50/60 dark:bg-zinc-900/50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {editingType ? "Edit Leave Category" : "Define Leave Type"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Define the category limits, applicability rules, and carry forward settings.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
           <form onSubmit={handleTypeSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Informative Academic Session Banner */}
+              {currentTemplate && (
+                <div className="rounded-lg bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40 p-3 text-xs flex items-start gap-2.5">
+                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <div className="font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <span>{currentTemplate.academic_year_name ? `Academic Year ${currentTemplate.academic_year_name}` : "Active Academic Session"}</span>
+                      {currentTemplate.current_cycle && (
+                        <span className="text-blue-600 dark:text-blue-400 font-normal">
+                          • Active Cycle: {currentTemplate.current_cycle.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-blue-700/90 dark:text-blue-300 text-[11px]">
+                      {currentTemplate.academic_year_range
+                        ? `Leave quota applies for session: ${currentTemplate.academic_year_range}`
+                        : "Leave quota applies for this active academic session."}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Row 1: Parent Policy Template & Inherited Cycle */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="type-name" className="text-xs font-semibold">Category Name (e.g. SICK, CASUAL)</Label>
+                  <Label htmlFor="type-template-select" className="text-xs font-semibold flex items-center justify-between">
+                    <span>
+                      Policy Template <span className="text-destructive">*</span>
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Select Policy</span>
+                  </Label>
+                  <Select
+                    value={typeTemplateId}
+                    onValueChange={(val) => {
+                      setTypeTemplateId(val || "");
+                      const match = templates.find((t) => String(t.id) === String(val));
+                      if (match) {
+                        setTypeAllocationPeriod(timelineToPeriod(match.time_line));
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      id="type-template-select"
+                      className="h-10 rounded-lg bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-1 focus:ring-primary"
+                    >
+                      <SelectValue placeholder="Select Policy Template">
+                        {(() => {
+                          const match = templates.find((t) => String(t.id) === typeTemplateId);
+                          return match
+                            ? (match.name ? `${match.name} (${getTimelineDisplay(match.time_line)})` : getTimelineDisplay(match.time_line))
+                            : undefined;
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
+                      {templates.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.name || "Template"}</span>
+                          <span className="text-muted-foreground text-xs ml-1.5">({getTimelineDisplay(t.time_line)})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">Allocation Period</Label>
+                  <div
+                    className={cn(
+                      "h-10 px-3.5 rounded-lg border flex items-center gap-2.5 text-xs font-medium",
+                      currentTemplate
+                        ? "bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                        : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400"
+                    )}
+                  >
+                    <Clock className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">
+                      Cycle:{" "}
+                      <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
+                        {currentTemplateTimelineDisplay || "No Parent Template"}
+                      </strong>
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground block truncate">
+                    {currentTemplate
+                      ? `Inherited automatically from "${currentTemplate.name || 'template'}".`
+                      : "Please create a Leave Template first."}
+                  </span>
+                </div>
+              </div>
+
+              {/* Row 2: Category Name & Short Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="type-name" className="text-xs font-semibold flex items-center justify-between">
+                    <span>
+                      Category Name <span className="text-destructive">*</span>
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-normal">e.g. SICK, CASUAL</span>
+                  </Label>
                   <Input
                     id="type-name"
                     placeholder="e.g., CASUAL"
                     value={typeName}
                     onChange={(e) => setTypeName(e.target.value)}
                     required
-                    className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+                    className="h-10 rounded-lg bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary uppercase"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="type-code" className="text-xs font-semibold">Short Code (e.g. CL, SL, EL)</Label>
+                  <Label htmlFor="type-code" className="text-xs font-semibold flex items-center justify-between">
+                    <span>Short Code</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">e.g. CL, SL, EL</span>
+                  </Label>
                   <Input
                     id="type-code"
                     placeholder="e.g., CL"
                     value={typeCode}
                     onChange={(e) => setTypeCode(e.target.value)}
-                    className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary uppercase"
+                    className="h-10 rounded-lg bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary uppercase"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="type-num" className="text-xs font-semibold">Allowed Leaves Count</Label>
-                  <Input
-                    id="type-num"
-                    type="number"
-                    min="0"
-                    value={typeNum}
-                    onChange={(e) => setTypeNum(Number(e.target.value))}
-                    required
-                    className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
-                  />
-                </div>
+              {/* Leave Unit / Measure Selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold flex items-center justify-between">
+                  <span>
+                    Leave Unit / Measure <span className="text-destructive">*</span>
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-normal">
+                    {leaveUnit === "HALF_DAY" ? "0.5 Day Multiplier" : "1.0 Day Multiplier"}
+                  </span>
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLeaveUnit("FULL_DAY")}
+                    className={cn(
+                      "p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5",
+                      leaveUnit === "FULL_DAY"
+                        ? "bg-primary/10 border-primary text-primary shadow-xs"
+                        : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="leave_unit"
+                      checked={leaveUnit === "FULL_DAY"}
+                      onChange={() => setLeaveUnit("FULL_DAY")}
+                      className="mt-0.5 accent-primary cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold leading-tight">Full Day (1.0)</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Measured in 1.0 day units
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="allocation-period" className="text-xs font-semibold">Allocation Period</Label>
-                  <Select value={typeAllocationPeriod} onValueChange={(val) => setTypeAllocationPeriod(val || "Yearly")}>
-                    <SelectTrigger id="allocation-period" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
-                      <SelectItem value="Monthly">Monthly</SelectItem>
-                      <SelectItem value="Quarterly">Quarterly</SelectItem>
-                      <SelectItem value="Yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLeaveUnit("HALF_DAY")}
+                    className={cn(
+                      "p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5",
+                      leaveUnit === "HALF_DAY"
+                        ? "bg-primary/10 border-primary text-primary shadow-xs"
+                        : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="leave_unit"
+                      checked={leaveUnit === "HALF_DAY"}
+                      onChange={() => setLeaveUnit("HALF_DAY")}
+                      className="mt-0.5 accent-primary cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold leading-tight">Half Day (0.5)</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Measured in 0.5 day units
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              {/* Row 3: Total Leaves Allowed with Dynamic Helper Text */}
+              <div className="space-y-1.5">
+                <Label htmlFor="type-num" className="text-xs font-semibold flex items-center gap-1">
+                  Total Leaves Allowed (per cycle) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="type-num"
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 12"
+                  value={typeNum}
+                  onChange={(e) => setTypeNum(Number(e.target.value))}
+                  required
+                  className="h-10 rounded-lg bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+                />
+                <span className="text-[11px] text-muted-foreground block">
+                  {leaveUnit === "HALF_DAY"
+                    ? "Total half-day instances granted (e.g., entering 6 allows 6 half-day leaves, equivalent to 3 full days)."
+                    : "Total full days granted for this policy cycle."}
+                </span>
+              </div>
+
+              {/* Staff Categories */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">Staff Categories</Label>
+                  <Label className="text-xs font-semibold flex items-center gap-1">
+                    Staff Categories <span className="text-destructive">*</span>
+                  </Label>
                   {selectedCategories.length > 0 && (
-                    <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                       {selectedCategories.length} selected
                     </span>
                   )}
                 </div>
 
-                <div className="rounded-lg border dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 divide-y dark:divide-zinc-800 max-h-48 overflow-y-auto">
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 divide-y divide-zinc-200 dark:divide-zinc-800 max-h-40 overflow-y-auto">
                   {/* Select All Roles Option */}
                   <div
                     role="button"
@@ -1272,13 +1589,13 @@ export default function LeaveConfigPage() {
                         toggleSelectAllCategories();
                       }
                     }}
-                    className={`flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors text-xs font-bold border-b border-zinc-200 dark:border-zinc-800 select-none ${
+                    className={`flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors text-xs font-bold border-b border-zinc-200 dark:border-zinc-800 select-none ${
                       isAllCategoriesSelected
                         ? "bg-primary/10 text-primary"
-                        : "bg-zinc-100/90 dark:bg-zinc-800/90 hover:bg-zinc-200/80 text-zinc-800 dark:text-zinc-200"
+                        : "bg-zinc-100/70 dark:bg-zinc-800/70 hover:bg-zinc-200/60 text-zinc-800 dark:text-zinc-200"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded accent-primary pointer-events-none"
@@ -1309,10 +1626,10 @@ export default function LeaveConfigPage() {
                             toggleCategory(roleId);
                           }
                         }}
-                        className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors text-sm select-none ${
+                        className={`flex items-center gap-2.5 px-3.5 py-2 cursor-pointer transition-colors text-xs select-none ${
                           isChecked
                             ? "bg-primary/8 dark:bg-primary/20 text-primary font-medium"
-                            : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                            : "hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300"
                         }`}
                       >
                         <input
@@ -1321,7 +1638,7 @@ export default function LeaveConfigPage() {
                           checked={isChecked}
                           readOnly
                         />
-                        <UserCheck className="h-3.5 w-3.5 text-primary/60 shrink-0" />
+                        <UserCheck className="h-3.5 w-3.5 text-primary/70 shrink-0" />
                         <span>{role.name}</span>
                       </div>
                     );
@@ -1329,32 +1646,12 @@ export default function LeaveConfigPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="type-template" className="text-xs font-semibold">Parent Leave Template Period</Label>
-                <Select value={typeTemplateId} onValueChange={(val) => setTypeTemplateId(val || "")} required>
-                  <SelectTrigger id="type-template" className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm">
-                    <SelectValue placeholder="Select Parent Template">
-                      {typeTemplateId ? (() => {
-                        const match = templates.find(t => String(t.id) === typeTemplateId);
-                        return match ? getTimelineDisplay(match.time_line) : undefined;
-                      })() : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-zinc-950 border dark:border-zinc-800">
-                    {templates.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {getTimelineDisplay(t.time_line)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+              {/* Policy Settings: Paid Leave & Carry Forward Side-by-Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40">
                   <div className="space-y-0.5 pr-2">
-                    <Label htmlFor="is-paid" className="text-xs font-semibold">Paid Leave</Label>
-                    <span className="text-[10px] text-muted-foreground block line-clamp-1">
+                    <Label htmlFor="is-paid" className="text-xs font-semibold cursor-pointer">Paid Leave</Label>
+                    <span className="text-[11px] text-muted-foreground block line-clamp-1">
                       Whether leave remains fully paid.
                     </span>
                   </div>
@@ -1365,76 +1662,64 @@ export default function LeaveConfigPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                  <div className="space-y-0.5 pr-2">
-                    <Label htmlFor="allow-encashment" className="text-xs font-semibold">Allow Encashment</Label>
-                    <span className="text-[10px] text-muted-foreground block line-clamp-1">
-                      Unused leaves can be encashed.
-                    </span>
-                  </div>
-                  <Switch
-                    id="allow-encashment"
-                    checked={typeAllowEncashment}
-                    onCheckedChange={setTypeAllowEncashment}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2 p-3 rounded-lg border dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5 pr-2">
-                    <Label htmlFor="carry-forward" className="text-xs font-semibold">Enable Carry Forward</Label>
-                    <span className="text-[10px] text-muted-foreground block">
-                      Whether unused leaves carry over to the next period.
-                    </span>
-                  </div>
-                  <Switch
-                    id="carry-forward"
-                    checked={typeCarryForward}
-                    onCheckedChange={setTypeCarryForward}
-                  />
-                </div>
-
-                {typeCarryForward && (
-                  <div className="space-y-1.5 pt-2 border-t dark:border-zinc-800">
-                    <Label htmlFor="max-carry-forward" className="text-xs font-semibold">Max Carry Forward (Days)</Label>
-                    <Input
-                      id="max-carry-forward"
-                      type="number"
-                      min="0"
-                      placeholder="0 = unlimited"
-                      value={maxCarryForward}
-                      onChange={(e) => setMaxCarryForward(Number(e.target.value))}
-                      className="rounded-lg shadow-inner bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 text-sm"
+                <div className="flex flex-col justify-between p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 pr-2">
+                      <Label htmlFor="carry-forward" className="text-xs font-semibold cursor-pointer">Enable Carry Forward</Label>
+                      <span className="text-[11px] text-muted-foreground block line-clamp-1">
+                        Carry over unused days to next cycle.
+                      </span>
+                    </div>
+                    <Switch
+                      id="carry-forward"
+                      checked={typeCarryForward}
+                      onCheckedChange={setTypeCarryForward}
                     />
                   </div>
-                )}
+
+                  {typeCarryForward && (
+                    <div className="space-y-1 pt-2.5 mt-2.5 border-t border-zinc-200/80 dark:border-zinc-800">
+                      <Label htmlFor="max-carry-forward" className="text-[11px] font-semibold text-muted-foreground">
+                        Max Carry Forward (Days)
+                      </Label>
+                      <Input
+                        id="max-carry-forward"
+                        type="number"
+                        min="0"
+                        placeholder="0 = unlimited"
+                        value={maxCarryForward}
+                        onChange={(e) => setMaxCarryForward(Number(e.target.value))}
+                        className="h-8 rounded-lg bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-3.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 backdrop-blur-xs shrink-0 flex items-center justify-end gap-3 mt-0">
+            <DialogFooter className="px-6 py-3.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 backdrop-blur-xs shrink-0 flex items-center justify-end gap-2.5 mt-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsTypeDialogOpen(false)}
-                className="rounded-lg border shadow-xs"
+                className="rounded-lg h-9 px-4 text-xs font-medium border-zinc-200 dark:border-zinc-800"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={isTypeSubmitting || !typeTemplateId}
-                className="rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                disabled={isTypeSubmitting || !typeName.trim() || selectedCategories.length === 0 || (!currentTemplate && templates.length === 0)}
+                className="rounded-lg h-9 px-4 text-xs font-semibold bg-primary hover:bg-primary/95 text-primary-foreground shadow-sm hover:shadow transition-all flex items-center gap-1.5"
               >
                 {isTypeSubmitting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
                     Save Configuration
-                    <Check className="h-4 w-4" />
+                    <Check className="h-3.5 w-3.5" />
                   </>
                 )}
               </Button>

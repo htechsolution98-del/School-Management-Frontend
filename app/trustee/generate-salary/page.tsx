@@ -27,13 +27,22 @@ import {
   Building2,
   Download,
   Printer,
+  Layers,
+  ExternalLink,
 } from "lucide-react";
 import {
   getSalaryPayments,
   generateSalary,
   getStaffList,
   triggerPayrollGeneration,
+  getSalaryPreview,
+  bulkGenerateSalaries,
+  bulkDisburseSalaries,
+  getPayslipViewUrl,
+  type SalaryPreviewData,
 } from "@/lib/fees";
+import { SalarySlipModal } from "@/components/payroll/SalarySlipModal";
+import type { PayrollPayslip } from "@/types/hr-config";
 import type {
   ComponentSnapshot,
   SalaryPayment,
@@ -68,19 +77,20 @@ type FilterStatus = "all" | "generated" | "pending";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformStaff(raw: any): StaffMember {
   const isPaid = raw.payment_status === "paid";
+  const hasRecord = Boolean(raw.receipt_number || raw.net_salary != null || raw.working_days != null);
   return {
     id: raw.id ?? raw.staff,
     name: raw.staff_name ?? raw.name ?? raw.full_name ?? "—",
     role: raw.staff_category ?? raw.role ?? raw.designation ?? "—",
     department: raw.staff_category ?? raw.department ?? "—",
     basic_salary: parseFloat(raw.basic_salary ?? "0"),
-    salary_generated: isPaid,
-    payment_status: raw.payment_status,
+    salary_generated: isPaid || (hasRecord && raw.payment_status === "pending"),
+    payment_status: raw.payment_status || (hasRecord ? "pending" : undefined),
     net_salary: raw.net_salary != null ? parseFloat(raw.net_salary) : undefined,
     payment_mode: raw.payment_mode,
     receipt_number: raw.receipt_number,
     payment_date: raw.payment_date,
-    payment_record: isPaid ? (raw as SalaryPayment) : undefined,
+    payment_record: hasRecord ? (raw as SalaryPayment) : undefined,
   };
 }
 
@@ -133,26 +143,40 @@ const getAvatarColor = (id: number) => AVATAR_COLORS[id % AVATAR_COLORS.length];
 const StatusBadge = ({
   generated,
   mode,
+  status,
 }: {
   generated: boolean;
   mode?: string;
-}) =>
-  generated ? (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-      <CheckCircle2 size={10} />
-      Paid
-      {mode && (
-        <span className="capitalize text-emerald-500 font-normal">
-          · {mode}
-        </span>
-      )}
-    </span>
-  ) : (
+  status?: string;
+}) => {
+  if (status === "paid") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <CheckCircle2 size={10} />
+        Paid
+        {mode && (
+          <span className="capitalize text-emerald-500 font-normal">
+            · {mode}
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (status === "pending" && generated) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+        <Sparkles size={10} />
+        Draft
+      </span>
+    );
+  }
+  return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">
       <Hourglass size={10} />
       Pending
     </span>
   );
+};
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 
@@ -537,6 +561,51 @@ const GenerateModal = ({
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState<number>(0);
   const [openDropdown, setOpenDropdown] = useState<"category" | "staff" | null>(null);
+  const [preview, setPreview] = useState<SalaryPreviewData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (staff && staff.id !== 0) {
+      setSelectedStaffId(staff.id);
+      setSelectedCategory(staff.department || staff.role || staff.category || "Staff");
+    }
+  }, [staff]);
+
+  useEffect(() => {
+    const targetId = selectedStaffId || (staff && staff.id !== 0 ? staff.id : 0);
+    if (!targetId || !salaryMonth) {
+      setPreview(null);
+      return;
+    }
+    let isMounted = true;
+    async function fetchPreview() {
+      setPreviewLoading(true);
+      setError("");
+      setMissingPunchWarning(null);
+      try {
+        const data = await getSalaryPreview(targetId, salaryMonth);
+        if (isMounted) {
+          setPreview(data);
+          if (data.requires_regularization) {
+            setMissingPunchWarning({
+              message: data.message || "Attendance regularization required.",
+              dates: data.missing_punch_dates,
+            });
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.warn("Salary preview notice:", err?.message);
+        }
+      } finally {
+        if (isMounted) setPreviewLoading(false);
+      }
+    }
+    fetchPreview();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStaffId, staff, salaryMonth]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -787,6 +856,58 @@ const GenerateModal = ({
               )}
             </div>
           </div>
+
+          {/* Dynamic Attendance, Leave & Auto-Deduction Statistics */}
+          {previewLoading && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-center gap-2.5 text-xs text-slate-500">
+              <Loader2 size={16} className="animate-spin text-indigo-500" />
+              <span>Calculating attendance records & LWP auto-deductions...</span>
+            </div>
+          )}
+
+          {preview && !previewLoading && (
+            <div className="bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/40 border border-indigo-100 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" /> Duty & Attendance Metrics
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Per-Day: <span className="text-slate-800 font-bold">{formatCurrency(preview.per_day_salary)}</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                <div className="bg-white rounded-xl p-2 border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Days</span>
+                  <span className="text-sm font-bold text-slate-800">{preview.working_days}</span>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-2 border border-emerald-200 shadow-2xs">
+                  <span className="text-[10px] text-emerald-600 block font-semibold uppercase">Present</span>
+                  <span className="text-sm font-bold text-emerald-700">{preview.present_days}</span>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-2 border border-blue-200 shadow-2xs">
+                  <span className="text-[10px] text-blue-600 block font-semibold uppercase">Paid Leaves</span>
+                  <span className="text-sm font-bold text-blue-700">{preview.paid_leaves}</span>
+                </div>
+                <div className="bg-rose-50 rounded-xl p-2 border border-rose-200 shadow-2xs">
+                  <span className="text-[10px] text-rose-600 block font-semibold uppercase">LWP</span>
+                  <span className="text-sm font-bold text-rose-700">{preview.lwp_days}</span>
+                </div>
+              </div>
+
+              {parseFloat(preview.lwp_deduction || "0") > 0 && (
+                <div className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg bg-rose-100/70 text-rose-800 border border-rose-200">
+                  <span>LWP Auto-Deduction ({preview.lwp_days} day{preview.lwp_days > 1 ? "s" : ""} @ {formatCurrency(preview.per_day_salary)}):</span>
+                  <span className="font-bold font-mono">-{formatCurrency(preview.lwp_deduction)}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1 border-t border-indigo-100/80">
+                <span className="text-xs font-semibold text-slate-600">Calculated Net Payable:</span>
+                <span className="text-base font-black text-indigo-700 font-mono">{formatCurrency(preview.net_salary)}</span>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
               Payment Mode
@@ -910,6 +1031,133 @@ const GenerateModal = ({
   );
 };
 
+// ─── Bulk Generate Salary Modal ────────────────────────────────────────────────
+const BulkGenerateModal = ({
+  salaryMonth,
+  totalStaff,
+  onClose,
+  onSuccess,
+}: {
+  salaryMonth: string;
+  totalStaff: number;
+  onClose: () => void;
+  onSuccess: (result: any) => void;
+}) => {
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("offline");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleBulkSubmit = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await bulkGenerateSalaries(salaryMonth, paymentMode);
+      onSuccess(result);
+    } catch (e: any) {
+      setError(e?.message || "Failed to bulk generate salaries.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 rounded-xl p-2.5">
+              <Sparkles size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-base">Bulk Salary Generation</p>
+              <p className="text-xs text-indigo-100 mt-0.5">
+                {formatMonth(salaryMonth)}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="bg-white/10 hover:bg-white/20 rounded-full p-1.5 transition-colors"
+          >
+            <X size={15} className="text-white" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-xs text-indigo-900 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-sm text-indigo-950">
+              <Users size={16} className="text-indigo-600" />
+              <span>Batch Process All Active Staff ({totalStaff})</span>
+            </div>
+            <p className="text-indigo-800 leading-relaxed">
+              This automated engine will audit each employee's monthly biometric attendance, calculate total working days, sum approved paid leaves vs. LWP (Leave Without Pay), auto-deduct LWP per-day amounts, and generate draft salary records for your audit and verification before disbursement.
+            </p>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+              Disbursement Mode
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["offline", "online"] as PaymentMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setPaymentMode(m)}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-semibold ${
+                    paymentMode === m
+                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                      : "border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600"
+                  }`}
+                >
+                  {m === "offline" ? <Banknote size={15} /> : <CreditCard size={15} />}
+                  <span className="capitalize">{m}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2 text-xs text-red-600 font-medium">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="pt-2 flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkSubmit}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-200"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>Generate All Drafts</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Month Selector ─────────────────────────────────────────────────────────────
 
 const MonthPicker = ({
@@ -992,6 +1240,8 @@ export default function GenerateSalaryPage() {
   const [salaryMonth, setSalaryMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [selectedDept, setSelectedDept] = useState<string>("all");
+  const [disbursingAll, setDisbursingAll] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [receiptData, setReceiptData] = useState<SalaryPayment | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
@@ -1002,6 +1252,9 @@ export default function GenerateSalaryPage() {
     type: "success" | "error";
   } | null>(null);
   const [engineRunning, setEngineRunning] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [activePayslip, setActivePayslip] = useState<PayrollPayslip | null>(null);
+  const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [skippedStaffWarnings, setSkippedStaffWarnings] = useState<
     Array<{
       staff_id: number;
@@ -1033,6 +1286,65 @@ export default function GenerateSalaryPage() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleBulkSuccess = useCallback(
+    async (result: any) => {
+      setShowBulkModal(false);
+      if (result.skipped && result.skipped.length > 0) {
+        setSkippedStaffWarnings(result.skipped);
+        showToast(
+          `Bulk salaries generated: ${result.total_processed} processed, ${result.total_skipped} skipped.`,
+          "error"
+        );
+      } else {
+        showToast(
+          `Bulk salaries generated successfully! ${result.total_processed} draft payslips created.`,
+          "success"
+        );
+      }
+      await fetchStaff(salaryMonth, true);
+    },
+    [fetchStaff, salaryMonth, showToast]
+  );
+
+  const openPayslipModal = useCallback(
+    (s: StaffMember) => {
+      const pRecord = s.payment_record;
+      const bDown = (pRecord?.component_breakdown || {}) as Record<string, any>;
+      const grossVal =
+        pRecord?.total_earnings ||
+        bDown.gross_earnings ||
+        s.net_salary ||
+        s.basic_salary;
+      const payslipObj: any = {
+        id: pRecord?.id || s.id,
+        school: pRecord?.school || 0,
+        staff: s.id,
+        staff_name: s.name,
+        staff_category: s.role || s.department,
+        designation: s.role,
+        department: s.department,
+        salary_month: salaryMonth,
+        basic_salary: s.basic_salary,
+        gross_earnings: grossVal,
+        total_earnings: grossVal,
+        total_deductions: pRecord?.total_deductions || bDown.total_deductions || "0.00",
+        net_salary: s.net_salary != null ? s.net_salary : s.basic_salary,
+        payment_mode: s.payment_mode || "offline",
+        payment_status: s.payment_status || "paid",
+        receipt_number: s.receipt_number || `SAL-${salaryMonth}-${s.id}`,
+        working_days: pRecord?.working_days || bDown.working_days,
+        present_days: pRecord?.present_days ?? bDown.present_days ?? "0",
+        paid_leaves: bDown.paid_leaves ?? 0,
+        unpaid_leaves: bDown.unpaid_leaves ?? bDown.lwp_days ?? 0,
+        component_breakdown: bDown,
+        created_at: pRecord?.created_at || new Date().toISOString(),
+      };
+      setActivePayslip(payslipObj);
+      setShowPayslipModal(true);
+    },
+    [salaryMonth]
+  );
 
   const handleRunPayrollEngine = async () => {
     setEngineRunning(true);
@@ -1105,6 +1417,18 @@ export default function GenerateSalaryPage() {
     return { total, generated, pending, totalNetPaid };
   }, [staffList]);
 
+  // ── Departments list for filter dropdown ─────────────────────────────────────
+  const departmentOptions = useMemo(() => {
+    const depts = new Set<string>();
+    staffList.forEach((s) => {
+      const d = (s.department || "").trim();
+      if (d && d !== "-") depts.add(d);
+      const r = (s.role || "").trim();
+      if (r && r !== "-") depts.add(r);
+    });
+    return Array.from(depts).sort();
+  }, [staffList]);
+
   // ── Filtered list ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -1118,9 +1442,56 @@ export default function GenerateSalaryPage() {
         filterStatus === "all" ||
         (filterStatus === "generated" && s.salary_generated) ||
         (filterStatus === "pending" && !s.salary_generated);
-      return matchSearch && matchFilter;
+      const matchDept =
+        selectedDept === "all" ||
+        s.department.toLowerCase() === selectedDept.toLowerCase() ||
+        s.role.toLowerCase() === selectedDept.toLowerCase();
+      return matchSearch && matchFilter && matchDept;
     });
-  }, [staffList, search, filterStatus]);
+  }, [staffList, search, filterStatus, selectedDept]);
+
+  // Filtered staff whose salary has been generated but not yet marked 'paid'
+  const pendingFiltered = useMemo(() => {
+    return filtered.filter(
+      (s) => s.salary_generated && s.payment_status !== "paid"
+    );
+  }, [filtered]);
+
+  const handleApproveDisburseAll = async () => {
+    if (pendingFiltered.length === 0) {
+      showToast("No pending/draft salaries to disburse in current view.", "error");
+      return;
+    }
+
+    const confirmMsg = `Approve and mark as Disbursed/Paid for ${pendingFiltered.length} staff member(s) for ${formatMonth(salaryMonth)}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDisbursingAll(true);
+    try {
+      const paymentIds = pendingFiltered
+        .map((s) => s.payment_record?.id)
+        .filter((id): id is number => typeof id === "number" && id > 0);
+      const staffIds = pendingFiltered.map((s) => s.id);
+
+      const res = await bulkDisburseSalaries(
+        salaryMonth,
+        paymentIds.length > 0 ? paymentIds : undefined,
+        staffIds
+      );
+      showToast(
+        res.message || `Approved & disbursed ${res.disbursed_count} salaries successfully!`,
+        "success"
+      );
+      await fetchStaff(salaryMonth, true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to disburse salaries.",
+        "error"
+      );
+    } finally {
+      setDisbursingAll(false);
+    }
+  };
 
   const progressPct = stats.total
     ? Math.round((stats.generated / stats.total) * 100)
@@ -1216,22 +1587,31 @@ export default function GenerateSalaryPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={handleRunPayrollEngine}
-              disabled={engineRunning || refreshing || pageLoading}
-              className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm shadow-violet-200"
-              title="Run dynamic calculation engine for all staff for this month"
+              onClick={() => setShowBulkModal(true)}
+              disabled={engineRunning || refreshing || pageLoading || disbursingAll}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm shadow-indigo-200 cursor-pointer"
+              title="Batch generate draft salaries for all active staff"
             >
-              {engineRunning ? (
+              <Sparkles size={15} />
+              Generate Bulk Salaries
+            </button>
+            <button
+              onClick={handleApproveDisburseAll}
+              disabled={disbursingAll || engineRunning || refreshing || pageLoading || pendingFiltered.length === 0}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm shadow-emerald-200 cursor-pointer"
+              title="Approve and disburse all currently filtered pending salaries in one click"
+            >
+              {disbursingAll ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  Running Engine…
+                  Disbursing…
                 </>
               ) : (
                 <>
-                  <Sparkles size={15} />
-                  Run Payroll Engine
+                  <CheckCircle2 size={15} />
+                  Approve & Disburse All {pendingFiltered.length > 0 ? `(${pendingFiltered.length})` : ""}
                 </>
               )}
             </button>
@@ -1246,7 +1626,7 @@ export default function GenerateSalaryPage() {
                   salary_generated: false,
                 })
               }
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm shadow-indigo-200"
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-sm font-semibold transition flex items-center gap-2 backdrop-blur-md shadow-sm"
             >
               <IndianRupee size={15} />
               Generate Salary
@@ -1421,6 +1801,23 @@ export default function GenerateSalaryPage() {
                 )}
               </div>
 
+              {/* Department Dropdown Filter */}
+              <div className="min-w-[170px]">
+                <select
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition cursor-pointer"
+                  title="Filter staff by department or category"
+                >
+                  <option value="all">All Departments</option>
+                  {departmentOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex gap-2">
                 {(["all", "generated", "pending"] as FilterStatus[]).map(
                   (f) => (
@@ -1516,6 +1913,7 @@ export default function GenerateSalaryPage() {
                             mode={
                               s.salary_generated ? s.payment_mode : undefined
                             }
+                            status={s.payment_status}
                           />
                         </div>
                         {/* Category label — display-only, not in any payload */}
@@ -1543,22 +1941,61 @@ export default function GenerateSalaryPage() {
                       </div>
 
                       {/* Action */}
-                      <div className="shrink-0 flex items-center gap-1.5">
+                      <div className="shrink-0 flex items-center gap-1.5 flex-wrap justify-end">
                         {s.salary_generated ? (
                           <>
+                            {/* Eye (View) Icon Button: Opens Payslip Modal */}
                             <button
-                              onClick={() => openReceipt(s)}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                              onClick={() => openPayslipModal(s)}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition-colors shadow-2xs"
+                              title="Audit structured Payslip with attendance and deductions"
                             >
-                              <Eye size={13} /> View Receipt
+                              <Eye size={13} /> Payslip
                             </button>
-                            <Link
-                              href={`/trustee/cheque-printing?payee=${encodeURIComponent(s.name)}&amount=${s.net_salary != null ? s.net_salary : s.basic_salary}&memo=${encodeURIComponent("Salary - " + formatMonth(salaryMonth))}`}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
-                              title="Print Cheque for this disbursement"
+
+                            {/* PDF / New Tab Button: Official Printable Document */}
+                            <a
+                              href={getPayslipViewUrl(
+                                s.payment_record?.id || s.id,
+                                "html",
+                                salaryMonth,
+                                typeof window !== "undefined" ? localStorage.getItem("access_token") || undefined : undefined,
+                                s.id
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold transition-colors"
+                              title="Open Official Payslip PDF / Print in new tab"
                             >
-                              <Printer size={13} /> Cheque
-                            </Link>
+                              <FileText size={13} /> PDF
+                            </a>
+
+                            {s.payment_status === "paid" ? (
+                              <>
+                                <button
+                                  onClick={() => openReceipt(s)}
+                                  className="hidden lg:flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-100 text-slate-500 text-xs font-medium hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                                  title="View Receipt"
+                                >
+                                  Receipt
+                                </button>
+                                <Link
+                                  href={`/trustee/cheque-printing?payee=${encodeURIComponent(s.name)}&amount=${s.net_salary != null ? s.net_salary : s.basic_salary}&memo=${encodeURIComponent("Salary - " + formatMonth(salaryMonth))}`}
+                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+                                  title="Print Cheque for this disbursement"
+                                >
+                                  <Printer size={13} /> Cheque
+                                </Link>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setSelectedStaff(s)}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs"
+                                title="Disburse and record payment for this draft"
+                              >
+                                <CheckCircle2 size={13} /> Disburse
+                              </button>
+                            )}
                           </>
                         ) : (
                           <button
@@ -1596,6 +2033,23 @@ export default function GenerateSalaryPage() {
       </div>
 
       {/* ── Modals ── */}
+      {showBulkModal && (
+        <BulkGenerateModal
+          salaryMonth={salaryMonth}
+          totalStaff={allStaff.length || staffList.length}
+          onClose={() => setShowBulkModal(false)}
+          onSuccess={handleBulkSuccess}
+        />
+      )}
+
+      {showPayslipModal && activePayslip && (
+        <SalarySlipModal
+          isOpen={showPayslipModal}
+          onClose={() => setShowPayslipModal(false)}
+          payslip={activePayslip}
+        />
+      )}
+
       {selectedStaff && (
         <GenerateModal
           staff={selectedStaff}

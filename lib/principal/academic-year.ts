@@ -58,7 +58,7 @@ export async function updateAcademicYearForPrincipal(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data?.detail || data?.message || "Failed to update academic year.");
+    throw new Error(data?.detail || data?.message ? data?.detail || data?.message : JSON.stringify(data));
   }
 
   return data;

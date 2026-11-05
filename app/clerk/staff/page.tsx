@@ -462,6 +462,13 @@ export default function ClerkStaffDashboard() {
     finally { busy.current = false; setSaving(false); }
   };
 
+  const handleDepartmentCreated = useCallback((newDept: Department) => {
+    setDepartments(previous => {
+      if (previous.some(item => item.id === newDept.id)) return previous;
+      return [...previous, newDept].sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }, []);
+
   const statCards = [
     {
       label: "Total staff",
@@ -576,6 +583,7 @@ export default function ClerkStaffDashboard() {
           onApplyExisting={applyExistingStaff}
           onClose={closeForm}
           onSubmit={save}
+          onDepartmentCreated={handleDepartmentCreated}
           onChange={(field, value) => {
             setForm(previous => ({ ...previous, [field]: value }));
             setErrors(previous => ({ ...previous, [field]: undefined }));

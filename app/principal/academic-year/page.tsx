@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
-    Calendar, CheckCircle2, Clock, FileText,
+    Calendar, Check, CheckCircle2, Clock, FileText,
     Plus, Pencil, Trash2, Loader2, X, AlertCircle, Power,
 } from "lucide-react";
 import {
@@ -136,8 +136,35 @@ function AcademicYearModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const [startYear, setStartYear] = useState(editing?.start_year ?? new Date().getFullYear());
-    const [endYear, setEndYear] = useState(editing?.end_year ?? new Date().getFullYear() + 1);
+    // Parse start and end year intelligently from editing object or name (e.g. "2024-25")
+    const getInitialStartYear = () => {
+        if (editing?.start_year) return editing.start_year;
+        if (editing?.name) {
+            const parts = editing.name.split("-");
+            const first = parseInt(parts[0], 10);
+            if (!isNaN(first)) return first;
+        }
+        return new Date().getFullYear();
+    };
+
+    const getInitialEndYear = () => {
+        if (editing?.end_year) return editing.end_year;
+        const startY = getInitialStartYear();
+        if (editing?.name) {
+            const parts = editing.name.split("-");
+            if (parts.length > 1) {
+                const second = parseInt(parts[1], 10);
+                if (!isNaN(second)) {
+                    const century = Math.floor(startY / 100) * 100;
+                    return century + second;
+                }
+            }
+        }
+        return startY + 1;
+    };
+
+    const [startYear, setStartYear] = useState(getInitialStartYear);
+    const [endYear, setEndYear] = useState(getInitialEndYear);
     const [openDropdown, setOpenDropdown] = useState<"start" | "end" | null>(null);
 
     const [startMonth, setStartMonth] = useState(editing?.start_month ?? 4);
@@ -145,11 +172,36 @@ function AcademicYearModal({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const startDropdownRef = useRef<HTMLDivElement>(null);
+    const endDropdownRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
-        const close = () => setOpenDropdown(null);
-        document.addEventListener("mousedown", close);
-        return () => document.removeEventListener("mousedown", close);
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (
+                startDropdownRef.current && !startDropdownRef.current.contains(target) &&
+                endDropdownRef.current && !endDropdownRef.current.contains(target)
+            ) {
+                setOpenDropdown(null);
+            }
+        };
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => document.removeEventListener("mousedown", handleOutsideClick);
     }, []);
+
+    const handleStartMonthSelect = (m: number) => {
+        setStartMonth(m);
+        // Automated 12-month calculation:
+        // Jan (1) -> Dec (12), Apr (4) -> Mar (3), Jun (6) -> May (5)
+        const computedEnd = m === 1 ? 12 : m - 1;
+        setEndMonth(computedEnd);
+        setOpenDropdown(null);
+    };
+
+    const handleEndMonthSelect = (m: number) => {
+        setEndMonth(m);
+        setOpenDropdown(null);
+    };
 
 
     const handleSave = async () => {
@@ -223,7 +275,13 @@ function AcademicYearModal({
                             <input
                                 type="number"
                                 value={startYear}
-                                onChange={(e) => setStartYear(Number(e.target.value))}
+                                onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setStartYear(val);
+                                    if (val && (!endYear || endYear === startYear + 1)) {
+                                        setEndYear(val + 1);
+                                    }
+                                }}
                                 placeholder="2026"
                                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                             />
@@ -244,26 +302,45 @@ function AcademicYearModal({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Start Month */}
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5">Start Month</label>
+                        <div ref={startDropdownRef} className="relative">
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                                Start Month <span className="text-red-400">*</span>
+                            </label>
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === "start" ? null : "start")}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white flex items-center justify-between transition-all ${
+                                    openDropdown === "start"
+                                        ? "border-indigo-600 ring-2 ring-indigo-100"
+                                        : "border-gray-200 hover:border-gray-300"
+                                } text-gray-800 font-medium`}
                             >
-                                <span>{MONTHS.find(m => m.value === startMonth)?.label}</span>
-                                <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === "start" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                <span>{MONTHS.find(m => m.value === startMonth)?.label || "Select Start Month"}</span>
+                                <svg
+                                    className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === "start" ? "rotate-180 text-indigo-600" : ""}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
                             </button>
                             {openDropdown === "start" && (
-                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto p-1 divide-y-0">
                                     {MONTHS.map(m => (
                                         <button
                                             key={m.value}
                                             type="button"
-                                            onClick={() => { setStartMonth(m.value); setOpenDropdown(null); }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${startMonth === m.value ? "bg-indigo-50 text-indigo-700 font-bold" : "text-gray-700"}`}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onClick={() => handleStartMonthSelect(m.value)}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between ${
+                                                startMonth === m.value
+                                                    ? "bg-indigo-50 text-indigo-700 font-bold"
+                                                    : "text-gray-700 hover:bg-gray-100"
+                                            }`}
                                         >
-                                            {m.label}
+                                            <span>{m.label}</span>
+                                            {startMonth === m.value && <Check size={14} className="text-indigo-600 shrink-0" />}
                                         </button>
                                     ))}
                                 </div>
@@ -271,26 +348,45 @@ function AcademicYearModal({
                         </div>
 
                         {/* End Month */}
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5">End Month</label>
+                        <div ref={endDropdownRef} className="relative">
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                                End Month <span className="text-red-400">*</span>
+                            </label>
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === "end" ? null : "end")}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white flex items-center justify-between transition-all ${
+                                    openDropdown === "end"
+                                        ? "border-indigo-600 ring-2 ring-indigo-100"
+                                        : "border-gray-200 hover:border-gray-300"
+                                } text-gray-800 font-medium`}
                             >
-                                <span>{MONTHS.find(m => m.value === endMonth)?.label}</span>
-                                <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === "end" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                <span>{MONTHS.find(m => m.value === endMonth)?.label || "Select End Month"}</span>
+                                <svg
+                                    className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === "end" ? "rotate-180 text-indigo-600" : ""}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
                             </button>
                             {openDropdown === "end" && (
-                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto p-1 divide-y-0">
                                     {MONTHS.map(m => (
                                         <button
                                             key={m.value}
                                             type="button"
-                                            onClick={() => { setEndMonth(m.value); setOpenDropdown(null); }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${endMonth === m.value ? "bg-indigo-50 text-indigo-700 font-bold" : "text-gray-700"}`}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onClick={() => handleEndMonthSelect(m.value)}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between ${
+                                                endMonth === m.value
+                                                    ? "bg-indigo-50 text-indigo-700 font-bold"
+                                                    : "text-gray-700 hover:bg-gray-100"
+                                            }`}
                                         >
-                                            {m.label}
+                                            <span>{m.label}</span>
+                                            {endMonth === m.value && <Check size={14} className="text-indigo-600 shrink-0" />}
                                         </button>
                                     ))}
                                 </div>
@@ -298,10 +394,27 @@ function AcademicYearModal({
                         </div>
                     </div>
 
-                    {startYear && endYear && startMonth && endMonth && (
-                        <div className="bg-indigo-50 rounded-xl px-3 py-2 text-xs text-indigo-700 font-medium">
-                            Duration: {monthCount(startMonth, endMonth)} months
-                            ({monthLabel(startMonth)} → {monthLabel(endMonth)})
+                    {startMonth && endMonth && (
+                        <div className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between transition-colors ${
+                            monthCount(startMonth, endMonth) === 12
+                                ? "bg-indigo-50/80 border border-indigo-200/80 text-indigo-800"
+                                : "bg-amber-50/90 border border-amber-200 text-amber-900"
+                        }`}>
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-block w-2 h-2 rounded-full ${monthCount(startMonth, endMonth) === 12 ? "bg-indigo-600" : "bg-amber-600"}`} />
+                                <span>
+                                    Duration: {monthCount(startMonth, endMonth)} months ({monthLabel(startMonth)} → {monthLabel(endMonth)})
+                                </span>
+                            </div>
+                            {monthCount(startMonth, endMonth) === 12 ? (
+                                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-md">
+                                    Standard 12-Month Year
+                                </span>
+                            ) : (
+                                <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                                    Custom Duration
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
