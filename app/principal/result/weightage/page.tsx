@@ -60,17 +60,14 @@ export default function WeightageConfigPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Filter classes that have exams scheduled (or all classes if none yet)
-  const classesWithExams = useMemo(() => {
-    if (!exams || exams.length === 0) return classes;
-    const classIdsWithExams = new Set(
-      exams.map((e: any) =>
-        String(typeof e.class_group === "object" && e.class_group !== null ? e.class_group.id : e.class_group)
-      ).filter(Boolean)
-    );
-    const filtered = classes.filter((c: any) => classIdsWithExams.has(String(c.id)));
-    return filtered.length > 0 ? filtered : classes;
-  }, [classes, exams]);
+  // Natural sorting for all classes in school so Principal can customize ANY class
+  const sortedClasses = useMemo(() => {
+    return [...classes].sort((a, b) => {
+      const nameA = String(a.school_class || "").toLowerCase();
+      const nameB = String(b.school_class || "").toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [classes]);
 
   // Load initial academic years, classes, and exams
   const loadInitialData = async () => {
@@ -130,10 +127,20 @@ export default function WeightageConfigPage() {
     let targetConfig: ResultWeightageConfig | undefined;
     if (selectedClassId === "ALL") {
       // Find global/school-wide config (school_class is null)
-      targetConfig = allConfigs.find((c) => !c.school_class);
+      targetConfig = allConfigs.find((c) => {
+        const cClass = typeof c.school_class === "object" && c.school_class !== null
+          ? (c.school_class as any).id
+          : c.school_class;
+        return !cClass;
+      });
     } else {
       // Find class-specific config
-      targetConfig = allConfigs.find((c) => String(c.school_class) === String(selectedClassId));
+      targetConfig = allConfigs.find((c) => {
+        const cClass = typeof c.school_class === "object" && c.school_class !== null
+          ? (c.school_class as any).id
+          : c.school_class;
+        return String(cClass) === String(selectedClassId);
+      });
     }
 
     if (targetConfig) {
@@ -222,12 +229,21 @@ export default function WeightageConfigPage() {
 
     setIsSaving(true);
     try {
-      let cfgId = currentConfig?.id;
       const targetClassNum = selectedClassId !== "ALL" ? Number(selectedClassId) : null;
       const selectedClassObj = classes.find((c) => String(c.id) === selectedClassId);
       const title = targetClassNum
         ? `${selectedClassObj?.school_class || "Class"} Result Weightage`
         : "Academic Year School-Wide Weightage";
+
+      // Always resolve config specifically by targetClassNum so another class is never overwritten
+      const matchingConfig = allConfigs.find((c) => {
+        const cClass = typeof c.school_class === "object" && c.school_class !== null
+          ? (c.school_class as any).id
+          : c.school_class;
+        return targetClassNum === null ? !cClass : String(cClass) === String(targetClassNum);
+      });
+
+      let cfgId = matchingConfig?.id;
 
       if (!cfgId) {
         const newCfg = await createWeightageConfig(Number(selectedYearId), targetClassNum, title);
@@ -334,12 +350,17 @@ export default function WeightageConfigPage() {
                 )}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-80">
               <SelectItem value="ALL" className="font-bold text-emerald-700">
                 🌐 All Classes (School-Wide Default)
               </SelectItem>
-              {classesWithExams.map((c) => {
-                const hasConfig = allConfigs.some((cfg) => String(cfg.school_class) === String(c.id));
+              {sortedClasses.map((c) => {
+                const hasConfig = allConfigs.some((cfg) => {
+                  const cfgClass = typeof cfg.school_class === "object" && cfg.school_class !== null
+                    ? (cfg.school_class as any).id
+                    : cfg.school_class;
+                  return String(cfgClass) === String(c.id);
+                });
                 return (
                   <SelectItem key={c.id} value={String(c.id)}>
                     🎓 {c.school_class} {hasConfig ? "• (Custom Active)" : "• (Uses Default)"}

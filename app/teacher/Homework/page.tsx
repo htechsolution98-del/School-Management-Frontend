@@ -702,7 +702,7 @@ export default function AllHomeworkPage() {
       const fd = new FormData();
       fd.append("division", String(data.divisionId));
       fd.append("title", fullTitle);
-      fd.append("description", data.description.trim());
+      fd.append("description", (data.description || "").trim());
       fd.append("due_date", formattedDueDate);
       fd.append("is_active", "true");
       if (data.file) {
@@ -840,12 +840,12 @@ export default function AllHomeworkPage() {
   }, [homeworks, searchHW, selectedClassFilter, selectedStatusFilter, selectedStatusDropdown]);
 
   return (
-    <div className="relative font-['Sora',sans-serif] text-[#172447] px-3.5 sm:px-6 py-3.5 sm:py-5 pb-4 lg:pb-8 max-w-7xl mx-auto box-border min-w-0 overflow-x-hidden">
+    <div className="relative min-h-full font-['Sora',sans-serif] text-[#172447] px-3.5 sm:px-6 py-3.5 sm:py-5 pb-4 lg:pb-8 max-w-7xl mx-auto box-border min-w-0 overflow-hidden">
       <link rel="stylesheet" href={FONT_URL} />
 
-      {/* ── Ambient Background Artwork (Exact Reference Formulation) ── */}
+      {/* ── Ambient Background Artwork (Contained within page bounds, never overlapping sidebar) ── */}
       <div
-        className="fixed inset-0 pointer-events-none z-0"
+        className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
         style={{
           background: `
             radial-gradient(ellipse at 5% 0%, rgba(139, 92, 246, 0.18), transparent 40%),
@@ -857,9 +857,9 @@ export default function AllHomeworkPage() {
         }}
       />
       {/* Soft curved decorative ambient shapes */}
-      <div className="fixed -top-20 -left-20 w-80 h-80 rounded-full bg-blue-600/8 blur-3xl pointer-events-none z-0" />
-      <div className="fixed top-48 -right-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none z-0" />
-      <div className="fixed -bottom-10 -right-20 w-80 h-80 rounded-full bg-blue-500/12 blur-3xl pointer-events-none z-0" />
+      <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-blue-600/8 blur-3xl pointer-events-none z-0" />
+      <div className="absolute top-48 -right-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none z-0" />
+      <div className="absolute -bottom-10 -right-20 w-80 h-80 rounded-full bg-blue-500/12 blur-3xl pointer-events-none z-0" />
 
       {/* Content Container (Layered above ambient background) */}
       <div className="relative z-10 space-y-3.5 sm:space-y-4">

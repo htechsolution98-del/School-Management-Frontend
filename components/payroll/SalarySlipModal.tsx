@@ -269,11 +269,11 @@ export function SalarySlipModal({
     if (!printRef.current) return;
     const printContent = printRef.current.innerHTML;
 
-    // Use an isolated hidden iframe to completely eliminate blank-page bugs and fit strictly on 1 sheet
+    // Use an isolated iframe to completely eliminate blank-page bugs and fit strictly on 1 sheet
     const iframe = document.createElement("iframe");
     iframe.setAttribute(
       "style",
-      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;"
+      "position:fixed;top:0;left:0;width:100%;height:100%;z-index:-9999;opacity:0;pointer-events:none;border:none;"
     );
     document.body.appendChild(iframe);
 
@@ -310,8 +310,16 @@ export function SalarySlipModal({
             .slip-root {
               width: 100%;
               max-width: 100%;
-              page-break-inside: avoid;
-              break-inside: avoid;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            img {
+              max-height: 42px !important;
+              max-width: 120px !important;
+              width: auto !important;
+              height: auto !important;
+              object-fit: contain !important;
+              display: inline-block !important;
             }
             .grid { display: grid; }
             .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -476,7 +484,7 @@ export function SalarySlipModal({
                 )}
                 <div>
                   <div className="flex items-center justify-center sm:justify-start gap-2 text-blue-600 dark:text-blue-400 font-black text-lg sm:text-xl tracking-tight leading-tight">
-                    <span>{payslip.school_name || resolvedSchoolName}</span>
+                    <span>{(payslip.school_name && payslip.school_name !== "Institutional Academy" ? payslip.school_name : null) || (resolvedSchoolName && resolvedSchoolName !== "Institutional Academy" ? resolvedSchoolName : null) || "School Management"}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                     Official Staff Payroll & Compensation Statement

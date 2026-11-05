@@ -52,7 +52,7 @@ interface LeavesCacheRecord<T> {
 }
 
 const leavesMemoryCache = new Map<string, LeavesCacheRecord<any>>();
-const LEAVES_CACHE_TTL = 30 * 1000; // 30 seconds
+const LEAVES_CACHE_TTL = 10 * 1000; // 30 seconds
 
 function getPersistentLeavesCache<T>(key: string): T | null {
   if (typeof window === "undefined") return null;

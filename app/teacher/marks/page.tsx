@@ -1356,13 +1356,31 @@ export default function EnterMarksPage() {
                             <TableCell className="text-center text-xs font-mono text-slate-500">{maxMarks}</TableCell>
                             <TableCell>
                               <Input
-                                type="number"
-                                min="0"
-                                max={maxMarks}
+                                type="text"
+                                inputMode="decimal"
                                 placeholder="Marks"
                                 disabled={st.is_absent || isLocked}
                                 value={st.marks_obtained}
-                                onChange={(e) => handleMarkChange(st.student_id, "marks_obtained", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (
+                                    !/[0-9]/.test(e.key) &&
+                                    !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) &&
+                                    !(e.key === '.' && !String(st.marks_obtained || '').includes('.'))
+                                  ) {
+                                    e.preventDefault();
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/[^0-9.]/g, '');
+                                  const parts = raw.split('.');
+                                  const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : raw;
+                                  const num = parseFloat(cleanVal);
+                                  if (!isNaN(num) && num > maxMarks) {
+                                    toast.error(`Marks cannot exceed maximum marks (${maxMarks})`);
+                                    return;
+                                  }
+                                  handleMarkChange(st.student_id, "marks_obtained", cleanVal);
+                                }}
                                 className="h-8.5 text-center font-extrabold bg-slate-50 focus:bg-white text-xs rounded-xl border-gray-200"
                               />
                             </TableCell>
