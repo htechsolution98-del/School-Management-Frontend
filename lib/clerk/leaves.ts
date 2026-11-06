@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 
 export interface LeaveDay {
@@ -31,12 +31,7 @@ export interface LeaveRequest {
 export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}/get-leave-requests/`);
   if (!response.ok) {
-    let message = "Failed to fetch leave requests.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch leave requests."));
   }
   return response.json();
 }
@@ -51,12 +46,7 @@ export async function changeLeaveDayStatus(
     body: JSON.stringify({ status }),
   });
   if (!response.ok) {
-    let message = "Failed to update leave day status.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update leave day status."));
   }
 }
 
@@ -70,34 +60,7 @@ export async function approveAllLeaveDays(
     body: JSON.stringify({ status }),
   });
   if (!response.ok) {
-    let message = "Failed to update entire leave request status.";
-    try {
-      const err = await response.json();
-      if (err) {
-        if (typeof err === "string") {
-          message = err;
-        } else if (err.detail) {
-          message = err.detail;
-        } else if (err.message) {
-          message = err.message;
-        } else if (err.error) {
-          message = err.error;
-        } else {
-          const keys = Object.keys(err);
-          if (keys.length > 0) {
-            const firstVal = err[keys[0]];
-            if (Array.isArray(firstVal) && firstVal.length > 0) {
-              message = `${keys[0]}: ${firstVal[0]}`;
-            } else if (typeof firstVal === "string") {
-              message = `${keys[0]}: ${firstVal}`;
-            } else {
-              message = JSON.stringify(err);
-            }
-          }
-        }
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update entire leave request status."));
   }
 }
 
@@ -125,12 +88,7 @@ export interface LeaveTemplate {
 export async function getLeaveTemplates(): Promise<LeaveTemplate[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-templates/`);
   if (!response.ok) {
-    let message = "Failed to fetch leave templates.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch leave templates."));
   }
   return response.json();
 }
@@ -145,12 +103,7 @@ export async function createLeaveTemplate(
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to create leave template.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to create leave template."));
   }
   return response.json();
 }
@@ -166,12 +119,7 @@ export async function updateLeaveTemplate(
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to update leave template.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update leave template."));
   }
   return response.json();
 }
@@ -181,12 +129,7 @@ export async function deleteLeaveTemplate(id: number): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) {
-    let message = "Failed to delete leave template.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete leave template."));
   }
 }
 
@@ -220,12 +163,7 @@ export interface LeaveTypeRecord extends LeaveTypePayload {
 export async function getLeaveTypes(): Promise<LeaveTypeRecord[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-types/`);
   if (!response.ok) {
-    let message = "Failed to fetch leave types.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch leave types."));
   }
   return response.json();
 }
@@ -237,12 +175,7 @@ export async function createLeaveType(payload: LeaveTypePayload): Promise<LeaveT
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to create leave type.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to create leave type."));
   }
   return response.json();
 }
@@ -257,12 +190,7 @@ export async function updateLeaveType(
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to update leave type.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update leave type."));
   }
   return response.json();
 }
@@ -272,12 +200,7 @@ export async function deleteLeaveType(id: number): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) {
-    let message = "Failed to delete leave type.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete leave type."));
   }
 }
 
@@ -307,12 +230,7 @@ export async function bulkManageLeaveTypes(
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to save leave types.";
-    try {
-      const err = await response.json();
-      message = err?.error || err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to save leave types."));
   }
   if (typeof window !== "undefined") {
     try {

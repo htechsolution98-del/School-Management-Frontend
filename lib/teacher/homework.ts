@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/lib/config";
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import type {
   HomeworkItem,
   HomeworkSubmission,
@@ -12,12 +12,7 @@ export async function getTeacherHomework(): Promise<HomeworkItem[]> {
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
-    let message = "Failed to fetch homework.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch homework."));
   }
 
   const data = await response.json();
@@ -33,12 +28,7 @@ export async function getHomeworkSubmissions(
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
-    let message = "Failed to fetch submissions.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch submissions."));
   }
 
   const data = await response.json();
@@ -58,12 +48,7 @@ export async function createHomework(
   });
 
   if (!response.ok) {
-    let message = "Failed to create homework.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || JSON.stringify(err) || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to create homework."));
   }
 
   return response.json();
@@ -82,12 +67,7 @@ export async function updateHomework(
   });
 
   if (!response.ok) {
-    let message = "Failed to update homework.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || JSON.stringify(err) || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update homework."));
   }
 
   return response.json();
@@ -100,12 +80,7 @@ export async function deleteHomework(id: number): Promise<void> {
   const response = await fetchWithAuth(url, { method: "DELETE" });
 
   if (!response.ok) {
-    let message = "Failed to delete homework.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete homework."));
   }
 }
 
@@ -128,12 +103,7 @@ export async function gradeSubmission(
   });
 
   if (!response.ok) {
-    let message = "Failed to grade submission.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to grade submission."));
   }
 
   return response.json();

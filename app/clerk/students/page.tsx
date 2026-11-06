@@ -422,7 +422,17 @@ function StudentDetailsModal({
     docOrUrl: string | { id?: number; file?: string; document_field?: number; document_label?: string; document_file?: string; document_name?: string },
     title?: string
   ) => {
+    const sanitizeUrl = (raw: string): string => {
+      if (!raw) return "";
+      const clean = raw.trim();
+      const lastHttps = clean.lastIndexOf("https://");
+      const lastHttp = clean.lastIndexOf("http://");
+      const idx = Math.max(lastHttps, lastHttp);
+      return idx > 0 ? clean.substring(idx) : clean;
+    };
+
     let url = typeof docOrUrl === "string" ? docOrUrl : (docOrUrl.file || docOrUrl.document_file || "");
+    url = sanitizeUrl(url);
     const docId = typeof docOrUrl === "object" ? docOrUrl.id : undefined;
     const docFieldId = typeof docOrUrl === "object" ? docOrUrl.document_field : undefined;
     const docLabel = (typeof docOrUrl === "object" ? (docOrUrl.document_label || docOrUrl.document_name) : title) || "Document";
@@ -445,7 +455,7 @@ function StudentDetailsModal({
         if (res.ok) {
           const data = await res.json();
           if (data.cloudinary_url || data.url) {
-            targetUrl = data.cloudinary_url || data.url;
+            targetUrl = sanitizeUrl(data.cloudinary_url || data.url);
             if (typeof docOrUrl === "object") {
               if (docOrUrl.file) docOrUrl.file = targetUrl;
               if (docOrUrl.document_file) docOrUrl.document_file = targetUrl;
@@ -455,6 +465,8 @@ function StudentDetailsModal({
       } catch (apiErr) {
         console.warn("Could not resolve Cloudinary URL via API:", apiErr);
       }
+
+      targetUrl = sanitizeUrl(targetUrl);
 
       if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
         window.open(targetUrl, "_blank", "noopener,noreferrer");
