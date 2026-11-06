@@ -37,6 +37,10 @@ import {
   ZoomOut,
   RotateCw,
   Image as ImageIcon,
+  Banknote,
+  CreditCard,
+  Wallet,
+  Receipt,
 } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/auth";
@@ -50,7 +54,7 @@ import { toast } from "sonner";
 
 import { AdmissionFieldInput, type MobileVerificationStatus } from "@/components/clerk/admission-field";
 import { BulkAdmissionImport } from "@/components/clerk/bulk-admission-import";
-import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, isAadhaarAdmissionField, isPhoneField, AADHAAR_DUPLICATE_ERROR, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
+import { admissionFields, normalizeAdmissionValue, validateAdmissionField, validateAdmissionFile, isBirthField, isAadhaarAdmissionField, isPhoneField, isClassField, AADHAAR_DUPLICATE_ERROR, type AdmissionConfig, type AdmissionField } from "@/lib/admission-validation";
 import { checkAadhaarUnique } from "@/lib/student-profile-validation";
 import { submitAdmission } from "@/lib/clerk/admission-submit";
 import "../clerk-workspace.css";
@@ -478,6 +482,10 @@ export default function ManualAdmissionPage() {
   const [isRte, setIsRte] = useState(false);
   const [rteDocument, setRteDocument] = useState<File | null>(null);
 
+  // Admission Fee Payment Mode & Details
+  const [paymentMode, setPaymentMode] = useState<"cash" | "online">("cash");
+  const [paymentNote, setPaymentNote] = useState<string>("");
+
   // Sibling / Family detection state
   const [siblingModalOpen, setSiblingModalOpen] = useState(false);
   const [siblingData, setSiblingData] = useState<{
@@ -550,6 +558,52 @@ export default function ManualAdmissionPage() {
   }, [allPhoneFields, dynamicValues, mobileStatuses]);
 
   const isMobileVerified = unverifiedPhoneFields.length === 0;
+
+  // Form Fee Calculation (General vs Individual / Class-wise)
+  const feeInfo = useMemo(() => {
+    if (!activeForm || !activeForm.fees_enable) {
+      return { enabled: false, amount: 0, reason: "No form fee configured" };
+    }
+    if (isRte) {
+      return { enabled: true, amount: 0, reason: "RTE Quota Student (Exempted - ₹0)" };
+    }
+
+    if (activeForm.fee_type === "general") {
+      const amt = Number(activeForm.fees || 0);
+      return { enabled: true, amount: amt, reason: "General Form Fee (Same for all classes)" };
+    }
+
+    if (activeForm.fee_type === "individual") {
+      const classField = admissionFields(activeForm).find(isClassField);
+      const selectedVal = classField ? dynamicValues[classField.id] : undefined;
+      if (!selectedVal) {
+        return { enabled: true, amount: 0, reason: "Select a Class above to see class-wise form fee" };
+      }
+
+      const matchedClass = classes.find(
+        (c) => String(c.id) === String(selectedVal) || String(c.school_class).toLowerCase() === String(selectedVal).toLowerCase()
+      );
+
+      const structures = activeForm.fee_structures || [];
+      const structure = structures.find((fs) => {
+        const cId = typeof fs.class_name === "object" && fs.class_name !== null ? (fs.class_name as any).id : fs.class_name;
+        if (matchedClass && String(cId) === String(matchedClass.id)) return true;
+        if (matchedClass && fs.class_name_display && fs.class_name_display.toLowerCase() === matchedClass.school_class.toLowerCase()) return true;
+        if (typeof fs.class_name === "string" && matchedClass && fs.class_name.toLowerCase() === matchedClass.school_class.toLowerCase()) return true;
+        return false;
+      });
+
+      if (structure && structure.fee_amount !== undefined && structure.fee_amount !== null) {
+        const amt = Number(structure.fee_amount || 0);
+        const cName = matchedClass?.school_class || structure.class_name_display || "Selected Class";
+        return { enabled: true, amount: amt, reason: `Individual Class Fee for ${cName}` };
+      }
+
+      return { enabled: true, amount: 0, reason: "No fee set for selected class (₹0)" };
+    }
+
+    return { enabled: false, amount: 0, reason: "" };
+  }, [activeForm, isRte, dynamicValues, classes]);
 
   useEffect(() => {
     async function loadData() {
@@ -972,6 +1026,9 @@ export default function ManualAdmissionPage() {
         isRte,
         rteDocument,
         parentId: linkedParent?.parentId,
+        paymentMode: feeInfo.amount > 0 ? paymentMode : (feeInfo.enabled ? "cash" : undefined),
+        paymentNote: paymentNote.trim() || undefined,
+        feeAmount: feeInfo.amount,
       });
       const admissionNumber = result.admissionNumber;
       setSubmissionWarnings(result.warnings);
@@ -991,6 +1048,8 @@ export default function ManualAdmissionPage() {
         setFieldErrors({});
         setIsRte(false);
         setRteDocument(null);
+        setPaymentMode("cash");
+        setPaymentNote("");
         setLinkedParent(null);
         setSiblingData(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1030,6 +1089,8 @@ export default function ManualAdmissionPage() {
     setDocFiles({});
     setIsRte(false);
     setRteDocument(null);
+    setPaymentMode("cash");
+    setPaymentNote("");
     setLinkedParent(null);
     setSiblingData(null);
     setMobileStatuses({});
@@ -1422,6 +1483,157 @@ export default function ManualAdmissionPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* ADMISSION FORM FEE & PAYMENT CARD */}
+          {activeForm.fees_enable && (
+            <Card className="rounded-2xl border-slate-200/90 shadow-2xs overflow-hidden dark:bg-zinc-900/60 dark:border-zinc-800">
+              <CardHeader className="bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-slate-50 border-b border-slate-100 dark:border-zinc-800/80 px-5 py-4 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-900">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-2xs">
+                      <Banknote className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+                        Admission Form Fee & Payment Mode
+                        {feeInfo.amount > 0 ? (
+                          <Badge className="bg-emerald-600 text-white border-0 text-[10px] font-bold px-2 py-0.5">
+                            Payable: ₹{feeInfo.amount.toLocaleString("en-IN")}
+                          </Badge>
+                        ) : isRte ? (
+                          <Badge className="bg-teal-600 text-white border-0 text-[10px] font-bold px-2 py-0.5">
+                            RTE Exempted (₹0)
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-slate-600 text-[10px] font-bold px-2 py-0.5">
+                            Free (₹0)
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs text-slate-500 mt-0.5">
+                        {feeInfo.reason || "Admission application fee details"}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Form Fee Amount</p>
+                    <p className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
+                      ₹{feeInfo.amount.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4">
+                {feeInfo.amount > 0 ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-200 mb-2">
+                        Payment Method Received <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMode("cash")}
+                          className={`relative flex items-center gap-3.5 p-3.5 rounded-xl border-2 transition-all text-left cursor-pointer ${
+                            paymentMode === "cash"
+                              ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-2xs"
+                              : "border-slate-200 hover:border-slate-300 bg-white dark:bg-zinc-800/50 dark:border-zinc-700"
+                          }`}
+                        >
+                          <div
+                            className={`flex size-10 items-center justify-center rounded-lg ${
+                              paymentMode === "cash"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-100 text-slate-600 dark:bg-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            <Banknote className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
+                              Cash Payment
+                              {paymentMode === "cash" && (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 ml-auto" />
+                              )}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Physical cash received by clerk at desk. Logs to Daily Cash register & Account Ledger.
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMode("online")}
+                          className={`relative flex items-center gap-3.5 p-3.5 rounded-xl border-2 transition-all text-left cursor-pointer ${
+                            paymentMode === "online"
+                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-2xs"
+                              : "border-slate-200 hover:border-slate-300 bg-white dark:bg-zinc-800/50 dark:border-zinc-700"
+                          }`}
+                        >
+                          <div
+                            className={`flex size-10 items-center justify-center rounded-lg ${
+                              paymentMode === "online"
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 text-slate-600 dark:bg-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            <CreditCard className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
+                              Online / UPI / QR / Card
+                              {paymentMode === "online" && (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 ml-auto" />
+                              )}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Applicant paid via school UPI QR or Netbanking. Recorded in Fees & Account Ledger.
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                        {paymentMode === "cash" ? "Cash Collection Note (Optional)" : "Transaction / Reference ID (Optional)"}
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder={
+                          paymentMode === "cash"
+                            ? "e.g. Cash received at office counter"
+                            : "e.g. UPI Ref / UTR / Transaction No."
+                        }
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        className="rounded-xl text-xs h-9"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 text-[11px] text-slate-600 dark:text-zinc-400">
+                      <Receipt className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>
+                        This payment of <strong>₹{feeInfo.amount.toLocaleString("en-IN")}</strong> will be automatically marked verified and credited to <strong>Fees Management</strong>, <strong>Daily Cash Register</strong> {paymentMode === "cash" ? "(Drawer Cash)" : "(Digital Audit)"}, and <strong>Account Ledger</strong>.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200/80 dark:border-zinc-700 text-xs text-slate-600 dark:text-zinc-300 flex items-center gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>
+                      {isRte
+                        ? "RTE application is exempt from admission form fees. No payment required."
+                        : activeForm.fee_type === "individual" && !admissionFields(activeForm).find(isClassField)
+                        ? "No fee configured."
+                        : "Form fee for this student application is ₹0. No fee collection needed."}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* ACTION TOOLBAR */}
           <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 pt-3">
