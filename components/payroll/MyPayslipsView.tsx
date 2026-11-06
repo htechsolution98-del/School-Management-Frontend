@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getMyPayslips, getStoredMyPayslips } from "@/lib/hr-config";
 import { SalarySlipModal } from "@/components/payroll/SalarySlipModal";
+import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 import type { PayrollPayslip } from "@/types/hr-config";
 
 function formatCurrency(val: number | string | null | undefined): string {
@@ -475,14 +476,27 @@ export function MyPayslipsView({
                     </div>
                   </div>
 
-                  {/* Action Button */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  {/* Action Buttons */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
                     <button
                       onClick={() => handleOpenSlip(slip)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 transition-all active:scale-[0.98]"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-200 transition-all active:scale-[0.98]"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>View & Download Slip</span>
+                      <span>View Slip</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await downloadPayslipPdf(slip);
+                        } catch (e) {
+                          console.error("PDF download failed:", e);
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm shadow-blue-500/20 hover:shadow-blue-500/30 transition-all active:scale-[0.98]"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download PDF</span>
                     </button>
                   </div>
                 </motion.div>

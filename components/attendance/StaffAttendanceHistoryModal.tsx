@@ -37,10 +37,28 @@ interface StaffAttendanceHistoryModalProps {
 
 function formatDateYYYYMMDD(val: any): string {
   if (!val) return "";
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const year = val.getFullYear();
+    const month = String(val.getMonth() + 1).padStart(2, "0");
+    const day = String(val.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
   if (typeof val === "string") {
     const trimmed = val.trim();
-    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (match) return match[1];
+    const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, "0");
+      const day = ymdMatch[3].padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, "0");
+      const month = dmyMatch[2].padStart(2, "0");
+      const year = dmyMatch[3];
+      return `${year}-${month}-${day}`;
+    }
     const d = new Date(trimmed);
     if (!isNaN(d.getTime())) {
       const year = d.getFullYear();
@@ -50,6 +68,21 @@ function formatDateYYYYMMDD(val: any): string {
     }
   }
   return "";
+}
+
+function parseDateForBadge(val: any): { month: string; day: string | number } {
+  const ymd = formatDateYYYYMMDD(val);
+  if (ymd) {
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dateObj = new Date(Date.UTC(y, m - 1, d));
+    if (!isNaN(dateObj.getTime())) {
+      return {
+        month: dateObj.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }),
+        day: d,
+      };
+    }
+  }
+  return { month: "—", day: "—" };
 }
 
 function parseISOTime(iso: string | null): string {
@@ -405,14 +438,19 @@ export function StaffAttendanceHistoryModal({
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-xs transition-all gap-3 bg-white"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex flex-col items-center justify-center text-slate-600 font-bold shrink-0">
-                      <span className="text-[10px] leading-none uppercase">
-                        {new Date(record.attendance_date).toLocaleDateString("en-US", { month: "short" })}
-                      </span>
-                      <span className="text-sm leading-none mt-0.5">
-                        {new Date(record.attendance_date).getDate()}
-                      </span>
-                    </div>
+                    {(() => {
+                      const badgeDate = parseDateForBadge(record.attendance_date);
+                      return (
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex flex-col items-center justify-center text-slate-600 font-bold shrink-0">
+                          <span className="text-[10px] leading-none uppercase">
+                            {badgeDate.month}
+                          </span>
+                          <span className="text-sm leading-none mt-0.5">
+                            {badgeDate.day}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <div>
                       <div className="flex items-center gap-2">

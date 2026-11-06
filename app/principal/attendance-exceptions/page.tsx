@@ -30,19 +30,60 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function parseISODate(iso: string): string {
+function parseISODate(iso: any): string {
   if (!iso) return "—";
   try {
-    const d = new Date(iso.includes("T") ? iso : iso + "T00:00:00Z");
-    return d.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      weekday: "short",
-      timeZone: "UTC",
-    });
+    const trimmed = String(iso).trim();
+    // Check DD-MM-YYYY or DD/MM/YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      const d = parseInt(dmyMatch[1], 10);
+      const m = parseInt(dmyMatch[2], 10);
+      const y = parseInt(dmyMatch[3], 10);
+      const dateObj = new Date(Date.UTC(y, m - 1, d));
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          weekday: "short",
+          timeZone: "UTC",
+        });
+      }
+    }
+    // Check YYYY-MM-DD or YYYY/MM/DD
+    const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+      const y = parseInt(ymdMatch[1], 10);
+      const m = parseInt(ymdMatch[2], 10);
+      const d = parseInt(ymdMatch[3], 10);
+      const dateObj = new Date(Date.UTC(y, m - 1, d));
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          weekday: "short",
+          timeZone: "UTC",
+        });
+      }
+    }
+    const d = new Date(trimmed.includes("T") ? trimmed : trimmed + "T00:00:00Z");
+    if (!isNaN(d.getTime())) {
+      const formatted = d.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        weekday: "short",
+        timeZone: "UTC",
+      });
+      if (formatted !== "Invalid Date") {
+        return formatted;
+      }
+    }
+    return String(iso);
   } catch {
-    return iso;
+    return String(iso);
   }
 }
 

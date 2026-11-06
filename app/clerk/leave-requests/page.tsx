@@ -355,14 +355,6 @@ export default function ClerkLeaveRequestsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowRawData(!showRawData)}
-            className="text-xs text-muted-foreground"
-          >
-            {showRawData ? "Hide Debug Data" : "Inspect Payload"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={fetchData}
             disabled={isLoading}
             className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs"
@@ -468,16 +460,6 @@ export default function ClerkLeaveRequestsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Debug view for payload validation */}
-      {showRawData && (
-        <Card className="border border-amber-200 bg-amber-500/5 p-4 rounded-xl">
-          <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 mb-2">Raw API Data Payload:</h4>
-          <pre className="text-xs max-h-60 overflow-y-auto bg-black/80 text-green-400 p-3 rounded-lg font-mono">
-            {JSON.stringify(requests, null, 2)}
-          </pre>
-        </Card>
-      )}
 
       {/* Tabs Filter & Leave requests list - Forced flex-col layout to stack tabs and cards vertically */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col gap-6">
