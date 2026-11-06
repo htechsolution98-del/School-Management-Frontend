@@ -1,4 +1,4 @@
-import { fetchWithAuth, extractErrorMessage } from "@/lib/auth";
+import { fetchWithAuth, extractErrorMessage, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import type { Admission } from "@/types/clerk";
 
@@ -8,17 +8,7 @@ export async function fetchAdmissions(): Promise<Admission[]> {
   });
 
   if (!response.ok) {
-    let message = "Failed to fetch admissions.";
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) message = text.slice(0, 200);
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch admissions"));
   }
 
   const data = await response.json();
@@ -36,21 +26,7 @@ export async function patchStudentDetails(
   });
 
   if (!response.ok) {
-    let message = `Failed to update student information (${response.status})`;
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) {
-          message = text.slice(0, 200);
-        } else if (response.status === 500) {
-          message = "Server error occurred while updating student.";
-        }
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, `Failed to update student information (${response.status})`));
   }
 
   return response.json();
@@ -70,21 +46,7 @@ export async function patchFieldValues(
   });
 
   if (!response.ok) {
-    let message = `Failed to update student information (${response.status})`;
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) {
-          message = text.slice(0, 200);
-        } else if (response.status === 500) {
-          message = "Server error occurred while updating student.";
-        }
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, `Failed to update student information (${response.status})`));
   }
 
   return response.json();
@@ -98,17 +60,7 @@ export async function patchStudentDivision(admissionNumber: string, division: st
   });
 
   if (!response.ok) {
-    let message = "Failed to update student division.";
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) message = text.slice(0, 200);
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update student division"));
   }
 
   return response.json();
@@ -134,17 +86,7 @@ export async function patchDocuments(
   });
 
   if (!response.ok) {
-    let message = "Failed to update documents.";
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) message = text.slice(0, 200);
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update documents"));
   }
 
   return response.json();
@@ -162,17 +104,7 @@ export async function assignGrNumber(
   });
 
   if (!response.ok) {
-    let message = "Failed to assign GR number.";
-    try {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        message = extractErrorMessage(err, message);
-      } catch {
-        if (text && !text.startsWith("<")) message = text.slice(0, 200);
-      }
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to assign GR number"));
   }
 }
 
@@ -186,12 +118,7 @@ export async function assignStudentPlacement(
     body: JSON.stringify(placement),
   });
   if (!response.ok) {
-    let message = "Failed to assign the student's class and division.";
-    try {
-      const error = await response.json();
-      message = extractErrorMessage(error, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to assign the student's class and division"));
   }
 }
 
@@ -205,11 +132,6 @@ export async function assignStudentDivision(
     body: JSON.stringify({ division }),
   });
   if (!response.ok) {
-    let message = "Failed to update the student's division.";
-    try {
-      const error = await response.json();
-      message = extractErrorMessage(error, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update the student's division"));
   }
 }

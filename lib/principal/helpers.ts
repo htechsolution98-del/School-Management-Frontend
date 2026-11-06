@@ -1,4 +1,4 @@
-import { fetchWithAuth, extractErrorMessage } from "@/lib/auth";
+import { fetchWithAuth, extractErrorMessage, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 
 export function normalizeList<T>(data: unknown): T[] {
@@ -15,23 +15,28 @@ export async function getErrorMessage(
   fallback: string
 ): Promise<string> {
   try {
-    const err = await response.json();
-    if (err && typeof err === "object") {
-      if (err.title) {
-        const titleMsg = Array.isArray(err.title) ? err.title.join(" ") : String(err.title);
-        if (/already exists/i.test(titleMsg)) {
-          return "A form with this title already exists.";
+    const cloned = response.clone();
+    try {
+      const err = await cloned.json();
+      if (err && typeof err === "object") {
+        if (err.title) {
+          const titleMsg = Array.isArray(err.title) ? err.title.join(" ") : String(err.title);
+          if (/already exists/i.test(titleMsg)) {
+            return "A form with this title already exists.";
+          }
+          return titleMsg;
         }
-        return titleMsg;
-      }
-      if (err.detail) {
-        const detailMsg = Array.isArray(err.detail) ? err.detail.join(" ") : String(err.detail);
-        if (/already exists/i.test(detailMsg)) {
-          return "A form with this title already exists.";
+        if (err.detail) {
+          const detailMsg = Array.isArray(err.detail) ? err.detail.join(" ") : String(err.detail);
+          if (/already exists/i.test(detailMsg)) {
+            return "A form with this title already exists.";
+          }
         }
       }
+      return extractErrorMessage(err, fallback);
+    } catch {
+      return await parseApiError(response, fallback);
     }
-    return extractErrorMessage(err, fallback);
   } catch {
     return fallback;
   }

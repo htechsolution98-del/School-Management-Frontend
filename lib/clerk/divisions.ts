@@ -1,4 +1,4 @@
-import { fetchWithAuth, extractErrorMessage } from "@/lib/auth";
+import { fetchWithAuth, extractErrorMessage, parseApiError } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { Division } from "@/types/clerk";
 
@@ -6,12 +6,7 @@ export async function getDivisions(): Promise<Division[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.DIVISION_SET}`);
 
   if (!response.ok) {
-    let message = "Failed to fetch divisions.";
-    try {
-      const err = await response.json();
-      message = extractErrorMessage(err, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch divisions"));
   }
 
   const data = await response.json();
@@ -49,12 +44,7 @@ export async function saveDivision(payload: Division): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to save division.";
-    try {
-      const err = await response.json();
-      message = extractErrorMessage(err, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to save division"));
   }
 }
 
@@ -86,12 +76,7 @@ export async function updateDivision(id: number, payload: Partial<Division>): Pr
   });
 
   if (!response.ok) {
-    let message = "Failed to update division.";
-    try {
-      const err = await response.json();
-      message = extractErrorMessage(err, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update division"));
   }
 }
 
@@ -101,11 +86,6 @@ export async function deleteDivision(id: number): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to delete division.";
-    try {
-      const err = await response.json();
-      message = extractErrorMessage(err, message);
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete division"));
   }
 }

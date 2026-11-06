@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 
 export interface RemainingLeave {
@@ -110,12 +110,7 @@ export async function getRemainingLeaves(forceFresh = false): Promise<RemainingL
 
   const response = await fetchWithAuth(`${API_BASE_URL}/get-remaining-leaves/`);
   if (!response.ok) {
-    let message = "Failed to fetch remaining leave balance.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch remaining leave balance."));
   }
   const data = await response.json();
   leavesMemoryCache.set(cacheKey, { data, timestamp: Date.now() });
@@ -139,12 +134,7 @@ export async function getMyLeaveRequests(forceFresh = false): Promise<MyLeaveReq
 
   const response = await fetchWithAuth(`${API_BASE_URL}/get-leave-requests-staff/`);
   if (!response.ok) {
-    let message = "Failed to fetch personal leave requests.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch personal leave requests."));
   }
   const data = await response.json();
   leavesMemoryCache.set(cacheKey, { data, timestamp: Date.now() });
@@ -201,12 +191,7 @@ export async function calculateLeaveDays(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to calculate effective leave days.";
-    try {
-      const err = await response.json();
-      message = err?.error || err?.detail || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to calculate effective leave days."));
   }
   return response.json();
 }
@@ -218,12 +203,7 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to submit leave request.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to submit leave request."));
   }
   invalidateLeavesCache();
   return response.json();
@@ -239,12 +219,7 @@ export async function updateLeaveRequest(
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let message = "Failed to update leave request.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to update leave request."));
   }
   invalidateLeavesCache();
   return response.json();
@@ -255,12 +230,7 @@ export async function deleteLeaveRequest(id: number): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) {
-    let message = "Failed to delete leave request.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete leave request."));
   }
   invalidateLeavesCache();
 }
@@ -270,12 +240,7 @@ export async function withdrawLeaveRequest(id: number): Promise<void> {
     method: "POST",
   });
   if (!response.ok) {
-    let message = "Failed to withdraw leave request.";
-    try {
-      const err = await response.json();
-      message = err?.error || err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to withdraw leave request."));
   }
   invalidateLeavesCache();
 }
@@ -287,12 +252,7 @@ export async function requestCancellation(id: number, reason: string): Promise<v
     body: JSON.stringify({ reason }),
   });
   if (!response.ok) {
-    let message = "Failed to request leave cancellation.";
-    try {
-      const err = await response.json();
-      message = err?.error || err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to request leave cancellation."));
   }
   invalidateLeavesCache();
 }

@@ -1,5 +1,5 @@
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import type {
   TodayAttendance,
   AttendanceRecord,
@@ -113,16 +113,7 @@ export async function markAttendance(payload: {
   });
 
   if (!response.ok) {
-    let message = "Attendance action failed.";
-    try {
-      const err = await response.json();
-      message =
-        err?.non_field_errors?.[0] ||
-        err?.detail ||
-        err?.message ||
-        message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Attendance action failed."));
   }
 
   invalidateAttendanceCache();
@@ -150,12 +141,7 @@ export async function getAttendanceHistory(params?: { staff_id?: number }, force
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
-    let message = "Failed to fetch attendance history.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch attendance history."));
   }
 
   const data = await response.json();
@@ -179,12 +165,7 @@ export async function getAttendanceCalendarStatus(date: string): Promise<Attenda
   const query = new URLSearchParams({ date });
   const response = await fetchWithAuth(`${API_BASE_URL}/attendance/calendar-status/?${query.toString()}`);
   if (!response.ok) {
-    let message = "Failed to fetch the school attendance calendar.";
-    try {
-      const error = await response.json();
-      message = error?.detail || error?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch the school attendance calendar."));
   }
   return response.json();
 }
@@ -209,12 +190,7 @@ export async function getStaffAttendance(params?: {
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
-    let message = "Failed to fetch staff attendance records.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch staff attendance records."));
   }
 
   const data = await response.json();
@@ -227,12 +203,7 @@ export async function checkFaceStatus(): Promise<{ enrolled: boolean }> {
   const url = `${API_BASE_URL}${API_ENDPOINTS.FACE_VERIFY}`;
   const response = await fetchWithAuth(url);
   if (!response.ok) {
-    let message = "Failed to check face enrollment status.";
-    try {
-      const error = await response.json();
-      message = error?.detail || error?.error || error?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to check face enrollment status."));
   }
   const data = await response.json();
   return { enrolled: data?.enrolled ?? data?.is_enrolled ?? false };
@@ -262,12 +233,7 @@ export async function verifyFace(imageBase64: string): Promise<any> {
   });
 
   if (!response.ok) {
-    let message = "Face verification failed.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Face verification failed."));
   }
 
   return response.json();
@@ -285,12 +251,7 @@ export async function enrollFace(imageBase64: string): Promise<{ success: boolea
   });
 
   if (!response.ok) {
-    let message = "Face enrollment failed.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch { }
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Face enrollment failed."));
   }
 
   return response.json();

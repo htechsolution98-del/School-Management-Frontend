@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { SchoolClass } from "@/types/clerk";
 
@@ -17,12 +17,7 @@ export async function getSchoolClasses(forceFresh = false): Promise<SchoolClass[
   const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.CLASSES}`);
 
   if (!response.ok) {
-    let message = "Failed to fetch classes.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch classes"));
   }
 
   const data = await response.json();
@@ -39,12 +34,7 @@ export async function getSchoolClassesForExam(): Promise<SchoolClass[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}/classes/`);
 
   if (!response.ok) {
-    let message = "Failed to fetch classes for exam timetable.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch classes for exam timetable"));
   }
 
   const data = await response.json();
@@ -60,12 +50,7 @@ export async function saveSchoolClasses(classes: string[]): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to save classes.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to save classes"));
   }
   classesCache = null;
 }
@@ -76,12 +61,7 @@ export async function deleteSchoolClass(id: number): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to delete class.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete class"));
   }
   classesCache = null;
 }
