@@ -14,8 +14,28 @@ async function responseData(response: Response): Promise<Record<string, unknown>
   return data;
 }
 
-export async function submitAdmission({ form, values, academicYear, documents = {}, isRte = false, rteDocument, parentId }: {
-  form: AdmissionConfig; values: AdmissionValues; academicYear?: string; documents?: Record<number, File>; isRte?: boolean; rteDocument?: File | null; parentId?: number | string | null;
+export async function submitAdmission({
+  form,
+  values,
+  academicYear,
+  documents = {},
+  isRte = false,
+  rteDocument,
+  parentId,
+  paymentMode,
+  paymentNote,
+  feeAmount,
+}: {
+  form: AdmissionConfig;
+  values: AdmissionValues;
+  academicYear?: string;
+  documents?: Record<number, File>;
+  isRte?: boolean;
+  rteDocument?: File | null;
+  parentId?: number | string | null;
+  paymentMode?: "cash" | "online";
+  paymentNote?: string;
+  feeAmount?: number;
 }) {
   const fields = admissionFields(form);
   const fieldValues = fields.map(field => ({ field: field.id, value: String(normalizeAdmissionValue(field, values[field.id])) }));
@@ -28,6 +48,9 @@ export async function submitAdmission({ form, values, academicYear, documents = 
   if (parentId) body.append("parent_id", String(parentId));
   if (academicYear) body.append("academic_year", academicYear);
   if (/^\d+$/.test(classValue)) body.append("school_class", classValue);
+  if (paymentMode) body.append("payment_mode", paymentMode);
+  if (paymentNote) body.append("payment_note", paymentNote);
+  if (feeAmount !== undefined) body.append("fee_amount", String(feeAmount));
   for (const [id, file] of Object.entries(documents)) body.append(`document_${id}`, file);
   const data = await responseData(await fetchWithAuth(`${API_BASE_URL}/submissions/`, { method: "POST", body }));
   const admissionNumber = data.admission_number || data.id;

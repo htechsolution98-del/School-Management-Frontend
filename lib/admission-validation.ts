@@ -8,11 +8,22 @@ export interface AdmissionField {
   map_to_student_field?: string | null;
   order?: number;
 }
+export interface AdmissionFeeStructureItem {
+  id?: number;
+  class_name: number | string | { id: number; school_class: string };
+  class_name_display?: string;
+  fee_amount: number | string;
+}
+
 export interface AdmissionConfig {
   id: number;
   title?: string;
   form_title?: string;
   is_active: boolean;
+  fees_enable?: boolean;
+  fee_type?: "general" | "individual" | string;
+  fees?: number | string;
+  fee_structures?: AdmissionFeeStructureItem[];
   sections: { id: number; title: string; order: number; fields: AdmissionField[] }[];
   document_fields: { id: number; label: string; is_required: boolean }[];
 }

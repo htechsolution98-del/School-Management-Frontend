@@ -666,6 +666,11 @@ export default function AllHomeworkPage() {
     try {
       const data = await getHomeworkSubmissions(hwId);
       setSubmissions(data);
+      setHomeworks((prev) =>
+        prev.map((item) =>
+          item.id === hwId ? { ...item, submission_count: data.length } : item
+        )
+      );
     } catch {
       setSubmissions([]);
     } finally {
