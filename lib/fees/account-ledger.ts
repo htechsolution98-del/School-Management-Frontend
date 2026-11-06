@@ -41,6 +41,9 @@ export interface LedgerSummary {
   total_outflow: number;
   net_change: number;
   closing_balance: number;
+  cash_in_drawer?: number;
+  total_bank_collection?: number;
+  total_school_funds?: number;
   total_transactions: number;
   fee_receipts_count: number;
   expenses_count: number;
@@ -84,6 +87,33 @@ export async function fetchAccountLedger(
     return {
       data: null,
       error: err?.message || "Failed to fetch account ledger",
+      success: false,
+    };
+  }
+}
+
+export interface SetInitialCashPayload {
+  amount: number;
+  date?: string;
+  notes?: string;
+}
+
+export async function setInitialCash(payload: SetInitialCashPayload): Promise<ApiResponse<any>> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/finance/set-initial-cash/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData?.error || resData?.detail || `Failed to set initial cash (HTTP ${response.status})`);
+    }
+    return { data: resData, error: null, success: true };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: err?.message || "Failed to set initial cash",
       success: false,
     };
   }

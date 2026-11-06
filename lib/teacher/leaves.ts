@@ -27,6 +27,7 @@ export interface MyLeaveRequest {
   dynamic_leave_type?: number | null;
   dynamic_leave_type_name?: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | string;
+  approval_remarks?: string;
   rejection_reason?: string;
   cancellation_status?: "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | string;
   cancellation_reason?: string;

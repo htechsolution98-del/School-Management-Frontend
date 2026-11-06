@@ -22,6 +22,8 @@ import {
   AlertCircle,
   Sparkles,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   TrendingUp,
   Clock,
   Building2,
@@ -41,8 +43,10 @@ import {
   getPayslipViewUrl,
   type SalaryPreviewData,
 } from "@/lib/fees";
+import { loadRazorpayScript } from "@/lib/razorpay";
 import { SalarySlipModal } from "@/components/payroll/SalarySlipModal";
 import type { PayrollPayslip } from "@/types/hr-config";
+import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 import type {
   ComponentSnapshot,
   SalaryPayment,
@@ -67,10 +71,27 @@ interface StaffMember {
   receipt_number?: string;
   payment_date?: string;
   payment_record?: SalaryPayment;
+  joining_date?: string;
 }
 
-type PaymentMode = "offline" | "online";
-type FilterStatus = "all" | "generated" | "pending";
+type PaymentMode = "offline" | "online" | "cheque" | "bank_transfer";
+type FilterStatus = "all" | "generated" | "pending" | "paid";
+
+// ─── Helper: Check if staff joined in a month after the target salary month ────
+function isStaffJoinedAfterMonth(joiningDate?: string, salaryMonthStr?: string): boolean {
+  if (!joiningDate || !salaryMonthStr) return false;
+  try {
+    const parts = salaryMonthStr.split("-").map(Number);
+    const y = parts[0];
+    const m = parts[1];
+    if (!y || !m) return false;
+    const lastDay = new Date(y, m, 0).getDate();
+    const monthEndStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    return String(joiningDate).substring(0, 10) > monthEndStr;
+  } catch {
+    return false;
+  }
+}
 
 // ─── Transform raw API response → StaffMember ──────────────────────────────────
 
@@ -78,8 +99,9 @@ type FilterStatus = "all" | "generated" | "pending";
 function transformStaff(raw: any): StaffMember {
   const isPaid = raw.payment_status === "paid";
   const hasRecord = Boolean(raw.receipt_number || raw.net_salary != null || raw.working_days != null);
+  const staffId = Number(raw.staff ?? raw.staff_id ?? raw.id);
   return {
-    id: raw.id ?? raw.staff,
+    id: staffId,
     name: raw.staff_name ?? raw.name ?? raw.full_name ?? "—",
     role: raw.staff_category ?? raw.role ?? raw.designation ?? "—",
     department: raw.staff_category ?? raw.department ?? "—",
@@ -91,6 +113,7 @@ function transformStaff(raw: any): StaffMember {
     receipt_number: raw.receipt_number,
     payment_date: raw.payment_date,
     payment_record: hasRecord ? (raw as SalaryPayment) : undefined,
+    joining_date: raw.joining_date || raw.joiningDate || raw.date_of_joining,
   };
 }
 
@@ -209,10 +232,7 @@ const StatCard = ({
   </div>
 );
 
-// ─── Receipt Modal ──────────────────────────────────────────────────────────────
-// Dynamically renders component_breakdown JSON (Earnings on left, Deductions on right).
-// No hardcoded columns. Directly reflects the dynamic Attendance, Leave, and Payroll engine.
-
+// Note: Receipt modal replaced by unified SalarySlipModal
 const ReceiptModal = ({
   data,
   onClose,
@@ -275,19 +295,24 @@ const ReceiptModal = ({
     };
   }, [data]);
 
-  const proRataPct = useMemo(() => {
-    const val = parseFloat(breakdown.pro_rata_multiplier || "1") * 100;
-    return isNaN(val) ? "100.0" : val.toFixed(1);
-  }, [breakdown.pro_rata_multiplier]);
+  const cycleDateRange = useMemo(() => {
+    if (!data.salary_month) return "";
+    const parts = String(data.salary_month).split("-");
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month)) return "";
+    const lastDay = new Date(year, month, 0).getDate();
+    return `01-${String(month).padStart(2, "0")}-${year} to ${String(lastDay).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
+  }, [data.salary_month]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative z-[210] bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Gradient Header */}
         <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white relative shrink-0">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors"
+            className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -301,9 +326,16 @@ const ReceiptModal = ({
                 Dynamic Salary Slip & Breakdown
               </p>
               <p className="font-bold text-xl leading-tight">{data.staff_name}</p>
-              <p className="text-xs text-indigo-200 mt-0.5">
-                {data.staff_category}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-indigo-200">
+                  {data.staff_category}
+                </span>
+                {cycleDateRange && (
+                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-md font-mono text-white">
+                    Cycle: {cycleDateRange}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -344,35 +376,39 @@ const ReceiptModal = ({
             </div>
           )}
 
-          {/* Attendance & Calculation Engine Metrics */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Attendance & Calculation Metrics
+          {/* Clean 5-Field Attendance & Duty Summary (Strictly essential fields only) */}
+          <div className="border border-slate-200 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Attendance & Duty Summary ({formatMonth(data.salary_month)})
               </p>
-              <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
-                Factor: {proRataPct}% ({breakdown.payable_days} / {breakdown.working_days} days)
-              </span>
+              {cycleDateRange && (
+                <span className="text-[11px] font-semibold text-slate-500 font-mono">
+                  {cycleDateRange}
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {[
-                { label: "Working Days", val: breakdown.working_days, color: "text-slate-700" },
-                { label: "Present Days", val: breakdown.present_days, color: "text-emerald-600" },
-                { label: "Paid Leaves", val: breakdown.paid_leaves, color: "text-blue-600" },
-                { label: "Half Days (×0.5)", val: breakdown.half_days, color: "text-amber-500" },
-                { label: "Late Punches", val: breakdown.late_days, color: "text-violet-600" },
-                { label: "Unpaid Leaves", val: breakdown.unpaid_leaves, color: "text-red-500" },
-                { label: "Payable Days", val: breakdown.payable_days, color: "text-indigo-700 font-extrabold" },
-                { label: "Pro-Rata Factor", val: `${proRataPct}%`, color: "text-indigo-700 font-extrabold" },
-              ].map(({ label, val, color }) => (
-                <div
-                  key={label}
-                  className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center"
-                >
-                  <p className={`text-lg font-bold ${color}`}>{val}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide">{label}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 text-center">
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Total Days in Cycle</span>
+                <span className="text-lg font-bold text-slate-800 mt-0.5 block">{breakdown.working_days}</span>
+              </div>
+              <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
+                <span className="text-[10px] text-emerald-600 block uppercase font-medium">Present Days</span>
+                <span className="text-lg font-bold text-emerald-700 mt-0.5 block">{breakdown.present_days}</span>
+              </div>
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+                <span className="text-[10px] text-blue-600 block uppercase font-medium">Paid Leaves</span>
+                <span className="text-lg font-bold text-blue-700 mt-0.5 block">{breakdown.paid_leaves}</span>
+              </div>
+              <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3">
+                <span className="text-[10px] text-rose-600 block uppercase font-medium">Unpaid / LOP</span>
+                <span className="text-lg font-bold text-rose-700 mt-0.5 block">{breakdown.unpaid_leaves}</span>
+              </div>
+              <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3">
+                <span className="text-[10px] text-indigo-600 block uppercase font-medium">Payable Days</span>
+                <span className="text-lg font-bold text-indigo-700 mt-0.5 block">{breakdown.payable_days}</span>
+              </div>
             </div>
           </div>
 
@@ -515,15 +551,15 @@ const ReceiptModal = ({
         <div className="border-t border-slate-100 p-4 flex gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Close
           </button>
           <button
             onClick={onDownloadPdf}
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200 cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-200 cursor-pointer"
           >
-            <Download size={14} /> Download / Print Payslip
+            <Printer size={15} /> Print / Save PDF (1 Page)
           </button>
         </div>
       </div>
@@ -555,9 +591,13 @@ const GenerateModal = ({
 }) => {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("offline");
   const [transactionId, setTransactionId] = useState("");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [bankName, setBankName] = useState("State Bank of India");
+  const [chequeDate, setChequeDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [createdPayment, setCreatedPayment] = useState<SalaryPayment | null>(null);
   const [missingPunchWarning, setMissingPunchWarning] = useState<{
     message: string;
     dates?: string[];
@@ -568,6 +608,33 @@ const GenerateModal = ({
   const [openDropdown, setOpenDropdown] = useState<"category" | "staff" | null>(null);
   const [preview, setPreview] = useState<SalaryPreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  const cycleDateRange = useMemo(() => {
+    if (!salaryMonth) return "";
+    const parts = String(salaryMonth).split("-");
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month)) return "";
+    const lastDay = new Date(year, month, 0).getDate();
+    return `01-${String(month).padStart(2, "0")}-${year} to ${String(lastDay).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
+  }, [salaryMonth]);
+
+  const isAlreadyGenerated = useMemo(() => {
+    if (!staff) return false;
+    return Boolean(
+      staff.salary_generated ||
+      staff.payment_status === "paid" ||
+      (staff.payment_record && staff.payment_record.salary_month === salaryMonth)
+    );
+  }, [staff, salaryMonth]);
+
+  const targetStaff = useMemo(() => {
+    return staffOptions.find((s) => s.id === selectedStaffId) || staff;
+  }, [staffOptions, selectedStaffId, staff]);
+
+  const isNotJoinedYet = useMemo(() => {
+    return isStaffJoinedAfterMonth(targetStaff?.joining_date, salaryMonth);
+  }, [targetStaff, salaryMonth]);
 
   useEffect(() => {
     if (staff && staff.id !== 0) {
@@ -623,6 +690,11 @@ const GenerateModal = ({
 
 
   const handleSubmit = async () => {
+    if (isNotJoinedYet) {
+      setError(`Cannot generate salary: ${targetStaff?.name || "Staff"} joined on ${targetStaff?.joining_date}. Salary cannot be generated for months prior to joining date.`);
+      return;
+    }
+
     if (!selectedCategory) {
       setError("Category is required.");
       return;
@@ -643,33 +715,40 @@ const GenerateModal = ({
       return;
     }
 
-    if (paymentMode === "online" && !transactionId.trim()) {
-      setError("Transaction ID is required.");
+    if (paymentMode === "cheque" && !chequeNumber.trim()) {
+      setError("Cheque Number is required.");
+      return;
+    }
+    if ((paymentMode === "online" || paymentMode === "bank_transfer") && !transactionId.trim()) {
+      setError("Transaction ID / Reference is required.");
       return;
     }
     setError("");
     setMissingPunchWarning(null);
     setLoading(true);
 
-    // ── Backend payload — staff id only, no category, no receipt_number ───
     const body: Record<string, unknown> = {
       staff: selectedStaffId,
       salary_month: salaryMonth,
-      payment_mode: paymentMode,
-
-      // required by backend
+      payment_mode: paymentMode === "cheque" ? "cheque" : paymentMode === "bank_transfer" ? "bank_transfer" : paymentMode,
       receipt_number: `SAL-${salaryMonth}-${selectedStaffId}`,
-      // optional note
-      note: note.trim(),
+      note: note.trim() || (paymentMode === "cheque" ? `Cheque #${chequeNumber} (${bankName})` : undefined),
     };
-    if (note.trim()) body.note = note.trim();
-    if (paymentMode === "online") body.transaction_id = transactionId.trim();
+    if (paymentMode === "cheque") {
+      body.transaction_id = chequeNumber.trim();
+    } else if (transactionId.trim()) {
+      body.transaction_id = transactionId.trim();
+    }
     // ──────────────────────────────────────────────────────────────────────
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = await generateSalary(body as any);
-      onSuccess(data);
+      if (paymentMode === "cheque") {
+        setCreatedPayment(data);
+      } else {
+        onSuccess(data);
+      }
     } catch (e: any) {
       const msg =
         e?.data?.message ||
@@ -716,6 +795,7 @@ const GenerateModal = ({
           department: s.category,
           basic_salary: Number(s.salary || 0),
           salary_generated: false,
+          joining_date: s.joining_date || s.joiningDate || s.date_of_joining,
         }));
 
         setStaffOptions(formatted);
@@ -727,9 +807,76 @@ const GenerateModal = ({
     loadStaff();
   }, []);
 
+
+  const handleRazorpayOnline = async () => {
+    if (isNotJoinedYet) {
+      setError(`Cannot generate salary: ${targetStaff?.name || "Staff"} joined on ${targetStaff?.joining_date}. Salary cannot be generated for months prior to joining date.`);
+      return;
+    }
+    if (!selectedStaffId) {
+      setError("Staff name is required.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        setError("Razorpay SDK could not be loaded. Check your internet connection.");
+        setLoading(false);
+        return;
+      }
+      const st = staffOptions.find((s) => s.id === selectedStaffId) || staff;
+      const amountNumber = Math.round((parseFloat(preview?.net_salary || "0") || 1000) * 100);
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_SFctsjgfvcrQ6h",
+        amount: amountNumber,
+        currency: "INR",
+        name: "School Trustee Payroll",
+        description: `Salary Payment for ${st?.name || "Staff"} (${formatMonth(salaryMonth)})`,
+        handler: async function (response: any) {
+          const txnId = response.razorpay_payment_id || `RZP-${Date.now()}`;
+          setTransactionId(txnId);
+          try {
+            const body = {
+              staff: selectedStaffId,
+              salary_month: salaryMonth,
+              payment_mode: "online",
+              receipt_number: `SAL-${salaryMonth}-${selectedStaffId}`,
+              transaction_id: txnId,
+              note: `Razorpay Online Payment (ID: ${txnId})`,
+            };
+            const data = await generateSalary(body as any);
+            onSuccess(data);
+          } catch (err: any) {
+            setError(err?.message || "Failed to finalize salary record.");
+          }
+        },
+        prefill: {
+          name: st?.name || "Staff",
+        },
+        theme: {
+          color: "#4f46e5",
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", function (resp: any) {
+        setError(`Payment declined: ${resp.error?.description || "Transaction failed"}`);
+        setLoading(false);
+      });
+      rzp.open();
+    } catch (err: any) {
+      setError(err?.message || "Razorpay initialization error.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative z-[210] bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -738,18 +885,40 @@ const GenerateModal = ({
             </div>
             <div>
               <p className="font-bold text-slate-800">Generate Salary</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {formatMonth(salaryMonth)}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-slate-400">
+                  {formatMonth(salaryMonth)}
+                </span>
+                {cycleDateRange && (
+                  <span className="text-[10px] font-semibold font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100">
+                    Cycle: {cycleDateRange}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="bg-slate-100 hover:bg-slate-200 rounded-full p-1.5 transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 rounded-full p-1.5 transition-colors cursor-pointer"
           >
             <X size={15} className="text-slate-500" />
           </button>
         </div>
+
+        {/* Duplicate Prevention Alert */}
+        {isAlreadyGenerated && (
+          <div className="mx-5 mt-4 bg-amber-50 border border-amber-300 rounded-2xl p-3.5 flex items-start gap-2.5">
+            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-900">
+                Salary Already Generated for This Cycle
+              </p>
+              <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                Salary for <strong>{staff?.name}</strong> has already been generated and recorded for {formatMonth(salaryMonth)} ({cycleDateRange}). Duplicate generation for the same date/cycle is not allowed.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Staff Info Strip
             Shows category label for the fee manager's reference.
@@ -786,7 +955,39 @@ const GenerateModal = ({
           </div>
         )}
 
-        {/* Form */}
+        {/* Cheque Success Direct Print Screen */}
+        {createdPayment && (
+          <div className="p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={24} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Salary Cheque Record Generated!</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Cheque #{chequeNumber} for {createdPayment.staff_name} ({formatCurrency(createdPayment.net_salary)}) has been recorded.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Link
+                href={`/trustee/cheque-printing?payee=${encodeURIComponent(createdPayment.staff_name || "")}&amount=${createdPayment.net_salary}&date=${chequeDate}&bank=${encodeURIComponent(bankName)}&memo=${encodeURIComponent(`Salary - ${salaryMonth}`)}`}
+                className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition"
+              >
+                <Printer size={15} /> Open & Print Cheque Now
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  onSuccess(createdPayment);
+                  onClose();
+                }}
+                className="py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+        {!createdPayment && (
         <div className="p-5 space-y-4">
           {/* Payment Mode */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -862,6 +1063,22 @@ const GenerateModal = ({
             </div>
           </div>
 
+          {isAlreadyGenerated && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-blue-600 shrink-0" />
+              <span>Salary record already exists for this staff member in {formatMonth(salaryMonth)}.</span>
+            </div>
+          )}
+
+          {isNotJoinedYet && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+              <AlertCircle size={15} className="text-amber-600 shrink-0" />
+              <span>
+                Staff joined on <strong>{targetStaff?.joining_date}</strong>. Salary cannot be generated for months prior to joining date.
+              </span>
+            </div>
+          )}
+
           {/* Dynamic Attendance, Leave & Auto-Deduction Statistics */}
           {previewLoading && (
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-center gap-2.5 text-xs text-slate-500">
@@ -872,13 +1089,17 @@ const GenerateModal = ({
 
           {preview && !previewLoading && (
             <div className="bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/40 border border-indigo-100 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
                   <Calendar size={13} className="text-indigo-600" /> Duty & Attendance Metrics
                 </span>
-                <span className="text-xs font-semibold text-slate-500">
-                  Per-Day: <span className="text-slate-800 font-bold">{formatCurrency(preview.per_day_salary)}</span>
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md">
+                  Period: {(preview as any).effective_start || `01-${salaryMonth}`} to {(preview as any).effective_end || `30-${salaryMonth}`}
                 </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 border-b border-indigo-100/60 pb-1.5">
+                <span>Working Days Rate:</span>
+                <span className="text-slate-800 font-bold font-mono">Per-Day: {formatCurrency(preview.per_day_salary)}</span>
               </div>
               <div className="grid grid-cols-4 gap-2 text-center text-xs">
                 <div className="bg-white rounded-xl p-2 border border-slate-200/80 shadow-2xs">
@@ -917,38 +1138,130 @@ const GenerateModal = ({
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
               Payment Mode
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(["offline", "online"] as PaymentMode[]).map((m) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id: "offline", label: "Cash", icon: Banknote },
+                { id: "cheque", label: "Cheque", icon: FileText },
+                { id: "online", label: "Razorpay", icon: CreditCard },
+                { id: "bank_transfer", label: "Bank Transfer", icon: Building2 },
+              ].map(({ id, label, icon: Icon }) => (
                 <button
-                  key={m}
-                  onClick={() => setPaymentMode(m)}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-semibold ${paymentMode === m
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600"
-                    }`}
+                  key={id}
+                  type="button"
+                  onClick={() => setPaymentMode(id as PaymentMode)}
+                  className={`flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 transition-all text-xs font-bold ${
+                    paymentMode === id
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
                 >
-                  {m === "offline" ? (
-                    <Banknote size={15} />
-                  ) : (
-                    <CreditCard size={15} />
-                  )}
-                  <span className="capitalize">{m}</span>
+                  <Icon size={16} />
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Transaction ID — online only */}
+          {/* Cheque Payment Inputs */}
+          {paymentMode === "cheque" && (
+            <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1">
+                  <FileText size={13} className="text-indigo-600" /> Cheque Issue Details
+                </span>
+                <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-100 px-2 py-0.5 rounded">
+                  Direct Cheque Printing Ready
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+                    Cheque Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={chequeNumber}
+                    onChange={(e) => setChequeNumber(e.target.value)}
+                    placeholder="e.g. 004812"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:border-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+                    Bank Name *
+                  </label>
+                  <select
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-indigo-400"
+                  >
+                    <option value="State Bank of India">State Bank of India (SBI)</option>
+                    <option value="HDFC Bank">HDFC Bank</option>
+                    <option value="ICICI Bank">ICICI Bank</option>
+                    <option value="Bank of Baroda">Bank of Baroda</option>
+                    <option value="Punjab National Bank">Punjab National Bank</option>
+                    <option value="Axis Bank">Axis Bank</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+                    Cheque Date
+                  </label>
+                  <input
+                    type="date"
+                    value={chequeDate}
+                    onChange={(e) => setChequeDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-indigo-400"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Razorpay Online Payment Integration */}
           {paymentMode === "online" && (
+            <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard size={13} className="text-indigo-600" /> Razorpay Payment Gateway
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded">
+                  Instant Verification
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRazorpayOnline}
+                disabled={loading || !selectedStaffId}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition"
+              >
+                <Sparkles size={14} /> Pay {formatCurrency(preview?.net_salary || 0)} with Razorpay
+              </button>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+                  Or Manual Razorpay Txn / Payment ID
+                </label>
+                <input
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white focus:outline-none focus:border-indigo-400 font-mono"
+                  placeholder="e.g. pay_Q8abcdef123456"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Bank Transfer Reference */}
+          {paymentMode === "bank_transfer" && (
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Transaction ID *
+                UTR / Bank Transfer Reference ID *
               </label>
               <input
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition font-mono"
-                placeholder="e.g. TXN123456"
+                placeholder="e.g. UTR1234567890"
               />
             </div>
           )}
@@ -1005,22 +1318,32 @@ const GenerateModal = ({
             </div>
           ) : null}
         </div>
+        )}
 
         {/* Footer */}
+        {!createdPayment && (
         <div className="border-t border-slate-100 p-4 flex gap-3">
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40"
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200"
+            disabled={loading || isAlreadyGenerated || isNotJoinedYet}
+            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-200 cursor-pointer"
           >
-            {loading ? (
+            {isAlreadyGenerated ? (
+              <>
+                <CheckCircle2 size={14} className="text-emerald-300" /> Already Generated
+              </>
+            ) : isNotJoinedYet ? (
+              <>
+                <AlertCircle size={14} className="text-amber-300" /> Not Joined in {formatMonth(salaryMonth)}
+              </>
+            ) : loading ? (
               <>
                 <Loader2 size={14} className="animate-spin" /> Processing…
               </>
@@ -1031,6 +1354,7 @@ const GenerateModal = ({
             )}
           </button>
         </div>
+        )}
       </div>
     </div>
   );
@@ -1065,9 +1389,19 @@ const BulkGenerateModal = ({
     }
   };
 
+  const cycleDateRange = useMemo(() => {
+    if (!salaryMonth) return "";
+    const parts = String(salaryMonth).split("-");
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month)) return "";
+    const lastDay = new Date(year, month, 0).getDate();
+    return `01-${String(month).padStart(2, "0")}-${year} to ${String(lastDay).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
+  }, [salaryMonth]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative z-[210] bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
           <div className="flex items-center gap-3">
@@ -1076,14 +1410,21 @@ const BulkGenerateModal = ({
             </div>
             <div>
               <p className="font-bold text-white text-base">Bulk Salary Generation</p>
-              <p className="text-xs text-indigo-100 mt-0.5">
-                {formatMonth(salaryMonth)}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-indigo-100">
+                  {formatMonth(salaryMonth)}
+                </span>
+                {cycleDateRange && (
+                  <span className="text-[10px] font-mono bg-white/20 text-white px-2 py-0.5 rounded-md">
+                    {cycleDateRange}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="bg-white/10 hover:bg-white/20 rounded-full p-1.5 transition-colors"
+            className="bg-white/10 hover:bg-white/20 rounded-full p-1.5 transition-colors cursor-pointer"
           >
             <X size={15} className="text-white" />
           </button>
@@ -1175,15 +1516,21 @@ const MonthPicker = ({
   const [open, setOpen] = useState(false);
 
   const months = useMemo(() => {
-    const result = [];
+    const result: Array<{ val: string; label: string }> = [];
     const now = new Date();
-    for (let i = 0; i < 12; i++) {
+    // Include 2 months ahead and up to 18 months in the past
+    for (let i = -2; i <= 18; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      result.push({ val, label: formatMonth(val) });
+      if (!result.some((m) => m.val === val)) {
+        result.push({ val, label: formatMonth(val) });
+      }
+    }
+    if (value && !result.some((m) => m.val === value)) {
+      result.unshift({ val: value, label: formatMonth(value) });
     }
     return result;
-  }, []);
+  }, [value]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -1194,45 +1541,88 @@ const MonthPicker = ({
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const selectedLabel = months.find((m) => m.val === value)?.label ?? value;
+  const handlePrev = () => {
+    const [y, m] = value.split("-").map(Number);
+    const prev = new Date(y, m - 2, 1);
+    onChange(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const handleNext = () => {
+    const [y, m] = value.split("-").map(Number);
+    const next = new Date(y, m, 1);
+    onChange(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const selectedLabel = months.find((m) => m.val === value)?.label ?? formatMonth(value);
 
   return (
-    <div className="relative" data-monthpicker>
+    <div className="relative inline-flex items-center gap-1.5" data-monthpicker>
       <button
         type="button"
-        data-monthpicker
-        onClick={() => setOpen((p) => !p)}
-        className="flex items-center gap-2 pl-3 pr-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white hover:border-slate-300 focus:outline-none focus:border-indigo-400 transition cursor-pointer"
+        onClick={handlePrev}
+        title="Previous Month"
+        className="p-2 border border-white/20 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition cursor-pointer backdrop-blur-md"
       >
-        <Calendar size={14} className="text-slate-400 shrink-0" />
-        <span className="font-medium">{selectedLabel}</span>
-        <ChevronDown
-          size={13}
-          className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <ChevronLeft size={16} />
       </button>
 
-      {open && (
-        <div
+      <div className="relative">
+        <button
+          type="button"
           data-monthpicker
-          className="absolute z-[200] top-full right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto min-w-[180px]"
+          onClick={() => setOpen((p) => !p)}
+          className="flex items-center gap-2 px-3.5 py-2 border border-white/20 rounded-xl text-sm font-semibold text-white bg-white/10 hover:bg-white/20 transition cursor-pointer backdrop-blur-md shadow-xs"
         >
-          {months.map((m) => (
-            <button
-              key={m.val}
-              type="button"
-              data-monthpicker
-              onClick={() => { onChange(m.val); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${value === m.val
-                ? "bg-indigo-50 text-indigo-700 font-semibold"
-                : "text-slate-700"
-                }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      )}
+          <Calendar size={15} className="text-purple-200 shrink-0" />
+          <span>{selectedLabel}</span>
+          <ChevronDown
+            size={14}
+            className={`text-purple-200 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {open && (
+          <div
+            data-monthpicker
+            className="absolute z-[300] top-full right-0 mt-2 bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto min-w-[220px] p-1.5 animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+              Select Salary Month
+            </div>
+            {months.map((m) => {
+              const isSelected = value === m.val;
+              return (
+                <button
+                  key={m.val}
+                  type="button"
+                  data-monthpicker
+                  onClick={() => {
+                    onChange(m.val);
+                    setOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                    isSelected
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "hover:bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  <span>{m.label}</span>
+                  {isSelected && <CheckCircle2 size={13} className="text-white shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleNext}
+        title="Next Month"
+        className="p-2 border border-white/20 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition cursor-pointer backdrop-blur-md"
+      >
+        <ChevronRight size={16} />
+      </button>
     </div>
   );
 };
@@ -1248,7 +1638,6 @@ export default function GenerateSalaryPage() {
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [disbursingAll, setDisbursingAll] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [receiptData, setReceiptData] = useState<SalaryPayment | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState("");
@@ -1260,6 +1649,7 @@ export default function GenerateSalaryPage() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [activePayslip, setActivePayslip] = useState<PayrollPayslip | null>(null);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
+  const [payslipAutoPrint, setPayslipAutoPrint] = useState(false);
   const [skippedStaffWarnings, setSkippedStaffWarnings] = useState<
     Array<{
       staff_id: number;
@@ -1277,13 +1667,28 @@ export default function GenerateSalaryPage() {
     }, 3000);
   }, []);
 
-  // ── GET /api/staff-salary-payment/?salary_month=YYYY-MM ────────────────────
+  // ── GET /api/staff-salary-payment/?salary_month=YYYY-MM + Staff Directory ────────────────────
   const fetchStaff = useCallback(async (month: string, isRefresh = false) => {
     isRefresh ? setRefreshing(true) : setPageLoading(true);
     setFetchError("");
     try {
-      const data = await getSalaryPayments(month);
-      setStaffList(data.map(transformStaff));
+      const [paymentsData, staffData] = await Promise.all([
+        getSalaryPayments(month),
+        getStaffList().catch(() => []),
+      ]);
+      setStaffList(paymentsData.map(transformStaff));
+      if (staffData && staffData.length > 0) {
+        const formatted = staffData.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          role: s.category || s.role || "Staff",
+          department: s.category || s.department || "General",
+          basic_salary: Number(s.salary || 0),
+          salary_generated: false,
+          joining_date: s.joining_date || s.joiningDate || s.date_of_joining,
+        }));
+        setAllStaff(formatted);
+      }
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Failed to load data.");
     } finally {
@@ -1312,8 +1717,8 @@ export default function GenerateSalaryPage() {
     [fetchStaff, salaryMonth, showToast]
   );
 
-  const openPayslipModal = useCallback(
-    (s: StaffMember) => {
+  const buildPayslipObj = useCallback(
+    (s: StaffMember): PayrollPayslip => {
       const pRecord = s.payment_record;
       const bDown = (pRecord?.component_breakdown || {}) as Record<string, any>;
       const grossVal =
@@ -1321,7 +1726,7 @@ export default function GenerateSalaryPage() {
         bDown.gross_earnings ||
         s.net_salary ||
         s.basic_salary;
-      const payslipObj: any = {
+      return {
         id: pRecord?.id || s.id,
         school: pRecord?.school || 0,
         staff: s.id,
@@ -1338,17 +1743,39 @@ export default function GenerateSalaryPage() {
         payment_mode: s.payment_mode || "offline",
         payment_status: s.payment_status || "paid",
         receipt_number: s.receipt_number || `SAL-${salaryMonth}-${s.id}`,
+        payment_date: s.payment_date || pRecord?.payment_date,
         working_days: pRecord?.working_days || bDown.working_days,
         present_days: pRecord?.present_days ?? bDown.present_days ?? "0",
         paid_leaves: bDown.paid_leaves ?? 0,
         unpaid_leaves: bDown.unpaid_leaves ?? bDown.lwp_days ?? 0,
         component_breakdown: bDown,
         created_at: pRecord?.created_at || new Date().toISOString(),
-      };
-      setActivePayslip(payslipObj);
-      setShowPayslipModal(true);
+      } as unknown as PayrollPayslip;
     },
     [salaryMonth]
+  );
+
+  const handleDirectPdfDownload = useCallback(
+    async (s: StaffMember) => {
+      try {
+        const payslipObj = buildPayslipObj(s);
+        await downloadPayslipPdf(payslipObj);
+        showToast(`Downloaded payslip PDF for ${s.name}`, "success");
+      } catch (err: any) {
+        showToast(err?.message || "Failed to download PDF.", "error");
+      }
+    },
+    [buildPayslipObj, showToast]
+  );
+
+  const openPayslipModal = useCallback(
+    (s: StaffMember, autoPrint: boolean = false) => {
+      const payslipObj = buildPayslipObj(s);
+      setActivePayslip(payslipObj);
+      setPayslipAutoPrint(autoPrint);
+      setShowPayslipModal(true);
+    },
+    [buildPayslipObj]
   );
 
   const handleRunPayrollEngine = async () => {
@@ -1378,82 +1805,146 @@ export default function GenerateSalaryPage() {
 
   useEffect(() => {
     fetchStaff(salaryMonth);
-
-    async function loadAllStaff() {
-      try {
-        const data = await getStaffList();
-
-        const formatted = data.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          role: s.category,
-          department: s.category,
-          basic_salary: Number(s.salary || 0),
-          salary_generated: false,
-        }));
-
-        setAllStaff(formatted);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    loadAllStaff();
   }, [salaryMonth, fetchStaff]);
-  // ── POST success: update row + open receipt modal with real backend data ───
+
+  // ── POST success: update row + open payslip modal with real backend data ───
   const handleSuccess = useCallback((data: SalaryPayment) => {
-    setStaffList((prev) => [transformStaff(data), ...prev]);
+    const transformed = transformStaff(data);
+    setStaffList((prev) => {
+      const filteredPrev = prev.filter(
+        (s) => s.id !== transformed.id && (!s.payment_record || s.payment_record.staff !== data.staff)
+      );
+      return [transformed, ...filteredPrev];
+    });
     setSelectedStaff(null);
-    setReceiptData(data);
     showToast(
       `Salary generated successfully for ${data.staff_name}`,
       "success",
     );
-  }, [showToast]);
+    const payslipObj = buildPayslipObj(transformed);
+    setActivePayslip(payslipObj);
+    setShowPayslipModal(true);
+  }, [buildPayslipObj, showToast]);
+
+  // ── Unified Staff List (All Active Staff + their Salary Payment status for salaryMonth) ──
+  const unifiedStaffList = useMemo(() => {
+    if (!allStaff.length) return staffList;
+
+    // Index payment records strictly by staff ID
+    const paymentMap = new Map<number, StaffMember>();
+    staffList.forEach((p) => {
+      const sId = Number(p.payment_record?.staff ?? p.id);
+      if (sId) {
+        paymentMap.set(sId, p);
+      }
+    });
+
+    const merged: StaffMember[] = allStaff.map((st) => {
+      const payment = paymentMap.get(st.id);
+      if (payment) {
+        return {
+          ...st,
+          ...payment,
+          id: st.id,
+          name: st.name || payment.name,
+          role: st.role || payment.role,
+          department: st.department || payment.department,
+          basic_salary: payment.basic_salary || st.basic_salary,
+          salary_generated: true,
+          payment_status: payment.payment_status || "pending",
+          net_salary: payment.net_salary,
+          payment_mode: payment.payment_mode,
+          receipt_number: payment.receipt_number,
+          payment_date: payment.payment_date,
+          payment_record: payment.payment_record,
+          joining_date: st.joining_date || payment.joining_date,
+        };
+      }
+      return {
+        ...st,
+        salary_generated: false,
+        payment_status: undefined,
+        net_salary: undefined,
+        payment_mode: undefined,
+        receipt_number: undefined,
+        payment_date: undefined,
+        payment_record: undefined,
+        joining_date: st.joining_date,
+      };
+    });
+
+    // Also include any payment record that might not be in allStaff
+    staffList.forEach((p) => {
+      const pStaffId = Number(p.payment_record?.staff ?? p.id);
+      if (pStaffId && !allStaff.some((st) => st.id === pStaffId)) {
+        merged.push({
+          ...p,
+          id: pStaffId,
+        });
+      }
+    });
+
+    return merged;
+  }, [allStaff, staffList]);
 
   // ── Stats ────────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const total = allStaff.length;
-    const generated = staffList.filter((s) => s.salary_generated).length;
-    const pending = total - generated;
-    const totalNetPaid = staffList
-      .filter((s) => s.salary_generated && s.net_salary != null)
+    // Only count staff who have generated salary OR were joined during or before salaryMonth
+    const eligibleStaff = unifiedStaffList.filter(
+      (s) => s.salary_generated || !isStaffJoinedAfterMonth(s.joining_date, salaryMonth)
+    );
+    const total = eligibleStaff.length;
+    const paid = eligibleStaff.filter(
+      (s) => s.salary_generated && s.payment_status === "paid"
+    ).length;
+    const generated = eligibleStaff.filter((s) => s.salary_generated).length;
+    const draft = eligibleStaff.filter(
+      (s) => s.salary_generated && s.payment_status !== "paid"
+    ).length;
+    const pending = total - paid;
+    const totalNetPaid = unifiedStaffList
+      .filter((s) => s.salary_generated && s.payment_status === "paid" && s.net_salary != null)
       .reduce((sum, s) => sum + (s.net_salary ?? 0), 0);
-    return { total, generated, pending, totalNetPaid };
-  }, [staffList]);
+    return { total, generated, pending, paid, draft, totalNetPaid };
+  }, [unifiedStaffList, salaryMonth]);
 
   // ── Departments list for filter dropdown ─────────────────────────────────────
   const departmentOptions = useMemo(() => {
     const depts = new Set<string>();
-    staffList.forEach((s) => {
+    unifiedStaffList.forEach((s) => {
       const d = (s.department || "").trim();
-      if (d && d !== "-") depts.add(d);
+      if (d && d !== "-" && d !== "—") depts.add(d);
       const r = (s.role || "").trim();
-      if (r && r !== "-") depts.add(r);
+      if (r && r !== "-" && r !== "—") depts.add(r);
     });
     return Array.from(depts).sort();
-  }, [staffList]);
+  }, [unifiedStaffList]);
 
   // ── Filtered list ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return staffList.filter((s) => {
+    const q = search.toLowerCase().trim();
+    return unifiedStaffList.filter((s) => {
       const matchSearch =
         !q ||
         s.name.toLowerCase().includes(q) ||
         s.role.toLowerCase().includes(q) ||
-        s.department.toLowerCase().includes(q);
+        s.department.toLowerCase().includes(q) ||
+        (s.receipt_number && s.receipt_number.toLowerCase().includes(q));
+
       const matchFilter =
         filterStatus === "all" ||
-        (filterStatus === "generated" && s.salary_generated) ||
-        (filterStatus === "pending" && !s.salary_generated);
+        (filterStatus === "paid" && s.salary_generated && s.payment_status === "paid") ||
+        (filterStatus === "pending" && (!s.salary_generated || s.payment_status !== "paid")) ||
+        (filterStatus === "generated" && s.salary_generated);
+
       const matchDept =
         selectedDept === "all" ||
         s.department.toLowerCase() === selectedDept.toLowerCase() ||
         s.role.toLowerCase() === selectedDept.toLowerCase();
+
       return matchSearch && matchFilter && matchDept;
     });
-  }, [staffList, search, filterStatus, selectedDept]);
+  }, [unifiedStaffList, search, filterStatus, selectedDept]);
 
   // Filtered staff whose salary has been generated but not yet marked 'paid'
   const pendingFiltered = useMemo(() => {
@@ -1502,48 +1993,6 @@ export default function GenerateSalaryPage() {
     ? Math.round((stats.generated / stats.total) * 100)
     : 0;
 
-  // ── Open receipt — prefer stored payment_record (real data) ─────────────────
-  const openReceipt = useCallback(
-    (s: StaffMember) => {
-      if (s.payment_record) {
-        setReceiptData(s.payment_record);
-        return;
-      }
-      // Fallback: build minimal object from list-level fields
-      // (only used if the GET list endpoint doesn't return full payment details)
-      setReceiptData({
-        id: s.id,
-        school: 0,
-        staff: s.id,
-        staff_name: s.name,
-        staff_category: s.department,
-        salary_month: salaryMonth,
-        basic_salary: String(s.basic_salary),
-        total_earnings: "0.00",
-        total_deductions: "0.00",
-        working_days: 0,
-        present_days: "0",
-        absent_days: 0,
-        half_days: 0,
-        attendance_deduction: "0.00",
-        component_snapshot: [],
-        net_salary: String(s.net_salary ?? s.basic_salary),
-        paid_amount: String(s.net_salary ?? s.basic_salary),
-        payment_mode: s.payment_mode ?? "offline",
-        payment_status: "paid",
-        transaction_id: null,
-        receipt_number: s.receipt_number ?? "—",
-        payment_date: s.payment_date ?? new Date().toISOString(),
-        note: "",
-        paid_by: 0,
-        paid_by_username: "—",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-    },
-    [salaryMonth],
-  );
-
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -1579,8 +2028,10 @@ export default function GenerateSalaryPage() {
         )}
       </AnimatePresence>
       {/* ── Page Header Banner ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+      <div className="relative rounded-3xl bg-gradient-to-r from-[#5c28e8] via-[#4d20cb] to-[#361399] p-8 text-white shadow-xl">
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+        </div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold uppercase tracking-wider">
@@ -1736,9 +2187,9 @@ export default function GenerateSalaryPage() {
               />
               <StatCard
                 icon={BadgeCheck}
-                label="Salary Generated"
-                value={stats.generated}
-                sub={`${progressPct}% complete`}
+                label="Salary Paid"
+                value={stats.paid}
+                sub={`${progressPct}% disbursed`}
                 iconBg="bg-emerald-500"
               />
               <StatCard
@@ -1764,9 +2215,9 @@ export default function GenerateSalaryPage() {
                   </span>
                 </p>
                 <p className="text-sm font-bold text-indigo-600">
-                  {stats.generated}
+                  {stats.paid}
                   <span className="text-slate-300 font-normal">
-                    /{stats.total}
+                    /{stats.total} paid
                   </span>
                 </p>
               </div>
@@ -1778,8 +2229,8 @@ export default function GenerateSalaryPage() {
               </div>
               <p className="text-xs text-slate-400 mt-2">
                 {progressPct === 100
-                  ? "✓ All salaries processed for this month"
-                  : `${progressPct}% salaries processed for this month`}
+                  ? "✓ All salaries paid for this month"
+                  : `${progressPct}% salaries disbursed for this month`}
               </p>
             </div>
 
@@ -1823,21 +2274,34 @@ export default function GenerateSalaryPage() {
                 </select>
               </div>
 
-              <div className="flex gap-2">
-                {(["all", "generated", "pending"] as FilterStatus[]).map(
-                  (f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFilterStatus(f)}
-                      className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all capitalize ${filterStatus === f
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { id: "all", label: "All", count: stats.total },
+                  { id: "paid", label: "Paid", count: stats.paid },
+                  { id: "pending", label: "Pending", count: stats.pending },
+                  { id: "generated", label: "Generated", count: stats.generated },
+                ].map(({ id, label, count }) => (
+                  <button
+                    key={id}
+                    onClick={() => setFilterStatus(id as FilterStatus)}
+                    className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      filterStatus === id
                         ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-white border border-slate-200 text-slate-500 hover:border-slate-300"
-                        }`}
+                        : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        filterStatus === id
+                          ? "bg-white/25 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
                     >
-                      {f}
-                    </button>
-                  ),
-                )}
+                      {count}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1958,40 +2422,23 @@ export default function GenerateSalaryPage() {
                               <Eye size={13} /> Payslip
                             </button>
 
-                            {/* PDF / New Tab Button: Official Printable Document */}
-                            <a
-                              href={getPayslipViewUrl(
-                                s.payment_record?.id || s.id,
-                                "html",
-                                salaryMonth,
-                                typeof window !== "undefined" ? localStorage.getItem("access_token") || undefined : undefined,
-                                s.id
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold transition-colors"
-                              title="Open Official Payslip PDF / Print in new tab"
+                            {/* Direct PDF Download Button */}
+                            <button
+                              onClick={() => handleDirectPdfDownload(s)}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                              title="Download Payslip PDF directly"
                             >
-                              <FileText size={13} /> PDF
-                            </a>
+                              <Download size={13} /> PDF
+                            </button>
 
                             {s.payment_status === "paid" ? (
-                              <>
-                                <button
-                                  onClick={() => openReceipt(s)}
-                                  className="hidden lg:flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-100 text-slate-500 text-xs font-medium hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                                  title="View Receipt"
-                                >
-                                  Receipt
-                                </button>
-                                <Link
-                                  href={`/trustee/cheque-printing?payee=${encodeURIComponent(s.name)}&amount=${s.net_salary != null ? s.net_salary : s.basic_salary}&memo=${encodeURIComponent("Salary - " + formatMonth(salaryMonth))}`}
-                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
-                                  title="Print Cheque for this disbursement"
-                                >
-                                  <Printer size={13} /> Cheque
-                                </Link>
-                              </>
+                              <Link
+                                href={`/trustee/cheque-printing?payee=${encodeURIComponent(s.name)}&amount=${s.net_salary != null ? s.net_salary : s.basic_salary}&memo=${encodeURIComponent("Salary - " + formatMonth(salaryMonth))}`}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
+                                title="Print Cheque for this disbursement"
+                              >
+                                <Printer size={13} /> Cheque
+                              </Link>
                             ) : (
                               <button
                                 onClick={() => setSelectedStaff(s)}
@@ -2002,10 +2449,18 @@ export default function GenerateSalaryPage() {
                               </button>
                             )}
                           </>
+                        ) : isStaffJoinedAfterMonth(s.joining_date, salaryMonth) ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium border border-slate-200"
+                            title={`Staff joined on ${s.joining_date}. Salary cannot be generated for months prior to joining date.`}
+                          >
+                            Joined {s.joining_date}
+                          </span>
                         ) : (
                           <button
                             onClick={() => setSelectedStaff(s)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 cursor-pointer"
+                            title="Calculate and generate salary for this staff member"
                           >
                             <IndianRupee size={13} /> Generate
                           </button>
@@ -2050,8 +2505,12 @@ export default function GenerateSalaryPage() {
       {showPayslipModal && activePayslip && (
         <SalarySlipModal
           isOpen={showPayslipModal}
-          onClose={() => setShowPayslipModal(false)}
+          onClose={() => {
+            setShowPayslipModal(false);
+            setPayslipAutoPrint(false);
+          }}
           payslip={activePayslip}
+          autoPrint={payslipAutoPrint}
         />
       )}
 
@@ -2061,45 +2520,6 @@ export default function GenerateSalaryPage() {
           salaryMonth={salaryMonth}
           onClose={() => setSelectedStaff(null)}
           onSuccess={handleSuccess}
-        />
-      )}
-      {receiptData && (
-        <ReceiptModal
-          data={receiptData}
-          onClose={() => setReceiptData(null)}
-          onDownloadPdf={() => {
-            const bDown: any = receiptData.component_breakdown || {};
-            const pDays = parseFloat(receiptData.present_days || "0");
-            const hDays = receiptData.half_days || 0;
-            const payable = pDays + hDays * 0.5;
-            const payslipObj: any = {
-              id: receiptData.id,
-              school: receiptData.school,
-              staff: receiptData.staff,
-              staff_name: receiptData.staff_name,
-              staff_category: receiptData.staff_category || "Staff",
-              designation: receiptData.staff_category || "Staff",
-              department: (receiptData as any).department || "General",
-              salary_month: receiptData.salary_month,
-              basic_salary: receiptData.basic_salary,
-              gross_earnings: receiptData.total_earnings || bDown.gross_earnings || receiptData.basic_salary,
-              total_earnings: receiptData.total_earnings || bDown.gross_earnings || receiptData.basic_salary,
-              total_deductions: receiptData.total_deductions || bDown.total_deductions || "0.00",
-              net_salary: receiptData.net_salary,
-              payment_mode: receiptData.payment_mode || "offline",
-              payment_status: receiptData.payment_status || "paid",
-              receipt_number: receiptData.receipt_number || `SAL-${receiptData.id}`,
-              working_days: receiptData.working_days || bDown.working_days,
-              present_days: receiptData.present_days ?? bDown.present_days ?? "0",
-              paid_leaves: bDown.paid_leaves ?? (receiptData as any).paid_leaves ?? 0,
-              unpaid_leaves: bDown.unpaid_leaves ?? (receiptData as any).unpaid_leaves ?? 0,
-              component_breakdown: bDown,
-              payment_date: receiptData.payment_date,
-              created_at: receiptData.created_at || receiptData.payment_date,
-            };
-            setActivePayslip(payslipObj);
-            setShowPayslipModal(true);
-          }}
         />
       )}
     </div>

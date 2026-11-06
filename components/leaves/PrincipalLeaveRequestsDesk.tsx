@@ -30,6 +30,16 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 import {
@@ -47,7 +57,20 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("pending");
-  const [showRawData, setShowRawData] = useState(false);
+
+  // Approval / Rejection Remark Dialog state
+  const [actionDialog, setActionDialog] = useState<{
+    open: boolean;
+    requestId: number | null;
+    action: "APPROVED" | "REJECTED";
+    requestName?: string;
+    dates?: string;
+  }>({
+    open: false,
+    requestId: null,
+    action: "APPROVED",
+  });
+  const [actionRemark, setActionRemark] = useState("");
 
   // Track loading status per request or per day to show inline spinners
   const [processingRequests, setProcessingRequests] = useState<Record<number, "approving" | "rejecting" | null>>({});
@@ -55,6 +78,17 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Real-time leave synchronization via WebSocket
+  useEffect(() => {
+    const handleRealtimeLeave = () => {
+      fetchData();
+    };
+    window.addEventListener("antigravity_leave_updated", handleRealtimeLeave);
+    return () => {
+      window.removeEventListener("antigravity_leave_updated", handleRealtimeLeave);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -144,29 +178,12 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
     return String(val).charAt(0).toUpperCase() + String(val).slice(1).toLowerCase();
   };
 
-  const handleBulkAction = async (requestId: number, action: "APPROVED" | "REJECTED") => {
+  const handleBulkAction = async (requestId: number, action: "APPROVED" | "REJECTED", remarkOrReason?: string) => {
     setProcessingRequests((prev) => ({ ...prev, [requestId]: action === "APPROVED" ? "approving" : "rejecting" }));
     try {
-      await approveAllLeaveDays(requestId, action);
+      await approveAllLeaveDays(requestId, action, remarkOrReason);
       toast.success(`Leave request ${action.toLowerCase()} successfully`);
-      
-      // Update local state immediately
-      setRequests((prev) =>
-        prev.map((req) => {
-          if (req && req.id === requestId) {
-            const rawDays = req.days || (req as any).leave_days || (req as any).dates || (req as any).request_days || [];
-            const updatedDays = rawDays.map((day: any) => ({ ...day, status: action }));
-            
-            return {
-              ...req,
-              status: action,
-              days: updatedDays,
-              leave_days: updatedDays,
-            };
-          }
-          return req;
-        })
-      );
+      fetchData();
     } catch (err: any) {
       console.error("Bulk action failed:", err);
       const actionName = action === "APPROVED" ? "Bulk approval" : "Bulk rejection";
@@ -176,6 +193,19 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
     } finally {
       setProcessingRequests((prev) => ({ ...prev, [requestId]: null }));
     }
+  };
+
+  const confirmBulkAction = async () => {
+    if (!actionDialog.requestId) return;
+    if (actionDialog.action === "REJECTED" && !actionRemark.trim()) {
+      toast.error("Please provide a reason for rejecting the leave request.");
+      return;
+    }
+    const reqId = actionDialog.requestId;
+    const act = actionDialog.action;
+    const remark = actionRemark.trim();
+    setActionDialog((prev) => ({ ...prev, open: false }));
+    await handleBulkAction(reqId, act, remark);
   };
 
   const handleDayAction = async (requestId: number, dayId: number, action: "APPROVED" | "REJECTED") => {
@@ -416,14 +446,6 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowRawData(!showRawData)}
-            className="text-xs text-muted-foreground"
-          >
-            {showRawData ? "Hide Debug Data" : "Inspect Payload"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={fetchData}
             disabled={isLoading}
             className="flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs"
@@ -529,16 +551,6 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
           </CardContent>
         </Card>
       </div>
-
-      {/* Debug view for payload validation */}
-      {showRawData && (
-        <Card className="border border-amber-200 bg-amber-500/5 p-4 rounded-xl">
-          <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 mb-2">Raw API Data Payload:</h4>
-          <pre className="text-xs max-h-60 overflow-y-auto bg-black/80 text-green-400 p-3 rounded-lg font-mono">
-            {JSON.stringify(requests, null, 2)}
-          </pre>
-        </Card>
-      )}
 
       {/* Tabs Filter & Leave requests list */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col gap-6">
@@ -759,6 +771,20 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
                               <span className="italic">"{reason}"</span>
                             </div>
 
+                            {/* Approval Remarks / Rejection Reason (if set) */}
+                            {(request as any).approval_remarks && (
+                              <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/40">
+                                <span className="font-bold mr-1.5 uppercase tracking-wider text-[10px]">Approver Remark:</span>
+                                <span className="italic">"{(request as any).approval_remarks}"</span>
+                              </div>
+                            )}
+                            {(request as any).rejection_reason && (
+                              <div className="text-xs text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900/40">
+                                <span className="font-bold mr-1.5 uppercase tracking-wider text-[10px]">Rejection Reason:</span>
+                                <span className="italic">"{(request as any).rejection_reason}"</span>
+                              </div>
+                            )}
+
                             {/* Real-time Remaining Leave Balance Banner */}
                             {(() => {
                               const currentRem = (request as any).current_leave_remaining !== undefined 
@@ -801,7 +827,16 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
                                   <Button
                                     variant="default"
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
-                                    onClick={() => handleBulkAction(request.id, "APPROVED")}
+                                    onClick={() => {
+                                      setActionRemark("");
+                                      setActionDialog({
+                                        open: true,
+                                        requestId: request.id,
+                                        action: "APPROVED",
+                                        requestName: (request as any).staff_name || "Staff Member",
+                                        dates: formatDateRange(request.start_date, request.end_date),
+                                      });
+                                    }}
                                     disabled={processingRequests[request.id] !== undefined}
                                   >
                                     {processingRequests[request.id] === "approving" ? (
@@ -819,7 +854,16 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
                                   <Button
                                     variant="destructive"
                                     className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-semibold shadow-sm hover:shadow-md transition-all px-4 py-2 hover:scale-[1.02] active:scale-[0.98]"
-                                    onClick={() => handleBulkAction(request.id, "REJECTED")}
+                                    onClick={() => {
+                                      setActionRemark("");
+                                      setActionDialog({
+                                        open: true,
+                                        requestId: request.id,
+                                        action: "REJECTED",
+                                        requestName: (request as any).staff_name || "Staff Member",
+                                        dates: formatDateRange(request.start_date, request.end_date),
+                                      });
+                                    }}
                                     disabled={processingRequests[request.id] !== undefined}
                                   >
                                     {processingRequests[request.id] === "rejecting" ? (
@@ -974,6 +1018,77 @@ export function PrincipalLeaveRequestsDesk({ roleTitle = "Principal" }: { roleTi
           </TabsContent>
         )}
       </Tabs>
+      {/* Approval / Rejection Remark Dialog */}
+      <Dialog
+        open={actionDialog.open}
+        onOpenChange={(open) => !open && setActionDialog((prev) => ({ ...prev, open: false }))}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className={cn(
+              "text-lg font-bold flex items-center gap-2",
+              actionDialog.action === "APPROVED" ? "text-emerald-600" : "text-rose-600"
+            )}>
+              {actionDialog.action === "APPROVED" ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Approve Leave Request
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5" />
+                  Reject Leave Request
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1">
+              {actionDialog.action === "APPROVED"
+                ? `Approve leave application for ${actionDialog.requestName || "Staff"} (${actionDialog.dates || ""}). You can optionally enter an approval remark below.`
+                : `Reject leave application for ${actionDialog.requestName || "Staff"} (${actionDialog.dates || ""}). Please specify the reason for rejection.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <Label htmlFor="action-remark" className="text-xs font-semibold">
+              {actionDialog.action === "APPROVED" ? "Approval Remark (Optional)" : "Rejection Reason *"}
+            </Label>
+            <Textarea
+              id="action-remark"
+              rows={3}
+              value={actionRemark}
+              onChange={(e) => setActionRemark(e.target.value)}
+              placeholder={
+                actionDialog.action === "APPROVED"
+                  ? "e.g., Approved as per school leave policy."
+                  : "e.g., Academic examination duty scheduled during these dates."
+              }
+              className="text-xs resize-none"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setActionDialog((prev) => ({ ...prev, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className={cn(
+                "text-white font-semibold",
+                actionDialog.action === "APPROVED"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-rose-600 hover:bg-rose-700"
+              )}
+              onClick={confirmBulkAction}
+            >
+              {actionDialog.action === "APPROVED" ? "Confirm & Approve" : "Confirm & Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

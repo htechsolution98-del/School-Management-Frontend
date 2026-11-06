@@ -453,7 +453,21 @@ export function useAnnouncementSocket() {
           return;
         }
 
-                // Staff status changed in real-time
+                // Real-time leave update
+        if (data?.type === "leave_update") {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("antigravity_leave_updated", { detail: data }));
+          }
+          if (data?.message) {
+            toast.info("Leave Update", {
+              description: data.message,
+              duration: 3500,
+            });
+          }
+          return;
+        }
+
+        // Staff status changed in real-time
         if (data?.type === "staff_status_changed") {
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("staff_status_changed", { detail: data }));
