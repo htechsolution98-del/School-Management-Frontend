@@ -188,12 +188,23 @@ function GrNumberDialog({
       setClassId("");
       setDivision("");
     } else {
-      const initialClass = admission.student_details?.school_class || resolvedAppliedClass?.id;
-      setClassId(initialClass ? String(initialClass) : "");
+      const rawClass =
+        admission.student_details?.school_class ||
+        (admission as any).school_class ||
+        (admission as any).class_name ||
+        admission.student_details?.school_class_name ||
+        resolvedAppliedClass?.id ||
+        appliedClassValue;
+      const matched = classes.find(
+        (cls) =>
+          String(cls.id) === String(rawClass) ||
+          cls.school_class.toLowerCase() === String(rawClass || "").toLowerCase()
+      );
+      setClassId(matched ? String(matched.id) : (rawClass ? String(rawClass) : ""));
       const initialDivision = admission.student_details?.division || admission.division || "";
       setDivision(initialDivision);
     }
-  }, [admission, resolvedAppliedClass?.id]);
+  }, [admission, resolvedAppliedClass?.id, classes]);
 
   useEffect(() => {
     if (availableDivisions.length === 1) setDivision(String(availableDivisions[0].division || ""));
@@ -290,7 +301,13 @@ function GrNumberDialog({
               Applying class <span className="text-red-500">*</span>
               <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm disabled:opacity-70" value={classId} disabled={!!resolvedAppliedClass} onChange={(event) => { setClassId(event.target.value); setDivision(""); }}>
                 <option value="">Select class</option>
-                {classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.school_class}</option>)}
+                {classes.map((cls) => {
+                  const cleaned = String(cls.school_class).replace(/class/gi, "").trim();
+                  return <option key={cls.id} value={cls.id}>{cleaned ? `Class ${cleaned}` : cls.school_class}</option>;
+                })}
+                {classId && !classes.some((c) => String(c.id) === String(classId)) && (
+                  <option value={classId}>{`Class ${String(classId).replace(/class/gi, "").trim()}`}</option>
+                )}
               </select>
             </label>
             <label className="space-y-1.5 text-sm font-semibold text-slate-700">
@@ -536,8 +553,10 @@ function StudentDetailsModal({
 
   const getClassDisplay = (val: string) => {
     if (!val || val === "—" || val === "N/A") return val || "N/A";
-    const match = classes.find((c) => String(c.id) === String(val) || c.school_class === val);
-    return match ? match.school_class : val;
+    const match = classes.find((c) => String(c.id) === String(val) || c.school_class.toLowerCase() === val.toLowerCase());
+    const result = match ? match.school_class : val;
+    const cleaned = String(result).replace(/class/gi, "").trim();
+    return cleaned ? `Class ${cleaned}` : result;
   };
 
   const getFieldValue = (label: string) => {
@@ -545,13 +564,18 @@ function StudentDetailsModal({
       fv.field_label.toLowerCase().includes(label.toLowerCase())
     );
     if (!fv) return "—";
-    if (label.toLowerCase().includes("class") || label.toLowerCase().includes("standard")) {
+    if (label.toLowerCase().includes("class") || label.toLowerCase().includes("standard") || label.toLowerCase().includes("grade")) {
       return getClassDisplay(fv.value);
     }
     return fv.value || "—";
   };
 
-  const classNameVal = getClassDisplay(getFieldValue("class") || getFieldValue("standard") || getFieldValue("applying for class") || "N/A");
+  const classNameVal =
+    (admission.student_details?.school_class_name ? getClassDisplay(admission.student_details.school_class_name) : "") ||
+    ((admission as any).class_name ? getClassDisplay((admission as any).class_name) : "") ||
+    (admission.student_details?.school_class ? getClassDisplay(String(admission.student_details.school_class)) : "") ||
+    getClassDisplay(getFieldValue("class") || getFieldValue("standard") || getFieldValue("applying for class") || "") ||
+    "N/A";
   const divisionVal = getFieldValue("division") || getFieldValue("section") || getFieldValue("sec") || "N/A";
   const phoneVal = getFieldValue("mobile") || getFieldValue("phone") || getFieldValue("contact") || "—";
   const fatherVal = getFieldValue("father") || getFieldValue("guardian") || "—";
@@ -705,7 +729,11 @@ function StudentDetailsModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {admission.field_values.map((fv) => {
                     let displayVal = fv.value || "—";
-                    if (fv.field_label.toLowerCase().includes("class") || fv.field_label.toLowerCase().includes("standard")) {
+                    if (
+                      fv.field_label.toLowerCase().includes("class") ||
+                      fv.field_label.toLowerCase().includes("standard") ||
+                      fv.field_label.toLowerCase().includes("grade")
+                    ) {
                       displayVal = getClassDisplay(fv.value);
                     }
 
@@ -1017,7 +1045,7 @@ export default function StudentRecordsPage() {
     roll_no: "",
     aadhar_number: "",
     address: "",
-    custom_fields: {} as Record<string, { label: string; value: string }>,
+    custom_fields: {} as Record<string, { label: string; value: string; field_type?: string; options?: any }>,
   });
   const [isSavingFields, setIsSavingFields] = useState(false);
   const studentFormDivisions = divisions.filter((item) => String(item.SchoolClass) === studentForm.school_class);
@@ -1125,8 +1153,74 @@ export default function StudentRecordsPage() {
 
   const cleanClassName = (raw: string | undefined | null) => {
     if (!raw || raw === "N/A") return "N/A";
-    const cleaned = String(raw).replace(/class/gi, "").trim();
-    return cleaned ? `Class ${cleaned}` : String(raw);
+    let target = String(raw).trim();
+    if (target.match(/^\d+$/)) {
+      const match = classes.find((c) => String(c.id) === target);
+      if (match && match.school_class) {
+        target = match.school_class;
+      } else {
+        const rosterMatch = rosterStudents?.find((s) => String(s.school_class) === target);
+        if (rosterMatch?.class_name) {
+          target = rosterMatch.class_name;
+        } else {
+          const admMatch = admissions?.find((a) => String(a.student_details?.school_class) === target);
+          if (admMatch?.student_details?.school_class_name) {
+            target = admMatch.student_details.school_class_name;
+          } else if ((admMatch as any)?.class_name) {
+            target = (admMatch as any).class_name;
+          }
+        }
+      }
+    }
+    const cleaned = target.replace(/class/gi, "").trim();
+    return cleaned ? `Class ${cleaned}` : target;
+  };
+
+  const resolveClassName = (classIdOrName: any): string => {
+    if (!classIdOrName || classIdOrName === "none" || classIdOrName === "N/A") return "";
+    const str = String(classIdOrName).trim();
+    const match = classes.find(
+      (c) => String(c.id) === str || String(c.school_class || "").toLowerCase() === str.toLowerCase()
+    );
+    if (match && match.school_class) {
+      return cleanClassName(match.school_class);
+    }
+    if (editingAdmission) {
+      if (
+        String(editingAdmission.student_details?.school_class) === str &&
+        editingAdmission.student_details?.school_class_name
+      ) {
+        return cleanClassName(editingAdmission.student_details.school_class_name);
+      }
+      if ((editingAdmission as any).class_name) {
+        return cleanClassName((editingAdmission as any).class_name);
+      }
+      const admClassVal = getFieldValue(editingAdmission, "applying for class", "class", "standard", "grade", "school_class");
+      if (admClassVal && admClassVal !== str) {
+        const matchApplied = classes.find(
+          (c) => String(c.id) === String(admClassVal) || String(c.school_class || "").toLowerCase() === String(admClassVal).toLowerCase()
+        );
+        if (matchApplied && matchApplied.school_class) {
+          return cleanClassName(matchApplied.school_class);
+        }
+      }
+    }
+    const rosterMatch = rosterStudents?.find(
+      (s) => String(s.school_class) === str || (editingAdmission?.student_id && s.id === editingAdmission.student_id)
+    );
+    if (rosterMatch?.class_name) {
+      return cleanClassName(rosterMatch.class_name);
+    }
+    const admMatch = admissions?.find(
+      (a) => String(a.student_details?.school_class) === str || (editingAdmission?.admission_number && a.admission_number === editingAdmission.admission_number)
+    );
+    if (admMatch?.student_details?.school_class_name) {
+      return cleanClassName(admMatch.student_details.school_class_name);
+    }
+    if ((admMatch as any)?.class_name) {
+      return cleanClassName((admMatch as any).class_name);
+    }
+    return cleanClassName(str);
   };
 
   const cleanDivisionName = (raw: string | undefined | null) => {
@@ -1293,6 +1387,11 @@ export default function StudentRecordsPage() {
 
   const getStudentClass = (adm: Admission) => {
     if (adm?.student_details?.school_class_name) return cleanClassName(adm.student_details.school_class_name);
+    if ((adm as any)?.class_name) return cleanClassName((adm as any).class_name);
+    if (adm?.student_details?.school_class) {
+      const match = classes.find((c) => String(c.id) === String(adm.student_details?.school_class));
+      if (match) return cleanClassName(match.school_class);
+    }
     const val = getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
     if (!val) return "N/A";
     const match = classes.find((c) => String(c.id) === String(val) || c.school_class.toLowerCase() === val.toLowerCase());
@@ -1469,18 +1568,16 @@ export default function StudentRecordsPage() {
 
     // Resolve class ID or name for the dropdown
     let resolvedClass = "";
-    if (sd?.school_class) {
-      resolvedClass = String(sd.school_class);
-    } else {
-      const rawClass = getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
+    const targetClass = sd?.school_class || (adm as any)?.class_name || (adm as any)?.school_class || getFieldValue(adm, "applying for class", "class", "standard", "grade", "school_class");
+    if (targetClass) {
       const matched = classes.find(
-        (c) => String(c.id) === String(rawClass) || c.school_class.toLowerCase() === rawClass.toLowerCase()
+        (c) => String(c.id) === String(targetClass) || c.school_class.toLowerCase() === String(targetClass).toLowerCase()
       );
-      resolvedClass = matched ? String(matched.id) : rawClass;
+      resolvedClass = matched ? String(matched.id) : String(targetClass);
     }
 
     // Isolate extra custom admission form fields (skip standard fields & empty labels)
-    const custom: Record<string, { label: string; value: string }> = {};
+    const custom: Record<string, { label: string; value: string; field_type?: string; options?: any }> = {};
     const standardKeys = [
       "surname", "last name", "lastname",
       "student name", "first name", "firstname", "candidate name",
@@ -1495,12 +1592,17 @@ export default function StudentRecordsPage() {
       "roll", "address", "city"
     ];
 
-    (adm.field_values || []).forEach((fv) => {
+    (adm.field_values || []).forEach((fv: any) => {
       const lbl = (fv.field_label || "").trim();
       if (!lbl) return; // Skip unlabeled blank inputs
       const lblLower = lbl.toLowerCase();
       if (!standardKeys.some((k) => lblLower.includes(k))) {
-        custom[String(fv.field)] = { label: lbl, value: fv.value || "" };
+        custom[String(fv.field)] = {
+          label: lbl,
+          value: fv.value || "",
+          field_type: fv.field_type || "text",
+          options: fv.options || [],
+        };
       }
     });
 
@@ -1983,10 +2085,10 @@ export default function StudentRecordsPage() {
                     variant="outline"
                     onClick={() => setGrAdmission(adm)}
                     className="h-10 w-10 cursor-pointer rounded-lg p-0 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                    title="Assign class placement or GR number"
-                    aria-label={`Assign class placement or GR number: ${getStudentName(adm)}`}
+                    title="Assign GR Number"
+                    aria-label={`Assign GR Number: ${getStudentName(adm)}`}
                   >
-                    {adm.student_details?.school_class && adm.student_details?.division ? <Hash className="h-3.5 w-3.5" /> : <School className="h-3.5 w-3.5" />}
+                    <Hash className="h-3.5 w-3.5" />
                   </Button>,
                 ]),
           ]}
@@ -2090,9 +2192,9 @@ export default function StudentRecordsPage() {
                         variant="outline"
                         onClick={() => setGrAdmission(adm)}
                         className="h-8 w-8 p-0 rounded-xl text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50"
-                        title="Assign class placement or GR number"
+                        title="Assign GR Number"
                       >
-                        {adm.student_details?.school_class && adm.student_details?.division ? <Hash className="h-3.5 w-3.5" /> : <School className="h-3.5 w-3.5" />}
+                        <Hash className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
@@ -2256,15 +2358,28 @@ export default function StudentRecordsPage() {
                       }}
                     >
                       <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
-                        <SelectValue placeholder="Select Class" />
+                        <SelectValue placeholder="Select Class">
+                          {(() => {
+                            const val = studentForm.school_class;
+                            if (!val || val === "none") return "Select Class";
+                            return resolveClassName(val) || "Select Class";
+                          })()}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Select Class</SelectItem>
                         {classes.map((cls) => (
                           <SelectItem key={cls.id} value={String(cls.id)}>
-                            {cls.school_class}
+                            {cleanClassName(cls.school_class)}
                           </SelectItem>
                         ))}
+                        {studentForm.school_class &&
+                          studentForm.school_class !== "none" &&
+                          !classes.some((c) => String(c.id) === String(studentForm.school_class)) && (
+                            <SelectItem value={String(studentForm.school_class)}>
+                              {resolveClassName(studentForm.school_class)}
+                            </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -2276,13 +2391,20 @@ export default function StudentRecordsPage() {
                       disabled={!studentForm.school_class || studentFormDivisions.length === 0}
                     >
                       <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
-                        <SelectValue placeholder={studentForm.school_class ? "Select Division" : "Select class first"} />
+                        <SelectValue placeholder={studentForm.school_class ? "Select Division" : "Select class first"}>
+                          {studentForm.division && studentForm.division !== "none" ? studentForm.division : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Select Division</SelectItem>
                         {studentFormDivisions.map((item) => (
                           <SelectItem key={item.id} value={String(item.division)}>{item.division}</SelectItem>
                         ))}
+                        {studentForm.division &&
+                          studentForm.division !== "none" &&
+                          !studentFormDivisions.some((item) => String(item.division) === studentForm.division) && (
+                            <SelectItem value={String(studentForm.division)}>{studentForm.division}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -2321,26 +2443,87 @@ export default function StudentRecordsPage() {
                     <Layers className="h-3.5 w-3.5" /> Additional Form Fields
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {Object.entries(studentForm.custom_fields).map(([fieldId, item]) => (
-                      <div key={fieldId} className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          {item.label}
-                        </label>
-                        <Input
-                          value={item.value}
-                          onChange={(e) =>
-                            setStudentForm((prev) => ({
-                              ...prev,
-                              custom_fields: {
-                                ...prev.custom_fields,
-                                [fieldId]: { ...item, value: e.target.value },
-                              },
-                            }))
+                    {Object.entries(studentForm.custom_fields).map(([fieldId, item]) => {
+                      const isLocationField = /district|state|pincode|pin\s*code|zip|postal/i.test(item.label || "");
+                      const isDropdown = !isLocationField && (item.field_type === "select" || item.field_type === "radio");
+                      let parsedOpts: { label: string; value: string }[] = [];
+
+                      if (isDropdown && item.options) {
+                        let raw = item.options;
+                        if (typeof raw === "string") {
+                          try {
+                            raw = JSON.parse(raw);
+                          } catch {
+                            raw = raw.split(",").map((s: string) => s.trim());
                           }
-                          className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
-                        />
-                      </div>
-                    ))}
+                        }
+                        if (Array.isArray(raw)) {
+                          parsedOpts = raw
+                            .map((o: any) => {
+                              if (typeof o === "object" && o !== null) {
+                                const val = String(o.value ?? o.id ?? o.label ?? o.name ?? "");
+                                const lbl = String(o.label ?? o.name ?? o.value ?? val);
+                                return { label: lbl, value: val };
+                              }
+                              return { label: String(o), value: String(o) };
+                            })
+                            .filter((o) => o.value.trim().length > 0);
+                        }
+                      }
+
+                      if (isDropdown && item.value && !parsedOpts.some((o) => o.value === item.value)) {
+                        parsedOpts = [{ label: item.value, value: item.value }, ...parsedOpts];
+                      }
+
+                      return (
+                        <div key={fieldId} className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                            {item.label}
+                          </label>
+                          {isDropdown && parsedOpts.length > 0 ? (
+                            <Select
+                              value={item.value || "none"}
+                              onValueChange={(val) =>
+                                setStudentForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: {
+                                    ...prev.custom_fields,
+                                    [fieldId]: { ...item, value: val === "none" ? "" : (val || "") },
+                                  },
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="w-full bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10">
+                                <SelectValue placeholder={`Select ${item.label}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">-- Select {item.label} --</SelectItem>
+                                {parsedOpts.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={item.value}
+                              onChange={(e) =>
+                                setStudentForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: {
+                                    ...prev.custom_fields,
+                                    [fieldId]: { ...item, value: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder={`Enter ${item.label}`}
+                              className="bg-slate-50 dark:bg-zinc-900 border-slate-200 text-xs rounded-xl h-10"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

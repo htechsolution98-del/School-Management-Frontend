@@ -32,6 +32,7 @@ export interface SubscriptionPlan {
   plan_modules?: SubscriptionPlanModule[];
   enabled_module_ids?: number[];
   subscribed_schools_count?: number;
+  enabled_tiers?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -79,6 +80,8 @@ export interface SchoolSubscription {
   calculated_amount: number;
   days_left: number;
   is_valid: boolean;
+  plan_details?: SubscriptionPlan;
+  enabled_tiers?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -293,6 +296,8 @@ export async function createRazorpayOrder(payload: {
   billing_cycle?: string;
   months_count?: number;
 }): Promise<{
+  free_activation?: boolean;
+  message?: string;
   order_id: string;
   amount: number;
   currency: string;

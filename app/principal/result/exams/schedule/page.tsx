@@ -50,6 +50,25 @@ import {
   type ResultWeightageComponent,
 } from "@/lib/exam-api";
 
+function toTitleCase(str?: string | null): string {
+  if (!str) return "";
+  return str
+    .toString()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => {
+      if (!word) return "";
+      const lower = word.toLowerCase();
+      if (/^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/i.test(lower)) {
+        return lower.toUpperCase();
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
 export default function ExamSchedulePage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -111,7 +130,7 @@ export default function ExamSchedulePage() {
       setWeightageComponents(examComps);
       if (examComps.length > 0 && !editingExam) {
         setNewTermId(String(examComps[0].id));
-        setNewExamTitle(examComps[0].name);
+        setNewExamTitle(toTitleCase(examComps[0].name));
         if (examComps[0].max_marks) setNewMaxMarks(String(examComps[0].max_marks));
         if (examComps[0].pass_marks || examComps[0].passing_marks) {
           setNewPassingMarks(String(examComps[0].pass_marks || examComps[0].passing_marks));
@@ -223,7 +242,7 @@ export default function ExamSchedulePage() {
 
       if (termsData.length > 0 && !newTermId) {
         setNewTermId(String(termsData[0].id));
-        setNewExamTitle(termsData[0].name);
+        setNewExamTitle(toTitleCase(termsData[0].name));
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to load exam schedules.");
@@ -241,7 +260,7 @@ export default function ExamSchedulePage() {
   const resetForm = () => {
     subjectRequestId.current += 1;
     setEditingExam(null);
-    setNewExamTitle(examTerms.length > 0 ? examTerms[0].name : "Term 1 Examination");
+    setNewExamTitle(examTerms.length > 0 ? toTitleCase(examTerms[0].name) : "Term 1 Examination");
     setNewTermId(examTerms.length > 0 ? String(examTerms[0].id) : "");
     setNewClassId("");
     setNewSubjectId("");
@@ -331,7 +350,7 @@ export default function ExamSchedulePage() {
 
   const handleEditExam = (ex: ExamFull) => {
     setEditingExam(ex);
-    setNewExamTitle(ex.title);
+    setNewExamTitle(toTitleCase(ex.title));
     setNewTermId(ex.exam_term ? String(ex.exam_term) : "");
     const cId = String(ex.class_group);
     setNewClassId(cId);
@@ -445,21 +464,23 @@ export default function ExamSchedulePage() {
                   <SelectValue placeholder="All Components">
                     {selectedTermFilter === "ALL"
                       ? "All Components"
-                      : examTerms.find((t) => String(t.id) === selectedTermFilter)?.name ||
-                        weightageComponents.find((w) => w.name === selectedTermFilter)?.name ||
-                        selectedTermFilter}
+                      : toTitleCase(
+                          examTerms.find((t) => String(t.id) === selectedTermFilter)?.name ||
+                          weightageComponents.find((w) => w.name === selectedTermFilter)?.name ||
+                          selectedTermFilter
+                        )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Components</SelectItem>
                   {examTerms.map((t) => (
                     <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name}
+                      {toTitleCase(t.name)}
                     </SelectItem>
                   ))}
                   {weightageComponents.map((w) => (
                     <SelectItem key={`comp-${w.id}`} value={w.name}>
-                      {w.name} ({w.weightage_percentage}%)
+                      {toTitleCase(w.name)} ({w.weightage_percentage}%)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -473,14 +494,14 @@ export default function ExamSchedulePage() {
                   <SelectValue placeholder="All Classes">
                     {selectedClassId === "ALL"
                       ? "All Classes"
-                      : classes.find((cls) => String(cls.id) === selectedClassId)?.school_class || `Class #${selectedClassId}`}
+                      : toTitleCase(classes.find((cls) => String(cls.id) === selectedClassId)?.school_class) || `Class #${selectedClassId}`}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Classes</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={String(cls.id)}>
-                      {cls.school_class}
+                      {toTitleCase(cls.school_class)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -492,14 +513,14 @@ export default function ExamSchedulePage() {
               <Select value={selectedDivFilter} onValueChange={(val) => { if (val) setSelectedDivFilter(val); }}>
                 <SelectTrigger className="h-10 rounded-xl text-xs bg-white dark:bg-zinc-800 border-gray-200 font-medium">
                   <SelectValue placeholder="All Divisions">
-                    {selectedDivFilter === "ALL" ? "All Divisions" : `Division ${selectedDivFilter}`}
+                    {selectedDivFilter === "ALL" ? "All Divisions" : `Division ${selectedDivFilter.toUpperCase()}`}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Divisions</SelectItem>
                   {availableDivisions.map((divName) => (
                     <SelectItem key={divName} value={divName}>
-                      Division {divName}
+                      Division {divName.toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -584,14 +605,14 @@ export default function ExamSchedulePage() {
                     <TableRow key={ex.id} className="hover:bg-slate-50/60 dark:hover:bg-zinc-800/60 transition-colors">
                       <TableCell className="text-center font-mono text-xs text-slate-400">{idx + 1}</TableCell>
                       <TableCell className="text-xs font-bold text-slate-900 dark:text-zinc-100">
-                        {ex.term_name || ex.title}
+                        {toTitleCase(ex.term_name || ex.title)}
                       </TableCell>
                       <TableCell className="text-xs font-semibold text-[#5c28e8] dark:text-purple-400">
-                        {ex.subject_name || "—"}
+                        {toTitleCase(ex.subject_name || "—")}
                       </TableCell>
                       <TableCell className="text-xs">
                         <span className="font-semibold text-slate-700 dark:text-zinc-300">
-                          {ex.class_name} {ex.division ? `(Div ${ex.division})` : ""}
+                          {toTitleCase(ex.class_name)} {ex.division ? `(Div ${ex.division.toUpperCase()})` : ""}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs font-mono font-semibold text-slate-800 dark:text-zinc-200">
@@ -610,7 +631,7 @@ export default function ExamSchedulePage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                          {ex.status}
+                          {toTitleCase(ex.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
@@ -644,8 +665,8 @@ export default function ExamSchedulePage() {
 
       {/* Schedule Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-3xl p-6 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl">
-          <DialogHeader className="pb-2 border-b border-gray-100 dark:border-zinc-800">
+        <DialogContent className="sm:max-w-xl max-h-[92vh] flex flex-col p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+          <DialogHeader className="pb-3 border-b border-gray-100 dark:border-zinc-800 shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
                 <CalendarDays className="h-5 w-5" />
@@ -661,29 +682,29 @@ export default function ExamSchedulePage() {
             </div>
           </DialogHeader>
 
-          <div className="space-y-4 py-3 text-xs">
+          <div className="space-y-4 py-3 text-xs overflow-y-auto flex-1 pr-1.5">
             {/* 1. Class Selection (First & Required) */}
             <div className="space-y-1.5">
               <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1">
-                  <School className="h-3.5 w-3.5" /> 1. Select Class <span className="text-rose-500">*</span>
+                <span className="flex items-center gap-1.5">
+                  <School className="h-4 w-4" /> 1. Select Class <span className="text-rose-500">*</span>
                 </span>
                 {newClassId && (
-                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
-                    Data Loaded for {classes.find((cls) => String(cls.id) === newClassId)?.school_class}
+                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200 bg-purple-50/50">
+                    Data Loaded for {toTitleCase(classes.find((cls) => String(cls.id) === newClassId)?.school_class)}
                   </Badge>
                 )}
               </label>
               <Select value={newClassId} onValueChange={(val) => { if (val) handleModalClassChange(val); }}>
                 <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
                   <SelectValue placeholder="Select Class First...">
-                    {classes.find((cls) => String(cls.id) === newClassId)?.school_class || "Select Class First..."}
+                    {toTitleCase(classes.find((cls) => String(cls.id) === newClassId)?.school_class) || "Select Class First..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl shadow-xl">
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={String(cls.id)} className="text-xs font-semibold py-2">
-                      {cls.school_class}
+                      {toTitleCase(cls.school_class)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -691,7 +712,7 @@ export default function ExamSchedulePage() {
             </div>
 
             {/* 2. Subject & Division */}
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 dark:text-zinc-300">
                   Subject <span className="text-rose-500">*</span>:
@@ -707,9 +728,10 @@ export default function ExamSchedulePage() {
                         ? "Loading subjects..."
                         : !newClassId
                         ? "Select Class first"
-                        : modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.name ||
-                          modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.subject_name ||
-                          (modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject")}
+                        : toTitleCase(
+                            modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.name ||
+                            modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.subject_name
+                          ) || (modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject")}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
@@ -719,7 +741,7 @@ export default function ExamSchedulePage() {
                       </SelectItem>
                     ) : modalSubjects.map((sub) => (
                       <SelectItem key={sub.id} value={String(sub.id)} className="text-xs font-semibold py-2">
-                        {sub.name || sub.subject_name}
+                        {toTitleCase(sub.name || sub.subject_name)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -731,14 +753,14 @@ export default function ExamSchedulePage() {
                 <Select value={newDivision} onValueChange={(val) => { if (val) setNewDivision(val); }} disabled={!newClassId}>
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold disabled:opacity-60">
                     <SelectValue placeholder="All Divisions">
-                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision}` : "All Divisions"}
+                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision.toUpperCase()}` : "All Divisions"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
                     <SelectItem value="ALL" className="text-xs font-semibold py-2">All Divisions</SelectItem>
                     {modalDivisions.map((divName: string) => (
                       <SelectItem key={divName} value={divName} className="text-xs font-semibold py-2">
-                        Division {divName}
+                        Division {divName.toUpperCase()}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -749,11 +771,11 @@ export default function ExamSchedulePage() {
             {/* 3. Class Exam Weightage Component / Term */}
             <div className="space-y-1.5">
               <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1">
-                  <Percent className="h-3.5 w-3.5" /> Class Exam Weightage Component / Term:
+                <span className="flex items-center gap-1.5">
+                  <Percent className="h-4 w-4" /> Class Exam Weightage Component / Term:
                 </span>
                 {weightageComponents.length > 0 && (
-                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
+                  <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200 bg-purple-50/50">
                     {weightageComponents.length} Exam Component(s) Found
                   </Badge>
                 )}
@@ -766,9 +788,9 @@ export default function ExamSchedulePage() {
                     const t = examTerms.find((term) => String(term.id) === val);
                     const w = weightageComponents.find((comp) => String(comp.id) === val);
                     if (t) {
-                      setNewExamTitle(t.name);
+                      setNewExamTitle(toTitleCase(t.name));
                     } else if (w) {
-                      setNewExamTitle(w.name);
+                      setNewExamTitle(toTitleCase(w.name));
                       if ((w as any).max_marks) setNewMaxMarks(String((w as any).max_marks));
                       if ((w as any).pass_marks || (w as any).passing_marks) {
                         setNewPassingMarks(String((w as any).pass_marks || (w as any).passing_marks));
@@ -781,9 +803,9 @@ export default function ExamSchedulePage() {
                   <SelectValue placeholder={newClassId ? "Select EXAM Weightage Component..." : "Select Class first to load weightage"}>
                     {(() => {
                       const t = examTerms.find((term) => String(term.id) === newTermId);
-                      if (t) return t.name;
+                      if (t) return toTitleCase(t.name);
                       const w = weightageComponents.find((comp) => String(comp.id) === newTermId);
-                      if (w) return `${w.name} (${w.weightage_percentage}% Weightage)`;
+                      if (w) return `${toTitleCase(w.name)} (${w.weightage_percentage}% Weightage)`;
                       return newClassId ? "Select EXAM Weightage Component..." : "Select Class first to load weightage";
                     })()}
                   </SelectValue>
@@ -791,51 +813,36 @@ export default function ExamSchedulePage() {
                 <SelectContent className="rounded-2xl shadow-xl">
                   {weightageComponents.map((w) => (
                     <SelectItem key={`weight-${w.id}`} value={String(w.id)} className="text-xs font-semibold py-2">
-                      {w.name} ({w.weightage_percentage}% Weightage)
+                      {toTitleCase(w.name)} ({w.weightage_percentage}% Weightage)
                     </SelectItem>
                   ))}
                   {examTerms.map((t) => (
                     <SelectItem key={`term-${t.id}`} value={String(t.id)} className="text-xs font-semibold py-2">
-                      {t.name}
+                      {toTitleCase(t.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* 4. Exam Title / Paper Name */}
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Title / Paper Name:</label>
-              <Input
-                value={newExamTitle}
-                onChange={(e) => setNewExamTitle(e.target.value)}
-                placeholder="e.g. Term 1 Mathematics Examination"
-                className="h-11 text-xs rounded-2xl border-gray-200 bg-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5">
+            {/* 4. Exam Title & Exam Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-zinc-300">Division (Optional):</label>
-                <Select value={newDivision} onValueChange={(val) => { if (val) setNewDivision(val); }}>
-                  <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
-                    <SelectValue placeholder="All Divisions">
-                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision}` : "All Divisions"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl shadow-xl">
-                    <SelectItem value="ALL" className="text-xs font-semibold py-2">All Divisions</SelectItem>
-                    {modalDivisions.map((divName: string) => (
-                      <SelectItem key={divName} value={divName} className="text-xs font-semibold py-2">
-                        Division {divName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="font-bold text-slate-700 dark:text-zinc-300">
+                  Exam Title / Paper Name <span className="text-rose-500">*</span>:
+                </label>
+                <Input
+                  value={newExamTitle}
+                  onChange={(e) => setNewExamTitle(e.target.value)}
+                  placeholder="e.g. Term 1 Mathematics Examination"
+                  className="h-11 text-xs rounded-2xl border-gray-200 bg-white"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-zinc-300">Exam Date:</label>
+                <label className="font-bold text-slate-700 dark:text-zinc-300">
+                  Exam Date <span className="text-rose-500">*</span>:
+                </label>
                 <Input
                   type="date"
                   min={minExamDate}
@@ -846,6 +853,7 @@ export default function ExamSchedulePage() {
               </div>
             </div>
 
+            {/* 5. Start Time & End Time */}
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 dark:text-zinc-300">Start Time:</label>
@@ -868,6 +876,7 @@ export default function ExamSchedulePage() {
               </div>
             </div>
 
+            {/* 6. Max Marks & Passing Marks */}
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 dark:text-zinc-300">Max Marks:</label>
@@ -891,7 +900,7 @@ export default function ExamSchedulePage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2.5 pt-4 border-t border-gray-100 dark:border-zinc-800">
+          <DialogFooter className="gap-2.5 pt-4 border-t border-gray-100 dark:border-zinc-800 shrink-0">
             <Button
               type="button"
               variant="outline"

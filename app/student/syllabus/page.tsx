@@ -16,9 +16,13 @@ import {
   FlaskConical,
   Calculator,
   Globe,
+  FolderOpen,
+  Tag,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getStudentSyllabus, type StudentSyllabusItem } from "@/lib/student";
+import { getStudentStudyMaterials, type StudyMaterialBackendItem } from "@/lib/study-materials";
 import { API_BASE_URL } from "@/lib/config";
 import {
   getSyllabusStreamUrl,
@@ -66,10 +70,13 @@ function getSubjectTheme(subjectName: string = "") {
 
 export default function StudentSyllabusPage() {
   const [syllabuses, setSyllabuses] = useState<StudentSyllabusItem[]>([]);
+  const [materials, setMaterials] = useState<StudyMaterialBackendItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadingMatId, setDownloadingMatId] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(9);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -91,17 +98,50 @@ export default function StudentSyllabusPage() {
     }
   };
 
+  const handleDownloadMaterial = async (url: string, fileName: string, id: number) => {
+    setDownloadingMatId(id);
+    try {
+      const resolved = resolveSyllabusUrl(url);
+      const blobUrl = await getDocumentBlobUrl(resolved, resolved);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName || "study_material.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      const resolved = resolveSyllabusUrl(url);
+      window.open(resolved, "_blank");
+    } finally {
+      setDownloadingMatId(null);
+    }
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
+    setIsLoadingMaterials(true);
     setError(null);
-    try {
-      setSyllabuses(await getStudentSyllabus());
 
+    // Fetch Syllabus
+    try {
+      const sylData = await getStudentSyllabus();
+      setSyllabuses(sylData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load syllabus data.");
-      toast.error("Could not load syllabus list");
     } finally {
       setIsLoading(false);
+    }
+
+    // Fetch Study Materials (Teacher uploaded for student's class and division)
+    try {
+      const matData = await getStudentStudyMaterials();
+      setMaterials(matData);
+    } catch (err) {
+      console.error("Failed to load study materials:", err);
+      setMaterials([]);
+    } finally {
+      setIsLoadingMaterials(false);
     }
   };
 
@@ -142,6 +182,19 @@ export default function StudentSyllabusPage() {
       return subName.includes(query) || classLabel.includes(query);
     });
   }, [syllabuses, searchQuery]);
+
+  const filteredMaterials = useMemo(() => {
+    if (!searchQuery.trim()) return materials;
+    const q = searchQuery.toLowerCase();
+    return materials.filter((m) => {
+      const title = (m.title || "").toLowerCase();
+      const subj = (m.display_subject || m.subject_name || "").toLowerCase();
+      const type = (m.material_type || "").toLowerCase();
+      const desc = (m.description || "").toLowerCase();
+      const cls = (m.display_class || m.class_name || "").toLowerCase();
+      return title.includes(q) || subj.includes(q) || type.includes(q) || desc.includes(q) || cls.includes(q);
+    });
+  }, [materials, searchQuery]);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -393,6 +446,190 @@ export default function StudentSyllabusPage() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          4. Study Materials Section (Uploaded by Teachers for this Class & Division)
+         ───────────────────────────────────────────────────────────── */}
+      <div className="mt-8 pt-8 border-t border-slate-200/80 flex flex-col gap-4">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <FolderOpen size={18} />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Class Study Materials & Learning Resources</span>
+                <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                  {filteredMaterials.length} Available
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Notes, worksheets, and study documents shared by teachers specifically for your class &amp; division.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Study Materials Grid */}
+        {isLoadingMaterials ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs animate-pulse space-y-4"
+              >
+                <div className="h-4 bg-slate-100 rounded-full w-32" />
+                <div className="h-10 bg-slate-50 rounded-2xl" />
+                <div className="flex gap-2">
+                  <div className="flex-1 h-9 bg-slate-100 rounded-full" />
+                  <div className="flex-1 h-9 bg-slate-100 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredMaterials.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-2xs text-center space-y-2">
+            <FolderOpen className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-bold text-slate-700">No study materials for your class &amp; division yet</p>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Any study notes, homework sheets, or revision guides uploaded by your teachers for your section will automatically appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredMaterials.map((mat, idx) => {
+              const theme = getSubjectTheme(mat.display_subject || mat.subject_name || "");
+              const ThemeIcon = theme.Icon;
+              const fileUrl = resolveSyllabusUrl(mat.file_url || mat.file);
+              const fileName = mat.file_name || mat.title || "study_material.pdf";
+              const typeColor =
+                mat.material_type === "assignment"
+                  ? "bg-sky-50 text-sky-700 border-sky-200"
+                  : mat.material_type === "worksheet"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : mat.material_type === "other"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-blue-50 text-blue-700 border-blue-200";
+
+              const typeLabel =
+                mat.material_type === "assignment"
+                  ? "Assignment"
+                  : mat.material_type === "worksheet"
+                  ? "Worksheet / Practice"
+                  : mat.material_type === "other"
+                  ? "Reference Guide"
+                  : "Study Notes";
+
+              const uploadDate = mat.created_at
+                ? new Date(mat.created_at).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "";
+
+              return (
+                <div
+                  key={mat.id || idx}
+                  className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-2xs flex flex-col justify-between hover:border-slate-200 transition-all group h-full gap-3.5"
+                >
+                  <div className="space-y-3">
+                    {/* Category badge & Date */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${typeColor}`}>
+                        {typeLabel}
+                      </span>
+                      {uploadDate && (
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {uploadDate}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Subject Icon + Material Title + Class/Div */}
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-2xl ${theme.bg} ${theme.text} flex items-center justify-center shrink-0 border ${theme.border} mt-0.5`}
+                      >
+                        <ThemeIcon size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-extrabold text-slate-900 tracking-tight leading-snug line-clamp-2">
+                          {mat.title}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium flex-wrap">
+                          <span className="font-semibold text-slate-700 capitalize">
+                            {mat.display_subject || mat.subject_name || "General"}
+                          </span>
+                          <span>•</span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-600">
+                            {mat.display_class || mat.class_name || "Class"}
+                            {mat.division ? ` · Div ${mat.division.toUpperCase()}` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {mat.description && (
+                      <p className="text-xs text-slate-500 line-clamp-2 pl-0.5">
+                        {mat.description}
+                      </p>
+                    )}
+
+                    {/* File Attachment Box */}
+                    <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        <FileText size={15} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-700 truncate" title={fileName}>
+                          {fileName}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          {mat.file_size || "Document"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2.5 w-full pt-1 mt-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (/^https?:\/\//i.test(fileUrl) && fileUrl.includes("cloudinary.com")) {
+                          window.open(fileUrl, "_blank", "noopener,noreferrer");
+                          return;
+                        }
+                        void openAuthenticatedDocument(fileUrl, mat.title, fileUrl);
+                      }}
+                      className="flex-1 py-2 px-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <ExternalLink size={13} className="text-slate-600" />
+                      <span>View</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadMaterial(fileUrl, fileName, mat.id)}
+                      disabled={downloadingMatId === mat.id}
+                      className="flex-1 py-2 px-3 rounded-full bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {downloadingMatId === mat.id ? (
+                        <Loader2 size={13} className="animate-spin text-white" />
+                      ) : (
+                        <Download size={13} />
+                      )}
+                      <span>{downloadingMatId === mat.id ? "Downloading..." : "Download"}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
       {!isLoading && !error && visibleCount < filteredSyllabuses.length && (
         <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
       )}
