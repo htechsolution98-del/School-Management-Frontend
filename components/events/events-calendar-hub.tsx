@@ -1241,12 +1241,6 @@ export function EventsCalendarHub({
                           <span className="truncate">{ev.location}</span>
                         </span>
                       )}
-
-                      {ev.target_audience && ev.target_audience !== "ALL" && (
-                        <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
-                          {ev.target_audience}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );
@@ -1574,14 +1568,32 @@ function EventFormModal({
   const [title, setTitle] = useState(event?.title || event?.name || "");
   const [eventType, setEventType] = useState<string>(event?.event_type || "EVENT");
   const [isHoliday, setIsHoliday] = useState<boolean>(event?.is_holiday ?? false);
-  const [startDate, setStartDate] = useState<string>(toISODateString(event?.start_date) || initialDate || todayStr);
+
+  const initialStartDate = useMemo(() => {
+    const existing = toISODateString(event?.start_date);
+    if (existing) return existing;
+    if (initialDate && initialDate >= todayStr) return initialDate;
+    return todayStr;
+  }, [event, initialDate, todayStr]);
+
+  const [startDate, setStartDate] = useState<string>(initialStartDate);
   const [endDate, setEndDate] = useState<string>(toISODateString(event?.end_date) || "");
   const [description, setDescription] = useState<string>(event?.description || "");
-  const [targetAudience, setTargetAudience] = useState<string>(event?.target_audience || "ALL");
-  const [audienceDrawerOpen, setAudienceDrawerOpen] = useState(false);
   const [location, setLocation] = useState<string>(event?.location || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const minStartDate = useMemo(() => {
+    if (isEdit && event?.start_date && event.start_date < todayStr) {
+      return event.start_date;
+    }
+    return todayStr;
+  }, [isEdit, event, todayStr]);
+
+  const minEndDate = useMemo(() => {
+    if (startDate) return startDate;
+    return minStartDate;
+  }, [startDate, minStartDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1591,6 +1603,14 @@ function EventFormModal({
     }
     if (!startDate) {
       setError("Please choose a start date.");
+      return;
+    }
+    if (!isEdit && startDate < todayStr) {
+      setError("Previous / past dates cannot be selected for an event or holiday.");
+      return;
+    }
+    if (endDate && endDate < startDate) {
+      setError("End date cannot be earlier than start date.");
       return;
     }
 
@@ -1606,7 +1626,7 @@ function EventFormModal({
         start_date: toISODateString(startDate),
         end_date: endDate ? toISODateString(endDate) : null,
         description: capitalizeFirstLetter(description.trim()),
-        target_audience: targetAudience,
+        target_audience: "ALL",
         location: location.trim() || undefined,
       };
 
@@ -1753,8 +1773,15 @@ function EventFormModal({
               </label>
               <Input
                 type="date"
+                min={minStartDate}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setStartDate(newStart);
+                  if (endDate && endDate < newStart) {
+                    setEndDate(newStart);
+                  }
+                }}
                 className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium"
                 required
               />
@@ -1768,120 +1795,31 @@ function EventFormModal({
               <Input
                 type="date"
                 value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                min={minEndDate}
+                onChange={(e) => {
+                  const newEnd = e.target.value;
+                  if (startDate && newEnd && newEnd < startDate) {
+                    setEndDate(startDate);
+                  } else {
+                    setEndDate(newEnd);
+                  }
+                }}
                 className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium"
               />
             </div>
           </div>
 
-          {/* Target Audience & Venue */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                Target Audience
-              </label>
-              {/* Mobile Audience Drawer Trigger */}
-              <div className="block sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => setAudienceDrawerOpen(true)}
-                  className="w-full h-10 px-3.5 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 flex items-center justify-between text-xs font-semibold text-slate-800 dark:text-zinc-200 active:scale-[0.99] transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {(() => {
-                      const matched = AUDIENCE_OPTIONS.find((a) => a.value === targetAudience);
-                      const Icon = matched?.icon || Users2;
-                      return (
-                        <>
-                          <Icon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
-                          <span className="truncate">{matched?.label || "Everyone"}</span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                </button>
-              </div>
-
-              {/* Mobile Bottom Drawer for Audience Selection */}
-              <MobileBottomDrawer
-                isOpen={audienceDrawerOpen}
-                onClose={() => setAudienceDrawerOpen(false)}
-                title="Select Target Audience"
-                subtitle="Who should see this event or holiday?"
-              >
-                <div className="space-y-2 py-1">
-                  {AUDIENCE_OPTIONS.map((a) => {
-                    const isSelected = targetAudience === a.value;
-                    const Icon = a.icon || Users2;
-                    return (
-                      <button
-                        key={a.value}
-                        type="button"
-                        onClick={() => {
-                          setTargetAudience(a.value);
-                          setAudienceDrawerOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left cursor-pointer ${
-                          isSelected
-                            ? "border-[#2563EB] bg-blue-50/70 dark:bg-blue-950/40 text-[#2563EB] font-black shadow-xs ring-1 ring-[#2563EB]"
-                            : "border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 font-semibold hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                            style={{
-                              backgroundColor: isSelected ? "#2563EB15" : "#64748b15",
-                              color: isSelected ? "#2563EB" : "#64748b",
-                            }}
-                          >
-                            <Icon className="w-4 h-4 stroke-[2.2]" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs sm:text-sm font-bold truncate">{a.label}</p>
-                            {a.desc && <p className="text-[10px] text-slate-400 truncate">{a.desc}</p>}
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                            <Check className="w-3 h-3 stroke-[3]" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </MobileBottomDrawer>
-
-              {/* Desktop Native Select */}
-              <div className="hidden sm:block">
-                <select
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  className="w-full h-10 px-3 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 font-semibold text-slate-800 dark:text-zinc-200 cursor-pointer"
-                >
-                  {AUDIENCE_OPTIONS.map((a) => (
-                    <option key={a.value} value={a.value}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                Venue / Location (Optional)
-              </label>
-              <Input
-                placeholder="e.g. School Auditorium, Ground"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium"
-              />
-            </div>
+          {/* Venue / Location */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+              Venue / Location (Optional)
+            </label>
+            <Input
+              placeholder="e.g. School Auditorium, Ground, Campus Hall"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="h-10 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 font-medium"
+            />
           </div>
 
           {/* Description */}

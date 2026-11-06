@@ -51,12 +51,14 @@ const emptyForm: CreateSchoolPayload = {
   trial_start_date: getTodayStr(),
   trial_end_date: getDefaultTrialEnd(getTodayStr()),
   pricing_model: "FLAT",
+  plan_name: "",
   monthly_price: 5000,
   quarterly_price: 13500,
   half_yearly_price: 25000,
   yearly_price: 48000,
   gst_included: false,
   gst_percentage: 18,
+  enabled_tiers: ["1", "3", "6", "12"],
 };
 
 const fields = [
@@ -102,6 +104,24 @@ export default function SchoolManager() {
     const diffTime = end.getTime() - start.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
+  };
+
+  const toggleTier = (tier: string) => {
+    setForm(curr => {
+      const current = (curr.enabled_tiers && curr.enabled_tiers.length > 0)
+        ? curr.enabled_tiers.map(String)
+        : ["1", "3", "6", "12"];
+      const sTier = String(tier);
+      const isSelected = current.includes(sTier);
+      if (isSelected) {
+        if (current.length <= 1) {
+          return curr; // Keep at least one tier active
+        }
+        return { ...curr, enabled_tiers: current.filter(t => t !== sTier) };
+      } else {
+        return { ...curr, enabled_tiers: [...current, sTier] };
+      }
+    });
   };
 
   const load = useCallback(async () => {
@@ -151,12 +171,16 @@ export default function SchoolManager() {
         trial_start_date: start,
         trial_end_date: sub?.trial_end_date || getDefaultTrialEnd(start),
         pricing_model: sub?.pricing_model || "FLAT",
-        monthly_price: sub?.monthly_price ? Number(sub.monthly_price) : 5000,
-        quarterly_price: sub?.quarterly_price ? Number(sub.quarterly_price) : 13500,
-        half_yearly_price: sub?.half_yearly_price ? Number(sub.half_yearly_price) : 25000,
-        yearly_price: sub?.yearly_price ? Number(sub.yearly_price) : 48000,
+        plan_name: sub?.plan_name || "",
+        monthly_price: sub?.monthly_price !== undefined && sub?.monthly_price !== null && sub?.monthly_price !== "" ? Number(sub.monthly_price) : 5000,
+        quarterly_price: sub?.quarterly_price !== undefined && sub?.quarterly_price !== null && sub?.quarterly_price !== "" ? Number(sub.quarterly_price) : 13500,
+        half_yearly_price: sub?.half_yearly_price !== undefined && sub?.half_yearly_price !== null && sub?.half_yearly_price !== "" ? Number(sub.half_yearly_price) : 25000,
+        yearly_price: sub?.yearly_price !== undefined && sub?.yearly_price !== null && sub?.yearly_price !== "" ? Number(sub.yearly_price) : 48000,
         gst_included: sub?.gst_included ?? false,
-        gst_percentage: sub?.gst_percentage ? Number(sub.gst_percentage) : 18,
+        gst_percentage: sub?.gst_percentage !== undefined && sub?.gst_percentage !== null && sub?.gst_percentage !== "" ? Number(sub.gst_percentage) : 18,
+        enabled_tiers: (sub?.enabled_tiers && Array.isArray(sub.enabled_tiers) && sub.enabled_tiers.length > 0)
+          ? sub.enabled_tiers.map(String)
+          : ["1", "3", "6", "12"],
       });
     } else {
       const today = getTodayStr();
@@ -165,6 +189,7 @@ export default function SchoolManager() {
         trial_start_date: today,
         trial_end_date: getDefaultTrialEnd(today),
         feature_ids: features.map(f => f.id),
+        enabled_tiers: ["1", "3", "6", "12"],
       });
     }
     setErrors({}); setFormError(""); setSuccess(""); setOpen(true);
@@ -617,6 +642,25 @@ export default function SchoolManager() {
                 </div>
               </div>
 
+              {/* Custom Plan Name Input */}
+              <div className="bg-white/95 rounded-xl p-3 border border-blue-100 shadow-2xs space-y-1.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <Label className="text-xs font-black text-slate-800">Custom Plan Name:</Label>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Leave blank for default auto-naming</span>
+                </div>
+                <Input
+                  type="text"
+                  maxLength={100}
+                  placeholder={`e.g. ${form.name || "School"} Custom Plan`}
+                  value={form.plan_name ?? ""}
+                  onChange={e => setForm(curr => ({ ...curr, plan_name: e.target.value }))}
+                  className="h-8 rounded-lg text-xs font-bold text-slate-800 bg-white border-slate-200"
+                />
+              </div>
+
               {/* GST Configuration Bar */}
               <div className="bg-white/95 rounded-xl p-3 border border-blue-100 shadow-2xs space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -687,127 +731,222 @@ export default function SchoolManager() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* 1 Month */}
-                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-2xs space-y-2 hover:border-slate-300 transition-all">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-slate-800 truncate">1 Month</span>
-                    <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold shrink-0">Monthly</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={form.monthly_price ?? 0}
-                      onChange={e => setForm(curr => ({ ...curr, monthly_price: Number(e.target.value) }))}
-                      className="pl-7 h-9 rounded-lg text-sm font-bold text-slate-800"
-                    />
-                  </div>
-                  {form.gst_included && (
-                    <div className="pt-1 border-t border-slate-100 text-[10px] space-y-0.5 font-medium">
-                      <div className="flex justify-between text-slate-400">
-                        <span>GST ({form.gst_percentage}%):</span>
-                        <span>+₹{Math.round(Number(form.monthly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+              {(() => {
+                const enabledList = (form.enabled_tiers && form.enabled_tiers.length > 0)
+                  ? form.enabled_tiers.map(String)
+                  : ["1", "3", "6", "12"];
+                const isTier1 = enabledList.includes("1");
+                const isTier3 = enabledList.includes("3");
+                const isTier6 = enabledList.includes("6");
+                const isTier12 = enabledList.includes("12");
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* 1 Month */}
+                    <div className={`rounded-xl p-3 border shadow-2xs space-y-2 transition-all ${
+                      isTier1 ? "bg-white border-slate-200/90 hover:border-slate-300" : "bg-slate-100/70 border-dashed border-slate-300 opacity-60"
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isTier1}
+                            onChange={() => toggleTier("1")}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                          />
+                          <span className="text-xs font-extrabold uppercase tracking-wide text-slate-800 truncate">1 Month</span>
+                        </label>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                          isTier1 ? "bg-slate-100 text-slate-700" : "bg-slate-200 text-slate-500"
+                        }`}>
+                          {isTier1 ? "Monthly" : "Disabled"}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-slate-800 font-extrabold text-[11px]">
-                        <span>Final Total:</span>
-                        <span>₹{Math.round(Number(form.monthly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          disabled={!isTier1}
+                          value={form.monthly_price === 0 ? "0" : (form.monthly_price ?? "")}
+                          onKeyDown={e => {
+                            if (["-", "+", "e", "E", ".", ","].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => {
+                            const clean = e.target.value.replace(/\D/g, "");
+                            setForm(curr => ({ ...curr, monthly_price: clean === "" ? 0 : parseInt(clean, 10) }));
+                          }}
+                          className="pl-7 h-9 rounded-lg text-sm font-bold text-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
                       </div>
+                      {isTier1 && form.gst_included && (
+                        <div className="pt-1 border-t border-slate-100 text-[10px] space-y-0.5 font-medium">
+                          <div className="flex justify-between text-slate-400">
+                            <span>GST ({form.gst_percentage}%):</span>
+                            <span>+₹{Math.round(Number(form.monthly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-800 font-extrabold text-[11px]">
+                            <span>Final Total:</span>
+                            <span>₹{Math.round(Number(form.monthly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* 3 Months Quarterly */}
-                <div className="bg-white rounded-xl p-3 border border-blue-200/80 shadow-2xs space-y-2 hover:border-blue-300 transition-all">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-blue-900 truncate">3 Months</span>
-                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full font-bold shrink-0">Quarterly</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-blue-400">₹</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={form.quarterly_price ?? 0}
-                      onChange={e => setForm(curr => ({ ...curr, quarterly_price: Number(e.target.value) }))}
-                      className="pl-7 h-9 rounded-lg text-sm font-bold text-blue-950"
-                    />
-                  </div>
-                  {form.gst_included && (
-                    <div className="pt-1 border-t border-blue-100 text-[10px] space-y-0.5 font-medium">
-                      <div className="flex justify-between text-blue-400">
-                        <span>GST ({form.gst_percentage}%):</span>
-                        <span>+₹{Math.round(Number(form.quarterly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                    {/* 3 Months Quarterly */}
+                    <div className={`rounded-xl p-3 border shadow-2xs space-y-2 transition-all ${
+                      isTier3 ? "bg-white border-blue-200/80 hover:border-blue-300" : "bg-slate-100/70 border-dashed border-slate-300 opacity-60"
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isTier3}
+                            onChange={() => toggleTier("3")}
+                            className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                          />
+                          <span className="text-xs font-extrabold uppercase tracking-wide text-blue-900 truncate">3 Months</span>
+                        </label>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                          isTier3 ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-200 text-slate-500"
+                        }`}>
+                          {isTier3 ? "Quarterly" : "Disabled"}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-blue-950 font-extrabold text-[11px]">
-                        <span>Final Total:</span>
-                        <span>₹{Math.round(Number(form.quarterly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-blue-400">₹</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          disabled={!isTier3}
+                          value={form.quarterly_price === 0 ? "0" : (form.quarterly_price ?? "")}
+                          onKeyDown={e => {
+                            if (["-", "+", "e", "E", ".", ","].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => {
+                            const clean = e.target.value.replace(/\D/g, "");
+                            setForm(curr => ({ ...curr, quarterly_price: clean === "" ? 0 : parseInt(clean, 10) }));
+                          }}
+                          className="pl-7 h-9 rounded-lg text-sm font-bold text-blue-950 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
                       </div>
+                      {isTier3 && form.gst_included && (
+                        <div className="pt-1 border-t border-blue-100 text-[10px] space-y-0.5 font-medium">
+                          <div className="flex justify-between text-blue-400">
+                            <span>GST ({form.gst_percentage}%):</span>
+                            <span>+₹{Math.round(Number(form.quarterly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex justify-between text-blue-950 font-extrabold text-[11px]">
+                            <span>Final Total:</span>
+                            <span>₹{Math.round(Number(form.quarterly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* 6 Months Half-Yearly */}
-                <div className="bg-white rounded-xl p-3 border border-sky-200/80 shadow-2xs space-y-2 hover:border-sky-300 transition-all">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-sky-900 truncate">6 Months</span>
-                    <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full font-bold shrink-0">Half-Yr</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-sky-500">₹</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={form.half_yearly_price ?? 0}
-                      onChange={e => setForm(curr => ({ ...curr, half_yearly_price: Number(e.target.value) }))}
-                      className="pl-7 h-9 rounded-lg text-sm font-bold text-sky-950"
-                    />
-                  </div>
-                  {form.gst_included && (
-                    <div className="pt-1 border-t border-sky-100 text-[10px] space-y-0.5 font-medium">
-                      <div className="flex justify-between text-sky-500">
-                        <span>GST ({form.gst_percentage}%):</span>
-                        <span>+₹{Math.round(Number(form.half_yearly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                    {/* 6 Months Half-Yearly */}
+                    <div className={`rounded-xl p-3 border shadow-2xs space-y-2 transition-all ${
+                      isTier6 ? "bg-white border-sky-200/80 hover:border-sky-300" : "bg-slate-100/70 border-dashed border-slate-300 opacity-60"
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isTier6}
+                            onChange={() => toggleTier("6")}
+                            className="rounded text-sky-600 focus:ring-sky-500 h-3.5 w-3.5 cursor-pointer"
+                          />
+                          <span className="text-xs font-extrabold uppercase tracking-wide text-sky-900 truncate">6 Months</span>
+                        </label>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                          isTier6 ? "bg-sky-50 text-sky-700 border border-sky-100" : "bg-slate-200 text-slate-500"
+                        }`}>
+                          {isTier6 ? "Half-Yr" : "Disabled"}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-sky-950 font-extrabold text-[11px]">
-                        <span>Final Total:</span>
-                        <span>₹{Math.round(Number(form.half_yearly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-sky-500">₹</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          disabled={!isTier6}
+                          value={form.half_yearly_price === 0 ? "0" : (form.half_yearly_price ?? "")}
+                          onKeyDown={e => {
+                            if (["-", "+", "e", "E", ".", ","].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => {
+                            const clean = e.target.value.replace(/\D/g, "");
+                            setForm(curr => ({ ...curr, half_yearly_price: clean === "" ? 0 : parseInt(clean, 10) }));
+                          }}
+                          className="pl-7 h-9 rounded-lg text-sm font-bold text-sky-950 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
                       </div>
+                      {isTier6 && form.gst_included && (
+                        <div className="pt-1 border-t border-sky-100 text-[10px] space-y-0.5 font-medium">
+                          <div className="flex justify-between text-sky-500">
+                            <span>GST ({form.gst_percentage}%):</span>
+                            <span>+₹{Math.round(Number(form.half_yearly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex justify-between text-sky-950 font-extrabold text-[11px]">
+                            <span>Final Total:</span>
+                            <span>₹{Math.round(Number(form.half_yearly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* 12 Months Yearly */}
-                <div className="bg-white rounded-xl p-3 border border-emerald-200/80 shadow-2xs space-y-2 hover:border-emerald-300 transition-all">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-emerald-900 truncate">12 Months</span>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-bold shrink-0">Annual</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-400">₹</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={form.yearly_price ?? 0}
-                      onChange={e => setForm(curr => ({ ...curr, yearly_price: Number(e.target.value) }))}
-                      className="pl-7 h-9 rounded-lg text-sm font-bold text-emerald-950"
-                    />
-                  </div>
-                  {form.gst_included && (
-                    <div className="pt-1 border-t border-emerald-100 text-[10px] space-y-0.5 font-medium">
-                      <div className="flex justify-between text-emerald-500">
-                        <span>GST ({form.gst_percentage}%):</span>
-                        <span>+₹{Math.round(Number(form.yearly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                    {/* 12 Months Yearly */}
+                    <div className={`rounded-xl p-3 border shadow-2xs space-y-2 transition-all ${
+                      isTier12 ? "bg-white border-emerald-200/80 hover:border-emerald-300" : "bg-slate-100/70 border-dashed border-slate-300 opacity-60"
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isTier12}
+                            onChange={() => toggleTier("12")}
+                            className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                          />
+                          <span className="text-xs font-extrabold uppercase tracking-wide text-emerald-900 truncate">12 Months</span>
+                        </label>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                          isTier12 ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-200 text-slate-500"
+                        }`}>
+                          {isTier12 ? "Annual" : "Disabled"}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-emerald-950 font-extrabold text-[11px]">
-                        <span>Final Total:</span>
-                        <span>₹{Math.round(Number(form.yearly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-400">₹</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          disabled={!isTier12}
+                          value={form.yearly_price === 0 ? "0" : (form.yearly_price ?? "")}
+                          onKeyDown={e => {
+                            if (["-", "+", "e", "E", ".", ","].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => {
+                            const clean = e.target.value.replace(/\D/g, "");
+                            setForm(curr => ({ ...curr, yearly_price: clean === "" ? 0 : parseInt(clean, 10) }));
+                          }}
+                          className="pl-7 h-9 rounded-lg text-sm font-bold text-emerald-950 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
                       </div>
+                      {isTier12 && form.gst_included && (
+                        <div className="pt-1 border-t border-emerald-100 text-[10px] space-y-0.5 font-medium">
+                          <div className="flex justify-between text-emerald-500">
+                            <span>GST ({form.gst_percentage}%):</span>
+                            <span>+₹{Math.round(Number(form.yearly_price || 0) * (Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-950 font-extrabold text-[11px]">
+                            <span>Final Total:</span>
+                            <span>₹{Math.round(Number(form.yearly_price || 0) * (1 + Number(form.gst_percentage || 18) / 100)).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 4. FEATURE SELECTION */}
