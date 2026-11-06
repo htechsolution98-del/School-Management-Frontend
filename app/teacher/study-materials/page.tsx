@@ -28,6 +28,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  getTeacherStudyMaterials,
+  uploadStudyMaterial,
+  deleteStudyMaterial,
+  StudyMaterialBackendItem,
+} from "@/lib/study-materials";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -126,13 +132,59 @@ export default function StudyMaterialsPage() {
   const [filterClass, setFilterClass] = useState("ALL");
   const [filterType, setFilterType] = useState("ALL");
 
-  // Load only real stored user uploads from localStorage
-  useEffect(() => {
+  // Load materials from backend API with localStorage fallback
+  const loadMaterials = async () => {
     try {
-      // Clean up all legacy mock keys completely
-      localStorage.removeItem("vidya_teacher_study_materials");
-      localStorage.removeItem("vidya_teacher_study_materials_v2");
+      const serverItems = await getTeacherStudyMaterials();
+      if (Array.isArray(serverItems) && serverItems.length > 0) {
+        const mapped: StudyMaterialItem[] = serverItems.map((item) => {
+          const ext = (item.file_name?.split(".").pop()?.toLowerCase() || "pdf") as AttachedFile["fileType"];
+          const uploadDateStr = new Date(item.created_at).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+          const typeLabel: StudyMaterialItem["type"] =
+            item.material_type === "notes"
+              ? "Study Notes"
+              : item.material_type === "assignment"
+              ? "Assignment"
+              : item.material_type === "worksheet"
+              ? "Practice Sheet"
+              : "Reference Guide";
 
+          return {
+            id: String(item.id),
+            title: item.title,
+            className: item.display_class || item.class_name || "Std 8",
+            division: item.division
+              ? item.division.toLowerCase().startsWith("div")
+                ? item.division
+                : `Div ${item.division.toUpperCase()}`
+              : "Div A",
+            subject: item.display_subject || item.subject_name || "Mathematics",
+            type: typeLabel,
+            files: [
+              {
+                id: `file-${item.id}`,
+                fileName: item.file_name || item.title || "Document.pdf",
+                fileSize: item.file_size || "1.2 MB",
+                fileType: ext || "pdf",
+                fileUrl: item.file_url || item.file,
+              },
+            ],
+            uploadDate: uploadDateStr,
+          };
+        });
+        setMaterials(mapped);
+        setIsLoaded(true);
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to load materials from server:", err);
+    }
+
+    try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -145,6 +197,10 @@ export default function StudyMaterialsPage() {
     } catch {}
     setMaterials([]);
     setIsLoaded(true);
+  };
+
+  useEffect(() => {
+    loadMaterials();
   }, []);
 
   // Save to localStorage whenever materials change
@@ -229,69 +285,44 @@ export default function StudyMaterialsPage() {
     setIsUploading(true);
     setUploadProgress(20);
 
-    // Simulated quick progress for snappy feedback
     const progressTimer = setInterval(() => {
       setUploadProgress((p) => {
-        if (p >= 90) {
-          clearInterval(progressTimer);
-          return 90;
-        }
-        return p + 25;
+        if (p >= 90) return 90;
+        return p + 20;
       });
-    }, 120);
+    }, 150);
 
-    setTimeout(() => {
+    try {
+      const fd = new FormData();
+      fd.append("title", title.trim());
+      fd.append("class_name", selectedClass);
+      fd.append("division", selectedDivision);
+      fd.append("subject_name", selectedSubject);
+      fd.append("material_type", materialType);
+      selectedFiles.forEach((file) => {
+        fd.append("files", file);
+      });
+
+      await uploadStudyMaterial(fd);
+
       clearInterval(progressTimer);
       setUploadProgress(100);
 
-      const attachedFiles: AttachedFile[] = selectedFiles.map((file, i) => {
-        const ext = file.name.split(".").pop()?.toLowerCase() as AttachedFile["fileType"];
-        let fileUrl: string | undefined;
-        try {
-          fileUrl = URL.createObjectURL(file);
-        } catch {}
-
-        return {
-          id: `${Date.now()}-${i}`,
-          fileName: file.name,
-          fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-          fileType: ext || "pdf",
-          fileUrl,
-          rawFile: file,
-        };
-      });
-
-      const now = new Date();
-      const uploadDateStr = now.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-
-      const newMaterial: StudyMaterialItem = {
-        id: `mat-${Date.now()}`,
-        title: title.trim(),
-        className: selectedClass,
-        division: selectedDivision,
-        subject: selectedSubject,
-        type: materialType,
-        files: attachedFiles,
-        uploadDate: uploadDateStr,
-      };
-
-      const nextList = [newMaterial, ...materials];
-      saveMaterials(nextList);
-
-      toast.success(`🎉 "${newMaterial.title}" with ${attachedFiles.length} file(s) published!`, {
-        duration: 3000,
+      toast.success(`🎉 "${title.trim()}" published to students successfully!`, {
+        duration: 3500,
       });
 
       // Reset
       setTitle("");
       setSelectedFiles([]);
+      await loadMaterials();
+    } catch (err: any) {
+      clearInterval(progressTimer);
+      toast.error(err.message || "Failed to upload study material.");
+    } finally {
       setIsUploading(false);
       setUploadProgress(0);
-    }, 600);
+    }
   };
 
   // ─── Download File Action ───────────────────────────────────────────────────
@@ -326,10 +357,17 @@ export default function StudyMaterialsPage() {
 
   // ─── Delete Actions ─────────────────────────────────────────────────────────
 
-  const handleDeleteMaterial = (id: string, materialTitle: string) => {
-    const next = materials.filter((m) => m.id !== id);
-    saveMaterials(next);
-    toast.success(`Removed "${materialTitle}".`);
+  const handleDeleteMaterial = async (id: string, materialTitle: string) => {
+    try {
+      if (!id.startsWith("mat-")) {
+        await deleteStudyMaterial(id);
+      }
+      const next = materials.filter((m) => m.id !== id);
+      saveMaterials(next);
+      toast.success(`Removed "${materialTitle}".`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove material.");
+    }
   };
 
   const handleDeleteIndividualFile = (materialId: string, fileId: string) => {

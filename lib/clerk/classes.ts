@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL, API_ENDPOINTS } from "@/lib/config";
 import type { SchoolClass } from "@/types/clerk";
 
@@ -14,21 +14,31 @@ export async function getSchoolClasses(forceFresh = false): Promise<SchoolClass[
     return classesCache.data;
   }
 
-  const response = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.CLASSES}`);
+  try {
+    const [resClasses, resSchoolClass] = await Promise.all([
+      fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.CLASSES}`).catch(() => null),
+      fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SCHOOL_CLASS}`).catch(() => null),
+    ]);
 
-  if (!response.ok) {
-    let message = "Failed to fetch classes.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    const data1 = resClasses && resClasses.ok ? await resClasses.json().catch(() => []) : [];
+    const data2 = resSchoolClass && resSchoolClass.ok ? await resSchoolClass.json().catch(() => []) : [];
+
+    const raw1 = Array.isArray(data1) ? data1 : data1?.data ?? data1?.results ?? [];
+    const raw2 = Array.isArray(data2) ? data2 : data2?.data ?? data2?.results ?? [];
+
+    const classMap = new Map<string, SchoolClass>();
+    for (const item of [...raw1, ...raw2]) {
+      if (item && item.id != null) {
+        classMap.set(String(item.id), item);
+      }
+    }
+    const merged = Array.from(classMap.values());
+    classesCache = { data: merged, timestamp: Date.now() };
+    return merged;
+  } catch (err) {
+    if (classesCache) return classesCache.data;
+    throw err;
   }
-
-  const data = await response.json();
-  const list = Array.isArray(data) ? data : data.data ?? data.results ?? [];
-  classesCache = { data: list, timestamp: Date.now() };
-  return list;
 }
 
 export async function getClasses(forceFresh = false): Promise<SchoolClass[]> {
@@ -39,12 +49,7 @@ export async function getSchoolClassesForExam(): Promise<SchoolClass[]> {
   const response = await fetchWithAuth(`${API_BASE_URL}/classes/`);
 
   if (!response.ok) {
-    let message = "Failed to fetch classes for exam timetable.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to fetch classes for exam timetable"));
   }
 
   const data = await response.json();
@@ -60,12 +65,7 @@ export async function saveSchoolClasses(classes: string[]): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to save classes.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to save classes"));
   }
   classesCache = null;
 }
@@ -76,12 +76,7 @@ export async function deleteSchoolClass(id: number): Promise<void> {
   });
 
   if (!response.ok) {
-    let message = "Failed to delete class.";
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, "Failed to delete class"));
   }
   classesCache = null;
 }

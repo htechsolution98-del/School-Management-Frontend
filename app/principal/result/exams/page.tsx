@@ -46,6 +46,25 @@ import {
   type ResultWeightageComponent,
 } from "@/lib/exam-api";
 
+function toTitleCase(str?: string | null): string {
+  if (!str) return "";
+  return str
+    .toString()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => {
+      if (!word) return "";
+      const lower = word.toLowerCase();
+      if (/^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/i.test(lower)) {
+        return lower.toUpperCase();
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
 export default function ExamManagementPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -375,14 +394,14 @@ export default function ExamManagementPage() {
                   <SelectValue placeholder="All Components">
                     {selectedComponentFilter === "ALL"
                       ? "All Components"
-                      : weightageComponents.find((c) => String(c.id) === selectedComponentFilter)?.name || "Component"}
+                      : toTitleCase(weightageComponents.find((c) => String(c.id) === selectedComponentFilter)?.name) || "Component"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Components</SelectItem>
                   {weightageComponents.map((comp) => (
                     <SelectItem key={comp.id} value={String(comp.id)}>
-                      {comp.name} ({comp.weightage_percentage}%)
+                      {toTitleCase(comp.name)} ({comp.weightage_percentage}%)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -396,14 +415,14 @@ export default function ExamManagementPage() {
                   <SelectValue placeholder="All Classes">
                     {selectedClassId === "ALL"
                       ? "All Classes"
-                      : classes.find((cls) => String(cls.id) === selectedClassId)?.school_class || `Class #${selectedClassId}`}
+                      : toTitleCase(classes.find((cls) => String(cls.id) === selectedClassId)?.school_class) || `Class #${selectedClassId}`}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Classes</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={String(cls.id)}>
-                      {cls.school_class}
+                      {toTitleCase(cls.school_class)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -415,14 +434,14 @@ export default function ExamManagementPage() {
               <Select value={selectedDivFilter} onValueChange={(val) => { if (val) setSelectedDivFilter(val); }}>
                 <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 dark:bg-zinc-800 font-medium">
                   <SelectValue placeholder="All Divisions">
-                    {selectedDivFilter === "ALL" ? "All Divisions" : `Division ${selectedDivFilter}`}
+                    {selectedDivFilter === "ALL" ? "All Divisions" : `Division ${selectedDivFilter.toUpperCase()}`}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Divisions</SelectItem>
                   {availableDivisions.map((divName) => (
                     <SelectItem key={divName} value={divName}>
-                      Division {divName}
+                      Division {divName.toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -497,16 +516,16 @@ export default function ExamManagementPage() {
                       </TableCell>
 
                       <TableCell className="text-xs font-bold text-slate-900 dark:text-zinc-100">
-                        {ex.title}
+                        {toTitleCase(ex.title)}
                       </TableCell>
 
                       <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-300">
-                        {ex.subject_name || "—"}
+                        {toTitleCase(ex.subject_name || "—")}
                       </TableCell>
 
                       <TableCell className="text-xs">
                         <Badge variant="outline" className="font-mono bg-purple-50 text-purple-700 dark:bg-purple-950 border-purple-200">
-                          {ex.class_name || "Class"} {ex.division ? `(Div ${ex.division})` : ""}
+                          {toTitleCase(ex.class_name || "Class")} {ex.division ? `(Div ${ex.division.toUpperCase()})` : ""}
                         </Badge>
                       </TableCell>
 
@@ -524,7 +543,7 @@ export default function ExamManagementPage() {
 
                       <TableCell className="text-center">
                         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] uppercase">
-                          {ex.status}
+                          {toTitleCase(ex.status)}
                         </Badge>
                       </TableCell>
 
@@ -561,8 +580,8 @@ export default function ExamManagementPage() {
 
       {/* Schedule New Exam Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-3xl p-6 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl">
-          <DialogHeader className="pb-2 border-b border-gray-100 dark:border-zinc-800">
+        <DialogContent className="sm:max-w-xl max-h-[92vh] flex flex-col p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+          <DialogHeader className="pb-3 border-b border-gray-100 dark:border-zinc-800 shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-[#5c28e8]">
                 <Calendar className="h-5 w-5" />
@@ -578,7 +597,7 @@ export default function ExamManagementPage() {
             </div>
           </DialogHeader>
 
-          <div className="space-y-4 py-3 text-xs">
+          <div className="space-y-4 py-3 text-xs overflow-y-auto flex-1 pr-1.5">
             <div className="space-y-1.5">
               <label className="font-bold text-[#5c28e8] dark:text-purple-400 flex items-center gap-1">
                 <Percent className="h-3.5 w-3.5" /> Exam Weightage Component:
@@ -589,21 +608,21 @@ export default function ExamManagementPage() {
                   if (val) {
                     setSelectedComponentId(val);
                     const comp = weightageComponents.find((c) => String(c.id) === val);
-                    if (comp) setNewExamTitle(comp.name);
+                    if (comp) setNewExamTitle(toTitleCase(comp.name));
                   }
                 }}
               >
                 <SelectTrigger className="h-11 text-xs rounded-2xl bg-slate-50/80 dark:bg-zinc-800 border-gray-200 font-semibold text-slate-800">
                   <SelectValue placeholder="Select EXAM Weightage Component...">
                     {weightageComponents.find((c) => String(c.id) === selectedComponentId)
-                      ? `${weightageComponents.find((c) => String(c.id) === selectedComponentId)?.name} (${weightageComponents.find((c) => String(c.id) === selectedComponentId)?.weightage_percentage}% Weightage)`
+                      ? `${toTitleCase(weightageComponents.find((c) => String(c.id) === selectedComponentId)?.name)} (${weightageComponents.find((c) => String(c.id) === selectedComponentId)?.weightage_percentage}% Weightage)`
                       : "Select EXAM Weightage Component..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl shadow-xl">
                   {weightageComponents.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)} className="text-xs font-semibold py-2">
-                      {c.name} ({c.weightage_percentage}% Weightage)
+                      {toTitleCase(c.name)} ({c.weightage_percentage}% Weightage)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -626,13 +645,13 @@ export default function ExamManagementPage() {
                 <Select value={newClassId} onValueChange={(val) => { if (val) handleModalClassChange(val); }}>
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
                     <SelectValue placeholder="Select Class">
-                      {classes.find((cls) => String(cls.id) === newClassId)?.school_class || "Select Class"}
+                      {toTitleCase(classes.find((cls) => String(cls.id) === newClassId)?.school_class) || "Select Class"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
                     {classes.map((cls) => (
                       <SelectItem key={cls.id} value={String(cls.id)} className="text-xs font-semibold py-2">
-                        {cls.school_class}
+                        {toTitleCase(cls.school_class)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -652,9 +671,10 @@ export default function ExamManagementPage() {
                         ? "Loading subjects..."
                         : !newClassId
                         ? "Select Class first"
-                        : modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.name ||
-                          modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.subject_name ||
-                          (modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject")}
+                        : toTitleCase(
+                            modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.name ||
+                            modalSubjects.find((sub) => String(sub.id) === newSubjectId)?.subject_name
+                          ) || (modalSubjects.length === 0 ? "No subjects assigned to this class" : "Select Subject")}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
@@ -664,7 +684,7 @@ export default function ExamManagementPage() {
                       </SelectItem>
                     ) : modalSubjects.map((sub) => (
                       <SelectItem key={sub.id} value={String(sub.id)} className="text-xs font-semibold py-2">
-                        {sub.name || sub.subject_name}
+                        {toTitleCase(sub.name || sub.subject_name)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -678,14 +698,14 @@ export default function ExamManagementPage() {
                 <Select value={newDivision || "ALL"} onValueChange={(val) => { if (val) setNewDivision(val); }}>
                   <SelectTrigger className="h-11 text-xs rounded-2xl bg-white dark:bg-zinc-800 border-gray-200 font-semibold">
                     <SelectValue placeholder="All Divisions">
-                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision}` : "All Divisions"}
+                      {newDivision && newDivision !== "ALL" ? `Division ${newDivision.toUpperCase()}` : "All Divisions"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl shadow-xl">
                     <SelectItem value="ALL" className="text-xs font-semibold py-2">All Divisions</SelectItem>
                     {modalDivisions.map((divName) => (
                       <SelectItem key={divName} value={divName} className="text-xs font-semibold py-2">
-                        Division {divName}
+                        Division {divName.toUpperCase()}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -748,7 +768,7 @@ export default function ExamManagementPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2.5 pt-4 border-t border-gray-100 dark:border-zinc-800">
+          <DialogFooter className="gap-2.5 pt-4 border-t border-gray-100 dark:border-zinc-800 shrink-0">
             <Button
               type="button"
               variant="outline"

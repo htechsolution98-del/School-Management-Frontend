@@ -34,12 +34,14 @@ export const schoolFormSchema = z.object({
   trial_start_date: z.string().optional(),
   trial_end_date: z.string().optional(),
   pricing_model: z.enum(["PER_STUDENT", "FLAT"]).optional(),
+  plan_name: z.string().trim().max(150).optional(),
   monthly_price: z.union([z.number(), z.string()]).optional(),
   quarterly_price: z.union([z.number(), z.string()]).optional(),
   half_yearly_price: z.union([z.number(), z.string()]).optional(),
   yearly_price: z.union([z.number(), z.string()]).optional(),
   gst_included: z.boolean().optional(),
   gst_percentage: z.union([z.number(), z.string()]).optional(),
+  enabled_tiers: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
   const indian = ["india", "in", "bharat"].includes(data.country.toLowerCase());
   if (!(indian ? /^[1-9][0-9]{5}$/ : /^[A-Za-z0-9][A-Za-z0-9 -]{1,9}$/).test(data.pincode)) {

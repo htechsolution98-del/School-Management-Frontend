@@ -76,7 +76,13 @@ function CheckoutContent() {
         if (planParam && plansData.length > 0) {
           const found = plansData.find((p) => String(p.id) === String(planParam));
           if (found) setSelectedPlan(found);
-          else setSelectedPlan(plansData[0]);
+          else if (currentData?.subscription?.plan_details && String(currentData.subscription.plan_details.id) === String(planParam)) {
+            setSelectedPlan(currentData.subscription.plan_details);
+          } else {
+            setSelectedPlan(currentData?.subscription?.plan_details || plansData[0]);
+          }
+        } else if (currentData?.subscription?.plan_details) {
+          setSelectedPlan(currentData.subscription.plan_details);
         } else if (plansData.length > 0) {
           setSelectedPlan(plansData[0]);
         }
@@ -129,20 +135,29 @@ function CheckoutContent() {
     setSuccessMsg("");
 
     try {
-      if (paymentMethod === "ONLINE") {
-        // 1. Ensure Razorpay checkout script is loaded
-        const isLoaded = await loadRazorpayScript();
-        if (!isLoaded || !window.Razorpay) {
-          throw new Error("Unable to load Razorpay payment gateway. Please check your internet connection.");
-        }
-
-        // 2. Create order in backend via Razorpay API
+      if (isFreeTier || paymentMethod === "ONLINE") {
+        // 1. Create order in backend (or directly auto-activate if ₹0)
         const orderRes = await createRazorpayOrder({
           school_id: currentSub.school,
           plan_id: selectedPlan?.id,
           billing_cycle: billingCycle,
           months_count: monthsCount,
         });
+
+        // 2. Check if this is a ₹0 / free activation
+        if (orderRes.free_activation || Number(orderRes.amount || 0) === 0) {
+          setSuccessMsg(orderRes.message || `Free subscription activated successfully! Active until ${orderRes.new_due_date}.`);
+          setTimeout(() => {
+            router.push("/trustee/subscription");
+          }, 1500);
+          return;
+        }
+
+        // 3. For paid transactions, ensure Razorpay checkout script is loaded
+        const isLoaded = await loadRazorpayScript();
+        if (!isLoaded || !window.Razorpay) {
+          throw new Error("Unable to load Razorpay payment gateway. Please check your internet connection.");
+        }
 
         const rawPhone = (currentSub.school_phone || "").replace(/\D/g, "");
         const contactPhone = /^[6-9]\d{9}$/.test(rawPhone) ? rawPhone : "9876543210";
@@ -151,7 +166,7 @@ function CheckoutContent() {
             ? currentSub.school_email
             : "trustee@school.com";
 
-        // 3. Configure Razorpay modal options
+        // 4. Configure Razorpay modal options
         const options = {
           key: orderRes.key,
           amount: Math.round(Number(orderRes.amount) * 100),
@@ -244,17 +259,6 @@ function CheckoutContent() {
   }
 
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-600 font-medium text-xs">
-          <RefreshCw className="w-5 h-5 animate-spin text-indigo-600" />
-          <span>Loading checkout options...</span>
-        </div>
-      </div>
-    );
-  }
-
   // Pre-configured duration cards
   const durationPresets = [
     {
@@ -303,6 +307,52 @@ function CheckoutContent() {
       multiplier: 12,
     },
   ];
+
+  const enabledTiers: string[] = (
+    (currentSub as any)?.enabled_tiers ||
+    (selectedPlan as any)?.enabled_tiers ||
+    ["1", "3", "6", "12"]
+  ).map(String);
+
+  const visiblePresets = durationPresets.filter(
+    (p) => enabledTiers.includes(String(p.months))
+  );
+
+  useEffect(() => {
+    if (visiblePresets.length > 0 && !visiblePresets.some((p) => p.months === monthsCount)) {
+      handleSelectTier(visiblePresets[0].cycle, visiblePresets[0].months);
+    }
+  }, [visiblePresets, monthsCount]);
+
+  const getPresetPrice = (item: typeof durationPresets[0]) => {
+    if (!selectedPlan) return 0;
+    if (item.months === 12 && selectedPlan.yearly_price !== undefined && selectedPlan.yearly_price !== null) {
+      return Number(selectedPlan.yearly_price);
+    }
+    if (item.months === 6 && selectedPlan.half_yearly_price !== undefined && selectedPlan.half_yearly_price !== null) {
+      return Number(selectedPlan.half_yearly_price);
+    }
+    if (item.months === 3 && selectedPlan.quarterly_price !== undefined && selectedPlan.quarterly_price !== null) {
+      return Number(selectedPlan.quarterly_price);
+    }
+    return Number(selectedPlan.monthly_price || 0) * item.multiplier;
+  };
+
+  const currentPreset = (visiblePresets.length > 0 ? visiblePresets : durationPresets).find((p) => p.months === monthsCount);
+  const effectiveFinalAmount = billingCalc?.final_amount !== undefined && billingCalc?.final_amount !== null ? Number(billingCalc.final_amount) : (currentPreset ? getPresetPrice(currentPreset) : 0);
+  const effectiveSubtotal = billingCalc?.subtotal !== undefined && billingCalc?.subtotal !== null ? Number(billingCalc.subtotal) : (currentPreset ? getPresetPrice(currentPreset) : 0);
+  const isFreeTier = effectiveFinalAmount === 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-slate-600 font-medium text-xs">
+          <RefreshCw className="w-5 h-5 animate-spin text-indigo-600" />
+          <span>Loading checkout options...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
@@ -360,8 +410,8 @@ function CheckoutContent() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {durationPresets.map((item) => {
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {(visiblePresets.length > 0 ? visiblePresets : durationPresets).map((item) => {
             const isSelected = monthsCount === item.months && (billingCycle === item.cycle || (item.months <= 2 && billingCycle === "MONTHLY"));
             return (
               <div
@@ -386,7 +436,7 @@ function CheckoutContent() {
 
                 <div className="mt-2 pt-2 border-t border-slate-100">
                   <div className="text-base font-black text-slate-900">
-                    ₹{(Number(selectedPlan?.monthly_price || 5000) * item.multiplier).toLocaleString("en-IN")}
+                    ₹{getPresetPrice(item).toLocaleString("en-IN")}
                   </div>
                   <div className="text-[9px] text-slate-400 font-semibold">
                     {item.months} month{item.months > 1 ? "s" : ""} validity
@@ -510,7 +560,7 @@ function CheckoutContent() {
           <div className="flex justify-between">
             <span>Base Rate:</span>
             <span className="font-semibold text-slate-900">
-              ₹{Number(billingCalc?.subtotal || (selectedPlan ? Number(selectedPlan.monthly_price) * monthsCount : 5000 * monthsCount)).toLocaleString("en-IN")}
+              ₹{effectiveSubtotal.toLocaleString("en-IN")}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -528,60 +578,74 @@ function CheckoutContent() {
           <div className="pt-2.5 border-t border-slate-200 flex justify-between text-sm font-extrabold text-slate-900">
             <span>Total Payable Amount:</span>
             <span className="text-indigo-600 text-xl font-black">
-              ₹{Number(billingCalc?.final_amount || 5000 * monthsCount).toLocaleString("en-IN")}
+              ₹{effectiveFinalAmount.toLocaleString("en-IN")}
             </span>
           </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleConfirmPayment} className="space-y-5">
-          {/* Payment Method Selector */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
-              Select Payment Gateway / Method
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("ONLINE")}
-                className={`p-4 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                  paymentMethod === "ONLINE"
-                    ? "border-indigo-600 bg-indigo-50/70 text-indigo-700 shadow-xs"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span>Razorpay (UPI, Card, NetBanking)</span>
-              </button>
+          {/* Payment Method Selector (Only for paid plans) */}
+          {!(isFreeTier || effectiveFinalAmount === 0) ? (
+            <>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+                  Select Payment Gateway / Method
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("ONLINE")}
+                    className={`p-4 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                      paymentMethod === "ONLINE"
+                        ? "border-indigo-600 bg-indigo-50/70 text-indigo-700 shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span>Razorpay (UPI, Card, NetBanking)</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("BANK_TRANSFER")}
-                className={`p-4 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                  paymentMethod === "BANK_TRANSFER"
-                    ? "border-indigo-600 bg-indigo-50/70 text-indigo-700 shadow-xs"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <Building className="w-4 h-4 text-indigo-600" />
-                <span>Bank Transfer / Cheque</span>
-              </button>
-            </div>
-          </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("BANK_TRANSFER")}
+                    className={`p-4 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                      paymentMethod === "BANK_TRANSFER"
+                        ? "border-indigo-600 bg-indigo-50/70 text-indigo-700 shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Building className="w-4 h-4 text-indigo-600" />
+                    <span>Bank Transfer / Cheque</span>
+                  </button>
+                </div>
+              </div>
 
-          {paymentMethod === "BANK_TRANSFER" && (
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">
-                Transaction ID / Reference Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={paymentReference}
-                onChange={(e) => setPaymentReference(e.target.value)}
-                placeholder="e.g. UTR123456789 or Cheque #00421"
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              {paymentMethod === "BANK_TRANSFER" && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Transaction ID / Reference Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="e.g. UTR123456789 or Cheque #00421"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-emerald-900">Complimentary 100% Free Plan (₹0)</p>
+                <p className="text-[11px] text-emerald-700 mt-0.5">
+                  No payment gateway or bank details are required. Click the button below to activate your free validity expansion immediately.
+                </p>
+              </div>
             </div>
           )}
 
@@ -599,7 +663,9 @@ function CheckoutContent() {
           <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
             <Lock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span>
-              256-bit encrypted checkout via Razorpay Gateway. Instant activation upon successful transaction.
+              {isFreeTier || effectiveFinalAmount === 0
+                ? "Instant complimentary activation. Your subscription duration will be stacked immediately."
+                : "256-bit encrypted checkout via Razorpay Gateway. Instant activation upon successful transaction."}
             </span>
           </div>
 
@@ -611,13 +677,15 @@ function CheckoutContent() {
             {submitting ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Opening Razorpay Secure Gateway...</span>
+                <span>{isFreeTier ? "Activating Free Subscription..." : "Opening Razorpay Secure Gateway..."}</span>
               </>
             ) : (
               <>
                 <ShieldCheck className="w-4 h-4 text-indigo-200" />
                 <span>
-                  Pay ₹{Number(billingCalc?.final_amount || 5000 * monthsCount).toLocaleString("en-IN")} via {paymentMethod === "ONLINE" ? "Razorpay Gateway" : "Bank Transfer"}
+                    {isFreeTier
+                      ? "Activate Free Plan (₹0) Now"
+                      : `Pay ₹${effectiveFinalAmount.toLocaleString("en-IN")} via ${paymentMethod === "ONLINE" ? "Razorpay Gateway" : "Bank Transfer"}`}
                 </span>
               </>
             )}

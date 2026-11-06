@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 
 export function normalizeList<T>(data: unknown): T[] {
@@ -27,12 +27,7 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    let message = `Request failed: ${response.statusText}`;
-    try {
-      const err = await response.json();
-      message = err?.detail || err?.message || JSON.stringify(err) || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(response, `Request failed: ${response.statusText || response.status}`));
   }
 
   if (response.status === 204) return undefined as T;

@@ -1,5 +1,5 @@
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
-import { fetchWithAuth, getAccessToken } from "./auth";
+import { fetchWithAuth, getAccessToken, parseApiError } from "./auth";
 
 export interface SubscriptionPlanModule {
   id: number;
@@ -32,6 +32,7 @@ export interface SubscriptionPlan {
   plan_modules?: SubscriptionPlanModule[];
   enabled_module_ids?: number[];
   subscribed_schools_count?: number;
+  enabled_tiers?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -79,6 +80,8 @@ export interface SchoolSubscription {
   calculated_amount: number;
   days_left: number;
   is_valid: boolean;
+  plan_details?: SubscriptionPlan;
+  enabled_tiers?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -193,7 +196,7 @@ export async function getSubscriptions(): Promise<SchoolSubscription[]> {
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTIONS}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch subscriptions");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch subscriptions"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -206,7 +209,7 @@ export async function getCurrentSchoolSubscription(): Promise<{
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTIONS}current/`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch current school subscription");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch current school subscription"));
   return res.json();
 }
 
@@ -214,7 +217,7 @@ export async function getSubscriptionSummary(): Promise<SubscriptionSummary> {
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTIONS}summary/`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch subscription summary");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch subscription summary"));
   return res.json();
 }
 
@@ -222,7 +225,7 @@ export async function getPublicPlans(): Promise<SubscriptionPlan[]> {
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PLANS}public/`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch public plans");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch public plans"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -231,7 +234,7 @@ export async function getPlans(): Promise<SubscriptionPlan[]> {
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PLANS}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch plans");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch plans"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -267,7 +270,7 @@ export async function deletePlan(id: number): Promise<void> {
     method: "DELETE",
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to delete plan");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to delete plan"));
 }
 
 export async function checkoutCalculate(payload: {
@@ -283,7 +286,7 @@ export async function checkoutCalculate(payload: {
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("Failed to calculate checkout billing");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to calculate checkout billing"));
   return res.json();
 }
 
@@ -293,6 +296,8 @@ export async function createRazorpayOrder(payload: {
   billing_cycle?: string;
   months_count?: number;
 }): Promise<{
+  free_activation?: boolean;
+  message?: string;
   order_id: string;
   amount: number;
   currency: string;
@@ -411,7 +416,7 @@ export async function extendTrial(subscriptionId: number, days: number, notes?: 
     headers: getAuthHeaders(),
     body: JSON.stringify({ days, notes }),
   });
-  if (!res.ok) throw new Error("Failed to extend trial");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to extend trial"));
   return res.json();
 }
 
@@ -431,7 +436,7 @@ export async function createManualSubscription(payload: {
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("Failed to create manual subscription");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to create manual subscription"));
   return res.json();
 }
 
@@ -440,7 +445,7 @@ export async function toggleSchoolLock(subscriptionId: number) {
     method: "POST",
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to toggle school lock");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to toggle school lock"));
   return res.json();
 }
 
@@ -449,7 +454,7 @@ export async function getSchoolInvoices(schoolId?: number): Promise<SchoolInvoic
     ? `${API_BASE_URL}${API_ENDPOINTS.INVOICES}?school=${schoolId}`
     : `${API_BASE_URL}${API_ENDPOINTS.INVOICES}`;
   const res = await fetchWithAuth(url, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error("Failed to fetch invoices");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch invoices"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -460,7 +465,7 @@ export async function markInvoicePaid(invoiceId: number, payload?: { payment_met
     headers: getAuthHeaders(),
     body: JSON.stringify(payload || {}),
   });
-  if (!res.ok) throw new Error("Failed to mark invoice as paid");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to mark invoice as paid"));
   return res.json();
 }
 
@@ -469,7 +474,7 @@ export async function deleteSchoolInvoice(invoiceId: number) {
     method: "DELETE",
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to remove pending invoice");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to remove pending invoice"));
   return true;
 }
 
@@ -477,7 +482,7 @@ export async function getSubscriptionPayments(): Promise<SubscriptionPayment[]> 
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_PAYMENTS}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch payments");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch payments"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -486,7 +491,7 @@ export async function getSubscriptionAuditLogs(): Promise<SubscriptionAuditLog[]
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_AUDIT_LOGS}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch audit logs");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch audit logs"));
   const data = await res.json();
   return Array.isArray(data) ? data : data.results || [];
 }
@@ -495,7 +500,7 @@ export async function getSaaSGlobalSettings(): Promise<SubscriptionSetting[]> {
   const res = await fetchWithAuth(`${API_BASE_URL}${API_ENDPOINTS.SUBSCRIPTION_SETTINGS}all/`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch global SaaS settings");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to fetch global SaaS settings"));
   return res.json();
 }
 
@@ -505,7 +510,7 @@ export async function updateSaaSGlobalSettings(settingsDict: Record<string, stri
     headers: getAuthHeaders(),
     body: JSON.stringify(settingsDict),
   });
-  if (!res.ok) throw new Error("Failed to update global SaaS settings");
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to update global SaaS settings"));
   return res.json();
 }
 

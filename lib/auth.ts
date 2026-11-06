@@ -25,7 +25,37 @@ export const API_ERROR_TOAST_ID = "api-error";
 
 export function extractErrorMessage(data: unknown, fallback = "Request failed"): string {
   if (!data) return fallback;
-  if (typeof data === "string") return data;
+
+  if (typeof data === "string") {
+    const trimmed = data.trim();
+    if (!trimmed) return fallback;
+
+    // Check if it's HTML (e.g. Django debug page or 500 server HTML error)
+    if (trimmed.startsWith("<") || /<html|<!doctype|<title|<pre class=["']exception/i.test(trimmed)) {
+      const excMatch = trimmed.match(/class=["']exception_value["'][^>]*>([\s\S]*?)<\/pre>/i) ||
+                       trimmed.match(/exception_value[^>]*>([\s\S]*?)</i);
+      if (excMatch && excMatch[1]) {
+        const clean = excMatch[1].replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#x27;/g, "'").trim();
+        if (clean) return clean;
+      }
+
+      const titleMatch = trimmed.match(/<title>(.*?)<\/title>/i);
+      if (titleMatch && titleMatch[1]) {
+        const cleanTitle = titleMatch[1].replace(/&quot;/g, '"').replace(/&#x27;/g, "'").trim();
+        if (cleanTitle) return cleanTitle;
+      }
+
+      const h1Match = trimmed.match(/<h1>(.*?)<\/h1>/i) || trimmed.match(/<h2>(.*?)<\/h2>/i);
+      if (h1Match && h1Match[1]) {
+        const cleanH1 = h1Match[1].replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#x27;/g, "'").trim();
+        if (cleanH1 && !cleanH1.toLowerCase().includes("server error")) return cleanH1;
+      }
+
+      return fallback;
+    }
+
+    return trimmed;
+  }
 
   if (Array.isArray(data)) {
     for (const item of data) {
@@ -39,26 +69,62 @@ export function extractErrorMessage(data: unknown, fallback = "Request failed"):
 
   if (typeof data === "object") {
     const obj = data as Record<string, unknown>;
-    if (typeof obj.message === "string" && obj.message) return obj.message;
-    if (typeof obj.detail === "string" && obj.detail) return obj.detail;
-    if (typeof obj.error === "string" && obj.error) return obj.error;
+    if (typeof obj.message === "string" && obj.message.trim()) return obj.message.trim();
+    if (typeof obj.detail === "string" && obj.detail.trim()) return obj.detail.trim();
+    if (typeof obj.error === "string" && obj.error.trim()) return obj.error.trim();
+    if (typeof obj.title === "string" && obj.title.trim()) return obj.title.trim();
+    if (typeof obj.reason === "string" && obj.reason.trim()) return obj.reason.trim();
+    if (typeof obj.msg === "string" && obj.msg.trim()) return obj.msg.trim();
 
+    if (obj.errors && typeof obj.errors === "object") {
+      const nested = extractErrorMessage(obj.errors, "");
+      if (nested) return nested;
+    }
+
+    const fieldErrors: string[] = [];
     for (const [key, val] of Object.entries(obj)) {
+      if (key === "traceback" || key === "code") continue;
       if (typeof val === "string") {
-        return key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${val}` : val;
+        fieldErrors.push(key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${val}` : val);
+      } else if (Array.isArray(val) && val.length > 0) {
+        const text = val.map((v) => (typeof v === "string" ? v : extractErrorMessage(v, ""))).filter(Boolean).join(" ");
+        if (text) {
+          fieldErrors.push(key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${text}` : text);
+        }
+      } else {
+        const nested = extractErrorMessage(val, "");
+        if (nested && nested !== "[object Object]") {
+          fieldErrors.push(nested);
+        }
       }
-      if (Array.isArray(val) && val.length > 0 && typeof val[0] === "string") {
-        const text = val.join(" ");
-        return key !== "non_field_errors" && isNaN(Number(key)) ? `${key}: ${text}` : text;
-      }
-      const nested = extractErrorMessage(val, "");
-      if (nested && nested !== "[object Object]") {
-        return nested;
-      }
+    }
+
+    if (fieldErrors.length > 0) {
+      return fieldErrors.join(" | ");
     }
   }
 
   return fallback;
+}
+
+export async function parseApiError(response: Response, defaultFallback = "Request failed"): Promise<string> {
+  try {
+    const cloned = response.clone();
+    try {
+      const errData = await cloned.json();
+      const extracted = extractErrorMessage(errData, "");
+      if (extracted && extracted !== "Request failed") {
+        return extracted;
+      }
+    } catch {
+      const text = await cloned.text();
+      const extracted = extractErrorMessage(text, "");
+      if (extracted && extracted !== "Request failed") {
+        return extracted;
+      }
+    }
+  } catch {}
+  return `${defaultFallback} (${response.status}${response.statusText ? `: ${response.statusText}` : ""})`;
 }
 
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
@@ -90,18 +156,23 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
 
   if (!response.ok) {
     try {
-      if (response.status >= 500) {
-        toast.error(`Server Error (${response.status})`, {
-          id: API_ERROR_TOAST_ID,
-          description: "An unexpected error occurred on the server.",
-        });
-      } else {
+      let errorDesc = "";
+      try {
         const errData = await response.clone().json();
-        const errorDesc = extractErrorMessage(errData, "Request failed");
+        errorDesc = extractErrorMessage(errData, "");
+      } catch {
+        try {
+          const text = await response.clone().text();
+          errorDesc = extractErrorMessage(text, "");
+        } catch {}
+      }
 
-        if (!errorDesc.includes("Refresh token is required") && errorDesc.trim()) {
-          toast.error(errorDesc, { id: API_ERROR_TOAST_ID });
-        }
+      if (!errorDesc || errorDesc === "Request failed") {
+        errorDesc = `Request failed (${response.status}${response.statusText ? `: ${response.statusText}` : ""})`;
+      }
+
+      if (!errorDesc.includes("Refresh token is required") && errorDesc.trim()) {
+        toast.error(errorDesc, { id: API_ERROR_TOAST_ID });
       }
     } catch {
       toast.error(`Request Failed (${response.status})`, { id: API_ERROR_TOAST_ID });

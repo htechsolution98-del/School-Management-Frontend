@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/lib/config";
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import type {
   StudentAttendanceListResponse,
   StudentAttendancePayload,
@@ -47,13 +47,8 @@ export async function submitStudentAttendance(
 
   for (const res of responses) {
     if (!res.ok) {
-      let message = "Failed to submit student attendance.";
-      try {
-        const err = await res.json();
-        message = err?.detail || err?.message || message;
-      } catch { }
-      throw new Error(message);
-    }
+    throw new Error(await parseApiError(res, "Failed to update student attendance"));
+  }
   }
 }
 
@@ -88,7 +83,7 @@ export async function getStudentAttendanceRecords(
   const response = await fetchWithAuth(url);
 
   if (!response.ok) {
-    throw new Error("Failed to fetch student attendance records.");
+    throw new Error(await parseApiError(response, "Failed to fetch student attendance records."));
   }
 
   const data = await response.json();
@@ -120,12 +115,7 @@ export async function updateSingleStudentAttendance(
   });
 
   if (!res.ok) {
-    let message = "Failed to update student attendance.";
-    try {
-      const err = await res.json();
-      message = err?.detail || err?.message || message;
-    } catch {}
-    throw new Error(message);
+    throw new Error(await parseApiError(res, "Failed to update student attendance"));
   }
 
   return await res.json();

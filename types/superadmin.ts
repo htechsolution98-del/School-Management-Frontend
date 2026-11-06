@@ -20,6 +20,7 @@ export interface SchoolSubscriptionDetails {
   yearly_price: number | string;
   gst_included?: boolean;
   gst_percentage?: number | string;
+  enabled_tiers?: string[];
 }
 
 export interface School {
@@ -44,12 +45,14 @@ export interface School {
   trial_start_date?: string | null;
   trial_end_date?: string | null;
   pricing_model?: "PER_STUDENT" | "FLAT";
+  plan_name?: string;
   monthly_price?: number | string;
   quarterly_price?: number | string;
   half_yearly_price?: number | string;
   yearly_price?: number | string;
   gst_included?: boolean;
   gst_percentage?: number | string;
+  enabled_tiers?: string[];
   subscription_details?: SchoolSubscriptionDetails | null;
   staff_count?: number;
   student_count?: number;
@@ -71,12 +74,14 @@ export interface CreateSchoolPayload {
   trial_start_date?: string;
   trial_end_date?: string;
   pricing_model?: "PER_STUDENT" | "FLAT";
+  plan_name?: string;
   monthly_price?: number | string;
   quarterly_price?: number | string;
   half_yearly_price?: number | string;
   yearly_price?: number | string;
   gst_included?: boolean;
   gst_percentage?: number | string;
+  enabled_tiers?: string[];
 }
 
 export interface CreateSchoolResponse {

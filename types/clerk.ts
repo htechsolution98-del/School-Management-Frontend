@@ -122,6 +122,8 @@ export interface Admission {
   gr_no?: string | null;
   division?: string | null;
   student_id?: number | null;
+  class_name?: string | null;
+  school_class?: number | null;
   student_details?: {
     id: number;
     surname?: string;

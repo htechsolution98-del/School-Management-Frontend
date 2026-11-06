@@ -46,7 +46,8 @@ import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { formatDDMMYYYY } from "@/lib/table-utils";
-import type { Admission } from "@/types/clerk";
+import type { Admission, SchoolClass } from "@/types/clerk";
+import { getClasses } from "@/lib/clerk/classes";
 import { fetchAdmissions, assignGrNumber } from "@/lib/clerk/admissions";
 import { groupStudentDocuments, type PendingDocItem } from "@/lib/clerk/pending-documents";
 import { StudentDocumentRows } from "@/components/clerk/student-document-rows";
@@ -85,6 +86,7 @@ export default function ClerkDashboard() {
   // Data states
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [admissions, setAdmissions] = useState<Admission[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [certRequests, setCertRequests] = useState<CertRequestItem[]>([]);
   const [attendanceStats, setAttendanceStats] = useState({
     total: 0,
@@ -139,12 +141,19 @@ export default function ClerkDashboard() {
         .then((res) => (res.ok ? res.json() : []))
         .catch(() => []);
 
-      const [studentsData, admissionsData, certData, attendanceData] = await Promise.all([
+      // 6. Fetch Classes
+      const classesPromise = getClasses().catch(() => []);
+
+      const [studentsData, admissionsData, certData, attendanceData, classesData] = await Promise.all([
         studentsPromise,
         admissionsPromise,
         certPromise,
         attendancePromise,
+        classesPromise,
       ]);
+
+      // Process Classes
+      setClasses(Array.isArray(classesData) ? classesData : []);
 
       // Process Students
       const studentList: StudentItem[] = Array.isArray(studentsData)
@@ -190,6 +199,53 @@ export default function ClerkDashboard() {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  const cleanClassName = useCallback((raw: string | undefined | null) => {
+    if (!raw || raw === "N/A" || raw === "General") return raw || "General";
+    let target = String(raw).trim();
+    if (target.match(/^\d+$/)) {
+      const match = classes.find((c) => String(c.id) === target);
+      if (match && match.school_class) {
+        target = match.school_class;
+      } else {
+        const stuMatch = students.find((s) => String(s.school_class) === target);
+        if (stuMatch?.class_name) {
+          target = stuMatch.class_name;
+        }
+      }
+    }
+    const cleaned = target.replace(/class/gi, "").trim();
+    return cleaned ? `Class ${cleaned}` : target;
+  }, [classes, students]);
+
+  const getAdmissionClass = useCallback((adm: Admission) => {
+    if (adm.student_details?.school_class_name) return cleanClassName(adm.student_details.school_class_name);
+    if ((adm as any).class_name) return cleanClassName((adm as any).class_name);
+    if (adm.student_details?.school_class) {
+      const match = classes.find((c) => String(c.id) === String(adm.student_details?.school_class));
+      if (match) return cleanClassName(match.school_class);
+    }
+    if (adm.student_id || adm.gr_no || adm.admission_number) {
+      const stu = students.find(
+        (s) =>
+          (adm.student_id && s.id === adm.student_id) ||
+          (adm.gr_no && s.gr_no && s.gr_no.toLowerCase() === adm.gr_no.toLowerCase())
+      );
+      if (stu?.class_name) return cleanClassName(stu.class_name);
+      if (stu?.school_class) {
+        const match = classes.find((c) => String(c.id) === String(stu.school_class));
+        if (match) return cleanClassName(match.school_class);
+      }
+    }
+    const raw = adm.field_values?.find((f) =>
+      /class|standard|grade|applying for class/i.test(f.field_label)
+    )?.value;
+    if (!raw) return "General";
+    const match = classes.find(
+      (c) => String(c.id) === String(raw) || c.school_class.toLowerCase() === String(raw).toLowerCase()
+    );
+    return cleanClassName(match ? match.school_class : raw);
+  }, [classes, students, cleanClassName]);
+
   // Extract Pending Documents from Admissions
   const pendingDocsList = useMemo<PendingDocItem[]>(() => {
     const list: PendingDocItem[] = [];
@@ -199,10 +255,7 @@ export default function ClerkDashboard() {
         adm.field_values?.find((f) =>
           /name|student_name|first_name/i.test(f.field_label)
         )?.value || `Applicant #${adm.admission_number}`;
-      const classField =
-        adm.field_values?.find((f) =>
-          /class|standard|grade/i.test(f.field_label)
-        )?.value || "N/A";
+      const classField = getAdmissionClass(adm) || "N/A";
 
       // General Documents
       adm.documents?.forEach((doc) => {
@@ -406,7 +459,7 @@ export default function ClerkDashboard() {
                               )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Class: <strong className="text-slate-700">{s.class_name || "N/A"}</strong> {s.division_name ? `• Div ${s.division_name}` : ""} • Roll: {s.roll_no || "-"}
+                              Class: <strong className="text-slate-700">{cleanClassName(classes.find((c) => String(c.id) === String(s.school_class || s.class_name))?.school_class || s.class_name || (s.school_class ? String(s.school_class) : "N/A"))}</strong> {s.division_name ? `• Div ${s.division_name}` : ""} • Roll: {s.roll_no || "-"}
                             </p>
                           </div>
                         </div>
@@ -915,10 +968,7 @@ export default function ClerkDashboard() {
                     adm.field_values?.find((f) =>
                       /name|student_name|first_name/i.test(f.field_label)
                     )?.value || `Applicant #${adm.admission_number}`;
-                  const className =
-                    adm.field_values?.find((f) =>
-                      /class|standard|grade/i.test(f.field_label)
-                    )?.value || "General";
+                  const className = getAdmissionClass(adm);
                   const isApproved = adm.status === "approved" || Boolean(adm.gr_no);
 
                   return (

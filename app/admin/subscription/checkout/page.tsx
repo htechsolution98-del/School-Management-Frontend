@@ -103,16 +103,23 @@ export default function SubscriptionCheckoutPage() {
 
     try {
       if (paymentMethod === "ONLINE") {
-        const scriptLoaded = await loadRazorpayScript();
-        if (!scriptLoaded || !window.Razorpay) {
-          throw new Error("Razorpay could not load. Check your internet connection and try again.");
-        }
         const order = await createRazorpayOrder({
           school_id: currentSub.school,
           plan_id: selectedPlan?.id,
           billing_cycle: billingCycle,
           months_count: billingCycle === "QUARTERLY" ? 3 : billingCycle === "HALF_YEARLY" ? 6 : billingCycle === "YEARLY" ? 12 : 1,
         });
+
+        if (order.free_activation || Number(order.amount || 0) === 0) {
+          setSuccessMsg(order.message || `Free subscription activated! Valid until ${order.new_due_date}.`);
+          setTimeout(() => router.push("/admin/subscription"), 1500);
+          return;
+        }
+
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded || !window.Razorpay) {
+          throw new Error("Razorpay could not load. Check your internet connection and try again.");
+        }
         if (!order.key || !order.order_id || !Number(order.amount)) {
           throw new Error("Razorpay returned incomplete payment details. Please contact support.");
         }

@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/lib/auth";
+import { fetchWithAuth, parseApiError } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 
 export function normalizeList<T>(data: unknown): T[] {
@@ -14,12 +14,7 @@ export async function getErrorMessage(
   response: Response,
   fallback: string
 ): Promise<string> {
-  try {
-    const err = await response.json();
-    return err?.detail || err?.message || JSON.stringify(err) || fallback;
-  } catch {
-    return fallback;
-  }
+  return parseApiError(response, fallback);
 }
 
 export async function apiFetch<T>(
