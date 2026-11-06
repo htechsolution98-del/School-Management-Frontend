@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense, useRef } from "react";
+import React, { useState, useEffect, useMemo, Suspense, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Printer,
@@ -232,7 +232,7 @@ function ChequePrintingContent() {
   // Offset & Calibration states
   const [offsets, setOffsets] = useState<CalibrationOffsets>(DEFAULT_OFFSETS);
   const [isAdvancedCalibrating, setIsAdvancedCalibrating] = useState<boolean>(false);
-  const [printMode, setPrintMode] = useState<"overlay" | "full">("overlay");
+  const [printMode, setPrintMode] = useState<"overlay" | "full">("full");
   const [isGridVisible, setIsGridVisible] = useState<boolean>(false);
 
   // Scaler ref for fixed base canvas aspect ratio (768px x 336px CTS-2010 ratio)
@@ -267,6 +267,14 @@ function ChequePrintingContent() {
     const paramAmount = searchParams.get("amount");
     const paramDate = searchParams.get("date");
     const paramMemo = searchParams.get("memo");
+    const paramBank = searchParams.get("bank");
+
+    if (paramBank) {
+      const bKey = paramBank.toLowerCase().trim();
+      if (DEFAULT_BANK_TEMPLATES[bKey]) {
+        setSelectedBankId(bKey);
+      }
+    }
 
     if (paramPayee) setPayeeName(paramPayee);
     if (paramAmount) {
@@ -389,8 +397,8 @@ function ChequePrintingContent() {
   const isAxis = selectedBankId === "axis";
   const isSbi = selectedBankId === "sbi";
 
-  // Print execution
-  const handlePrint = () => {
+  // Print execution via isolated hidden iframe (Guarantees zero blank-page bugs & perfect 202mm x 92mm alignment)
+  const handlePrint = useCallback(() => {
     if (!payeeName.trim()) {
       toast.error("Please enter a Payee Name before printing.");
       return;
@@ -399,8 +407,213 @@ function ChequePrintingContent() {
       toast.error("Please enter a valid Amount before printing.");
       return;
     }
-    window.print();
-  };
+
+    const stageEl = document.getElementById("cheque-print-stage");
+    if (!stageEl) {
+      window.print();
+      return;
+    }
+
+    const isOverlay = printMode === "overlay";
+
+    // Grab all application stylesheets & font declarations
+    const parentStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((el) => el.outerHTML)
+      .join("\n");
+
+    // Create a dedicated isolated iframe
+    const printFrame = document.createElement("iframe");
+    printFrame.setAttribute(
+      "style",
+      "position:fixed;top:0;left:0;width:100%;height:100%;z-index:-9999;opacity:0;pointer-events:none;border:none;"
+    );
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    const stageClone = stageEl.cloneNode(true) as HTMLElement;
+    // Set explicit physical print dimensions
+    stageClone.style.width = "202mm";
+    stageClone.style.height = "92mm";
+    stageClone.style.position = "relative";
+    stageClone.style.overflow = "hidden";
+    stageClone.style.margin = "0";
+    stageClone.style.padding = "0";
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Cheque - ${payeeName} (${isOverlay ? "Real Cheque Overlay" : "Paper Cheque Test"})</title>
+          ${parentStyles}
+          <style>
+            @page {
+              size: 202mm 92mm landscape;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box !important;
+              margin: 0;
+              padding: 0;
+            }
+            html, body {
+              width: 202mm !important;
+              height: 92mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: ${isOverlay ? "transparent" : "#ffffff"} !important;
+              color: #000000 !important;
+              font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+              overflow: hidden !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .cheque-print-outer {
+              width: 202mm;
+              height: 92mm;
+              position: relative;
+              overflow: hidden;
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              ${isOverlay ? "" : "border: 1px dashed #94a3b8;"}
+            }
+            #cheque-print-stage {
+              width: 202mm !important;
+              height: 92mm !important;
+              position: relative !important;
+              overflow: hidden !important;
+              aspect-ratio: 202 / 92 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              background-color: ${isOverlay ? "transparent" : "#f7fafc"} !important;
+              ${isOverlay ? "background-image: none !important; border: none !important;" : ""}
+            }
+            /* Explicit fallback CSS rules for layout & positioning */
+            .absolute { position: absolute !important; }
+            .relative { position: relative !important; }
+            .inset-0 { top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }
+            .inset-x-0 { left: 0 !important; right: 0 !important; }
+            .top-0 { top: 0 !important; }
+            .left-0 { left: 0 !important; }
+            .bottom-0 { bottom: 0 !important; }
+            .right-0 { right: 0 !important; }
+            .flex { display: flex !important; }
+            .inline-flex { display: inline-flex !important; }
+            .flex-col { flex-direction: column !important; }
+            .items-center { align-items: center !important; }
+            .items-end { align-items: flex-end !important; }
+            .justify-center { justify-content: center !important; }
+            .justify-end { justify-content: flex-end !important; }
+            .justify-between { justify-content: space-between !important; }
+            .shrink-0 { flex-shrink: 0 !important; }
+            .block { display: block !important; }
+            .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+            .pointer-events-none { pointer-events: none !important; }
+            .select-none { user-select: none !important; }
+            .font-mono { font-family: "Courier New", Courier, monospace !important; }
+            .font-bold { font-weight: 700 !important; }
+            .font-black { font-weight: 900 !important; }
+            .tracking-tight { letter-spacing: -0.025em !important; }
+            .tracking-wide { letter-spacing: 0.025em !important; }
+            .tracking-wider { letter-spacing: 0.05em !important; }
+            .tracking-widest { letter-spacing: 0.1em !important; }
+            .uppercase { text-transform: uppercase !important; }
+            .leading-tight { line-height: 1.25 !important; }
+            .border { border: 1px solid #94a3b8 !important; }
+            .border-b { border-bottom: 1px solid #94a3b8 !important; }
+            .border-t { border-top: 1px solid #cbd5e1 !important; }
+            .border-dotted { border-style: dotted !important; }
+            .rounded-\\[1px\\] { border-radius: 1px !important; }
+            .rounded-\\[2px\\] { border-radius: 2px !important; }
+            .w-\\[15px\\] { width: 15px !important; }
+            .h-\\[22px\\] { height: 22px !important; }
+            .w-3 { width: 12px !important; }
+            .h-6 { height: 24px !important; }
+            .gap-\\[2px\\] { gap: 2px !important; }
+            .gap-2\\.5 { gap: 10px !important; }
+            .gap-8 { gap: 32px !important; }
+            .text-right { text-align: right !important; }
+            .text-center { text-align: center !important; }
+            .text-\\[7\\.5px\\] { font-size: 7.5px !important; }
+            .text-\\[8px\\] { font-size: 8px !important; }
+            .text-\\[9px\\] { font-size: 9px !important; }
+            .text-\\[10px\\] { font-size: 10px !important; }
+            .text-\\[11px\\] { font-size: 11px !important; }
+            .text-\\[12px\\] { font-size: 12px !important; }
+            .text-\\[13px\\] { font-size: 13px !important; }
+            .text-\\[13\\.5px\\] { font-size: 13.5px !important; }
+            .text-\\[15px\\] { font-size: 15px !important; }
+            .text-xs { font-size: 12px !important; }
+            .text-sm { font-size: 14px !important; }
+            .text-2xl { font-size: 24px !important; }
+            .text-slate-950 { color: #020617 !important; }
+            .text-slate-800 { color: #1e293b !important; }
+            .text-slate-700 { color: #334155 !important; }
+            .text-slate-500 { color: #64748b !important; }
+            .text-slate-400 { color: #94a3b8 !important; }
+            .text-black { color: #000000 !important; }
+            .bg-white { background-color: #ffffff !important; }
+            .bg-white\\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+            .bg-white\\/85 { background-color: rgba(255, 255, 255, 0.85) !important; }
+
+            ${
+              isOverlay
+                ? ".cheque-graphic-element, .no-print { display: none !important; }"
+                : `
+              .no-print { display: none !important; }
+              .cheque-graphic-element { display: flex !important; }
+              div.cheque-graphic-element.text-right { display: block !important; }
+              div.cheque-graphic-element.absolute.inset-0 { display: flex !important; }
+              img.cheque-graphic-element { display: block !important; }
+            `
+            }
+
+            /* Clean high-contrast print typography */
+            span, div, p {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cheque-print-outer">
+            ${stageClone.outerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    printFrame.contentWindow?.focus();
+    setTimeout(() => {
+      printFrame.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 1000);
+    }, 250);
+  }, [payeeName, amountNumeric, printMode]);
+
+  // Intercept Ctrl+P / Cmd+P to invoke the reliable iframe printer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handlePrint]);
 
   // Populate Demo Data
   const populateDemo = () => {
@@ -1349,19 +1562,74 @@ function ChequePrintingContent() {
       {/* ─── Global Print Styles ────────────────────────────────────────────── */}
       <style jsx global>{`
         @page {
-          size: landscape;
+          size: 202mm 92mm landscape;
           margin: 0;
         }
 
         @media print {
+          aside,
+          header,
+          nav,
+          [data-sidebar],
+          .print\:hidden,
+          #app-header,
+          #app-sidebar,
+          .workspace-navigation,
+          .app-workspace > aside {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
+
           html,
-          body {
+          body,
+          main,
+          .app-workspace {
             width: 100% !important;
-            height: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             background: #fff !important;
             overflow: visible !important;
+          }
+
+          .cheque-canvas-wrapper {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 202mm !important;
+            height: 92mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            display: block !important;
+            visibility: visible !important;
+            overflow: hidden !important;
+          }
+
+          .cheque-scaler {
+            transform: none !important;
+            width: 202mm !important;
+            height: 92mm !important;
+            display: block !important;
+            visibility: visible !important;
+          }
+
+          #cheque-print-stage {
+            width: 202mm !important;
+            height: 92mm !important;
+            display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          #cheque-print-stage * {
+            visibility: visible !important;
           }
 
           /* In overlay mode, completely hide background graphics, borders, and watermarks */
@@ -1371,8 +1639,10 @@ function ChequePrintingContent() {
             border: none !important;
           }
 
-          .cheque-overlay-mode .cheque-graphic-element {
+          .cheque-overlay-mode .cheque-graphic-element,
+          .cheque-overlay-mode .no-print {
             display: none !important;
+            visibility: hidden !important;
           }
         }
       `}</style>

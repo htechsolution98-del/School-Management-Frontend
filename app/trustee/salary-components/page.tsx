@@ -69,7 +69,7 @@ function formatComponentDisplay(c: SalaryComponent): string {
     return `Formula: ${c.calc_base?.trim() || "N/A"}`;
   }
   const numVal = Number(rawVal);
-  const formatted = isNaN(numVal) ? "0" : numVal.toLocaleString("en-IN");
+  const formatted = isNaN(numVal) || numVal < 0 ? "0" : numVal.toLocaleString("en-IN");
   return `₹${formatted}`;
 }
 
@@ -208,6 +208,11 @@ export default function SalaryComponentsPage() {
     if (!finalName) { setFormError("Component name is required."); return; }
     if (usedNames.has(finalName.toLowerCase())) {
       setFormError("A component with this name already exists."); return;
+    }
+    const numVal = Number(value);
+    if (value.trim() !== "" && (isNaN(numVal) || numVal < 0)) {
+      setFormError("Amount or rate cannot be negative. Value must be 0 or greater.");
+      return;
     }
 
     setFormError("");
@@ -478,6 +483,7 @@ export default function SalaryComponentsPage() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   placeholder={
                     calcType === "Percentage"
                       ? "e.g. 12"

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   Printer,
+  Download,
   FileText,
   CheckCircle2,
   ArrowDownRight,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import type { PayrollPayslip } from "@/types/hr-config";
 import { getCurrentUserProfile } from "@/lib/current-user";
+import { downloadPayslipPdf } from "@/lib/payslip-pdf";
 
 interface SalarySlipModalProps {
   isOpen: boolean;
@@ -264,17 +266,28 @@ export function SalarySlipModal({
       ? Number(payslip.net_salary)
       : Math.max(0, grossEarnings - totalDeductions);
 
-  // ── 3. High-Fidelity 1-Page Printable Handler ──
+  // ── 3. High-Fidelity 1-Page Printable Handler & Direct PDF ──
+  const handleDownloadPdf = async () => {
+    if (!payslip) return;
+    try {
+      await downloadPayslipPdf(
+        payslip,
+        resolvedSchoolName !== "School Management" ? resolvedSchoolName : undefined,
+        resolvedSchoolLogo || undefined
+      );
+    } catch (err) {
+      console.error("PDF download failed:", err);
+    }
+  };
+
   const handlePrint = () => {
     if (!printRef.current) return;
     const printContent = printRef.current.innerHTML;
 
-    // Use an isolated iframe to completely eliminate blank-page bugs and fit strictly on 1 sheet
+    // Use an isolated iframe with complete inline styling to eliminate blank-page bugs
     const iframe = document.createElement("iframe");
-    iframe.setAttribute(
-      "style",
-      "position:fixed;top:0;left:0;width:100%;height:100%;z-index:-9999;opacity:0;pointer-events:none;border:none;"
-    );
+    iframe.style.cssText =
+      "position:fixed;bottom:0;right:0;width:1px;height:1px;border:none;visibility:visible;";
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow?.document;
@@ -300,8 +313,8 @@ export function SalarySlipModal({
             }
             html, body {
               width: 100%;
-              background: #ffffff;
-              color: #0f172a;
+              background: #ffffff !important;
+              color: #0f172a !important;
               font-size: 11px;
               line-height: 1.25;
               -webkit-print-color-adjust: exact !important;
@@ -325,18 +338,47 @@ export function SalarySlipModal({
             .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
             .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+            @media (min-width: 640px) {
+              .sm\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+              .sm\\:grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+              .sm\\:flex-row { flex-direction: row !important; }
+              .sm\\:items-center { align-items: center !important; }
+              .sm\\:justify-between { justify-content: space-between !important; }
+              .sm\\:text-left { text-align: left !important; }
+              .sm\\:text-right { text-align: right !important; }
+            }
+            @media (min-width: 768px) {
+              .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            }
             .gap-2 { gap: 6px; }
             .gap-2\\.5 { gap: 8px; }
             .gap-3 { gap: 10px; }
             .gap-4 { gap: 12px; }
+            .block { display: block !important; }
+            .inline-block { display: inline-block !important; }
+            .inline-flex { display: inline-flex !important; }
+            .w-full { width: 100% !important; }
+            .h-full { height: 100% !important; }
+            .mt-0\\.5 { margin-top: 2px !important; }
+            .mt-1 { margin-top: 4px !important; }
+            .mb-0\\.5 { margin-bottom: 2px !important; }
+            .mb-1 { margin-bottom: 4px !important; }
+            .space-y-0\\.5 > * + * { margin-top: 2px !important; }
+            .font-mono { font-family: monospace, Courier, monospace !important; }
+            .p-1\\.5 { padding: 5px 7px; }
             .p-2 { padding: 6px 8px; }
             .p-2\\.5 { padding: 7px 10px; }
             .p-3 { padding: 8px 12px; }
             .p-4 { padding: 10px 14px; }
+            .px-2\\.5 { padding-left: 8px; padding-right: 8px; }
             .px-3 { padding-left: 10px; padding-right: 10px; }
+            .py-0\\.5 { padding-top: 2px; padding-bottom: 2px; }
             .py-1 { padding-top: 3px; padding-bottom: 3px; }
             .py-1\\.5 { padding-top: 4px; padding-bottom: 4px; }
             .py-2 { padding-top: 5px; padding-bottom: 5px; }
+            .pb-3 { padding-bottom: 8px; }
+            .pt-1 { padding-top: 4px; }
+            .pt-2 { padding-top: 6px; }
             .border { border: 1px solid #e2e8f0; }
             .border-b { border-bottom: 1px solid #e2e8f0; }
             .border-t { border-top: 1px solid #e2e8f0; }
@@ -344,25 +386,27 @@ export function SalarySlipModal({
             .rounded-lg { border-radius: 6px; }
             .rounded-xl { border-radius: 8px; }
             .rounded-2xl { border-radius: 10px; }
-            .bg-slate-50 { background-color: #f8fafc; }
-            .bg-emerald-50 { background-color: #ecfdf5; }
-            .bg-rose-50 { background-color: #fff1f2; }
-            .bg-blue-50 { background-color: #eff6ff; }
-            .bg-indigo-50 { background-color: #eef2ff; }
-            .text-emerald-600 { color: #059669; }
-            .text-emerald-700 { color: #047857; }
-            .text-emerald-800 { color: #065f46; }
-            .text-rose-600 { color: #e11d48; }
-            .text-rose-800 { color: #9f1239; }
-            .text-blue-600 { color: #2563eb; }
-            .text-blue-700 { color: #1d4ed8; }
-            .text-indigo-600 { color: #4f46e5; }
-            .text-indigo-700 { color: #4338ca; }
-            .text-slate-400 { color: #94a3b8; }
-            .text-slate-500 { color: #64748b; }
-            .text-slate-600 { color: #475569; }
-            .text-slate-700 { color: #334155; }
-            .text-slate-800 { color: #1e293b; }
+            .rounded-full { border-radius: 9999px; }
+            .bg-slate-50 { background-color: #f8fafc !important; }
+            .bg-emerald-50 { background-color: #ecfdf5 !important; }
+            .bg-rose-50 { background-color: #fff1f2 !important; }
+            .bg-blue-50 { background-color: #eff6ff !important; }
+            .bg-indigo-50 { background-color: #eef2ff !important; }
+            .text-emerald-600 { color: #059669 !important; }
+            .text-emerald-700 { color: #047857 !important; }
+            .text-emerald-800 { color: #065f46 !important; }
+            .text-rose-600 { color: #e11d48 !important; }
+            .text-rose-800 { color: #9f1239 !important; }
+            .text-blue-600 { color: #2563eb !important; }
+            .text-blue-700 { color: #1d4ed8 !important; }
+            .text-indigo-600 { color: #4f46e5 !important; }
+            .text-indigo-700 { color: #4338ca !important; }
+            .text-indigo-800 { color: #3730a3 !important; }
+            .text-slate-400 { color: #94a3b8 !important; }
+            .text-slate-500 { color: #64748b !important; }
+            .text-slate-600 { color: #475569 !important; }
+            .text-slate-700 { color: #334155 !important; }
+            .text-slate-800 { color: #1e293b !important; }
             .font-medium { font-weight: 500; }
             .font-semibold { font-weight: 600; }
             .font-bold { font-weight: 700; }
@@ -385,13 +429,17 @@ export function SalarySlipModal({
             .items-center { align-items: center; }
             .justify-between { justify-content: space-between; }
             .shrink-0 { flex-shrink: 0; }
+            .space-y-1\\.5 > * + * { margin-top: 5px; }
             .space-y-3 > * + * { margin-top: 8px; }
             .divide-y > * + * { border-top: 1px solid #f1f5f9; }
             .net-banner {
-              background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #0f172a 100%) !important;
+              background: #1e3a8a !important;
               color: #ffffff !important;
               border-radius: 8px;
               padding: 8px 12px;
+            }
+            .net-banner * {
+              color: #ffffff !important;
             }
           </style>
         </head>
@@ -404,26 +452,32 @@ export function SalarySlipModal({
     `);
     doc.close();
 
-    iframe.contentWindow?.focus();
+    // Allow synchronous rendering and fonts to settle before printing
     setTimeout(() => {
-      iframe.contentWindow?.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 250);
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print execution failed:", err);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }
+    }, 350);
   };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:overflow-visible">
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:overflow-visible">
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 10 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:rounded-none"
+          className="relative z-[310] w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:rounded-none"
         >
           {/* ── Modal Action Header (Hidden on Print) ── */}
           <div className="print:hidden flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
@@ -443,11 +497,20 @@ export function SalarySlipModal({
 
             <div className="flex items-center gap-2">
               <button
+                onClick={handleDownloadPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition shadow-2xs cursor-pointer"
+                title="Download Clean A4 PDF"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </button>
+              <button
                 onClick={handlePrint}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white transition shadow-sm shadow-blue-500/25 cursor-pointer"
+                title="Print Payslip"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>Print / Save PDF (1 Page)</span>
+                <span>Print</span>
               </button>
               <button
                 onClick={onClose}
@@ -505,57 +568,57 @@ export function SalarySlipModal({
             {/* Employee Metadata Details */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800/40 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 text-[11px]">
               <div>
-                <span className="text-slate-400 block font-medium">Employee Name</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-xs mt-0.5 block">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Employee Name</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 text-xs mt-0.5 leading-tight">
                   {payslip.staff_name || `Staff #${payslip.staff}`}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Staff ID / Code</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Staff ID / Code</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-tight">
                   EMP-{payslip.staff}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Designation / Role</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block capitalize">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Designation / Role</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 capitalize leading-tight">
                   {payslip.designation || payslip.staff_category || "Staff"}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Department</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Department</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-tight">
                   {payslip.department || "General"}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Payment Mode</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block uppercase">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Payment Mode</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 uppercase leading-tight">
                   {payslip.payment_mode || "Direct / Cash"}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Receipt Ref</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Receipt Ref</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-tight">
                   {payslip.receipt_number || `SAL-${payslip.id}`}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Payment Date</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Payment Date</div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-tight">
                   {payslip.payment_date
                     ? new Date(payslip.payment_date).toLocaleDateString("en-IN")
                     : payslip.created_at
                     ? new Date(payslip.created_at).toLocaleDateString("en-IN")
                     : "—"}
-                </span>
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block font-medium">Status</span>
-                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                <div className="text-slate-400 font-medium text-[10px] leading-tight">Status</div>
+                <div className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 leading-tight">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   {payslip.payment_status === "paid" ? "Paid & Reconciled" : "Disbursed"}
-                </span>
+                </div>
               </div>
             </div>
 
@@ -566,34 +629,34 @@ export function SalarySlipModal({
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-center text-[11px]">
                 <div className="p-1.5 sm:p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                  <span className="text-slate-400 block text-[10px]">Total Days in Cycle</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
+                  <div className="text-slate-400 text-[10px] leading-tight">Total Days in Cycle</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-tight">
                     {totalWorkingDays}
-                  </span>
+                  </div>
                 </div>
                 <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300">
-                  <span className="text-emerald-600 dark:text-emerald-400 block text-[10px]">Present Days</span>
-                  <span className="text-sm font-bold mt-0.5 block">
+                  <div className="text-emerald-600 dark:text-emerald-400 text-[10px] leading-tight">Present Days</div>
+                  <div className="text-sm font-bold mt-0.5 leading-tight">
                     {presentDays}
-                  </span>
+                  </div>
                 </div>
                 <div className="p-1.5 sm:p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300">
-                  <span className="text-blue-600 dark:text-blue-400 block text-[10px]">Paid Leaves</span>
-                  <span className="text-sm font-bold mt-0.5 block">
+                  <div className="text-blue-600 dark:text-blue-400 text-[10px] leading-tight">Paid Leaves</div>
+                  <div className="text-sm font-bold mt-0.5 leading-tight">
                     {paidLeaves}
-                  </span>
+                  </div>
                 </div>
                 <div className="p-1.5 sm:p-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300">
-                  <span className="text-rose-600 dark:text-rose-400 block text-[10px]">Unpaid / LOP</span>
-                  <span className="text-sm font-bold mt-0.5 block">
+                  <div className="text-rose-600 dark:text-rose-400 text-[10px] leading-tight">Unpaid / LOP</div>
+                  <div className="text-sm font-bold mt-0.5 leading-tight">
                     {unpaidLeaves}
-                  </span>
+                  </div>
                 </div>
                 <div className="p-1.5 sm:p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-300">
-                  <span className="text-indigo-600 dark:text-indigo-400 block text-[10px]">Payable Days</span>
-                  <span className="text-sm font-bold mt-0.5 block">
+                  <div className="text-indigo-600 dark:text-indigo-400 text-[10px] leading-tight">Payable Days</div>
+                  <div className="text-sm font-bold mt-0.5 leading-tight">
                     {payableDays}
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>

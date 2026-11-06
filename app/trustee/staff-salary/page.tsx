@@ -453,7 +453,7 @@ function EditModal({
   );
 }
 
-// ─── Assignment Modal ─────────────────────────────────────────────────────────
+// ─── Assignment Modal (Supports Multi-Select & Single-Select) ───────────────
 function AssignModal({
   open,
   onClose,
@@ -469,10 +469,17 @@ function AssignModal({
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedStaff, setSelectedStaff] = useState<number | "">("");
-  const [selComponent, setSelComponent] = useState<number | "">("");
-  const [calcType, setCalcType] = useState<CalcType>("fixed");
-  const [calculateOn, setCalculateOn] = useState<"Basic Salary" | "Total Gross">("Basic Salary");
-  const [value, setValue] = useState("");
+  const [selectedCompIds, setSelectedCompIds] = useState<number[]>([]);
+  const [compConfigs, setCompConfigs] = useState<
+    Record<
+      number,
+      {
+        calcType: CalcType;
+        calculateOn: "Basic Salary" | "Total Gross";
+        value: string;
+      }
+    >
+  >({});
   const [formErr, setFormErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<"category" | "staff" | "component" | null>(null);
@@ -490,47 +497,107 @@ function AssignModal({
     if (open) {
       setSelectedCategory("");
       setSelectedStaff("");
-      setSelComponent("");
-      setCalcType("fixed");
-      setCalculateOn("Basic Salary");
-      setValue("");
+      setSelectedCompIds([]);
+      setCompConfigs({});
       setFormErr("");
       setOpenDropdown(null);
     }
   }, [open]);
 
-  const selectedComp = components.find((c) => c.id === selComponent);
+  const toggleComponent = (c: SalaryComponent) => {
+    setFormErr("");
+    if (selectedCompIds.includes(c.id)) {
+      setSelectedCompIds((prev) => prev.filter((id) => id !== c.id));
+    } else {
+      setSelectedCompIds((prev) => [...prev, c.id]);
+      if (!compConfigs[c.id]) {
+        const isPct = (c.calc_type || "").toLowerCase() === "percentage";
+        const defVal = c.value !== undefined && c.value !== null && Number(c.value) > 0 ? String(c.value) : "5000";
+        setCompConfigs((prev) => ({
+          ...prev,
+          [c.id]: {
+            calcType: isPct ? "percentage" : "fixed",
+            calculateOn: "Basic Salary",
+            value: defVal,
+          },
+        }));
+      }
+    }
+  };
+
+  const updateCompConfig = (
+    id: number,
+    field: "calcType" | "calculateOn" | "value",
+    val: any
+  ) => {
+    setFormErr("");
+    setCompConfigs((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || {
+          calcType: "fixed",
+          calculateOn: "Basic Salary",
+          value: "5000",
+        }),
+        [field]: val,
+      },
+    }));
+  };
 
   const handleSubmit = async () => {
-    if (!selectedStaff) { setFormErr("Select a staff member."); return; }
-    if (!selComponent) { setFormErr("Select a salary component."); return; }
-    const v = value.trim();
-    if (!v || isNaN(Number(v)) || Number(v) <= 0) { setFormErr("Enter a valid positive value."); return; }
-    if (calcType === "percentage" && Number(v) > 100) { setFormErr("Percentage cannot exceed 100%."); return; }
+    if (!selectedStaff) {
+      setFormErr("Select a staff member.");
+      return;
+    }
+    if (selectedCompIds.length === 0) {
+      setFormErr("Select at least one salary component.");
+      return;
+    }
+
+    for (const cid of selectedCompIds) {
+      const cfg = compConfigs[cid];
+      const comp = components.find((c) => c.id === cid);
+      const v = (cfg?.value ?? "").trim();
+      if (!v || isNaN(Number(v)) || Number(v) <= 0) {
+        setFormErr(`Enter a valid positive value for ${comp?.name || "selected component"}.`);
+        return;
+      }
+      if (cfg?.calcType === "percentage" && Number(v) > 100) {
+        setFormErr(`Percentage cannot exceed 100% for ${comp?.name || "selected component"}.`);
+        return;
+      }
+    }
+
     setFormErr("");
     setSubmitting(true);
     try {
-      const created = await createStaffSalaryComponent({
-        staff: selectedStaff as number,
-        component: selComponent as number,
-        calculation_type: calcType,
-        calc_base: calcType === "percentage" ? calculateOn : undefined,
-        value: v,
-      });
-      const comp = components.find((c) => c.id === selComponent)!;
       const staff = staffList.find((s) => s.id === selectedStaff);
-      onAssigned({
-        id: created.id,
-        staffId: selectedStaff as number,
-        staffName: staff?.name ?? `Staff #${selectedStaff}`,
-        component: selComponent as number,
-        componentName: comp.name,
-        componentType: comp.component_type,
-        calculation_type: calcType,
-        calc_base: calcType === "percentage" ? calculateOn : undefined,
-        value: v,
-        isActive: true,
-      });
+      for (const cid of selectedCompIds) {
+        const cfg = compConfigs[cid];
+        const comp = components.find((c) => c.id === cid)!;
+        const v = cfg.value.trim();
+
+        const created = await createStaffSalaryComponent({
+          staff: selectedStaff as number,
+          component: cid,
+          calculation_type: cfg.calcType,
+          calc_base: cfg.calcType === "percentage" ? cfg.calculateOn : undefined,
+          value: v,
+        });
+
+        onAssigned({
+          id: created.id,
+          staffId: selectedStaff as number,
+          staffName: staff?.name ?? `Staff #${selectedStaff}`,
+          component: cid,
+          componentName: comp.name,
+          componentType: comp.component_type,
+          calculation_type: cfg.calcType,
+          calc_base: cfg.calcType === "percentage" ? cfg.calculateOn : undefined,
+          value: v,
+          isActive: true,
+        });
+      }
       onClose();
     } catch (e) {
       setFormErr(e instanceof Error ? e.message : "Assignment failed.");
@@ -558,15 +625,15 @@ function AssignModal({
             className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="relative w-full max-w-lg rounded-3xl overflow-hidden pointer-events-auto mx-2 sm:mx-0"
+              className="relative w-full max-w-xl rounded-3xl overflow-hidden pointer-events-auto mx-2 sm:mx-0 max-h-[90vh] flex flex-col"
               style={{
                 background: "white",
                 boxShadow: "0 32px 80px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05)",
               }}
             >
-              <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)" }} />
+              <div className="h-1.5 w-full shrink-0" style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)" }} />
 
-              <div className="flex items-start justify-between px-4 sm:px-7 pt-5 sm:pt-6 pb-4 sm:pb-5 gap-3">
+              <div className="flex items-start justify-between px-4 sm:px-7 pt-5 sm:pt-6 pb-4 sm:pb-5 gap-3 shrink-0 border-b border-slate-100">
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                   <div
                     className="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -575,8 +642,8 @@ function AssignModal({
                     <Banknote className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-extrabold text-slate-900 leading-none">Assign Component</h2>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Link salary to staff member</p>
+                    <h2 className="text-lg font-extrabold text-slate-900 leading-none">Assign Salary Components</h2>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Link single or multi-select components with details</p>
                   </div>
                 </div>
                 <button
@@ -587,7 +654,7 @@ function AssignModal({
                 </button>
               </div>
 
-              <div className="px-4 sm:px-7 pb-5 sm:pb-7 space-y-5 max-h-[85vh] overflow-y-auto">
+              <div className="px-4 sm:px-7 py-5 space-y-5 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* ── Category ── */}
                   <div className="relative" data-dropdown>
@@ -644,7 +711,7 @@ function AssignModal({
                           className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${!selectedStaff ? "bg-indigo-50 text-indigo-700" : "text-slate-400"}`}>
                           Select Staff
                         </button>
-                        {staffList.filter(s => (s.designation ?? s.category ?? "") === selectedCategory).map(s => (
+                        {staffList.filter(s => !selectedCategory || (s.designation ?? s.category ?? "") === selectedCategory).map(s => (
                           <button key={s.id} type="button" data-dropdown
                             onClick={() => { setSelectedStaff(s.id); setFormErr(""); setOpenDropdown(null); }}
                             className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${selectedStaff === s.id ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}>
@@ -654,143 +721,208 @@ function AssignModal({
                       </div>
                     )}
                   </div>
+                </div>
 
-                  {/* ── Component ── */}
-                  <div className="relative md:col-span-2" data-dropdown>
-                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                      Component <span className="text-red-400">*</span>
+                {/* ── Multi-Select Components Dropdown & Selector ── */}
+                <div className="relative" data-dropdown>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                      Components ({selectedCompIds.length} selected) <span className="text-red-400">*</span>
                     </label>
-                    <button
-                      type="button"
-                      data-dropdown
-                      onClick={() => setOpenDropdown(openDropdown === "component" ? null : "component")}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-left flex items-center justify-between focus:outline-none focus:border-indigo-400 transition-all"
-                      style={{ color: selComponent ? "#1e293b" : "#94a3b8" }}
-                    >
-                      <span>{selComponent ? components.find(c => c.id === selComponent)?.name : "Select…"}</span>
-                      <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform shrink-0 ${openDropdown === "component" ? "rotate-180" : ""}`} />
-                    </button>
-                    {openDropdown === "component" && (
-                      <div data-dropdown className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border-2 border-slate-100 rounded-xl shadow-2xl max-h-44 overflow-y-auto">
-                        <button type="button" data-dropdown
-                          onClick={() => { setSelComponent(""); setOpenDropdown(null); }}
-                          className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${!selComponent ? "bg-indigo-50 text-indigo-700" : "text-slate-400"}`}>
-                          Select…
-                        </button>
-                        {components.map(c => (
-                          <button key={c.id} type="button" data-dropdown
-                            onClick={() => { setSelComponent(c.id); setFormErr(""); setOpenDropdown(null); }}
-                            className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${selComponent === c.id ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}>
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
+                    {components.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedCompIds.length === components.length) {
+                            setSelectedCompIds([]);
+                          } else {
+                            components.forEach((c) => {
+                              if (!selectedCompIds.includes(c.id)) toggleComponent(c);
+                            });
+                          }
+                        }}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                      >
+                        {selectedCompIds.length === components.length ? "Deselect All" : "Select All"}
+                      </button>
                     )}
                   </div>
-                </div>
 
-                <div className={`grid grid-cols-1 ${calcType === "percentage" ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Calculation</label>
-                    <div className="flex rounded-xl border-2 border-slate-100 bg-slate-50 p-1 gap-1">
-                      {(["fixed", "percentage"] as const).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => { setCalcType(t); setFormErr(""); }}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold capitalize transition-all"
-                          style={calcType === t
-                            ? { background: "white", color: "#4f46e5", boxShadow: "0 2px 8px rgba(99,102,241,0.15)" }
-                            : { color: "#94a3b8" }}
-                        >
-                          {t === "fixed" ? <IndianRupee className="h-3 w-3" /> : <Percent className="h-3 w-3" />}
-                          {t}
-                        </button>
-                      ))}
+                  <button
+                    type="button"
+                    data-dropdown
+                    onClick={() => setOpenDropdown(openDropdown === "component" ? null : "component")}
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-left flex items-center justify-between focus:outline-none focus:border-indigo-400 transition-all"
+                  >
+                    <div className="flex flex-wrap gap-1.5 max-w-[90%]">
+                      {selectedCompIds.length === 0 ? (
+                        <span className="text-slate-400">Select one or multiple components…</span>
+                      ) : (
+                        selectedCompIds.map((cid) => {
+                          const comp = components.find((c) => c.id === cid);
+                          if (!comp) return null;
+                          return (
+                            <span
+                              key={cid}
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold border ${
+                                comp.component_type === "earning"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}
+                            >
+                              {comp.name}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComponent(comp);
+                                }}
+                                className="hover:opacity-75"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })
+                      )}
                     </div>
-                  </div>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform shrink-0 ${openDropdown === "component" ? "rotate-180" : ""}`} />
+                  </button>
 
-                  {calcType === "percentage" && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                        Calculate On <span className="text-red-400">*</span>
-                      </label>
-                      <select
-                        value={calculateOn}
-                        onChange={(e) => setCalculateOn(e.target.value as "Basic Salary" | "Total Gross")}
-                        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3.5 py-3 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all cursor-pointer"
-                      >
-                        <option value="Basic Salary">Basic Salary</option>
-                        <option value="Total Gross">Total Gross</option>
-                      </select>
-                    </motion.div>
-                  )}
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                      Value <span className="text-red-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm select-none">
-                        {calcType === "fixed" ? "₹" : "%"}
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        step={calcType === "fixed" ? "100" : "0.5"}
-                        placeholder={calcType === "fixed" ? "5000" : "10"}
-                        value={value}
-                        onChange={(e) => { setValue(e.target.value); setFormErr(""); }}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-                        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 pl-9 pr-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-300 placeholder:font-normal focus:outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <AnimatePresence>
-                  {selectedStaff && selComponent && value && Number(value) > 0 && selectedComp && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div
-                        className="rounded-2xl border-2 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-                        style={{
-                          borderColor: selectedComp.component_type === "earning" ? "#bbf7d0" : "#fecaca",
-                          background: selectedComp.component_type === "earning" ? "#f0fdf4" : "#fef2f2",
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
+                  {openDropdown === "component" && (
+                    <div data-dropdown className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border-2 border-slate-100 rounded-xl shadow-2xl max-h-56 overflow-y-auto p-2 space-y-1">
+                      {components.map((c) => {
+                        const isChecked = selectedCompIds.includes(c.id);
+                        return (
                           <div
-                            className="w-8 h-8 rounded-xl flex items-center justify-center"
-                            style={{ background: selectedComp.component_type === "earning" ? "#dcfce7" : "#fee2e2" }}
+                            key={c.id}
+                            data-dropdown
+                            onClick={() => toggleComponent(c)}
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-xs font-semibold transition-colors ${
+                              isChecked ? "bg-indigo-50/80 text-indigo-900" : "hover:bg-slate-50 text-slate-700"
+                            }`}
                           >
-                            {selectedComp.component_type === "earning"
-                              ? <TrendingUp className="h-4 w-4 text-emerald-600" />
-                              : <TrendingDown className="h-4 w-4 text-red-500" />}
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 pointer-events-none"
+                              />
+                              <span>{c.name}</span>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                                c.component_type === "earning"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}
+                            >
+                              {c.component_type}
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">{selectedComp.name}</p>
-                            <p className="text-xs font-medium" style={{ color: selectedComp.component_type === "earning" ? "#15803d" : "#b91c1c" }}>
-                              {selectedComp.component_type === "earning" ? "Earning" : "Deduction"}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xl font-black" style={{ fontFamily: "'DM Mono', monospace", color: selectedComp.component_type === "earning" ? "#15803d" : "#b91c1c" }}>
-                          {calcType === "fixed" ? `₹${Number(value).toLocaleString("en-IN")}` : `${value}%`}
-                        </p>
-                      </div>
-                    </motion.div>
+                        );
+                      })}
+                    </div>
                   )}
-                </AnimatePresence>
+                </div>
+
+                {/* ── Component Details Configuration Cards (Rendered for Each Selected Component) ── */}
+                {selectedCompIds.length > 0 && (
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <span className="block text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                      Component Details & Calculations
+                    </span>
+                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                      {selectedCompIds.map((cid) => {
+                        const comp = components.find((c) => c.id === cid);
+                        if (!comp) return null;
+                        const cfg = compConfigs[cid] || {
+                          calcType: "fixed",
+                          calculateOn: "Basic Salary",
+                          value: "5000",
+                        };
+
+                        return (
+                          <div
+                            key={cid}
+                            className="p-3.5 rounded-2xl border-2 border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-colors space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-sm text-slate-800">{comp.name}</span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                                    comp.component_type === "earning"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : "bg-rose-50 text-rose-700 border-rose-200"
+                                  }`}
+                                >
+                                  {comp.component_type}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleComponent(comp)}
+                                className="text-slate-400 hover:text-rose-500 text-xs"
+                                title="Remove component"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                              {/* Calculation type toggle */}
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                  Calculation Type
+                                </label>
+                                <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 gap-1">
+                                  {(["fixed", "percentage"] as const).map((t) => (
+                                    <button
+                                      key={t}
+                                      type="button"
+                                      onClick={() => updateCompConfig(cid, "calcType", t)}
+                                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg capitalize transition-all ${
+                                        cfg.calcType === t
+                                          ? "bg-indigo-600 text-white shadow-xs"
+                                          : "text-slate-600 hover:bg-slate-50"
+                                      }`}
+                                    >
+                                      {t === "fixed" ? "Fixed (₹)" : "Percent (%)"}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Value Input */}
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                  {cfg.calcType === "fixed" ? "Amount (₹)" : "Percentage (%)"}
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs select-none">
+                                    {cfg.calcType === "fixed" ? "₹" : "%"}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step={cfg.calcType === "fixed" ? "100" : "0.5"}
+                                    placeholder={cfg.calcType === "fixed" ? "5000" : "10"}
+                                    value={cfg.value}
+                                    onChange={(e) => updateCompConfig(cid, "value", e.target.value)}
+                                    className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-400"
+                                    style={{ fontFamily: "'DM Mono', monospace" }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <AnimatePresence>
                   {formErr && (
@@ -804,18 +936,20 @@ function AssignModal({
                     </motion.p>
                   )}
                 </AnimatePresence>
+              </div>
 
+              <div className="p-4 sm:p-7 border-t border-slate-100 bg-slate-50/50 shrink-0">
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="w-full py-3.5 sm:py-4 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                  className="w-full py-3.5 sm:py-4 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md"
                   style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 8px 24px -4px rgba(99,102,241,0.5)" }}
                 >
                   {submitting ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Assigning…</>
                   ) : (
-                    <><Send className="h-4 w-4" /> Assign Component</>
+                    <><Send className="h-4 w-4" /> Assign {selectedCompIds.length > 1 ? `${selectedCompIds.length} Components` : "Component"}</>
                   )}
                 </motion.button>
               </div>

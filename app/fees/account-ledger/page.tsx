@@ -23,10 +23,14 @@ import {
   Coins,
   BadgePercent,
   Banknote,
+  X,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchAccountLedger,
+  setInitialCash,
   type AccountLedgerData,
   type LedgerTransactionItem,
   type LedgerTransactionType,
@@ -52,6 +56,13 @@ export default function AccountLedgerPage() {
 
   const [ledgerData, setLedgerData] = useState<AccountLedgerData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Initial Petty Cash Drawer Float modal state
+  const [isInitialCashModalOpen, setIsInitialCashModalOpen] = useState(false);
+  const [initialCashAmount, setInitialCashAmount] = useState("");
+  const [initialCashDate, setInitialCashDate] = useState(firstDayOfMonthStr);
+  const [initialCashNotes, setInitialCashNotes] = useState("Initial Petty Cash Float");
+  const [savingInitialCash, setSavingInitialCash] = useState(false);
 
   // Load report data
   const loadLedger = useCallback(
@@ -265,6 +276,35 @@ export default function AccountLedgerPage() {
     window.print();
   };
 
+  const handleSaveInitialCash = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(initialCashAmount);
+    if (isNaN(amt) || amt < 0) {
+      toast.error("Please enter a valid cash float amount");
+      return;
+    }
+    setSavingInitialCash(true);
+    try {
+      const res = await setInitialCash({
+        amount: amt,
+        date: initialCashDate,
+        notes: initialCashNotes,
+      });
+      if (res.success) {
+        toast.success(res.data?.message || "Initial petty cash updated successfully! 💰");
+        setIsInitialCashModalOpen(false);
+        setInitialCashAmount("");
+        loadLedger(startDate, endDate);
+      } else {
+        toast.error(res.error || "Failed to set initial cash");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "An error occurred");
+    } finally {
+      setSavingInitialCash(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 sm:p-6 lg:p-8 space-y-6">
       {/* ─── Printable Header (Screen Hidden) ─── */}
@@ -305,28 +345,19 @@ export default function AccountLedgerPage() {
           </div>
         </div>
 
-        {/* Action Buttons: Export & Print */}
+        {/* Action Buttons: Set Initial Cash, Export & Print */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleExportCSV}
-            disabled={loading || !filteredTransactions.length}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
-            title="Download CSV Spreadsheet"
+            onClick={() => {
+              setInitialCashDate(startDate);
+              setIsInitialCashModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-lg shadow-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+            title="Set Initial Petty Cash / Cash Float"
           >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handlePrint}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white rounded-lg shadow-xs transition-all disabled:opacity-50"
-            title="Print Account Ledger"
-          >
-            <Printer className="h-4 w-4" />
-            <span>Print Ledger</span>
+            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <span>Set Initial Petty Cash</span>
           </button>
         </div>
       </div>
@@ -428,123 +459,146 @@ export default function AccountLedgerPage() {
         </div>
       </div>
 
-      {/* ─── 4 Prominent Summary KPI Cards ─── */}
+      {/* ─── 5 Prominent Summary KPI Cards ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {/* Card 1: Opening Balance */}
+        {/* Card 1: Opening Cash Balance */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-500/10 via-slate-50 to-transparent dark:from-indigo-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-              Opening Balance
+              Opening Cash Balance
             </span>
             <div className="h-9 w-9 rounded-xl bg-indigo-500/15 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center ring-1 ring-indigo-500/20">
               <Wallet className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 font-mono">
+            <div className={`text-2xl lg:text-3xl font-extrabold tracking-tight font-mono ${summary.opening_balance < 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-slate-100"}`}>
               ₹ {summary.opening_balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Balance carried forward prior to {startDate}
+              Cash carried forward prior to {startDate}
             </p>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
-            Starting Drawer Cash Position
+          <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[11px]">
+            <span className="text-indigo-700 dark:text-indigo-300 font-medium">Starting Drawer Position</span>
+            <button
+              type="button"
+              onClick={() => {
+                setInitialCashDate(startDate);
+                setIsInitialCashModalOpen(true);
+              }}
+              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 underline decoration-indigo-300 underline-offset-2"
+            >
+              Set Initial Cash
+            </button>
           </div>
         </div>
 
-        {/* Card 2: Total Inflow */}
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-500/10 via-slate-50 to-transparent dark:from-emerald-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
+        {/* Card 2: Cash Inflow & Outflow */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-500/10 via-slate-50 to-transparent dark:from-slate-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Total Inflow (+)
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Cash Inflow / Outflow
             </span>
-            <div className="h-9 w-9 rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center ring-1 ring-emerald-500/20">
-              <ArrowDownLeft className="h-4 w-4" />
+            <div className="h-9 w-9 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-400 flex items-center justify-center">
+              <ArrowUpDown className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-emerald-700 dark:text-emerald-400 font-mono">
-              ₹ {summary.total_inflow.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="mt-3 space-y-1">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Inflow:</span>
+              <span className="text-lg font-extrabold text-emerald-700 dark:text-emerald-400 font-mono">
+                +₹ {summary.total_inflow.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Cash fee receipts + miscellaneous cash inflows
-            </p>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-medium text-rose-600 dark:text-rose-400">Outflow:</span>
+              <span className="text-lg font-extrabold text-rose-600 dark:text-rose-400 font-mono">
+                -₹ {summary.total_outflow.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
-            <span>{summary.fee_receipts_count} Completed Fee Payments</span>
-            <span>+{summary.misc_income_count} Misc Incomes</span>
-          </div>
-        </div>
-
-        {/* Card 3: Total Outflow */}
-        <div className="relative overflow-hidden rounded-2xl border border-rose-200/80 dark:border-rose-900/50 bg-gradient-to-br from-rose-500/10 via-slate-50 to-transparent dark:from-rose-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
-              Total Outflow (-)
+          <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+            <span>{summary.fee_receipts_count} In • {summary.expenses_count + summary.bank_deposits_count} Out</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Net: {summary.net_change >= 0 ? "+" : ""}₹{summary.net_change.toFixed(2)}
             </span>
-            <div className="h-9 w-9 rounded-xl bg-rose-500/15 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center ring-1 ring-rose-500/20">
-              <ArrowUpRight className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400 font-mono">
-              ₹ {summary.total_outflow.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Petty cash expenses + bank cash deposits
-            </p>
-          </div>
-          <div className="mt-3 pt-2 border-t border-rose-100 dark:border-rose-900/40 flex items-center justify-between text-[11px] text-rose-800 dark:text-rose-300 font-medium">
-            <span>{summary.expenses_count} Expenses</span>
-            <span>{summary.bank_deposits_count} Bank Deposits</span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-sky-200/80 dark:border-sky-900/50 bg-gradient-to-br from-sky-500/10 via-slate-50 to-transparent dark:from-sky-950/30 dark:via-slate-900 p-5 shadow-xs transition-all hover:shadow-md">
+        {/* Card 3: Cash in Drawer (Hand Cash) */}
+        <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-500/70 dark:border-emerald-500/60 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 p-5 shadow-xs transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Fee Collection · All Modes</span>
-            <div className="h-9 w-9 rounded-xl bg-sky-500/15 text-sky-600 flex items-center justify-center"><Banknote className="h-4 w-4" /></div>
-          </div>
-          <div className="mt-3 text-2xl lg:text-3xl font-extrabold tracking-tight text-sky-700 dark:text-sky-300 font-mono">
-            ₹ {Number(summary.total_fee_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Verified payments from {startDate} to {endDate}</p>
-          <div className="mt-3 border-t border-sky-100 dark:border-sky-900/40 pt-2 text-[11px] font-medium text-sky-800 dark:text-sky-300">
-            {summary.fee_payment_count || 0} completed payments • not added to drawer cash
-          </div>
-        </div>
-
-        {/* Card 4: Closing Balance */}
-        <div className="relative overflow-hidden rounded-2xl border-2 border-indigo-500/80 dark:border-indigo-500/80 bg-gradient-to-br from-indigo-500/15 via-indigo-500/5 to-transparent dark:from-indigo-950/50 dark:via-indigo-950/30 p-5 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Closing Balance (=)
+            <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              Cash in Drawer (Hand Cash)
             </span>
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+            <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
               <Coins className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-indigo-950 dark:text-indigo-100 font-mono">
-              ₹ {summary.closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-emerald-950 dark:text-emerald-100 font-mono">
+              ₹ {(summary.cash_in_drawer ?? (summary.opening_balance + summary.total_inflow - summary.total_outflow)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Net balance at end of period ({endDate})
+            <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80 font-medium">
+              Physical Cash Available in Office Drawer
             </p>
           </div>
-          <div className="mt-3 pt-2 border-t border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between text-[11px] font-semibold">
-            <span className="text-slate-600 dark:text-slate-300">Net Period Change:</span>
-            <span
-              className={
-                summary.net_change >= 0
-                  ? "text-emerald-700 dark:text-emerald-400 font-bold"
-                  : "text-rose-600 dark:text-rose-400 font-bold"
-              }
-            >
-              {summary.net_change >= 0 ? "+" : ""}
-              ₹ {summary.net_change.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="mt-3 pt-2 border-t border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-[11px] font-semibold text-emerald-900 dark:text-emerald-200">
+            <span>Reconciles with drawer count</span>
+            <span className="px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px]">
+              Cash Only
             </span>
+          </div>
+        </div>
+
+        {/* Card 4: Total Bank Balance (Online / Bank) */}
+        <div className="relative overflow-hidden rounded-2xl border-2 border-sky-500/70 dark:border-sky-500/60 bg-gradient-to-br from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/40 dark:via-sky-950/20 p-5 shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+              Total Bank Balance (Online / Bank)
+            </span>
+            <div className="h-9 w-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs">
+              <Building2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-sky-950 dark:text-sky-100 font-mono">
+              ₹ {(summary.total_bank_collection ?? summary.total_fee_collected ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="mt-1 text-xs text-sky-800/80 dark:text-sky-300/80 font-medium">
+              Direct Bank Settlements (UPI, Razorpay, Cheque)
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-sky-200 dark:border-sky-800/60 flex items-center justify-between text-[11px] font-semibold text-sky-900 dark:text-sky-200">
+            <span>Settled directly in school account</span>
+            <span className="px-1.5 py-0.5 rounded-sm bg-sky-100 dark:bg-sky-900/60 text-sky-800 dark:text-sky-200 text-[10px]">
+              Bank/Online
+            </span>
+          </div>
+        </div>
+
+        {/* Card 5: Total Consolidated Funds / Master Position */}
+        <div className="relative overflow-hidden rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-gradient-to-br from-indigo-600/15 via-indigo-600/5 to-transparent dark:from-indigo-950/60 dark:via-indigo-950/30 p-5 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
+              Total School Funds (=)
+            </span>
+            <div className="h-9 w-9 rounded-xl bg-indigo-700 text-white flex items-center justify-center shadow-xs">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl lg:text-3xl font-extrabold tracking-tight text-indigo-950 dark:text-indigo-50 font-mono">
+              ₹ {((summary.cash_in_drawer ?? (summary.opening_balance + summary.total_inflow - summary.total_outflow)) + (summary.total_bank_collection ?? 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+              Grand Consolidated Position (Cash + Bank Combined)
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-indigo-200 dark:border-indigo-800/60 flex items-center justify-between text-[11px] font-bold text-indigo-900 dark:text-indigo-200">
+            <span>Combined Drawer Cash + Bank Collections</span>
+            <span className="text-emerald-700 dark:text-emerald-400">Master Net</span>
           </div>
         </div>
       </div>
@@ -605,21 +659,21 @@ export default function AccountLedgerPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider divide-x divide-slate-200/80 dark:divide-slate-800">
                 <th className="py-3.5 px-4 whitespace-nowrap">Date & Time</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Type</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Type & Mode</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Slip / Ref #</th>
                 <th className="py-3.5 px-4 min-w-[260px]">Particulars / Source</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Recorded By</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Fee Collected</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Cash Inflow (+)</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Outflow (-)</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Balance (=)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Cash Outflow (-)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Drawer Cash Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {/* Row 0: Opening Balance Line */}
-              <tr className="bg-indigo-50/40 dark:bg-indigo-950/20 font-medium">
+              <tr className="bg-indigo-50/40 dark:bg-indigo-950/20 font-medium divide-x divide-indigo-100 dark:divide-indigo-950/40">
                 <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300" colSpan={3}>
                   <div className="flex items-center gap-1.5">
                     <Wallet className="h-3.5 w-3.5 text-indigo-600" />
@@ -627,7 +681,7 @@ export default function AccountLedgerPage() {
                   </div>
                 </td>
                 <td className="py-3 px-4 font-semibold text-indigo-900 dark:text-indigo-200">
-                  Opening Balance (Carried Forward)
+                  Opening Cash Balance (Carried Forward)
                 </td>
                 <td className="py-3 px-4 text-slate-400">-</td>
                 <td className="py-3 px-4 text-right text-slate-400">-</td>
@@ -677,7 +731,7 @@ export default function AccountLedgerPage() {
                   return (
                     <tr
                       key={tx.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors divide-x divide-slate-100 dark:divide-slate-800/60"
                     >
                       {/* Date & Time */}
                       <td className="py-3 px-4 whitespace-nowrap">
@@ -781,7 +835,7 @@ export default function AccountLedgerPage() {
 
             {/* ─── Summary Footer Row ─── */}
             <tfoot>
-              <tr className="bg-slate-100 dark:bg-slate-800/90 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs">
+              <tr className="bg-slate-100 dark:bg-slate-800/90 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs divide-x divide-slate-200 dark:divide-slate-700">
                 <td className="py-3.5 px-4" colSpan={5}>
                   <div className="flex items-center gap-2">
                     <span>Summary Totals ({filteredTransactions.length} records shown)</span>
@@ -808,6 +862,112 @@ export default function AccountLedgerPage() {
           </table>
         </div>
       </div>
+
+      {/* ─── Set Initial Petty Cash Modal ─── */}
+      {isInitialCashModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center ring-1 ring-indigo-500/20">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Set Initial Petty Cash
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Starting drawer float (remedies negative opening balance)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInitialCashModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInitialCash} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Starting Cash Float Amount (₹) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="e.g. 5000"
+                    value={initialCashAmount}
+                    onChange={(e) => setInitialCashAmount(e.target.value)}
+                    className="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Enter physical cash in drawer when accounting started.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Effective Start Date
+                </label>
+                <input
+                  type="date"
+                  value={initialCashDate}
+                  onChange={(e) => setInitialCashDate(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Notes / Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Initial Drawer Float established by Management"
+                  value={initialCashNotes}
+                  onChange={(e) => setInitialCashNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsInitialCashModalOpen(false)}
+                  disabled={savingInitialCash}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingInitialCash}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                >
+                  {savingInitialCash ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Starting Float</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

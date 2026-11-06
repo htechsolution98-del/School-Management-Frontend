@@ -142,6 +142,17 @@ export function StaffLeavesDesk({
     fetchData(true);
   }, [academicYear]);
 
+  // Real-time leave synchronization via WebSocket
+  useEffect(() => {
+    const handleRealtimeLeave = () => {
+      fetchData(false);
+    };
+    window.addEventListener("antigravity_leave_updated", handleRealtimeLeave);
+    return () => {
+      window.removeEventListener("antigravity_leave_updated", handleRealtimeLeave);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -923,9 +934,27 @@ export function StaffLeavesDesk({
                             {req.status}
                           </Badge>
 
+                          {isApproved && req.approval_remarks && (
+                            <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium mt-1 max-w-[200px] leading-tight">
+                              <span className="font-bold">Remark:</span> "{req.approval_remarks}"
+                            </div>
+                          )}
+
+                          {isRejected && req.rejection_reason && (
+                            <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium mt-1 max-w-[200px] leading-tight">
+                              <span className="font-bold">Reason:</span> "{req.rejection_reason}"
+                            </div>
+                          )}
+
                           {req.cancellation_status === "REQUESTED" && (
                             <div className="text-[10px] text-amber-600 font-bold mt-1">
                               Cancellation Pending Review
+                            </div>
+                          )}
+
+                          {req.cancellation_status === "REJECTED" && req.cancellation_rejection_reason && (
+                            <div className="text-[10px] text-rose-600 font-medium mt-1 max-w-[200px] leading-tight">
+                              <span className="font-bold">Cancel Denied:</span> "{req.cancellation_rejection_reason}"
                             </div>
                           )}
                         </td>
@@ -1049,9 +1078,27 @@ export function StaffLeavesDesk({
                       </p>
                     )}
 
+                    {isApproved && req.approval_remarks && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-200">
+                        <span className="font-bold">Approver Remark:</span> "{req.approval_remarks}"
+                      </div>
+                    )}
+
+                    {isRejected && req.rejection_reason && (
+                      <div className="text-[11px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2 rounded-xl border border-rose-200">
+                        <span className="font-bold">Rejection Reason:</span> "{req.rejection_reason}"
+                      </div>
+                    )}
+
                     {req.cancellation_status === "REQUESTED" && (
                       <div className="text-[10px] text-amber-600 font-bold bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded-lg border border-amber-200">
                         Cancellation Pending Review
+                      </div>
+                    )}
+
+                    {req.cancellation_status === "REJECTED" && req.cancellation_rejection_reason && (
+                      <div className="text-[11px] text-rose-600 bg-rose-50 dark:bg-rose-950/30 p-2 rounded-xl border border-rose-200">
+                        <span className="font-bold">Cancellation Rejected:</span> "{req.cancellation_rejection_reason}"
                       </div>
                     )}
 

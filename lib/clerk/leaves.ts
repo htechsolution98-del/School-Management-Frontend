@@ -23,6 +23,12 @@ export interface LeaveRequest {
   is_paid?: boolean;
   reason: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected";
+  approval_remarks?: string;
+  rejection_reason?: string;
+  cancellation_status?: "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | string;
+  cancellation_reason?: string;
+  cancellation_requested_at?: string;
+  cancellation_rejection_reason?: string;
   days: LeaveDay[];
   leave_days?: LeaveDay[];
   remaining_leaves?: any[];
@@ -52,12 +58,18 @@ export async function changeLeaveDayStatus(
 
 export async function approveAllLeaveDays(
   requestId: number,
-  status: "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected" | string
+  status: "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected" | string,
+  reasonOrRemarks?: string
 ): Promise<void> {
+  const payload: any = { status };
+  if (reasonOrRemarks) {
+    payload.reason = reasonOrRemarks;
+    payload.remarks = reasonOrRemarks;
+  }
   const response = await fetchWithAuth(`${API_BASE_URL}/approve-all-leave/${requestId}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     throw new Error(await parseApiError(response, "Failed to update entire leave request status."));
@@ -246,9 +258,11 @@ export async function bulkManageLeaveTypes(
 // Approval & Cancellation API Helpers
 // ==========================================
 
-export async function approveLeaveRequest(id: number): Promise<void> {
+export async function approveLeaveRequest(id: number, remarks?: string): Promise<void> {
   const response = await fetchWithAuth(`${API_BASE_URL}/leave-request/${id}/approve/`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remarks: remarks || "" }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

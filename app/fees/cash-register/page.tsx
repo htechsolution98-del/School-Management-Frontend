@@ -35,6 +35,7 @@ import {
   type CashRegisterTransaction,
   type CashOutflowItem,
 } from "@/lib/fees/cash-register";
+import { setInitialCash } from "@/lib/fees/account-ledger";
 
 // Note colors tailored to Indian Rupee note palettes
 const NOTE_THEMES: Record<number, { border: string; bg: string; badge: string; text: string }> = {
@@ -101,6 +102,7 @@ const COMMON_BANKS = [
 ];
 
 const MISC_INCOME_SOURCES = [
+  "Initial Cash Float (Starting Drawer Float)",
   "Scrap Sale (Paper / Metal)",
   "Form / Prospectus Fee",
   "Donation / Charity",
@@ -144,6 +146,42 @@ export default function DailyCashRegisterPage() {
   const [incomeCategory, setIncomeCategory] = useState<string>(MISC_INCOME_SOURCES[0]);
   const [incomeNotes, setIncomeNotes] = useState<string>("");
   const [incomeSubmitting, setIncomeSubmitting] = useState<boolean>(false);
+
+  // Initial Cash Float Modal state
+  const [isInitialCashModalOpen, setIsInitialCashModalOpen] = useState(false);
+  const [initialCashAmount, setInitialCashAmount] = useState("");
+  const [initialCashDate, setInitialCashDate] = useState(todayStr);
+  const [initialCashNotes, setInitialCashNotes] = useState("Initial Petty Cash Float");
+  const [savingInitialCash, setSavingInitialCash] = useState(false);
+
+  const handleSaveInitialCash = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(initialCashAmount);
+    if (isNaN(amt) || amt < 0) {
+      toast.error("Please enter a valid cash float amount");
+      return;
+    }
+    setSavingInitialCash(true);
+    try {
+      const res = await setInitialCash({
+        amount: amt,
+        date: initialCashDate,
+        notes: initialCashNotes,
+      });
+      if (res.success) {
+        toast.success(res.data?.message || "Initial cash float updated successfully! 💰");
+        setIsInitialCashModalOpen(false);
+        setInitialCashAmount("");
+        await loadReport(selectedDate);
+      } else {
+        toast.error(res.error || "Failed to set initial cash float");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "An error occurred");
+    } finally {
+      setSavingInitialCash(false);
+    }
+  };
 
   const loadReport = useCallback(async (date: string) => {
     setLoading(true);
@@ -453,14 +491,18 @@ export default function DailyCashRegisterPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-600" : ""}`} />
           </button>
 
-          {/* Print Button */}
+          {/* Set Initial Float Button */}
           <button
             type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white rounded-lg shadow-xs transition-all"
+            onClick={() => {
+              setInitialCashDate(selectedDate);
+              setIsInitialCashModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-lg shadow-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+            title="Set Initial Petty Cash Drawer Float"
           >
-            <Printer className="h-4 w-4" />
-            <span>Print Register</span>
+            <Wallet className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <span>Set Initial Float</span>
           </button>
         </div>
       </div>
@@ -778,7 +820,7 @@ export default function DailyCashRegisterPage() {
             </div>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider divide-x divide-slate-200/80 dark:divide-slate-800">
                 <th className="py-3 px-4">Receipt #</th>
                 <th className="py-3 px-4">Student & Class</th>
                 <th className="py-3 px-4">Fee Head</th>
@@ -818,7 +860,7 @@ export default function DailyCashRegisterPage() {
                 filteredTransactions.map((tx) => (
                   <tr
                     key={`tx-${tx.id}`}
-                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors divide-x divide-slate-100 dark:divide-slate-800/60"
                   >
                     <td className="py-3 px-4 font-mono font-medium text-slate-900 dark:text-slate-100">
                       {tx.receipt_number}
@@ -905,7 +947,7 @@ export default function DailyCashRegisterPage() {
             </div>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider divide-x divide-slate-200/80 dark:divide-slate-800">
                 <th className="py-3 px-4">Date / Time</th>
                 <th className="py-3 px-4">Transaction Type</th>
                 <th className="py-3 px-4">Category / Source / Bank</th>
@@ -947,7 +989,7 @@ export default function DailyCashRegisterPage() {
                   return (
                     <tr
                       key={`outflow-${item.id}`}
-                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors divide-x divide-slate-100 dark:divide-slate-800/60"
                     >
                       <td className="py-3 px-4 font-mono text-slate-500">
                         {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : item.date}
@@ -1392,6 +1434,112 @@ export default function DailyCashRegisterPage() {
                 >
                   {incomeSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   <span>Confirm Misc Income</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Set Initial Petty Cash Modal ─── */}
+      {isInitialCashModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center ring-1 ring-indigo-500/20">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Set Initial Petty Cash
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Starting drawer float (remedies negative opening balance)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInitialCashModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInitialCash} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Starting Cash Float Amount (₹) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="e.g. 5000"
+                    value={initialCashAmount}
+                    onChange={(e) => setInitialCashAmount(e.target.value)}
+                    className="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Enter physical cash in drawer when accounting started.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Effective Start Date
+                </label>
+                <input
+                  type="date"
+                  value={initialCashDate}
+                  onChange={(e) => setInitialCashDate(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Notes / Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Initial Drawer Float established by Management"
+                  value={initialCashNotes}
+                  onChange={(e) => setInitialCashNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsInitialCashModalOpen(false)}
+                  disabled={savingInitialCash}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingInitialCash}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                >
+                  {savingInitialCash ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Starting Float</span>
+                  )}
                 </button>
               </div>
             </form>
